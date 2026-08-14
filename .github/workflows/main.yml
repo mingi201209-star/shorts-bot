@@ -1,15 +1,13 @@
-name: Shorts Automation
+name: Shorts Automation Trigger
 
 on:
-  workflow_dispatch:  # 👈 텔레그램 봇이나 수동 실행을 허용하는 트리거
-  # schedule:
-  #   - cron: '0 21 * * *'  # 필요하다면 기존 정기 예약 실행은 주석 처리 또는 유지 가능
+  workflow_dispatch: # 텔레그램 코드의 dispatches 방식과 연동되기 위해 필수!
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v3
 
       - name: Set up Python
@@ -19,12 +17,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pkg_resources || pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Run Shorts Generator
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
