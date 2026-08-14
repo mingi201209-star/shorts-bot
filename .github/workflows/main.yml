@@ -24,10 +24,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-nanum
 
-      - name: Install Python Packages
+      - name: Create Venv & Install Packages
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install gTTS gtts openai requests moviepy==1.0.3 Pillow==9.5.0 numpy google-api-python-client google-auth-oauthlib google-auth-httplib2
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install gTTS gtts openai requests moviepy==1.0.3 Pillow==9.5.0 numpy google-api-python-client google-auth-oauthlib google-auth-httplib2
 
       - name: Run Shorts Creator Script
         env:
@@ -36,4 +38,5 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
+          source venv/bin/activate
           python main.py
