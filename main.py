@@ -5,6 +5,7 @@ import requests
 import openai
 import edge_tts
 import numpy as np
+from urllib.parse import quote
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
 from moviepy.video.fx.all import crop, loop
@@ -17,8 +18,13 @@ TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 def send_telegram_message(message):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: 
         return
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": message})
+    # UTF-8 인코딩 안전하게 처리
+    safe_message = quote(str(message))
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={safe_message}"
+    try:
+        requests.get(url, timeout=10)
+    except:
+        pass
 
 def send_telegram_video(video_path):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: 
@@ -33,9 +39,9 @@ def send_telegram_video(video_path):
                 timeout=120
             )
             if not response.ok:
-                send_telegram_message(f"⚠️ 영상 업로드 실패: {response.text}")
+                send_telegram_message(f"영상 업로드 실패: {response.status_code}")
     except Exception as e:
-        send_telegram_message(f"⚠️ 영상 전송 에러: {str(e)}")
+        send_telegram_message(f"영상 전송 에러: {str(e)}")
 
 async def generate_voice(text, output_path):
     communicate = edge_tts.Communicate(text, "ko-KR-SunHiNeural")
@@ -169,13 +175,14 @@ def main():
             keyword_res = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": keyword_prompt}])
             raw_keyword = keyword_res.choices[0].message.content.strip()
             
-            # latin-1 오류 방지: 순수 영어 알파벳만 남김
+            # pure ascii alphabets only
             search_query = re.sub(r'[^a-zA-Z]', '', raw_keyword)
             if not search_query:
                 search_query = "nature"
 
             headers = {"Authorization": PEXELS_API_KEY}
-            res = requests.get(f"https://api.pexels.com/videos/search?query={search_query}&per_page=3&orientation=portrait", headers=headers).json()
+            pexels_url = f"https://api.pexels.com/videos/search?query={search_query}&per_page=3&orientation=portrait"
+            res = requests.get(pexels_url, headers=headers).json()
             
             video_path = f"video_{i}.mp4"
             if "videos" in res and res["videos"] and len(res["videos"]) > 0:
@@ -208,7 +215,9 @@ def main():
         send_telegram_video(final_output_path)
 
     except Exception as e:
-        send_telegram_message(f"오류 발생: {str(e)}")
+        # 에러 문자열 안전 인코딩 후 전송
+        error_msg = str(e).replace("'", "").replace('"', '')
+        send_telegram_message(f"오류 발생: {error_msg}")
         raise e
 
 if __name__ == "__main__":
