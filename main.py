@@ -24,7 +24,7 @@ def send_telegram_video(video_path):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
     try:
         with open(video_path, 'rb') as video_file:
-            # 타임아웃을 120초로 설정하여 깃허브 액션 환경에서 대용량 영상 전송 끊김 방지
+            # 타임아웃을 120초로 설정하여 끊김 방지
             response = requests.post(
                 url, 
                 data={"chat_id": TELEGRAM_CHAT_ID}, 
@@ -141,9 +141,17 @@ def main():
 
         final_video = concatenate_videoclips(clip_list)
         final_output_path = "final_shorts.mp4"
-        final_video.write_videofile(final_output_path, fps=30, codec="libx264", audio_codec="aac")
+        
+        # bitrate='3000k'를 지정하여 용량을 텔레그램 제한(50MB) 이하로 슬림하게 압축
+        final_video.write_videofile(
+            final_output_path, 
+            fps=30, 
+            codec="libx264", 
+            audio_codec="aac",
+            bitrate="3000k"
+        )
 
-        # 안내 메시지와 영상을 연속으로 전송
+        # 안내 메시지와 영상 파일 전송
         send_telegram_message("🎬 영상 생성이 완료되었습니다! 아래 파일을 확인하세요.")
         send_telegram_video(final_output_path)
 
