@@ -919,51 +919,411 @@ def create_voice(
         )
 
 
+## ============================================================
+# 15. 대본 생성
 # ============================================================
-# 15. 총 영상 길이 검사
-# ============================================================
 
-def check_total_duration(
-    scenes
-):
+def generate_script(topic_info):
 
-    total = 0.0
-
-    for scene in scenes:
-
-        try:
-
-            total += float(
-                scene.duration
-            )
-
-        except Exception:
-            pass
+    category = topic_info["category"]
+    topic = topic_info["topic"]
 
     log(
-        f"🎞️ 최종 예상 길이: "
-        f"{total:.2f}초"
+        "🧠 AI에게 새로운 대본 요청 중..."
     )
 
-    if total < TARGET_MIN_SECONDS:
+    prompt = f"""
+너는 유튜브 Shorts 전문 대본 작가이자
+영상 검색 키워드 설계 전문가다.
 
-        log(
-            "⚠️ 목표 최소 길이보다 짧습니다."
+이번 영상의 분야:
+{category}
+
+이번 영상의 방향:
+{topic}
+
+
+============================================================
+[가장 중요한 목표]
+============================================================
+
+대본의 내용과 영상 화면이 반드시 서로 관련되어야 한다.
+
+예를 들어 대본이
+
+"밤하늘에서 별이 폭발하면 엄청난 빛이 발생합니다."
+
+라고 한다면
+
+좋은 keyword:
+"star explosion night sky"
+"supernova space"
+"exploding star galaxy"
+
+나쁜 keyword:
+"space"
+"science"
+"stars"
+"galaxy"
+"technology"
+
+처럼 너무 넓은 단어를 사용하지 마라.
+
+
+============================================================
+[소재 선택]
+============================================================
+
+이번 영상에서는 위 방향에 맞는
+구체적인 하나의 실제 소재를 선택한다.
+
+이전 영상의 소재를 반복하지 마라.
+
+단순한 잡학 상식 모음이 아니라
+하나의 소재를 중심으로 이야기를 진행한다.
+
+사실 여부가 확인되지 않은 괴담이나
+인터넷 루머는 사용하지 마라.
+
+
+============================================================
+[영상 길이]
+============================================================
+
+총 길이:
+75초 ~ 90초
+
+장면 수:
+12 ~ 13개
+
+각 장면은 짧고 강하게 작성한다.
+
+한 장면의 대사는
+대략 12 ~ 25자 정도를 목표로 한다.
+
+필요한 경우 조금 길어도 된다.
+
+
+============================================================
+[장면 구성]
+============================================================
+
+1번:
+강력한 후킹
+
+2번:
+무슨 현상인지 설명
+
+3~5번:
+배경과 원리
+
+6~9번:
+구체적인 사례 / 숫자 / 과정
+
+10~11번:
+가장 놀라운 사실 또는 반전
+
+12~13번:
+결론과 여운
+
+
+============================================================
+[영상 검색어 — 매우 중요]
+============================================================
+
+각 장면에는 반드시
+"그 장면에서 화면에 실제로 보여줄 수 있는 것"
+을 검색어로 작성한다.
+
+keyword는 Pexels에서 사용할
+영어 검색어다.
+
+검색어는 2~5개의 영어 단어로 작성한다.
+
+반드시 구체적인 명사와 행동을 포함한다.
+
+좋은 예:
+
+"exploding star space"
+"astronaut inside spacecraft"
+"deep ocean underwater"
+"volcano eruption aerial"
+"lightning storm night"
+"human brain scan"
+"old medieval battlefield"
+"ancient stone ruins"
+"rocket launch sky"
+"solar flare sun"
+
+나쁜 예:
+
+"space"
+"science"
+"history"
+"technology"
+"mystery"
+"nature"
+"interesting science"
+"amazing"
+"information"
+
+특히 다음과 같은
+너무 넓은 단독 검색어는 절대 사용하지 마라:
+
+space
+science
+history
+technology
+nature
+ocean
+animal
+human
+sky
+earth
+
+
+============================================================
+[검색어와 대사의 관계]
+============================================================
+
+각 keyword는 반드시
+그 장면의 text와 직접적인 시각적 관계가 있어야 한다.
+
+예:
+
+text:
+"태양에서는 거대한 폭발이 일어납니다."
+
+keyword:
+"solar flare sun"
+
+가능하면 이렇게 작성한다.
+
+text:
+"심해에는 빛이 거의 도달하지 않습니다."
+
+keyword:
+"deep ocean underwater"
+
+잘못된 예:
+
+text:
+"심해에는 빛이 거의 도달하지 않습니다."
+
+keyword:
+"space galaxy"
+
+절대 이런 식으로
+대사와 관계없는 영상을 검색하지 마라.
+
+
+============================================================
+[고유명사]
+============================================================
+
+Pexels 검색에서 검색 결과가 너무 제한될 수 있으므로
+사람 이름이나 특정 사건명 같은 고유명사는
+가능하면 사용하지 마라.
+
+대신 장면을 시각적으로 표현할 수 있는
+일반 영어 검색어를 사용한다.
+
+
+============================================================
+[숫자와 사실]
+============================================================
+
+확실하지 않은 숫자를 만들어내지 마라.
+
+숫자가 필요하면
+널리 알려진 범위 수준으로 표현한다.
+
+사실처럼 보이는 가짜 통계나
+가짜 연구 결과를 만들지 마라.
+
+
+============================================================
+[출력 형식]
+============================================================
+
+반드시 JSON 객체 하나만 출력한다.
+
+JSON 외의 설명은 절대 출력하지 마라.
+
+형식:
+
+{{
+  "title": "영상 제목",
+  "topic": "선택한 실제 소재",
+  "category": "{category}",
+  "scenes": [
+    {{
+      "text": "짧은 대사",
+      "keyword": "specific visual English search query"
+    }}
+  ]
+}}
+
+반드시 12~13개의 scenes를 생성한다.
+
+각 scene의 keyword는 서로 똑같지 않도록 한다.
+
+keyword는 반드시 영어로 작성한다.
+
+keyword는 반드시 실제 영상으로 찾을 수 있는
+구체적인 장면이어야 한다.
+"""
+
+    try:
+
+        response = openai.chat.completions.create(
+
+            model="gpt-4o-mini",
+
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "너는 사실 기반 유튜브 Shorts "
+                        "대본 작가이자 Pexels 영상 검색 "
+                        "키워드 전문가다. "
+                        "대본과 영상 검색어의 시각적 "
+                        "일치도를 가장 중요하게 생각한다."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+
+            temperature=1.0
         )
 
-    elif total > TARGET_MAX_SECONDS:
-
-        log(
-            "⚠️ 목표 최대 길이를 초과했습니다."
+        content = (
+            response
+            .choices[0]
+            .message
+            .content
+            .strip()
         )
 
-    else:
+        data = extract_json(content)
 
-        log(
-            "✅ 목표 길이 범위입니다."
+        if isinstance(data, list):
+
+            items = data
+
+            result = {
+                "title": topic,
+                "topic": topic,
+                "category": category,
+                "scenes": items
+            }
+
+        else:
+
+            result = data
+
+        scenes = result.get(
+            "scenes",
+            []
         )
 
-    return total
+        if not isinstance(
+            scenes,
+            list
+        ):
+
+            raise ValueError(
+                "scenes가 배열이 아닙니다."
+            )
+
+        cleaned_scenes = []
+
+        for scene in scenes:
+
+            if not isinstance(
+                scene,
+                dict
+            ):
+                continue
+
+            text = str(
+                scene.get(
+                    "text",
+                    ""
+                )
+            ).strip()
+
+            keyword = str(
+                scene.get(
+                    "keyword",
+                    ""
+                )
+            ).strip()
+
+            if not text:
+                continue
+
+            if not keyword:
+                keyword = "nature landscape"
+
+            cleaned_scenes.append(
+                {
+                    "text": text,
+                    "keyword": keyword
+                }
+            )
+
+        scenes = cleaned_scenes
+
+        if len(scenes) < MIN_SCENES:
+
+            raise ValueError(
+                f"장면 수 부족: {len(scenes)}"
+            )
+
+        result["scenes"] = scenes[
+            :MAX_SCENES
+        ]
+
+        log(
+            f"✅ 대본 생성 완료: "
+            f"{len(result['scenes'])}개 장면"
+        )
+
+        log(
+            f"📌 실제 소재: "
+            f"{result.get('topic', '미상')}"
+        )
+
+        # ----------------------------------------
+        # 검색어 확인 로그
+        # ----------------------------------------
+
+        log(
+            "🔎 장면별 Pexels 검색어:"
+        )
+
+        for idx, scene in enumerate(
+            result["scenes"]
+        ):
+
+            log(
+                f"   {idx + 1}. "
+                f"{scene['keyword']}"
+            )
+
+        return result
+
+    except Exception as e:
+
+        log(
+            f"AI 대본 생성 실패: {e}"
+        )
+
+        raise
 
 
 # ============================================================
