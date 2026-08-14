@@ -4,9 +4,7 @@ on:
   workflow_dispatch: # [수동 실행] 버튼
   schedule:
     # ⏰ 매일 정해진 시간에 자동 실행 (UTC 기준)
-    # 1. 매일 아침 8시 (UTC 기준 전날 23:00)
     - cron: '0 23 * * *'
-    # 2. 매일 저녁 6시 (UTC 기준 당일 09:00)
     - cron: '0 9 * * *'
 
 jobs:
@@ -30,7 +28,7 @@ jobs:
       - name: Install Python Packages
         run: |
           python -m pip install --upgrade pip
-          python -m pip install --no-cache-dir -r requirements.txt
+          python -m pip install -r requirements.txt
 
       - name: Run Shorts Creator Script
         env:
