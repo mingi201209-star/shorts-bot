@@ -26,8 +26,8 @@ jobs:
 
       - name: Install Python Packages
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install -r requirements.txt
+          python -m pip install --upgrade pip
+          python -m pip install gTTS gtts openai requests moviepy==1.0.3 Pillow==9.5.0 numpy google-api-python-client google-auth-oauthlib google-auth-httplib2
 
       - name: Run Shorts Creator Script
         env:
@@ -36,4 +36,4 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          python3 main.py
+          python main.py
