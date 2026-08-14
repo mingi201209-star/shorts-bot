@@ -1,13 +1,6 @@
 openai
-gtts
 requests
-moviepy==1.0.3
-Pillow==9.5.0
-numpy
-google-api-python-client
-google-auth-oauthlib
-google-auth-httplib2
 edge-tts
-openai-whisper
-torch
-
+moviepy==1.0.3
+Pillow
+numpy
