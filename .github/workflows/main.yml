@@ -2,6 +2,8 @@ name: Shorts Creator Bot
 
 on:
   workflow_dispatch:
+  repository_dispatch:
+    types: [telegram_trigger]  # 텔레그램 웹훅에서 깨워줄 트리거 이벤트 이름
 
 jobs:
   build:
@@ -9,10 +11,10 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Set up Python 3.10
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
@@ -20,7 +22,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg imagemagick fonts-nanum
-          sudo sed -i 's/<policy domain="path" rights="none" pattern="@\*" \/>/<policy domain="path" rights="read|write" pattern="@\*" \/>/g' /etc/ImageMagick-6/policy.xml
+          # ImageMagick 보안 정책 수정 (자막 텍스트 렌더링용)
+          sudo sed -i 's/<policy domain="path" rights="none" pattern="@\*" \/>/<policy domain="path" rights="read|write" pattern="@\*" \/>/g' /etc/ImageMagick-6/policy.xml || true
 
       - name: Install Python Packages
         run: |
