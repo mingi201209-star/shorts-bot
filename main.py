@@ -6,7 +6,6 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
 
-# 환경 변수 설정
 openai.api_key = os.environ.get("OPENAI_KEY")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -23,7 +22,6 @@ def send_telegram_video(video_path):
     with open(video_path, 'rb') as video_file:
         requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID}, files={"video": video_file})
 
-# Pillow를 사용하여 이미지 기반 노란색 자막 만들기 (ImageMagick 미사용)
 def create_subtitle_clip(text, duration, video_width):
     font_path = "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf"
     font_size = 40
@@ -32,10 +30,8 @@ def create_subtitle_clip(text, duration, video_width):
     except:
         font = ImageFont.load_default()
 
-    # 자막 영역 크기 설정
     img_w = int(video_width * 0.9)
     
-    # 텍스트 줄바꿈 처리
     lines = []
     words = text.split()
     current_line = ""
@@ -53,31 +49,25 @@ def create_subtitle_clip(text, duration, video_width):
     line_height = font_size + 10
     img_h = line_height * len(lines) + 20
 
-    # 투명 PNG 이미지 생성
     img = Image.new("RGBA", (img_w, img_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    # 텍스트 및 검은색 테두리 그리과 노란색 글자 덮기
     y = 10
     for line in lines:
         bbox = font.getbbox(line)
         line_w = bbox[2] - bbox[0]
         x = (img_w - line_w) // 2
 
-        # 테두리 (Stroke)
         stroke_width = 3
         for adj_x in range(-stroke_width, stroke_width + 1):
             for adj_y in range(-stroke_width, stroke_width + 1):
                 draw.text((x + adj_x, y + adj_y), line, font=font, fill="black")
 
-        # 메인 글씨 (노란색)
         draw.text((x, y), line, font=font, fill="yellow")
         y += line_height
 
-    # PIL 이미지를 MoviePy용 클립으로 변환
     img_np = np.array(img)
-    subtitle_clip = ImageClip(img_np).set_duration(duration).set_position(('center', 0.8), relative=True)
-    return subtitle_clip
+    return ImageClip(img_np).set_duration(duration).set_position(('center', 0.8), relative=True)
 
 try:
     prompt = """
@@ -120,10 +110,8 @@ try:
                 f.write(requests.get(video_url).content)
             video_clip = VideoFileClip(video_path).subclip(0, min(duration, 5))
         else:
-            # 기본 백그라운드 없을 시 대처
             video_clip = VideoFileClip("default_video.mp4").subclip(0, duration)
 
-        # ImageMagick 대신 Pillow 방식 자막 생성
         txt_clip = create_subtitle_clip(line, duration, video_clip.w)
 
         combined_clip = CompositeVideoClip([video_clip, txt_clip]).set_audio(audio_clip)
@@ -133,7 +121,7 @@ try:
     final_output_path = "final_shorts.mp4"
     final_video.write_videofile(final_output_path, fps=30, codec="libx264", audio_codec="aac")
 
-    send_telegram_message("🎬 자막 합성 완료! 아래 생성된 영상 파일을 확인하세요.")
+    send_telegram_message("🎬 영상 생성이 완료되었습니다! 아래 파일을 확인하세요.")
     send_telegram_video(final_output_path)
 
 except Exception as e:
