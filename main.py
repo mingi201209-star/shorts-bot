@@ -6,7 +6,7 @@ import edge_tts
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
-from moviepy.video.fx.all import crop
+from moviepy.video.fx.all import crop, loop
 
 openai.api_key = os.environ.get("OPENAI_KEY")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
@@ -32,7 +32,7 @@ def send_telegram_video(video_path):
                 timeout=120
             )
             if not response.ok:
-                send_telegram_message(f"⚠️ 영상 업로드 실패 ({response.status_code}): {response.text}")
+                send_telegram_message(f"⚠️ 영상 업로드 실패: {response.text}")
     except Exception as e:
         send_telegram_message(f"⚠️ 영상 전송 에러: {str(e)}")
 
@@ -40,9 +40,16 @@ async def generate_voice(text, output_path):
     communicate = edge_tts.Communicate(text, "ko-KR-SunHiNeural")
     await communicate.save(output_path)
 
-# 가로/세로 모든 비디오를 1080x1920 세로 규격으로 변환
+# 비디오 길이 부족 시 반복(loop) 및 세로(1080x1920) 강제 크롭 (검은 화면 완벽 방지)
 def process_video_clip(clip_path, duration):
     clip = VideoFileClip(clip_path)
+    
+    # 비디오 길이가 음성보다 짧으면 루프 실행
+    if clip.duration < duration:
+        clip = loop(clip, duration=duration)
+    else:
+        clip = clip.subclip(0, duration)
+
     w, h = clip.size
     target_w, target_h = 1080, 1920
     target_ratio = target_w / target_h
@@ -55,22 +62,22 @@ def process_video_clip(clip_path, duration):
         new_h = int(w / target_ratio)
         clip = crop(clip, y_center=h/2, width=w, height=new_h)
 
-    clip = clip.resize((target_w, target_h))
-    return clip.subclip(0, min(duration, clip.duration if clip.duration else duration))
+    return clip.resize((target_w, target_h))
 
+# 가독성 높은 숏폼 전용 자막 생성
 def create_subtitle_clip(text, duration):
-    target_w, target_h = 1080, 1920
+    target_w = 1080
     font_path = "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf"
-    font_size = 50
+    font_size = 52
     try:
         font = ImageFont.truetype(font_path, font_size)
     except:
         font = ImageFont.load_default()
 
     img_w = int(target_w * 0.85)
+    words = text.split()
     
     lines = []
-    words = text.split()
     current_line = ""
     for word in words:
         test_line = f"{current_line} {word}".strip()
@@ -83,40 +90,38 @@ def create_subtitle_clip(text, duration):
             current_line = word
     lines.append(current_line)
 
-    line_height = font_size + 15
-    img_h = line_height * len(lines) + 30
+    line_height = font_size + 20
+    img_h = line_height * len(lines) + 40
 
     img = Image.new("RGBA", (img_w, img_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    y = 15
+    y = 20
     for line in lines:
         bbox = font.getbbox(line)
         line_w = bbox[2] - bbox[0]
         x = (img_w - line_w) // 2
 
-        stroke_width = 4
+        stroke_width = 5
+        # 테두리(검은색)
         for adj_x in range(-stroke_width, stroke_width + 1):
             for adj_y in range(-stroke_width, stroke_width + 1):
                 draw.text((x + adj_x, y + adj_y), line, font=font, fill="black")
 
-        draw.text((x, y), line, font=font, fill="yellow")
+        # 본문(노란색)
+        draw.text((x, y), line, font=font, fill="#FFE600")
         y += line_height
 
     img_np = np.array(img)
-    return ImageClip(img_np).set_duration(duration).set_position(('center', 0.75), relative=True)
+    return ImageClip(img_np).set_duration(duration).set_position(('center', 0.72), relative=True)
 
 def main():
     try:
         prompt = """
-        유튜브 숏츠용 재미있는 상식 대본을 작성해줘.
+        유튜브 숏츠용 흥미로운 과학/자연 상식 대본 3문장을 만들어줘.
         [규칙]
-        - 반드시 하나의 주제에 대해서만 연결되게 작성할 것.
-        - 숫자인덱스(1., 2. 등), 특수문자, 따옴표 없이 순수 문장만 3줄로 작성할 것. (한 줄에 한 문장)
-        - 예시:
-        당신이 몰랐던 흥미로운 우주의 비밀을 알고 계신가요?
-        우주는 지금 이 순간에도 빛보다 빠른 속도로 커지고 있습니다.
-        과연 우주의 끝에는 무엇이 기다리고 있을까요?
+        - 반드시 시청자의 호기심을 유발하는 하나의 일관된 주제로만 작성할 것.
+        - 특수문자, 번호표시(1.,2.), 따옴표 절대로 없이 순수 한국어 문장만 3줄 작성.
         """
         
         response = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
@@ -132,12 +137,18 @@ def main():
             audio_clip = AudioFileClip(audio_path)
             duration = audio_clip.duration
 
-            keyword_prompt = f"다음 문장에 어울리는 영상 검색용 영어 단어 딱 1개만 출력해줘: '{line}'"
+            # 키워드 추출 시 '바다', '우주' 등 배경 영상에 어울리는 구체적 명사 강조
+            keyword_prompt = f"""
+            다음 문장의 분위기와 가장 잘 어울리는 HD 배경 비디오 검색용 영어 단어 1개만 골라줘.
+            (예시: ocean, space, forest, galaxy, deep sea)
+            문장: '{line}'
+            답변: 단어 1개만
+            """
             keyword_res = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": keyword_prompt}])
             search_query = keyword_res.choices[0].message.content.strip().replace('"', '').replace('.', '')
 
             headers = {"Authorization": PEXELS_API_KEY}
-            res = requests.get(f"https://api.pexels.com/videos/search?query={search_query}&per_page=1&orientation=portrait", headers=headers).json()
+            res = requests.get(f"https://api.pexels.com/videos/search?query={search_query}&per_page=3&orientation=portrait", headers=headers).json()
             
             video_path = f"video_{i}.mp4"
             if "videos" in res and res["videos"] and len(res["videos"]) > 0:
@@ -145,18 +156,19 @@ def main():
                 with open(video_path, "wb") as f:
                     f.write(requests.get(video_url).content)
             else:
-                # 대체 기본 영상다운
+                # 대체 기본 우주/바다 힐링 영상
                 video_url = "https://static-vecteezy.com/system/resources/previews/001/802/396/mp4/abstract-loop-background-free-video.mp4"
                 with open(video_path, "wb") as f:
                     f.write(requests.get(video_url).content)
 
+            # 비디오 가공 (루프 + 크롭)
             video_clip = process_video_clip(video_path, duration)
             txt_clip = create_subtitle_clip(line, duration)
 
             combined_clip = CompositeVideoClip([video_clip, txt_clip]).set_audio(audio_clip)
             clip_list.append(combined_clip)
 
-        # compose 방식으로 안정적으로 합성 (글리치 방지)
+        # 연결 부위 매끄럽게 합성
         final_video = concatenate_videoclips(clip_list, method="compose")
         final_output_path = "final_shorts.mp4"
         
@@ -168,7 +180,7 @@ def main():
             bitrate="3000k"
         )
 
-        send_telegram_message("🎬 숏츠 생성이 완료되었습니다!")
+        send_telegram_message("🎬 고화질 숏츠 영상 생성이 완료되었습니다!")
         send_telegram_video(final_output_path)
 
     except Exception as e:
