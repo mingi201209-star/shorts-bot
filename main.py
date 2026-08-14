@@ -58,7 +58,7 @@ def send_telegram_video(video_path):
         send_telegram_message(f"⚠️ 영상 전송 에러: {str(e)}")
 
 async def generate_voice(text, output_path):
-    communicate = edge_tts.Communicate(text, "ko-KR-SunHiNeural")
+    communicate = edge_tts.Communicate(text, "ko-KR-InJoonNeural")
     await communicate.save(output_path)
 
 def process_video_clip(clip_path, duration):
@@ -93,10 +93,16 @@ def process_video_clip(clip_path, duration):
 
 def get_safe_korean_font(size):
     font_filename = "NanumGothic.ttf"
+    if os.path.exists(font_filename):
+        try:
+            return ImageFont.truetype(font_filename, size)
+        except Exception:
+            pass
+    
     font_paths = [
-        font_filename,
         "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf",
-        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "/usr/share/fonts/truetype/fonts-japanese-gothic.ttf"
     ]
     for path in font_paths:
         if os.path.exists(path):
@@ -119,14 +125,14 @@ def render_subtitle_image(text):
     line_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in text)
     x = max(20, int((target_w - line_w) // 2))
 
-    # 두꺼운 외곽선 처리 (가독성 증대)
+    # 외곽선
     stroke_width = 8
     for dx in range(-stroke_width, stroke_width + 1):
         for dy in range(-stroke_width, stroke_width + 1):
             draw.text((x + dx, padding + dy), text, font=font, fill="black")
 
-    # 선명한 황금색 텍스트
-    draw.text((x, padding), text, font=font, fill="#FFD700")
+    # 선명한 노란색 텍스트
+    draw.text((x, padding), text, font=font, fill="#FFE600")
     return np.array(img)
 
 def create_split_subtitles(text, duration):
@@ -173,21 +179,23 @@ def fetch_pexels_video(query):
 
 def main():
     try:
+        # 💡 일반인은 잘 모르는 딥한 잡학/미스터리/상식 대본 프롬프트
         prompt = """
-        유튜브 숏츠용 흥미로운 '일반 상식/잡학' 주제로 대본을 구성해줘.
+        유튜브 숏츠용 사람들이 거의 모를 법한 '아주 깊고 흥미로운 잡학/미스터리/과학/역사 상식' 주제로 대본을 구성해줘.
+        뻔한 바나나 이야기 같은 것은 제외하고, '모르는 게 당연한' 수준의 신기한 주제를 선정할 것.
         
         [규칙]
-        - 전체 길이가 30초 정도 되도록 총 5개~6개 구절(scenes)로 구성할 것.
-        - 각 구절은 짧고 명확하게 작성할 것.
+        - 전체 길이가 30초 내외가 되도록 총 5개~6개 구절(scenes)로 구성할 것.
+        - 각 구절은 짧고 명확하게(15자 내외) 작성할 것.
         - 구절마다 시각적으로 딱 맞는 정확한 Pexels 영어 검색 키워드(keyword)를 작성할 것.
         
         응답은 오직 아래 JSON 포맷으로만 전달해:
         [
-          {"text": "우리가 흔히 먹는 바나나에는 비밀이 있습니다.", "keyword": "banana fruit"},
-          {"text": "사실 우리가 먹는 바나나는 씨가 없는 변종입니다.", "keyword": "banana farm"},
-          {"text": "원래 야생 바나나는 씨앗으로 가득했죠.", "keyword": "wild fruit seed"},
-          {"text": "유전자가 같아서 전염병에 매우 취약합니다.", "keyword": "laboratory science"},
-          {"text": "언젠가 바나나가 멸종할지도 모른다는 사실, 알고 계셨나요?", "keyword": "thinking mystery"}
+          {"text": "지구상에서 가장 외로운 곳, '포인트 네모'를 아시나요?", "keyword": "point nemo ocean"},
+          {"text": "육지에서 무려 2,688km나 떨어져 있습니다.", "keyword": "map isolated ocean"},
+          {"text": "너무 멀어서 가장 가까운 인간은 우주 비행사입니다.", "keyword": "iss astronaut space"},
+          {"text": "수명이 다한 인공위성들의 무덤이기도 하죠.", "keyword": "satellite crashing ocean"},
+          {"text": "이곳에 가면 지구상 그 누구와도 만날 수 없습니다.", "keyword": "thinking mystery isolated"}
         ]
         """
         
@@ -206,7 +214,7 @@ def main():
 
         for idx, item in enumerate(items[:6]):
             text = item.get("text", "")
-            keyword = item.get("keyword", "lifestyle")
+            keyword = item.get("keyword", "mystery")
 
             audio_path = f"scene_{idx}.mp3"
             asyncio.run(generate_voice(text, audio_path))
@@ -222,26 +230,4 @@ def main():
             video_clip = process_video_clip(video_path, duration)
             sub_clips = create_split_subtitles(text, duration)
 
-            combined = CompositeVideoClip([video_clip] + sub_clips).set_audio(audio_clip)
-            scene_clips.append(combined)
-
-        final_video = concatenate_videoclips(scene_clips, method="chain")
-        final_output_path = "final_shorts.mp4"
-        
-        final_video.write_videofile(
-            final_output_path, 
-            fps=30, 
-            codec="libx264", 
-            audio_codec="aac",
-            bitrate="3000k"
-        )
-
-        send_telegram_message("🎬 퀄리티 보정본(끊김 자막+30초+장면 매칭) 제작 완료!")
-        send_telegram_video(final_output_path)
-
-    except Exception as e:
-        send_telegram_message(f"오류 발생: {str(e)[:100]}")
-        raise e
-
-if __name__ == "__main__":
-    main()
+            combined = CompositeVideoClip([video_clip] + sub_clips).set_audio(audio_clip
