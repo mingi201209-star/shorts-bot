@@ -9,46 +9,22 @@ from datetime import datetime
 
 import openai
 import edge_tts
-import PIL.Image
 
-from video.video_downloader import (
-    download_video,
-    fetch_pexels_video,
-)
-
-from video.video_utils import (
-    process_video_clip,
-)
-
-from video.video_engine import (
-    create_scene,
-)
+from video.video_engine import create_scene
 
 
 # ============================================================
 # Shorts Generator
 # ============================================================
+#
 # 역할:
+#   1. 주제 선택
+#   2. OpenAI 대본 생성
+#   3. 한국어 TTS 생성
+#   4. video_engine을 이용한 장면 생성
+#   5. 전체 장면 합성
+#   6. Telegram으로 결과 전송
 #
-# main.py
-#   ├── 환경변수 관리
-#   ├── 주제 선택
-#   ├── AI 대본 생성
-#   ├── TTS 생성
-#   ├── 전체 장면 실행
-#   ├── 최종 영상 렌더링
-#   └── Telegram 전송
-#
-# 세부 기능은 각 모듈로 분리:
-#
-# video_downloader.py
-#   └── Pexels 검색 / 영상 다운로드
-#
-# video_utils.py
-#   └── 영상 크롭 / 9:16 변환
-#
-# video_engine.py
-#   └── 장면 생성 / 자막 / 영상 합성 / 최종 렌더링
 # ============================================================
 
 
@@ -58,26 +34,17 @@ from video.video_engine import (
 
 OPENAI_KEY = os.environ.get("OPENAI_KEY")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
-
-TELEGRAM_BOT_TOKEN = os.environ.get(
-    "TELEGRAM_BOT_TOKEN"
-)
-
-TELEGRAM_CHAT_ID = os.environ.get(
-    "TELEGRAM_CHAT_ID"
-)
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 
-# OpenAI API
+# OpenAI API 키
 openai.api_key = OPENAI_KEY
 
 
 # ============================================================
 # 2. 기본 설정
 # ============================================================
-
-VIDEO_WIDTH = 1080
-VIDEO_HEIGHT = 1920
 
 FPS = 30
 
@@ -99,62 +66,41 @@ MAX_RECENT_TOPICS = 10
 
 
 # ============================================================
-# 3. Pillow 호환성
-# ============================================================
-
-if not hasattr(
-    PIL.Image,
-    "ANTIALIAS"
-):
-    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
-
-
-# ============================================================
-# 4. 로그
+# 3. 로그
 # ============================================================
 
 def log(message):
-    """
-    GitHub Actions 로그 출력
-    """
+    """GitHub Actions 로그 출력"""
 
-    now = datetime.now().strftime(
-        "%H:%M:%S"
-    )
+    now = datetime.now().strftime("%H:%M:%S")
 
     print(
-        f"[{now}] {message}"
+        f"[{now}] {message}",
+        flush=True
     )
 
 
 # ============================================================
-# 5. Telegram 메시지
+# 4. Telegram 메시지
 # ============================================================
 
 def send_telegram_message(message):
-    """
-    Telegram 텍스트 메시지 전송
-    """
+    """Telegram 텍스트 메시지 전송"""
 
     if not TELEGRAM_BOT_TOKEN:
-        log(
-            "Telegram BOT TOKEN 없음"
-        )
+        log("⚠️ TELEGRAM_BOT_TOKEN 없음")
         return
 
     if not TELEGRAM_CHAT_ID:
-        log(
-            "Telegram CHAT ID 없음"
-        )
+        log("⚠️ TELEGRAM_CHAT_ID 없음")
         return
 
-    try:
+    url = (
+        f"https://api.telegram.org/"
+        f"bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    )
 
-        url = (
-            "https://api.telegram.org/"
-            f"bot{TELEGRAM_BOT_TOKEN}/"
-            "sendMessage"
-        )
+    try:
 
         response = requests.post(
             url,
@@ -162,56 +108,54 @@ def send_telegram_message(message):
                 "chat_id": TELEGRAM_CHAT_ID,
                 "text": str(message)
             },
-            timeout=15
+            timeout=20
         )
 
-        if not response.ok:
+        if response.ok:
+
+            log("📨 Telegram 메시지 전송 완료")
+
+        else:
 
             log(
-                "Telegram 메시지 전송 실패: "
-                f"{response.status_code}"
+                "⚠️ Telegram 메시지 전송 실패: "
+                f"HTTP {response.status_code}"
             )
 
     except Exception as e:
 
         log(
-            f"Telegram 메시지 에러: {e}"
+            f"⚠️ Telegram 메시지 에러: {e}"
         )
 
 
 # ============================================================
-# 6. Telegram 영상 전송
+# 5. Telegram 영상 전송
 # ============================================================
 
 def send_telegram_video(video_path):
-    """
-    완성된 Shorts를 Telegram으로 전송
-    """
+    """완성된 영상을 Telegram으로 전송"""
 
     if not TELEGRAM_BOT_TOKEN:
-        log(
-            "Telegram BOT TOKEN 없음"
-        )
+        log("⚠️ TELEGRAM_BOT_TOKEN 없음")
         return
 
     if not TELEGRAM_CHAT_ID:
-        log(
-            "Telegram CHAT ID 없음"
-        )
+        log("⚠️ TELEGRAM_CHAT_ID 없음")
         return
 
     if not os.path.exists(video_path):
 
         log(
-            "전송할 영상이 존재하지 않음"
+            "⚠️ 전송할 영상이 없습니다: "
+            f"{video_path}"
         )
 
         return
 
     url = (
-        "https://api.telegram.org/"
-        f"bot{TELEGRAM_BOT_TOKEN}/"
-        "sendVideo"
+        f"https://api.telegram.org/"
+        f"bot{TELEGRAM_BOT_TOKEN}/sendVideo"
     )
 
     try:
@@ -233,20 +177,20 @@ def send_telegram_video(video_path):
                     "video": video_file
                 },
 
-                timeout=180
+                timeout=300
             )
 
         if response.ok:
 
             log(
-                "Telegram 영상 전송 완료"
+                "📤 Telegram 영상 전송 완료"
             )
 
         else:
 
             log(
-                "Telegram 영상 전송 실패: "
-                f"{response.status_code}"
+                "⚠️ Telegram 영상 전송 실패: "
+                f"HTTP {response.status_code}"
             )
 
             send_telegram_message(
@@ -257,17 +201,17 @@ def send_telegram_video(video_path):
     except Exception as e:
 
         log(
-            f"Telegram 영상 전송 에러: {e}"
+            f"⚠️ Telegram 영상 전송 에러: {e}"
         )
 
         send_telegram_message(
             "⚠️ 영상 전송 에러\n"
-            f"{str(e)[:200]}"
+            f"{str(e)[:300]}"
         )
 
 
 # ============================================================
-# 7. 환경변수 검사
+# 6. 환경변수 검사
 # ============================================================
 
 def validate_environment():
@@ -275,34 +219,34 @@ def validate_environment():
     missing = []
 
     if not OPENAI_KEY:
-        missing.append(
-            "OPENAI_KEY"
-        )
+        missing.append("OPENAI_KEY")
 
     if not PEXELS_API_KEY:
-        missing.append(
-            "PEXELS_API_KEY"
-        )
+        missing.append("PEXELS_API_KEY")
 
     if not TELEGRAM_BOT_TOKEN:
-        missing.append(
-            "TELEGRAM_BOT_TOKEN"
-        )
+        missing.append("TELEGRAM_BOT_TOKEN")
 
     if not TELEGRAM_CHAT_ID:
-        missing.append(
-            "TELEGRAM_CHAT_ID"
-        )
+        missing.append("TELEGRAM_CHAT_ID")
 
     if missing:
 
         error_message = (
-            "필수 환경변수 없음:\n"
-            + "\n".join(missing)
+            "필수 환경변수가 없습니다:\n"
+            + "\n".join(
+                f"- {item}"
+                for item in missing
+            )
         )
 
         log(
-            error_message
+            f"❌ {error_message}"
+        )
+
+        send_telegram_message(
+            "🚨 Shorts Generator 환경변수 오류\n\n"
+            + error_message
         )
 
         raise RuntimeError(
@@ -310,12 +254,12 @@ def validate_environment():
         )
 
     log(
-        "환경변수 검사 완료"
+        "✅ 환경변수 검사 완료"
     )
 
 
 # ============================================================
-# 8. 토픽 풀
+# 7. 토픽 풀
 # ============================================================
 
 TOPIC_POOL = {
@@ -452,7 +396,7 @@ TOPIC_POOL = {
 
 
 # ============================================================
-# 9. 토픽 풀 평탄화
+# 8. 전체 토픽 생성
 # ============================================================
 
 def flatten_topic_pool():
@@ -477,7 +421,7 @@ ALL_TOPICS = flatten_topic_pool()
 
 
 # ============================================================
-# 10. 최근 주제 로드
+# 9. 최근 주제 불러오기
 # ============================================================
 
 def load_recent_topics():
@@ -498,25 +442,21 @@ def load_recent_topics():
 
             data = json.load(f)
 
-        if isinstance(
-            data,
-            list
-        ):
+        if isinstance(data, list):
 
             return data
 
     except Exception as e:
 
         log(
-            "최근 주제 기록 읽기 실패: "
-            f"{e}"
+            f"⚠️ 최근 주제 읽기 실패: {e}"
         )
 
     return []
 
 
 # ============================================================
-# 11. 최근 주제 저장
+# 10. 최근 주제 저장
 # ============================================================
 
 def save_recent_topics(topics):
@@ -530,9 +470,7 @@ def save_recent_topics(topics):
         ) as f:
 
             json.dump(
-                topics[
-                    -MAX_RECENT_TOPICS:
-                ],
+                topics[-MAX_RECENT_TOPICS:],
                 f,
                 ensure_ascii=False,
                 indent=2
@@ -541,56 +479,48 @@ def save_recent_topics(topics):
     except Exception as e:
 
         log(
-            "최근 주제 저장 실패: "
-            f"{e}"
+            f"⚠️ 최근 주제 저장 실패: {e}"
         )
 
 
 # ============================================================
-# 12. 주제 선택
+# 11. 주제 선택
 # ============================================================
 
 def choose_topic():
 
-    recent_topics = (
-        load_recent_topics()
-    )
+    recent_topics = load_recent_topics()
 
     recent_names = []
 
     for item in recent_topics:
 
-        if isinstance(
-            item,
-            dict
-        ):
+        if isinstance(item, dict):
 
-            recent_names.append(
-                item.get(
-                    "topic",
-                    ""
-                )
+            name = item.get(
+                "topic",
+                ""
             )
 
-        elif isinstance(
-            item,
-            str
-        ):
+            if name:
+                recent_names.append(name)
 
-            recent_names.append(
-                item
-            )
+        elif isinstance(item, str):
+
+            recent_names.append(item)
 
     candidates = [
-
         item
         for item in ALL_TOPICS
-        if item["topic"]
-        not in recent_names
-
+        if item["topic"] not in recent_names
     ]
 
     if not candidates:
+
+        log(
+            "♻️ 모든 주제를 사용했으므로 "
+            "전체 풀에서 다시 선택합니다."
+        )
 
         candidates = ALL_TOPICS
 
@@ -599,13 +529,11 @@ def choose_topic():
     )
 
     log(
-        f"🎯 선택된 분야: "
-        f"{selected['category']}"
+        f"🎯 분야: {selected['category']}"
     )
 
     log(
-        f"🎯 선택된 방향: "
-        f"{selected['topic']}"
+        f"🎯 방향: {selected['topic']}"
     )
 
     recent_topics.append(
@@ -620,13 +548,19 @@ def choose_topic():
 
 
 # ============================================================
-# 13. JSON 추출
+# 12. JSON 추출
 # ============================================================
 
 def extract_json(text):
 
+    if not text:
+        raise ValueError(
+            "AI 응답이 비어 있습니다."
+        )
+
     text = text.strip()
 
+    # Markdown 코드블록 제거
     text = re.sub(
         r"```json",
         "",
@@ -645,154 +579,123 @@ def extract_json(text):
     # 전체 JSON
     try:
 
-        return json.loads(
-            text
-        )
+        return json.loads(text)
 
     except Exception:
         pass
 
     # 배열
-    array_start = text.find("[")
-    array_end = text.rfind("]")
+    start = text.find("[")
+    end = text.rfind("]")
 
     if (
-        array_start != -1
-        and array_end != -1
-        and array_end > array_start
+        start != -1
+        and end != -1
+        and end > start
     ):
 
         candidate = text[
-            array_start:
-            array_end + 1
+            start:end + 1
         ]
 
         try:
 
-            return json.loads(
-                candidate
-            )
+            return json.loads(candidate)
 
         except Exception:
             pass
 
     # 객체
-    object_start = text.find("{")
-    object_end = text.rfind("}")
+    start = text.find("{")
+    end = text.rfind("}")
 
     if (
-        object_start != -1
-        and object_end != -1
-        and object_end > object_start
+        start != -1
+        and end != -1
+        and end > start
     ):
 
         candidate = text[
-            object_start:
-            object_end + 1
+            start:end + 1
         ]
 
         try:
 
-            return json.loads(
-                candidate
-            )
+            return json.loads(candidate)
 
         except Exception:
             pass
 
     raise ValueError(
-        "AI 응답에서 JSON을 찾을 수 없습니다."
+        "AI 응답에서 JSON을 찾지 못했습니다."
     )
 
 
 # ============================================================
-# 14. 대본 생성
+# 13. AI 대본 생성
 # ============================================================
 
-def generate_script(
-    topic_info
-):
+def generate_script(topic_info):
 
-    category = topic_info[
-        "category"
-    ]
+    category = topic_info["category"]
 
-    topic = topic_info[
-        "topic"
-    ]
+    topic = topic_info["topic"]
 
     log(
-        "🧠 AI에게 새로운 대본 요청 중..."
+        "🧠 AI 대본 생성 시작..."
     )
 
     prompt = f"""
 너는 유튜브 Shorts 전문 대본 작가다.
 
-이번 영상의 분야:
+분야:
 {category}
 
-이번 영상의 방향:
+영상 방향:
 {topic}
 
-중요:
-이전 영상에서 사용했던 특정 소재를
-반복하지 마라.
+반드시 위 방향에 맞는
+하나의 구체적인 실제 소재를 선택해라.
 
-이번에는 반드시 위 방향에 맞는
-완전히 다른 하나의 실제 소재를 선택해라.
+이전에 사용한 소재를 반복하지 마라.
 
 사람들이 처음 들었을 때
-
 "뭐라고?"
-"그게 진짜야?"
+"진짜?"
 "왜?"
+라는 반응을 할 만한 소재를 선택해라.
 
-라고 반응할 만한 소재를 찾아라.
+단순한 잡학 나열이 아니라
+하나의 이야기처럼 이어져야 한다.
 
-단순한 잡학 상식이 아니라
-하나의 흥미로운 이야기처럼 구성해라.
+영상 길이는 75~90초를 목표로 한다.
 
-영상 길이:
-75초 ~ 90초
-
-장면 수:
-12 ~ 13개
+장면 수는 12~13개다.
 
 각 장면은 짧고 강하게 작성한다.
-
-구성:
-
-1. 강력한 후킹
-2. 무슨 일이 일어나는지 설명
-3~5. 배경과 핵심 정보
-6~9. 구체적인 숫자나 사례
-10~11. 반전 또는 가장 놀라운 사실
-12~13. 마무리
 
 검증되지 않은 인터넷 괴담을
 사실처럼 말하지 마라.
 
-실제 과학, 역사, 지리, 기술 등에서
+과학, 역사, 지리, 기술 등의
 확인 가능한 소재를 우선한다.
 
-숫자가 필요하면
+숫자가 필요할 경우
 지나치게 세밀한 가짜 숫자를 만들지 마라.
 
-keyword는 Pexels에서 검색할 것이다.
+Pexels 영상 검색을 위해
+각 장면마다 영어 keyword를 작성한다.
 
-고유명사를 사용하지 마라.
+keyword는 일반적인 시각 키워드로 작성한다.
 
-좋은 예:
-"deep ocean"
-"old laboratory"
-"desert landscape"
+예:
+deep ocean
+night city
+old laboratory
+space stars
+forest animal
 
-나쁜 예:
-특정 인물 이름
-특정 장소 이름
-특정 사건 이름
-
-keyword는 일반적인 영어 시각 키워드로 작성한다.
+고유명사는 가급적 사용하지 마라.
 
 반드시 JSON 객체 하나만 출력한다.
 
@@ -800,49 +703,40 @@ keyword는 일반적인 영어 시각 키워드로 작성한다.
 
 {{
   "title": "영상 제목",
-  "topic": "선택한 실제 소재",
+  "topic": "실제 선택한 소재",
   "category": "{category}",
   "scenes": [
     {{
-      "text": "짧은 대사",
+      "text": "장면 대사",
       "keyword": "english visual keyword"
     }}
   ]
 }}
 
-절대로 JSON 앞뒤에 설명을 붙이지 마라.
+JSON 앞뒤에 설명을 붙이지 마라.
 """
 
     try:
 
-        response = (
-            openai
-            .chat
-            .completions
-            .create(
+        response = openai.chat.completions.create(
 
-                model="gpt-4o-mini",
+            model="gpt-4o-mini",
 
-                messages=[
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "너는 사실 기반 "
+                        "유튜브 Shorts 대본 전문가다."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
 
-                    {
-                        "role": "system",
-                        "content": (
-                            "너는 사실 기반 "
-                            "유튜브 Shorts "
-                            "대본 전문가다."
-                        )
-                    },
-
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-
-                ],
-
-                temperature=1.0
-            )
+            temperature=1.0
         )
 
         content = (
@@ -852,20 +746,11 @@ keyword는 일반적인 영어 시각 키워드로 작성한다.
             .content
         )
 
-        if not content:
-
-            raise ValueError(
-                "AI 응답이 비어 있습니다."
-            )
-
         data = extract_json(
             content
         )
 
-        if isinstance(
-            data,
-            list
-        ):
+        if isinstance(data, list):
 
             result = {
                 "title": topic,
@@ -877,6 +762,15 @@ keyword는 일반적인 영어 시각 키워드로 작성한다.
         else:
 
             result = data
+
+        if not isinstance(
+            result,
+            dict
+        ):
+
+            raise ValueError(
+                "AI 결과가 객체가 아닙니다."
+            )
 
         scenes = result.get(
             "scenes",
@@ -892,39 +786,82 @@ keyword는 일반적인 영어 시각 키워드로 작성한다.
                 "scenes가 배열이 아닙니다."
             )
 
-        scenes = [
+        clean_scenes = []
 
-            scene
-            for scene in scenes
+        for scene in scenes:
 
-            if isinstance(
+            if not isinstance(
                 scene,
                 dict
+            ):
+
+                continue
+
+            text = str(
+                scene.get(
+                    "text",
+                    ""
+                )
+            ).strip()
+
+            keyword = str(
+                scene.get(
+                    "keyword",
+                    "nature landscape"
+                )
+            ).strip()
+
+            if not text:
+                continue
+
+            if not keyword:
+                keyword = "nature landscape"
+
+            clean_scenes.append(
+                {
+                    "text": text,
+                    "keyword": keyword
+                }
             )
 
-            and scene.get("text")
-
-        ]
-
-        if len(scenes) < MIN_SCENES:
+        if len(clean_scenes) < MIN_SCENES:
 
             raise ValueError(
                 "장면 수 부족: "
-                f"{len(scenes)}"
+                f"{len(clean_scenes)}개"
             )
 
         result["scenes"] = (
-            scenes[:MAX_SCENES]
+            clean_scenes[:MAX_SCENES]
+        )
+
+        if not result.get("title"):
+
+            result["title"] = topic
+
+        if not result.get("topic"):
+
+            result["topic"] = topic
+
+        if not result.get("category"):
+
+            result["category"] = category
+
+        log(
+            "✅ 대본 생성 완료"
         )
 
         log(
-            "✅ 대본 생성 완료: "
-            f"{len(result['scenes'])}개 장면"
+            f"📝 제목: {result['title']}"
         )
 
         log(
-            "📌 실제 소재: "
-            f"{result.get('topic', '미상')}"
+            f"🧠 소재: {result['topic']}"
+        )
+
+        log(
+            f"🎬 장면 수: "
+            f"{len(result['scenes'])}"
         )
 
         return result
@@ -932,14 +869,14 @@ keyword는 일반적인 영어 시각 키워드로 작성한다.
     except Exception as e:
 
         log(
-            f"AI 대본 생성 실패: {e}"
+            f"❌ AI 대본 생성 실패: {e}"
         )
 
         raise
 
 
 # ============================================================
-# 15. TTS
+# 14. TTS
 # ============================================================
 
 async def generate_voice(
@@ -947,11 +884,9 @@ async def generate_voice(
     output_path
 ):
 
-    communicate = (
-        edge_tts.Communicate(
-            text,
-            TTS_VOICE
-        )
+    communicate = edge_tts.Communicate(
+        text,
+        TTS_VOICE
     )
 
     await communicate.save(
@@ -965,7 +900,7 @@ def create_voice(
 ):
 
     log(
-        f"🎙️ TTS 생성: {text}"
+        f"🎙️ TTS: {text}"
     )
 
     asyncio.run(
@@ -985,26 +920,28 @@ def create_voice(
 
 
 # ============================================================
-# 16. 총 영상 길이 검사
+# 15. 총 영상 길이 검사
 # ============================================================
 
 def check_total_duration(
     scenes
 ):
 
-    total = 0
+    total = 0.0
 
     for scene in scenes:
 
         try:
 
-            total += scene.duration
+            total += float(
+                scene.duration
+            )
 
         except Exception:
             pass
 
     log(
-        "🎞️ 예상 최종 길이: "
+        f"🎞️ 최종 예상 길이: "
         f"{total:.2f}초"
     )
 
@@ -1023,14 +960,14 @@ def check_total_duration(
     else:
 
         log(
-            "✅ 목표 영상 길이 범위!"
+            "✅ 목표 길이 범위입니다."
         )
 
     return total
 
 
 # ============================================================
-# 17. 최종 영상 렌더링
+# 16. 최종 영상 렌더링
 # ============================================================
 
 def render_final_video(
@@ -1043,20 +980,18 @@ def render_final_video(
             "생성된 장면이 없습니다."
         )
 
-    log("")
-    log(
-        "🎞️ 모든 장면 합치는 중..."
-    )
-
     from moviepy.editor import (
         concatenate_videoclips
     )
 
-    final_video = (
-        concatenate_videoclips(
-            scene_clips,
-            method="chain"
-        )
+    log("")
+    log(
+        "🎞️ 모든 장면을 합치는 중..."
+    )
+
+    final_video = concatenate_videoclips(
+        scene_clips,
+        method="compose"
     )
 
     total_duration = (
@@ -1064,12 +999,12 @@ def render_final_video(
     )
 
     log(
-        "최종 영상 길이: "
+        f"🎬 최종 영상 길이: "
         f"{total_duration:.2f}초"
     )
 
     log(
-        "🎬 FFmpeg 렌더링 시작..."
+        "🎥 FFmpeg 렌더링 시작..."
     )
 
     final_video.write_videofile(
@@ -1087,7 +1022,6 @@ def render_final_video(
         threads=2,
 
         preset="medium"
-
     )
 
     final_video.close()
@@ -1100,7 +1034,7 @@ def render_final_video(
 
 
 # ============================================================
-# 18. 결과 요약
+# 17. 결과 요약
 # ============================================================
 
 def send_result_summary(
@@ -1123,11 +1057,9 @@ def send_result_summary(
         "분야 없음"
     )
 
-    scene_count = len(
-        script_data.get(
-            "scenes",
-            []
-        )
+    scenes = script_data.get(
+        "scenes",
+        []
     )
 
     message = (
@@ -1136,8 +1068,8 @@ def send_result_summary(
         f"🧠 소재: {topic}\n"
         f"📝 제목: {title}\n"
         f"🎞️ 길이: {duration:.1f}초\n"
-        f"🎥 장면: {scene_count}개\n\n"
-        "📦 영상 전송 준비 완료"
+        f"🎥 장면: {len(scenes)}개\n\n"
+        "📦 영상 전송 중..."
     )
 
     send_telegram_message(
@@ -1146,7 +1078,54 @@ def send_result_summary(
 
 
 # ============================================================
-# 19. 메인 실행
+# 18. 임시 파일 정리
+# ============================================================
+
+def cleanup_temp_files():
+
+    log(
+        "🧹 임시 파일 정리 시작"
+    )
+
+    for filename in os.listdir("."):
+
+        should_delete = False
+
+        if (
+            filename.startswith("scene_")
+            and filename.endswith(".mp3")
+        ):
+
+            should_delete = True
+
+        elif (
+            filename.startswith("video_")
+            and filename.endswith(".mp4")
+        ):
+
+            should_delete = True
+
+        if not should_delete:
+            continue
+
+        try:
+
+            os.remove(filename)
+
+            log(
+                f"삭제: {filename}"
+            )
+
+        except Exception as e:
+
+            log(
+                f"⚠️ 삭제 실패 "
+                f"{filename}: {e}"
+            )
+
+
+# ============================================================
+# 19. 메인
 # ============================================================
 
 def main():
@@ -1169,21 +1148,21 @@ def main():
             "======================================"
         )
 
-        # ------------------------------------
+        # ----------------------------------------------------
         # 환경변수
-        # ------------------------------------
+        # ----------------------------------------------------
 
         validate_environment()
 
-        # ------------------------------------
+        # ----------------------------------------------------
         # 주제
-        # ------------------------------------
+        # ----------------------------------------------------
 
         topic_info = choose_topic()
 
-        # ------------------------------------
+        # ----------------------------------------------------
         # 대본
-        # ------------------------------------
+        # ----------------------------------------------------
 
         script_data = generate_script(
             topic_info
@@ -1204,9 +1183,9 @@ def main():
             f"📚 총 {len(scenes)}개 장면 처리"
         )
 
-        # ------------------------------------
+        # ----------------------------------------------------
         # 장면 생성
-        # ------------------------------------
+        # ----------------------------------------------------
 
         for idx, item in enumerate(
             scenes[:MAX_SCENES]
@@ -1214,40 +1193,53 @@ def main():
 
             try:
 
+                # ★ 중요 ★
+                #
+                # video_engine.py의 create_scene()
+                # 함수는 다음 4개 인자를 받는다.
+                #
+                # create_scene(
+                #     idx,
+                #     item,
+                #     create_voice,
+                #     requests
+                # )
+                #
+                # 기존 코드의
+                #
+                #     create_voice,
+                #     requests
+                #
+                # 를 함수 바깥에 따로 적어버린 것이
+                # "takes 4 positional arguments but 7"
+                # 오류의 원인이었다.
+
                 scene = create_scene(
-
                     idx,
-
                     item,
-
                     create_voice,
-
-                    fetch_pexels_video,
-
-                    download_video,
-
-                    process_video_clip,
-
                     requests
-
                 )
 
                 scene_clips.append(
                     scene
                 )
 
+                log(
+                    f"✅ SCENE {idx + 1} 완료"
+                )
+
             except Exception as e:
 
                 log(
-                    f"❌ SCENE {idx + 1} 실패: "
-                    f"{e}"
+                    f"❌ SCENE {idx + 1} 실패: {e}"
                 )
 
                 raise
 
-        # ------------------------------------
+        # ----------------------------------------------------
         # 총 길이
-        # ------------------------------------
+        # ----------------------------------------------------
 
         total_duration = (
             check_total_duration(
@@ -1255,9 +1247,9 @@ def main():
             )
         )
 
-        # ------------------------------------
-        # 최종 렌더링
-        # ------------------------------------
+        # ----------------------------------------------------
+        # 최종 영상
+        # ----------------------------------------------------
 
         final_path = (
             render_final_video(
@@ -1265,26 +1257,26 @@ def main():
             )
         )
 
-        # ------------------------------------
-        # Telegram 요약
-        # ------------------------------------
+        # ----------------------------------------------------
+        # Telegram 결과
+        # ----------------------------------------------------
 
         send_result_summary(
             script_data,
             total_duration
         )
 
-        # ------------------------------------
+        # ----------------------------------------------------
         # Telegram 영상
-        # ------------------------------------
+        # ----------------------------------------------------
 
         send_telegram_video(
             final_path
         )
 
-        # ------------------------------------
+        # ----------------------------------------------------
         # 완료
-        # ------------------------------------
+        # ----------------------------------------------------
 
         elapsed = (
             time.time()
@@ -1296,8 +1288,12 @@ def main():
         )
 
         log(
-            "🎉 전체 작업 완료 "
-            f"({elapsed / 60:.1f}분)"
+            "🎉 SHORTS GENERATOR COMPLETE"
+        )
+
+        log(
+            f"⏱️ 전체 소요시간: "
+            f"{elapsed / 60:.1f}분"
         )
 
         log(
@@ -1319,17 +1315,17 @@ def main():
         )
 
         send_telegram_message(
-
             "🚨 Shorts 생성 실패\n\n"
             f"{str(e)[:500]}"
-
         )
 
         raise
 
     finally:
 
+        # ----------------------------------------------------
         # MoviePy 객체 닫기
+        # ----------------------------------------------------
 
         for clip in scene_clips:
 
@@ -1339,6 +1335,12 @@ def main():
 
             except Exception:
                 pass
+
+        # ----------------------------------------------------
+        # 임시 파일
+        # ----------------------------------------------------
+
+        cleanup_temp_files()
 
 
 # ============================================================
