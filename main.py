@@ -4,12 +4,11 @@ import asyncio
 import requests
 import openai
 import edge_tts
-import whisper
 import numpy as np
 import PIL.Image
 from PIL import Image, ImageDraw, ImageFont
 
-# Pillow 10+ 호환성 패치
+# Pillow 호환성 패치
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
@@ -112,7 +111,7 @@ def render_subtitle_image(text):
     font = get_safe_korean_font(font_size)
     img_w = int(target_w * 0.9)
 
-    img = Image.new("RGBA", (img_w, font_size + 40), (0, 0, 0, 0))
+    img = Image.new("RGBA", (img_w, font_size + 50), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
     line_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in text)
@@ -126,98 +125,80 @@ def render_subtitle_image(text):
     draw.text((x, 20), text, font=font, fill="#FFE600")
     return np.array(img)
 
-def fetch_pexels_video(query, index=0):
+def fetch_pexels_video(query):
     headers = {"Authorization": PEXELS_API_KEY}
-    url = f"https://api.pexels.com/videos/search?query={query}&per_page=5&orientation=portrait"
+    url = f"https://api.pexels.com/videos/search?query={query}&per_page=3&orientation=portrait"
     try:
         res = requests.get(url, headers=headers, timeout=10)
         data = res.json()
         if "videos" in data and len(data["videos"]) > 0:
-            idx = min(index, len(data["videos"]) - 1)
-            return data["videos"][idx]["video_files"][0]["link"]
+            return data["videos"][0]["video_files"][0]["link"]
     except Exception as e:
-        print(f"Pexels search error: {e}")
+        print(f"Pexels fetch error for {query}: {e}")
     return "https://videos.pexels.com/video-files/856987/856987-hd_1080_1920_30fps.mp4"
 
 def main():
     try:
-        # Whisper 경량 모델 로드
-        whisper_model = whisper.load_model("base")
-
+        # GPT에게 PPT 연출용 대본 세트 요구
         prompt = """
-        유튜브 숏츠용 흥미로운 과학 상식 대본 3문장을 작성해줘.
+        유튜브 숏츠용 과학 상식 숏츠 구조를 JSON 형태로 짜줘.
         [규칙]
-        - 각 문장마다 명확히 다른 영상 주제(예: 지구 대기, 화성 환경, 우주 먼지)가 드러나게 작성할 것.
-        - 특수문자, 번호표시, 따옴표 없이 순수 한국어 문장만 3줄로 출력할 것.
+        - 대본은 3개 구절로 구성.
+        - 구절마다 화면에 어울리는 영어 검색 키워드(search_keyword)를 명확히 지정해줘.
+        
+        응답은 오직 아래 JSON 포맷으로만 전달해:
+        [
+          {"text": "지구의 대기는 수많은 가스로 차있습니다.", "keyword": "earth atmosphere"},
+          {"text": "질소가 약 78퍼센트를 차지하고 있죠.", "keyword": "nitrogen gas"},
+          {"text": "대기가 없다면 화성처럼 황량해집니다.", "keyword": "mars planet"}
+        ]
         """
         
-        response = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
-        raw_lines = response.choices[0].message.content.strip().split("\n")
-        lines = [l.strip() for l in raw_lines if l.strip() and not l.strip().isdigit()]
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini", 
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"}
+        )
+        
+        import json
+        content = response.choices[0].message.content.strip()
+        data = json.loads(content)
+        
+        # JSON 구조 유연하게 파싱
+        items = data if isinstance(data, list) else data.get("scenes", data.get("script", list(data.values())[0]))
 
-        clip_list = []
+        scene_clips = []
 
-        for i, line in enumerate(lines[:3]):
-            audio_path = f"audio_{i}.mp3"
-            asyncio.run(generate_voice(line, audio_path))
-            
+        for idx, item in enumerate(items[:4]):
+            text = item.get("text", "")
+            keyword = item.get("keyword", "nature")
+
+            audio_path = f"scene_{idx}.mp3"
+            asyncio.run(generate_voice(text, audio_path))
+
             audio_clip = AudioFileClip(audio_path)
-            total_duration = audio_clip.duration
+            duration = audio_clip.duration
 
-            # 1. Whisper로 음성 분석 (단어별 타임스탬프 추출)
-            result = whisper_model.transcribe(audio_path, language="ko", word_timestamps=True)
-            
-            # 2. 문장 대표 검색어 추출
-            keyword_prompt = f"Convert this Korean sentence into 1 short English keyword for stock video: '{line}'"
-            keyword_res = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": keyword_prompt}])
-            search_query = re.sub(r'[^a-zA-Z]', '', keyword_res.choices[0].message.content.strip()) or "nature"
-
-            # 3. 해당 키워드로 배경 영상 매칭
-            video_url = fetch_pexels_video(search_query, i)
-            video_path = f"video_{i}.mp4"
+            # Pexels 비디오 매칭
+            video_url = fetch_pexels_video(keyword)
+            video_path = f"video_{idx}.mp4"
             with open(video_path, "wb") as f:
                 f.write(requests.get(video_url, timeout=30).content)
 
-            bg_video_clip = process_video_clip(video_path, total_duration)
+            # 비디오 처리
+            video_clip = process_video_clip(video_path, duration)
 
-            # 4. 자막 타임라인 싱크 맞추기 (Whisper 분석 데이터 기반)
-            subtitle_clips = []
-            segments = result.get("segments", [])
-            
-            for segment in segments:
-                words = segment.get("words", [])
-                if not words:
-                    # 단어 분할이 안 된 경우 세그먼트 전체 기준
-                    txt = segment.get("text", "").strip()
-                    if txt:
-                        start = segment["start"]
-                        end = min(segment["end"], total_duration)
-                        dur = max(0.1, end - start)
-                        img_np = render_subtitle_image(txt)
-                        sub_clip = (ImageClip(img_np)
-                                    .set_start(start)
-                                    .set_duration(dur)
-                                    .set_position(('center', 0.75), relative=True))
-                        subtitle_clips.append(sub_clip)
-                else:
-                    for w in words:
-                        word_txt = w["word"].strip()
-                        if not word_txt:
-                            continue
-                        start = w["start"]
-                        end = min(w["end"], total_duration)
-                        dur = max(0.1, end - start)
-                        img_np = render_subtitle_image(word_txt)
-                        sub_clip = (ImageClip(img_np)
-                                    .set_start(start)
-                                    .set_duration(dur)
-                                    .set_position(('center', 0.75), relative=True))
-                        subtitle_clips.append(sub_clip)
+            # 자막 이미지 생성 및 적용 (해당 구절 재생 시점에 싱크 고정)
+            sub_np = render_subtitle_image(text)
+            sub_clip = (ImageClip(sub_np)
+                        .set_start(0)
+                        .set_duration(duration)
+                        .set_position(('center', 0.75), relative=True))
 
-            combined_clip = CompositeVideoClip([bg_video_clip] + subtitle_clips).set_audio(audio_clip)
-            clip_list.append(combined_clip)
+            combined = CompositeVideoClip([video_clip, sub_clip]).set_audio(audio_clip)
+            scene_clips.append(combined)
 
-        final_video = concatenate_videoclips(clip_list, method="compose")
+        final_video = concatenate_videoclips(scene_clips, method="compose")
         final_output_path = "final_shorts.mp4"
         
         final_video.write_videofile(
@@ -228,7 +209,7 @@ def main():
             bitrate="3000k"
         )
 
-        send_telegram_message("🎬 PPT 스타일 초단위 싱크 숏츠 작성이 완료되었습니다!")
+        send_telegram_message("🎬 내용-영상 딱 맞춘 PPT 연출 숏츠 완성!")
         send_telegram_video(final_output_path)
 
     except Exception as e:
