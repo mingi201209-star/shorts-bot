@@ -1,7 +1,9 @@
 name: Shorts Automation Trigger
 
 on:
-  workflow_dispatch: # 텔레그램 코드의 dispatches 방식과 연동되기 위해 필수!
+  workflow_dispatch:
+  repository_dispatch:
+    types: [trigger-shorts]
 
 jobs:
   build:
