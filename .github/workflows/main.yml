@@ -1,9 +1,9 @@
 name: Shorts Creator Bot
 
 on:
-  workflow_dispatch: # [수동 실행] 버튼 유지
+  workflow_dispatch: # [수동 실행] 버튼
   schedule:
-    # ⏰ 매일 정해진 시간에 자동 실행 (UTC 기준 / 한국 시간 = UTC + 9시간)
+    # ⏰ 매일 정해진 시간에 자동 실행 (UTC 기준)
     # 1. 매일 아침 8시 (UTC 기준 전날 23:00)
     - cron: '0 23 * * *'
     # 2. 매일 저녁 6시 (UTC 기준 당일 09:00)
@@ -25,12 +25,10 @@ jobs:
       - name: Install System Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg imagemagick fonts-nanum
-          sudo sed -i 's/<policy domain="path" rights="none" pattern="@\*" \/>/<policy domain="path" rights="read|write" pattern="@\*" \/>/g' /etc/ImageMagick-6/policy.xml
+          sudo apt-get install -y ffmpeg fonts-nanum
 
-
-            - name: Install Python Packages
-              run: |
+      - name: Install Python Packages
+        run: |
           python -m pip install --upgrade pip
           python -m pip install --no-cache-dir -r requirements.txt
 
