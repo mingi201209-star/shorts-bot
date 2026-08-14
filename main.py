@@ -125,7 +125,7 @@ def render_subtitle_image(text):
     line_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in text)
     x = max(20, int((target_w - line_w) // 2))
 
-    # 외곽선
+    # 두꺼운 외곽선
     stroke_width = 8
     for dx in range(-stroke_width, stroke_width + 1):
         for dy in range(-stroke_width, stroke_width + 1):
@@ -179,7 +179,6 @@ def fetch_pexels_video(query):
 
 def main():
     try:
-        # 💡 일반인은 잘 모르는 딥한 잡학/미스터리/상식 대본 프롬프트
         prompt = """
         유튜브 숏츠용 사람들이 거의 모를 법한 '아주 깊고 흥미로운 잡학/미스터리/과학/역사 상식' 주제로 대본을 구성해줘.
         뻔한 바나나 이야기 같은 것은 제외하고, '모르는 게 당연한' 수준의 신기한 주제를 선정할 것.
@@ -230,4 +229,27 @@ def main():
             video_clip = process_video_clip(video_path, duration)
             sub_clips = create_split_subtitles(text, duration)
 
-            combined = CompositeVideoClip([video_clip] + sub_clips).set_audio(audio_clip
+            # 괄호 수식 정확히 교정
+            combined = CompositeVideoClip([video_clip] + sub_clips).set_audio(audio_clip)
+            scene_clips.append(combined)
+
+        final_video = concatenate_videoclips(scene_clips, method="chain")
+        final_output_path = "final_shorts.mp4"
+        
+        final_video.write_videofile(
+            final_output_path, 
+            fps=30, 
+            codec="libx264", 
+            audio_codec="aac",
+            bitrate="3000k"
+        )
+
+        send_telegram_message("🎬 딥한 잡학 주제 숏츠 제작 완료!")
+        send_telegram_video(final_output_path)
+
+    except Exception as e:
+        send_telegram_message(f"오류 발생: {str(e)[:100]}")
+        raise e
+
+if __name__ == "__main__":
+    main()
