@@ -2,10 +2,10 @@ import time
 import requests
 import os
 
-# 이미 발급받아 두신 토큰과 정보를 여기에 입력하세요
+# 1. 텔레그램 봇 토큰과 깃허브 토큰을 입력하세요
 TELEGRAM_BOT_TOKEN = "여기에_텔레그램_봇_토큰"
 GITHUB_TOKEN = "여기에_아까_발급받은_깃허브_토큰"
-GITHUB_REPO = "mingi201/shorts-automation"  # 본인의 정확한 깃허브 저장소 이름
+GITHUB_REPO = "mingi201209-star/shorts-bot"  # 네 실제 저장소 이름으로 수정됨!
 
 def trigger_github_action():
     """GitHub Actions 워크플로우를 원격으로 강제 실행하는 함수"""
