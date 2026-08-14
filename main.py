@@ -5,9 +5,14 @@ import requests
 import openai
 import edge_tts
 import numpy as np
+import PIL.Image
 from PIL import Image, ImageDraw, ImageFont
 
-# MoviePy 버전에 상관없이 안전하게 import
+# Pillow 10+ 호환성 패치 (MoviePy 1.0.3의 Image.ANTIALIAS 에러 방지)
+if not hasattr(PIL.Image, 'ANTIALIAS'):
+    PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
+
+# MoviePy 안전 Import
 try:
     from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
     from moviepy.video.fx.all import crop, loop
@@ -61,7 +66,7 @@ def process_video_clip(clip_path, duration):
     if clip.duration < duration:
         try:
             clip = loop(clip, duration=duration)
-        except:
+        except Exception:
             clip = clip.loop(duration=duration)
     else:
         clip = clip.subclip(0, duration)
@@ -75,13 +80,13 @@ def process_video_clip(clip_path, duration):
         new_w = int(h * target_ratio)
         try:
             clip = crop(clip, x_center=w/2, width=new_w, height=h)
-        except:
+        except Exception:
             clip = clip.crop(x_center=w/2, width=new_w, height=h)
     else:
         new_h = int(w / target_ratio)
         try:
             clip = crop(clip, y_center=h/2, width=w, height=new_h)
-        except:
+        except Exception:
             clip = clip.crop(y_center=h/2, width=w, height=new_h)
 
     return clip.resize((target_w, target_h))
