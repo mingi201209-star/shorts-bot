@@ -1,4 +1,5 @@
 import os
+import re
 import asyncio
 import requests
 import openai
@@ -62,17 +63,16 @@ def process_video_clip(clip_path, duration):
 
     return clip.resize((target_w, target_h))
 
-# 자막 이미지 생성 함수
 def render_subtitle_image(text):
     target_w = 1080
     font_path = "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf"
-    font_size = 60
+    font_size = 65
     try:
         font = ImageFont.truetype(font_path, font_size)
     except:
         font = ImageFont.load_default()
 
-    img_w = int(target_w * 0.85)
+    img_w = int(target_w * 0.88)
     
     lines = []
     words = text.split()
@@ -100,7 +100,7 @@ def render_subtitle_image(text):
         line_w = bbox[2] - bbox[0]
         x = (img_w - line_w) // 2
 
-        stroke_width = 6
+        stroke_width = 7
         for adj_x in range(-stroke_width, stroke_width + 1):
             for adj_y in range(-stroke_width, stroke_width + 1):
                 draw.text((x + adj_x, y + adj_y), line, font=font, fill="black")
@@ -110,13 +110,11 @@ def render_subtitle_image(text):
 
     return np.array(img)
 
-# 문장을 2~3단어씩 쪼개서 짧은 단위 자막 클립들로 변환
 def create_animated_subtitles(text, total_duration):
     words = text.split()
     if not words:
         return []
 
-    # 2~3단어씩 구문 묶기
     chunks = []
     curr = []
     for word in words:
@@ -136,7 +134,7 @@ def create_animated_subtitles(text, total_duration):
         sub_clip = (ImageClip(img_np)
                     .set_start(start_time)
                     .set_duration(chunk_duration)
-                    .set_position(('center', 0.75), relative=True))
+                    .set_position(('center', 0.72), relative=True))
         subtitle_clips.append(sub_clip)
 
     return subtitle_clips
@@ -146,8 +144,8 @@ def main():
         prompt = """
         유튜브 숏츠용 흥미로운 과학/우주/자연 상식 대본 3문장을 작성해줘.
         [규칙]
-        - 반드시 시청자가 끝까지 몰입할 수 있는 하나의 일관된 주제로만 작성할 것.
-        - 숫자인덱스(1., 2. 등), 특수문자, 따옴표 없이 순수 한국어 문장만 3줄로 출력할 것.
+        - 반드시 하나의 일관된 주제로만 작성할 것.
+        - 특수문자, 번호표시, 따옴표 없이 순수 한국어 문장만 3줄로 출력할 것.
         """
         
         response = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
@@ -164,12 +162,17 @@ def main():
             duration = audio_clip.duration
 
             keyword_prompt = f"""
-            다음 문장의 배경으로 어울리는 시각적 영상 검색용 영어 단어 1개만 골라줘.
-            문장: '{line}'
-            출력: 단어 1개만
+            Extract ONE English word for Pexels video search.
+            Sentence: '{line}'
+            Output: ONLY 1 English word (e.g. galaxy, ocean, nature)
             """
             keyword_res = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": keyword_prompt}])
-            search_query = keyword_res.choices[0].message.content.strip().replace('"', '').replace('.', '')
+            raw_keyword = keyword_res.choices[0].message.content.strip()
+            
+            # latin-1 오류 방지: 순수 영어 알파벳만 남김
+            search_query = re.sub(r'[^a-zA-Z]', '', raw_keyword)
+            if not search_query:
+                search_query = "nature"
 
             headers = {"Authorization": PEXELS_API_KEY}
             res = requests.get(f"https://api.pexels.com/videos/search?query={search_query}&per_page=3&orientation=portrait", headers=headers).json()
@@ -185,8 +188,6 @@ def main():
                     f.write(requests.get(video_url).content)
 
             video_clip = process_video_clip(video_path, duration)
-            
-            # 자막을 단어 단위로 착-착 전환되게 생성
             sub_clips = create_animated_subtitles(line, duration)
 
             combined_clip = CompositeVideoClip([video_clip] + sub_clips).set_audio(audio_clip)
@@ -203,7 +204,7 @@ def main():
             bitrate="3000k"
         )
 
-        send_telegram_message("🎬 퀄리티 업그레이드된 숏츠 영상 생성 완료!")
+        send_telegram_message("🎬 업그레이드된 숏츠 생성이 완료되었습니다!")
         send_telegram_video(final_output_path)
 
     except Exception as e:
