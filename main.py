@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import asyncio
 import requests
 import openai
@@ -12,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
-# MoviePy 안전 Import
+# MoviePy Import
 try:
     from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
     from moviepy.video.fx.all import crop, loop
@@ -107,23 +108,56 @@ def get_safe_korean_font(size):
 
 def render_subtitle_image(text):
     target_w = 1080
-    font_size = 65
+    font_size = 70
     font = get_safe_korean_font(font_size)
-    img_w = int(target_w * 0.9)
-
-    img = Image.new("RGBA", (img_w, font_size + 50), (0, 0, 0, 0))
+    
+    padding = 40
+    img_h = font_size + padding * 2
+    img = Image.new("RGBA", (target_w, img_h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
     line_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in text)
-    x = max(0, int((img_w - line_w) // 2))
+    x = max(20, int((target_w - line_w) // 2))
 
-    stroke_width = 6
-    for adj_x in range(-stroke_width, stroke_width + 1):
-        for adj_y in range(-stroke_width, stroke_width + 1):
-            draw.text((x + adj_x, 20 + adj_y), text, font=font, fill="black")
+    # 두꺼운 외곽선 처리 (가독성 증대)
+    stroke_width = 8
+    for dx in range(-stroke_width, stroke_width + 1):
+        for dy in range(-stroke_width, stroke_width + 1):
+            draw.text((x + dx, padding + dy), text, font=font, fill="black")
 
-    draw.text((x, 20), text, font=font, fill="#FFE600")
+    # 선명한 황금색 텍스트
+    draw.text((x, padding), text, font=font, fill="#FFD700")
     return np.array(img)
+
+def create_split_subtitles(text, duration):
+    words = text.split()
+    if not words:
+        return []
+
+    chunks = []
+    curr = []
+    for word in words:
+        curr.append(word)
+        if len(curr) >= 2:
+            chunks.append(" ".join(curr))
+            curr = []
+    if curr:
+        chunks.append(" ".join(curr))
+
+    chunk_dur = duration / len(chunks)
+    sub_clips = []
+
+    for idx, chunk in enumerate(chunks):
+        sub_np = render_subtitle_image(chunk)
+        start_time = idx * chunk_dur
+        
+        clip = (ImageClip(sub_np)
+                .set_start(start_time)
+                .set_duration(chunk_dur)
+                .set_position(('center', 0.72), relative=True))
+        sub_clips.append(clip)
+
+    return sub_clips
 
 def fetch_pexels_video(query):
     headers = {"Authorization": PEXELS_API_KEY}
@@ -139,18 +173,21 @@ def fetch_pexels_video(query):
 
 def main():
     try:
-        # GPT에게 PPT 연출용 대본 세트 요구
         prompt = """
-        유튜브 숏츠용 과학 상식 숏츠 구조를 JSON 형태로 짜줘.
+        유튜브 숏츠용 흥미로운 '일반 상식/잡학' 주제로 대본을 구성해줘.
+        
         [규칙]
-        - 대본은 3개 구절로 구성.
-        - 구절마다 화면에 어울리는 영어 검색 키워드(search_keyword)를 명확히 지정해줘.
+        - 전체 길이가 30초 정도 되도록 총 5개~6개 구절(scenes)로 구성할 것.
+        - 각 구절은 짧고 명확하게 작성할 것.
+        - 구절마다 시각적으로 딱 맞는 정확한 Pexels 영어 검색 키워드(keyword)를 작성할 것.
         
         응답은 오직 아래 JSON 포맷으로만 전달해:
         [
-          {"text": "지구의 대기는 수많은 가스로 차있습니다.", "keyword": "earth atmosphere"},
-          {"text": "질소가 약 78퍼센트를 차지하고 있죠.", "keyword": "nitrogen gas"},
-          {"text": "대기가 없다면 화성처럼 황량해집니다.", "keyword": "mars planet"}
+          {"text": "우리가 흔히 먹는 바나나에는 비밀이 있습니다.", "keyword": "banana fruit"},
+          {"text": "사실 우리가 먹는 바나나는 씨가 없는 변종입니다.", "keyword": "banana farm"},
+          {"text": "원래 야생 바나나는 씨앗으로 가득했죠.", "keyword": "wild fruit seed"},
+          {"text": "유전자가 같아서 전염병에 매우 취약합니다.", "keyword": "laboratory science"},
+          {"text": "언젠가 바나나가 멸종할지도 모른다는 사실, 알고 계셨나요?", "keyword": "thinking mystery"}
         ]
         """
         
@@ -160,18 +197,16 @@ def main():
             response_format={"type": "json_object"}
         )
         
-        import json
         content = response.choices[0].message.content.strip()
         data = json.loads(content)
         
-        # JSON 구조 유연하게 파싱
         items = data if isinstance(data, list) else data.get("scenes", data.get("script", list(data.values())[0]))
 
         scene_clips = []
 
-        for idx, item in enumerate(items[:4]):
+        for idx, item in enumerate(items[:6]):
             text = item.get("text", "")
-            keyword = item.get("keyword", "nature")
+            keyword = item.get("keyword", "lifestyle")
 
             audio_path = f"scene_{idx}.mp3"
             asyncio.run(generate_voice(text, audio_path))
@@ -179,26 +214,18 @@ def main():
             audio_clip = AudioFileClip(audio_path)
             duration = audio_clip.duration
 
-            # Pexels 비디오 매칭
             video_url = fetch_pexels_video(keyword)
             video_path = f"video_{idx}.mp4"
             with open(video_path, "wb") as f:
                 f.write(requests.get(video_url, timeout=30).content)
 
-            # 비디오 처리
             video_clip = process_video_clip(video_path, duration)
+            sub_clips = create_split_subtitles(text, duration)
 
-            # 자막 이미지 생성 및 적용 (해당 구절 재생 시점에 싱크 고정)
-            sub_np = render_subtitle_image(text)
-            sub_clip = (ImageClip(sub_np)
-                        .set_start(0)
-                        .set_duration(duration)
-                        .set_position(('center', 0.75), relative=True))
-
-            combined = CompositeVideoClip([video_clip, sub_clip]).set_audio(audio_clip)
+            combined = CompositeVideoClip([video_clip] + sub_clips).set_audio(audio_clip)
             scene_clips.append(combined)
 
-        final_video = concatenate_videoclips(scene_clips, method="compose")
+        final_video = concatenate_videoclips(scene_clips, method="chain")
         final_output_path = "final_shorts.mp4"
         
         final_video.write_videofile(
@@ -209,7 +236,7 @@ def main():
             bitrate="3000k"
         )
 
-        send_telegram_message("🎬 내용-영상 딱 맞춘 PPT 연출 숏츠 완성!")
+        send_telegram_message("🎬 퀄리티 보정본(끊김 자막+30초+장면 매칭) 제작 완료!")
         send_telegram_video(final_output_path)
 
     except Exception as e:
