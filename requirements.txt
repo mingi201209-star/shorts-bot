@@ -2,6 +2,7 @@ openai
 gTTS
 requests
 moviepy==1.0.3
+Pillow==9.5.0
 google-api-python-client
 google-auth-oauthlib
 google-auth-httplib2
