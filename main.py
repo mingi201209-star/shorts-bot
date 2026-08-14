@@ -218,4 +218,6 @@ def create_split_subtitles(text, duration):
 
 def fetch_pexels_video(query):
     """Pexels API를 통한 세로형 스톡 비디오 검색"""
-    headers = {"
+    headers = {
+    "Authorization": PEXELS_API_KEY
+    }
