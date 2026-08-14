@@ -6,8 +6,19 @@ import openai
 import edge_tts
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
-from moviepy.video.fx.all import crop, loop
+
+# MoviePy 버전에 상관없이 안전하게 import
+try:
+    from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
+    from moviepy.video.fx.all import crop, loop
+except ImportError:
+    from moviepy.video.io.VideoFileClip import VideoFileClip
+    from moviepy.audio.io.AudioFileClip import AudioFileClip
+    from moviepy.video.VideoClip import ImageClip
+    from moviepy.video.compositing.CompositeVideoClip import CompositeVideoClip
+    from moviepy.video.compositing.concatenate import concatenate_videoclips
+    import moviepy.video.fx.crop as crop
+    import moviepy.video.fx.loop as loop
 
 openai.api_key = os.environ.get("OPENAI_KEY")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
@@ -48,7 +59,10 @@ def process_video_clip(clip_path, duration):
     clip = VideoFileClip(clip_path)
     
     if clip.duration < duration:
-        clip = loop(clip, duration=duration)
+        try:
+            clip = loop(clip, duration=duration)
+        except:
+            clip = clip.loop(duration=duration)
     else:
         clip = clip.subclip(0, duration)
 
@@ -59,14 +73,19 @@ def process_video_clip(clip_path, duration):
 
     if current_ratio > target_ratio:
         new_w = int(h * target_ratio)
-        clip = crop(clip, x_center=w/2, width=new_w, height=h)
+        try:
+            clip = crop(clip, x_center=w/2, width=new_w, height=h)
+        except:
+            clip = clip.crop(x_center=w/2, width=new_w, height=h)
     else:
         new_h = int(w / target_ratio)
-        clip = crop(clip, y_center=h/2, width=w, height=new_h)
+        try:
+            clip = crop(clip, y_center=h/2, width=w, height=new_h)
+        except:
+            clip = clip.crop(y_center=h/2, width=w, height=new_h)
 
     return clip.resize((target_w, target_h))
 
-# 한글 TTF 폰트를 직접 다운로드받아 로드 (디폴트 latin-1 폰트 진입 방지)
 def get_safe_korean_font(size):
     font_filename = "NanumGothic.ttf"
     font_paths = [
@@ -104,7 +123,6 @@ def render_subtitle_image(text):
     words = text.split()
     current_line = ""
     
-    # latin-1 에러 차단을 위한 글자 수 기반 너비 수치 계산
     for word in words:
         test_line = f"{current_line} {word}".strip()
         estimated_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in test_line)
