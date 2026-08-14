@@ -13,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
-# MoviePy Import
+# MoviePy Import 안전 처리
 try:
     from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
     from moviepy.video.fx.all import crop, loop
@@ -125,7 +125,7 @@ def render_subtitle_image(text):
     line_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in text)
     x = max(20, int((target_w - line_w) // 2))
 
-    # 두꺼운 외곽선으로 가독성 극대화
+    # 가독성을 높이기 위한 두꺼운 외곽선 처리
     stroke_width = 8
     for dx in range(-stroke_width, stroke_width + 1):
         for dy in range(-stroke_width, stroke_width + 1):
@@ -149,7 +149,7 @@ def create_split_subtitles(text, duration):
     if curr:
         chunks.append(" ".join(curr))
 
-    chunk_dur = duration / len(chunks)
+    chunk_dur = duration / len(chunks) if len(chunks) > 0 else duration
     sub_clips = []
 
     for idx, chunk in enumerate(chunks):
@@ -182,7 +182,6 @@ def fetch_pexels_video(query):
 
 def main():
     try:
-        # 💡 최대 1분 30초 상한선(약 12~13개 구절)을 채우는 구체적이고 깊이 있는 대본 프롬프트
         prompt = """
         유튜브 숏츠용으로 사람들이 전혀 몰랐던 '아주 깊고 구체적인 과학/역사/미스터리' 상식 주제로 대본을 구성해줘.
         단순히 겉핥기 식이 아니라 사건의 배경, 구체적인 수치, 놀라운 반전이나 이유를 상세히 서술할 것.
@@ -222,7 +221,6 @@ def main():
 
         scene_clips = []
 
-        # 최대 13개 구절까지 수용
         for idx, item in enumerate(items[:13]):
             text = item.get("text", "")
             keyword = item.get("keyword", "nature landscape")
@@ -247,7 +245,6 @@ def main():
         final_video = concatenate_videoclips(scene_clips, method="chain")
         final_output_path = "final_shorts.mp4"
         
-        # 5000k 고화질 비트레이트 유지
         final_video.write_videofile(
             final_output_path, 
             fps=30, 
