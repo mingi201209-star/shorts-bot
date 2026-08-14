@@ -1,5 +1,3 @@
-import os
-
 from moviepy.editor import VideoFileClip
 
 try:
@@ -13,21 +11,37 @@ VIDEO_WIDTH = 1080
 VIDEO_HEIGHT = 1920
 
 
-def process_video_clip(clip_path, duration):
-    clip = VideoFileClip(clip_path)
+def process_video_clip(
+    clip_path,
+    duration
+):
+    """
+    영상을 목표 길이 + 9:16 + 1080x1920으로 변환
+    """
+
+    clip = VideoFileClip(
+        clip_path
+    )
 
     try:
+
+        # 영상이 짧으면 반복
         if clip.duration < duration:
+
             try:
                 clip = loop(
                     clip,
                     duration=duration
                 )
+
             except Exception:
                 clip = clip.loop(
                     duration=duration
                 )
+
+        # 영상이 길면 자르기
         else:
+
             clip = clip.subclip(
                 0,
                 duration
@@ -41,6 +55,7 @@ def process_video_clip(clip_path, duration):
 
         current_ratio = w / h
 
+        # 가로 영상
         if current_ratio > target_ratio:
 
             new_w = int(
@@ -48,19 +63,23 @@ def process_video_clip(clip_path, duration):
             )
 
             try:
+
                 clip = crop(
                     clip,
                     x_center=w / 2,
                     width=new_w,
                     height=h
                 )
+
             except Exception:
+
                 clip = clip.crop(
                     x_center=w / 2,
                     width=new_w,
                     height=h
                 )
 
+        # 세로 영상
         else:
 
             new_h = int(
@@ -68,19 +87,23 @@ def process_video_clip(clip_path, duration):
             )
 
             try:
+
                 clip = crop(
                     clip,
                     y_center=h / 2,
                     width=w,
                     height=new_h
                 )
+
             except Exception:
+
                 clip = clip.crop(
                     y_center=h / 2,
                     width=w,
                     height=new_h
                 )
 
+        # 최종 크기
         clip = clip.resize(
             (
                 VIDEO_WIDTH,
@@ -91,5 +114,7 @@ def process_video_clip(clip_path, duration):
         return clip
 
     except Exception:
+
         clip.close()
+
         raise
