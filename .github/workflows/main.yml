@@ -1,8 +1,9 @@
 name: Shorts Creator Bot
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # [수동 실행] 버튼
   schedule:
+    # ⏰ 매일 정해진 시간에 자동 실행 (UTC 기준)
     - cron: '0 23 * * *'
     - cron: '0 9 * * *'
 
