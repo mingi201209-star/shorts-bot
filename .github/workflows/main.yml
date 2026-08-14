@@ -29,10 +29,10 @@ jobs:
           sudo sed -i 's/<policy domain="path" rights="none" pattern="@\*" \/>/<policy domain="path" rights="read|write" pattern="@\*" \/>/g' /etc/ImageMagick-6/policy.xml
 
 
-      - name: Install Python Packages
-        run: |
+            - name: Install Python Packages
+              run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          python -m pip install --no-cache-dir -r requirements.txt
 
       - name: Run Shorts Creator Script
         env:
