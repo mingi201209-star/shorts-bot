@@ -13,28 +13,6 @@ VIDEO_WIDTH = 1080
 VIDEO_HEIGHT = 1920
 
 
-def download_video(video_url, output_path, requests_module):
-    print(f"⬇️ 영상 다운로드: {output_path}")
-
-    response = requests_module.get(
-        video_url,
-        timeout=60
-    )
-
-    response.raise_for_status()
-
-    with open(output_path, "wb") as f:
-        f.write(response.content)
-
-    if (
-        not os.path.exists(output_path)
-        or os.path.getsize(output_path) < 1000
-    ):
-        raise RuntimeError(
-            "영상 다운로드 결과가 비정상적입니다."
-        )
-
-
 def process_video_clip(clip_path, duration):
     clip = VideoFileClip(clip_path)
 
@@ -63,7 +41,6 @@ def process_video_clip(clip_path, duration):
 
         current_ratio = w / h
 
-        # 가로 영상 → 중앙 크롭
         if current_ratio > target_ratio:
 
             new_w = int(
@@ -84,7 +61,6 @@ def process_video_clip(clip_path, duration):
                     height=h
                 )
 
-        # 세로 영상 → 중앙 크롭
         else:
 
             new_h = int(
@@ -105,7 +81,6 @@ def process_video_clip(clip_path, duration):
                     height=new_h
                 )
 
-        # 최종 9:16
         clip = clip.resize(
             (
                 VIDEO_WIDTH,
