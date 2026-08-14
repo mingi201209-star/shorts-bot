@@ -1,11 +1,10 @@
 import os
-import random
+import re
 import json
 import asyncio
 import requests
 import openai
 import edge_tts
-from pydub import AudioSegment, silence
 import numpy as np
 import PIL.Image
 from PIL import Image, ImageDraw, ImageFont
@@ -14,7 +13,7 @@ from PIL import Image, ImageDraw, ImageFont
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
-# MoviePy Import 안전 처리
+# MoviePy Import
 try:
     from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
     from moviepy.video.fx.all import crop, loop
@@ -27,24 +26,21 @@ except ImportError:
     import moviepy.video.fx.crop as crop
     import moviepy.video.fx.loop as loop
 
-# 환경 변수 설정
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+openai.api_key = os.environ.get("OPENAI_KEY")
 PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 def send_telegram_message(message):
-    """텔레그램 텍스트 알림 전송"""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: 
         return
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
         requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": str(message)}, timeout=10)
     except Exception as e:
-        print(f"Telegram message error: {e}")
+        print(f"Telegram error: {e}")
 
 def send_telegram_video(video_path):
-    """텔레그램 최종 숏츠 영상 전송"""
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: 
         return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
@@ -62,28 +58,10 @@ def send_telegram_video(video_path):
         send_telegram_message(f"⚠️ 영상 전송 에러: {str(e)}")
 
 async def generate_voice(text, output_path):
-    """edge-tts를 이용한 자연스러운 한국어 음성 생성"""
-    communicate = edge_tts.Communicate(text, "ko-KR-SunHiNeural")
+    communicate = edge_tts.Communicate(text, "ko-KR-InJoonNeural")
     await communicate.save(output_path)
 
-def preprocess_audio(input_path, output_path, silence_thresh=-40, min_silence_len=400):
-    """BGM이 없는 채널에 맞춰 내레이션의 무음 구간을 제거하고 볼륨을 정규화"""
-    audio = AudioSegment.from_file(input_path)
-    chunks = silence.split_on_silence(
-        audio, 
-        min_silence_len=min_silence_len, 
-        silence_thresh=silence_thresh,
-        keep_silence=150
-    )
-    processed_audio = AudioSegment.empty()
-    for chunk in chunks:
-        processed_audio += chunk
-    processed_audio = processed_audio.normalize()
-    processed_audio.export(output_path, format="mp3")
-    return output_path
-
 def process_video_clip(clip_path, duration):
-    """스톡 영상을 숏츠 규격(9:16)으로 크롭 및 루프 처리 후 역동적인 줌 효과(Ken Burns) 적용"""
     clip = VideoFileClip(clip_path)
     if clip.duration < duration:
         try:
@@ -111,23 +89,9 @@ def process_video_clip(clip_path, duration):
         except Exception:
             clip = clip.crop(y_center=h/2, width=w, height=new_h)
 
-    clip = clip.resize((target_w, target_h))
-
-    def zoom_effect(get_frame, t):
-        img = get_frame(t)
-        progress = t / duration if duration > 0 else 0
-        zoom = 1.0 + 0.08 * progress
-        new_w, new_h = int(target_w * zoom), int(target_h * zoom)
-        pil_img = Image.fromarray(img).resize((new_w, new_h), Image.Resampling.LANCZOS)
-        left = (new_w - target_w) // 2
-        top = (new_h - target_h) // 2
-        cropped = pil_img.crop((left, top, left + target_w, top + target_h))
-        return np.array(cropped)
-
-    return clip.fl(zoom_effect, keep_duration=True)
+    return clip.resize((target_w, target_h))
 
 def get_safe_korean_font(size):
-    """가독성 높은 한글 폰트 로드"""
     font_filename = "NanumGothic.ttf"
     if os.path.exists(font_filename):
         try:
@@ -149,7 +113,6 @@ def get_safe_korean_font(size):
     return ImageFont.load_default()
 
 def render_subtitle_image(text):
-    """고가독성 자막 렌더링"""
     target_w = 1080
     font_size = 70
     font = get_safe_korean_font(font_size)
@@ -162,6 +125,7 @@ def render_subtitle_image(text):
     line_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in text)
     x = max(20, int((target_w - line_w) // 2))
 
+    # 두꺼운 외곽선으로 가독성 극대화
     stroke_width = 8
     for dx in range(-stroke_width, stroke_width + 1):
         for dy in range(-stroke_width, stroke_width + 1):
@@ -170,23 +134,7 @@ def render_subtitle_image(text):
     draw.text((x, padding), text, font=font, fill="#FFE600")
     return np.array(img)
 
-def render_hook_title_image(title_text):
-    """초반 3초 시선을 강탈하는 인트로 후크 타이틀 배너 생성"""
-    target_w = 1080
-    font_size = 85
-    font = get_safe_korean_font(font_size)
-    
-    padding = 50
-    img_h = (font_size * 2) + (padding * 2)
-    img = Image.new("RGBA", (target_w, img_h), (0, 0, 0, 0))
-    draw = ImageDraw.Draw(img)
-
-    draw.rectangle([100, padding, target_w - 100, img_h - padding], fill=(0, 0, 0, 180), outline=(255, 230, 0), width=4)
-    draw.text((target_w // 2, img_h // 2), title_text, font=font, fill="#FFE600", anchor="mm")
-    return np.array(img)
-
 def create_split_subtitles(text, duration):
-    """텍스트를 쪼개어 싱크에 맞는 자막 클립 생성"""
     words = text.split()
     if not words:
         return []
@@ -201,7 +149,7 @@ def create_split_subtitles(text, duration):
     if curr:
         chunks.append(" ".join(curr))
 
-    chunk_dur = duration / len(chunks) if len(chunks) > 0 else duration
+    chunk_dur = duration / len(chunks)
     sub_clips = []
 
     for idx, chunk in enumerate(chunks):
@@ -211,13 +159,109 @@ def create_split_subtitles(text, duration):
         clip = (ImageClip(sub_np)
                 .set_start(start_time)
                 .set_duration(chunk_dur)
-                .set_position(('center', 0.78), relative=True))
+                .set_position(('center', 0.72), relative=True))
         sub_clips.append(clip)
 
     return sub_clips
 
 def fetch_pexels_video(query):
-    """Pexels API를 통한 세로형 스톡 비디오 검색"""
-    headers = {
-    "Authorization": PEXELS_API_KEY
-    }
+    headers = {"Authorization": PEXELS_API_KEY}
+    url = f"https://api.pexels.com/videos/search?query={query}&per_page=5&orientation=portrait"
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        data = res.json()
+        if "videos" in data and len(data["videos"]) > 0:
+            videos = data["videos"][0]["video_files"]
+            for v in videos:
+                if v.get("width", 0) >= 1080 or v.get("quality") == "hd":
+                    return v["link"]
+            return videos[0]["link"]
+    except Exception as e:
+        print(f"Pexels fetch error for {query}: {e}")
+    return "https://videos.pexels.com/video-files/856987/856987-hd_1080_1920_30fps.mp4"
+
+def main():
+    try:
+        # 💡 최대 1분 30초 상한선(약 12~13개 구절)을 채우는 구체적이고 깊이 있는 대본 프롬프트
+        prompt = """
+        유튜브 숏츠용으로 사람들이 전혀 몰랐던 '아주 깊고 구체적인 과학/역사/미스터리' 상식 주제로 대본을 구성해줘.
+        단순히 겉핥기 식이 아니라 사건의 배경, 구체적인 수치, 놀라운 반전이나 이유를 상세히 서술할 것.
+        
+        [규칙]
+        - 전체 총 길이가 1분 15초 ~ 1분 30초 내외가 되도록 **총 12개~13개의 구절(scenes)**로 풍성하게 구성할 것.
+        - 각 구절은 명확한 내용 전달을 위해 15자 내외로 작성할 것.
+        - Pexels 검색 키워드는 고유명사를 절대 쓰지 말고, 100% 보편적 영문 풍경/시각 키워드만 사용할 것.
+        
+        응답은 오직 아래 JSON 포맷으로만 전달해 (배열 형태):
+        [
+          {"text": "지구상에서 가장 외로운 곳, 포인트 네모를 아시나요?", "keyword": "deep ocean aerial"},
+          {"text": "남태평양 한가운데 위치한 거대한 바다의 오지입니다.", "keyword": "blue ocean waves"},
+          {"text": "가장 가까운 육지에서 무려 2,688km나 떨어져 있죠.", "keyword": "world map vintage"},
+          {"text": "이곳은 영양분이 거의 없어 생물도 살기 힘든 바다의 사막입니다.", "keyword": "underwater empty sea"},
+          {"text": "인간의 발길이 완전히 닿지 않는 완벽한 고립 지대인데요,", "keyword": "isolated ocean drone"},
+          {"text": "너무 외딴곳이라 상공을 지나가는 가장 가까운 인간은,", "keyword": "iss astronaut space"},
+          {"text": "무중력 우주 정거장에 머무는 우주 비행사들뿐입니다.", "keyword": "earth view from space"},
+          {"text": "지상에서 수백 킬로미터 떨어진 우주가 더 가깝다는 뜻이죠.", "keyword": "galaxy stars night"},
+          {"text": "게다가 이곳은 수명이 다한 인공위성들의 거대한 무덤이기도 한데요,", "keyword": "satellite orbiting earth"},
+          {"text": "지구로 떨어질 때 민간 피해를 막기 위해 의도적으로 추락시키는 곳입니다.", "keyword": "dark ocean night"},
+          {"text": "지금 이 순간에도 수많은 인공위성들이 이 깊은 바다로 잠들어 가고 있습니다.", "keyword": "deep blue sea underwater"},
+          {"text": "우리가 모르는 지구의 또 다른 비밀, 정말 놀랍지 않나요?", "keyword": "mysterious universe glow"}
+        ]
+        """
+        
+        response = openai.chat.completions.create(
+            model="gpt-4o-mini", 
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"}
+        )
+        
+        content = response.choices[0].message.content.strip()
+        data = json.loads(content)
+        
+        items = data if isinstance(data, list) else data.get("scenes", data.get("script", list(data.values())[0]))
+
+        scene_clips = []
+
+        # 최대 13개 구절까지 수용
+        for idx, item in enumerate(items[:13]):
+            text = item.get("text", "")
+            keyword = item.get("keyword", "nature landscape")
+
+            audio_path = f"scene_{idx}.mp3"
+            asyncio.run(generate_voice(text, audio_path))
+
+            audio_clip = AudioFileClip(audio_path)
+            duration = audio_clip.duration
+
+            video_url = fetch_pexels_video(keyword)
+            video_path = f"video_{idx}.mp4"
+            with open(video_path, "wb") as f:
+                f.write(requests.get(video_url, timeout=30).content)
+
+            video_clip = process_video_clip(video_path, duration)
+            sub_clips = create_split_subtitles(text, duration)
+
+            combined = CompositeVideoClip([video_clip] + sub_clips).set_audio(audio_clip)
+            scene_clips.append(combined)
+
+        final_video = concatenate_videoclips(scene_clips, method="chain")
+        final_output_path = "final_shorts.mp4"
+        
+        # 5000k 고화질 비트레이트 유지
+        final_video.write_videofile(
+            final_output_path, 
+            fps=30, 
+            codec="libx264", 
+            audio_codec="aac",
+            bitrate="5000k"
+        )
+
+        send_telegram_message("🎬 최대 1분 30초 상한선 적용 완료된 고화질 숏츠 완성!")
+        send_telegram_video(final_output_path)
+
+    except Exception as e:
+        send_telegram_message(f"오류 발생: {str(e)[:100]}")
+        raise e
+
+if __name__ == "__main__":
+    main()
