@@ -1,9 +1,8 @@
 name: Shorts Creator Bot
 
 on:
-  workflow_dispatch: # [수동 실행] 버튼
+  workflow_dispatch:
   schedule:
-    # ⏰ 매일 정해진 시간에 자동 실행 (UTC 기준)
     - cron: '0 23 * * *'
     - cron: '0 9 * * *'
 
@@ -25,12 +24,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-nanum
 
-      - name: Create Venv & Install Packages
+      - name: Create Venv and Install Packages
         run: |
           python -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
-          pip install gTTS gtts openai requests moviepy==1.0.3 Pillow==9.5.0 numpy google-api-python-client google-auth-oauthlib google-auth-httplib2
+          ./venv/bin/pip install --upgrade pip
+          ./venv/bin/pip install gTTS gtts openai requests moviepy==1.0.3 Pillow==9.5.0 numpy google-api-python-client google-auth-oauthlib google-auth-httplib2
 
       - name: Run Shorts Creator Script
         env:
@@ -39,5 +37,4 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          source venv/bin/activate
-          python main.py
+          ./venv/bin/python main.py
