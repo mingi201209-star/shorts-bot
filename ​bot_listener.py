@@ -2,10 +2,10 @@ import time
 import requests
 import os
 
-# 본인의 정보로 수정해주세요!
-TELEGRAM_BOT_TOKEN = "당신의_텔레그램_봇_토큰"
-GITHUB_TOKEN = "당신의_깃허브_Personal_Access_Token"
-GITHUB_REPO = "mingi201/.../shorts..."  # 본인의 깃허브 사용자이름/저장소이름 (예: mingi201/shorts-automation)
+# 이미 발급받아 두신 토큰과 정보를 여기에 입력하세요
+TELEGRAM_BOT_TOKEN = "여기에_텔레그램_봇_토큰"
+GITHUB_TOKEN = "여기에_아까_발급받은_깃허브_토큰"
+GITHUB_REPO = "mingi201/shorts-automation"  # 본인의 정확한 깃허브 저장소 이름
 
 def trigger_github_action():
     """GitHub Actions 워크플로우를 원격으로 강제 실행하는 함수"""
@@ -47,13 +47,9 @@ def main():
                         else:
                             send_msg(chat_id, "❌ GitHub 트리거 실패. 토큰이나 저장소 이름을 확인해주세요.")
                             
-                    elif text in ["/help", "/도움말"]:
-                        send_msg(chat_id, "📌 명령어 안내\n/shorts 또는 /시작 : 랜덤 딥상식 숏츠 제작 시작")
-                            
         except Exception as e:
             print(f"Polling error: {e}")
         time.sleep(2)
 
 if __name__ == "__main__":
     main()
-
