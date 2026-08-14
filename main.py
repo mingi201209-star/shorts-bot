@@ -1,12 +1,11 @@
 import os
 import re
-import json
 import asyncio
-import urllib.request
-import urllib.parse
+import requests
 import openai
 import edge_tts
 import numpy as np
+from urllib.parse import quote
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
 from moviepy.video.fx.all import crop, loop
@@ -21,45 +20,26 @@ def send_telegram_message(message):
         return
     try:
         url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-        data = json.dumps({"chat_id": TELEGRAM_CHAT_ID, "text": str(message)}).encode('utf-8')
-        req = urllib.request.Request(url, data=data, headers={'Content-Type': 'application/json'})
-        urllib.request.urlopen(req, timeout=10)
+        requests.post(url, json={"chat_id": TELEGRAM_CHAT_ID, "text": str(message)}, timeout=10)
     except Exception as e:
-        print(f"Telegram send error: {e}")
+        print(f"Telegram error: {e}")
 
 def send_telegram_video(video_path):
     if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: 
         return
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
     try:
-        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
-        boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
-        
-        with open(video_path, 'rb') as f:
-            video_data = f.read()
-
-        body = []
-        body.append(f'--{boundary}'.encode('utf-8'))
-        body.append(f'Content-Disposition: form-data; name="chat_id"'.encode('utf-8'))
-        body.append(b'')
-        body.append(str(TELEGRAM_CHAT_ID).encode('utf-8'))
-
-        body.append(f'--{boundary}'.encode('utf-8'))
-        body.append(f'Content-Disposition: form-data; name="video"; filename="shorts.mp4"'.encode('utf-8'))
-        body.append(b'Content-Type: video/mp4')
-        body.append(b'')
-        body.append(video_data)
-        body.append(f'--{boundary}--'.encode('utf-8'))
-        body.append(b'')
-
-        payload = b'\r\n'.join(body)
-        headers = {
-            'Content-Type': f'multipart/form-data; boundary={boundary}',
-            'Content-Length': str(len(payload))
-        }
-        req = urllib.request.Request(url, data=payload, headers=headers)
-        urllib.request.urlopen(req, timeout=120)
+        with open(video_path, 'rb') as video_file:
+            response = requests.post(
+                url, 
+                data={"chat_id": TELEGRAM_CHAT_ID}, 
+                files={"video": video_file},
+                timeout=120
+            )
+            if not response.ok:
+                send_telegram_message(f"⚠️ 영상 전송 실패 (코드: {response.status_code})")
     except Exception as e:
-        send_telegram_message(f"비디오 전송 실패: {str(e)}")
+        send_telegram_message(f"⚠️ 영상 전송 에러: {str(e)}")
 
 async def generate_voice(text, output_path):
     communicate = edge_tts.Communicate(text, "ko-KR-SunHiNeural")
@@ -185,35 +165,32 @@ def main():
             audio_clip = AudioFileClip(audio_path)
             duration = audio_clip.duration
 
-            keyword_prompt = f"""
-            Extract ONE English word for Pexels video search based on this sentence: '{line}'
-            Respond with ONLY ONE ENGLISH WORD.
-            """
+            keyword_prompt = f"Extract 1 English word for Pexels search: '{line}'"
             keyword_res = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": keyword_prompt}])
             raw_keyword = keyword_res.choices[0].message.content.strip()
             
-            # 순수 영문 알파벳만 추출
+            # 영문만 남기기
             search_query = re.sub(r'[^a-zA-Z]', '', raw_keyword)
             if not search_query:
-                search_query = "nature"
+                search_query = "galaxy"
 
             headers = {"Authorization": PEXELS_API_KEY}
             pexels_url = f"https://api.pexels.com/videos/search?query={search_query}&per_page=3&orientation=portrait"
             
-            req = urllib.request.Request(pexels_url, headers=headers)
-            try:
-                with urllib.request.urlopen(req, timeout=15) as res:
-                    data = json.loads(res.read().decode('utf-8'))
-            except:
-                data = {}
+            res = requests.get(pexels_url, headers=headers, timeout=15)
+            res.encoding = 'utf-8'
+            data = res.json()
 
             video_path = f"video_{i}.mp4"
             if "videos" in data and len(data["videos"]) > 0:
                 video_url = data["videos"][0]["video_files"][0]["link"]
-                urllib.request.urlretrieve(video_url, video_path)
             else:
-                fallback_url = "https://static-vecteezy.com/system/resources/previews/001/802/396/mp4/abstract-loop-background-free-video.mp4"
-                urllib.request.urlretrieve(fallback_url, video_path)
+                # Pexels 내 기본 우주 영상 URL (안전한 대체 링크)
+                video_url = "https://videos.pexels.com/video-files/856987/856987-hd_1080_1920_30fps.mp4"
+
+            video_bytes = requests.get(video_url, timeout=30).content
+            with open(video_path, "wb") as f:
+                f.write(video_bytes)
 
             video_clip = process_video_clip(video_path, duration)
             sub_clips = create_animated_subtitles(line, duration)
@@ -236,7 +213,7 @@ def main():
         send_telegram_video(final_output_path)
 
     except Exception as e:
-        send_telegram_message("작업 중 오류 발생 (로그 확인 필요)")
+        send_telegram_message(f"오류 발생: {str(e)[:100]}")
         raise e
 
 if __name__ == "__main__":
