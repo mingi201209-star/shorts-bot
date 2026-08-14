@@ -4,11 +4,12 @@ import asyncio
 import requests
 import openai
 import edge_tts
+import whisper
 import numpy as np
 import PIL.Image
 from PIL import Image, ImageDraw, ImageFont
 
-# Pillow 10+ 호환성 패치 (MoviePy 1.0.3의 Image.ANTIALIAS 에러 방지)
+# Pillow 10+ 호환성 패치
 if not hasattr(PIL.Image, 'ANTIALIAS'):
     PIL.Image.ANTIALIAS = PIL.Image.LANCZOS
 
@@ -62,7 +63,6 @@ async def generate_voice(text, output_path):
 
 def process_video_clip(clip_path, duration):
     clip = VideoFileClip(clip_path)
-    
     if clip.duration < duration:
         try:
             clip = loop(clip, duration=duration)
@@ -98,103 +98,56 @@ def get_safe_korean_font(size):
         "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf",
         "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
     ]
-    
-    if not any(os.path.exists(p) for p in font_paths):
-        try:
-            url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Bold.ttf"
-            r = requests.get(url, timeout=15)
-            with open(font_filename, "wb") as f:
-                f.write(r.content)
-        except Exception as e:
-            print(f"Font download failed: {e}")
-
     for path in font_paths:
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)
             except Exception:
                 pass
-                
     return ImageFont.load_default()
 
 def render_subtitle_image(text):
     target_w = 1080
     font_size = 65
     font = get_safe_korean_font(font_size)
+    img_w = int(target_w * 0.9)
 
-    img_w = int(target_w * 0.88)
-    
-    lines = []
-    words = text.split()
-    current_line = ""
-    
-    for word in words:
-        test_line = f"{current_line} {word}".strip()
-        estimated_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in test_line)
-            
-        if estimated_w <= img_w:
-            current_line = test_line
-        else:
-            lines.append(current_line)
-            current_line = word
-    lines.append(current_line)
-
-    line_height = font_size + 20
-    img_h = line_height * len(lines) + 40
-
-    img = Image.new("RGBA", (img_w, img_h), (0, 0, 0, 0))
+    img = Image.new("RGBA", (img_w, font_size + 40), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
 
-    y = 20
-    for line in lines:
-        line_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in line)
-        x = max(0, int((img_w - line_w) // 2))
+    line_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in text)
+    x = max(0, int((img_w - line_w) // 2))
 
-        stroke_width = 6
-        for adj_x in range(-stroke_width, stroke_width + 1):
-            for adj_y in range(-stroke_width, stroke_width + 1):
-                draw.text((x + adj_x, y + adj_y), line, font=font, fill="black")
+    stroke_width = 6
+    for adj_x in range(-stroke_width, stroke_width + 1):
+        for adj_y in range(-stroke_width, stroke_width + 1):
+            draw.text((x + adj_x, 20 + adj_y), text, font=font, fill="black")
 
-        draw.text((x, y), line, font=font, fill="#FFE600")
-        y += line_height
-
+    draw.text((x, 20), text, font=font, fill="#FFE600")
     return np.array(img)
 
-def create_animated_subtitles(text, total_duration):
-    words = text.split()
-    if not words:
-        return []
-
-    chunks = []
-    curr = []
-    for word in words:
-        curr.append(word)
-        if len(curr) >= 2:
-            chunks.append(" ".join(curr))
-            curr = []
-    if curr:
-        chunks.append(" ".join(curr))
-
-    chunk_duration = total_duration / len(chunks)
-    subtitle_clips = []
-
-    for i, chunk in enumerate(chunks):
-        img_np = render_subtitle_image(chunk)
-        start_time = i * chunk_duration
-        sub_clip = (ImageClip(img_np)
-                    .set_start(start_time)
-                    .set_duration(chunk_duration)
-                    .set_position(('center', 0.72), relative=True))
-        subtitle_clips.append(sub_clip)
-
-    return subtitle_clips
+def fetch_pexels_video(query, index=0):
+    headers = {"Authorization": PEXELS_API_KEY}
+    url = f"https://api.pexels.com/videos/search?query={query}&per_page=5&orientation=portrait"
+    try:
+        res = requests.get(url, headers=headers, timeout=10)
+        data = res.json()
+        if "videos" in data and len(data["videos"]) > 0:
+            idx = min(index, len(data["videos"]) - 1)
+            return data["videos"][idx]["video_files"][0]["link"]
+    except Exception as e:
+        print(f"Pexels search error: {e}")
+    return "https://videos.pexels.com/video-files/856987/856987-hd_1080_1920_30fps.mp4"
 
 def main():
     try:
+        # Whisper 경량 모델 로드
+        whisper_model = whisper.load_model("base")
+
         prompt = """
-        유튜브 숏츠용 흥미로운 과학/우주/자연 상식 대본 3문장을 작성해줘.
+        유튜브 숏츠용 흥미로운 과학 상식 대본 3문장을 작성해줘.
         [규칙]
-        - 반드시 하나의 일관된 주제로만 작성할 것.
+        - 각 문장마다 명확히 다른 영상 주제(예: 지구 대기, 화성 환경, 우주 먼지)가 드러나게 작성할 것.
         - 특수문자, 번호표시, 따옴표 없이 순수 한국어 문장만 3줄로 출력할 것.
         """
         
@@ -209,37 +162,59 @@ def main():
             asyncio.run(generate_voice(line, audio_path))
             
             audio_clip = AudioFileClip(audio_path)
-            duration = audio_clip.duration
+            total_duration = audio_clip.duration
 
-            keyword_prompt = f"Extract 1 English word for Pexels search: '{line}'"
+            # 1. Whisper로 음성 분석 (단어별 타임스탬프 추출)
+            result = whisper_model.transcribe(audio_path, language="ko", word_timestamps=True)
+            
+            # 2. 문장 대표 검색어 추출
+            keyword_prompt = f"Convert this Korean sentence into 1 short English keyword for stock video: '{line}'"
             keyword_res = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": keyword_prompt}])
-            raw_keyword = keyword_res.choices[0].message.content.strip()
-            
-            search_query = re.sub(r'[^a-zA-Z]', '', raw_keyword)
-            if not search_query:
-                search_query = "galaxy"
+            search_query = re.sub(r'[^a-zA-Z]', '', keyword_res.choices[0].message.content.strip()) or "nature"
 
-            headers = {"Authorization": PEXELS_API_KEY}
-            pexels_url = f"https://api.pexels.com/videos/search?query={search_query}&per_page=3&orientation=portrait"
-            
-            res = requests.get(pexels_url, headers=headers, timeout=15)
-            res.encoding = 'utf-8'
-            data = res.json()
-
+            # 3. 해당 키워드로 배경 영상 매칭
+            video_url = fetch_pexels_video(search_query, i)
             video_path = f"video_{i}.mp4"
-            if "videos" in data and len(data["videos"]) > 0:
-                video_url = data["videos"][0]["video_files"][0]["link"]
-            else:
-                video_url = "https://videos.pexels.com/video-files/856987/856987-hd_1080_1920_30fps.mp4"
-
-            video_bytes = requests.get(video_url, timeout=30).content
             with open(video_path, "wb") as f:
-                f.write(video_bytes)
+                f.write(requests.get(video_url, timeout=30).content)
 
-            video_clip = process_video_clip(video_path, duration)
-            sub_clips = create_animated_subtitles(line, duration)
+            bg_video_clip = process_video_clip(video_path, total_duration)
 
-            combined_clip = CompositeVideoClip([video_clip] + sub_clips).set_audio(audio_clip)
+            # 4. 자막 타임라인 싱크 맞추기 (Whisper 분석 데이터 기반)
+            subtitle_clips = []
+            segments = result.get("segments", [])
+            
+            for segment in segments:
+                words = segment.get("words", [])
+                if not words:
+                    # 단어 분할이 안 된 경우 세그먼트 전체 기준
+                    txt = segment.get("text", "").strip()
+                    if txt:
+                        start = segment["start"]
+                        end = min(segment["end"], total_duration)
+                        dur = max(0.1, end - start)
+                        img_np = render_subtitle_image(txt)
+                        sub_clip = (ImageClip(img_np)
+                                    .set_start(start)
+                                    .set_duration(dur)
+                                    .set_position(('center', 0.75), relative=True))
+                        subtitle_clips.append(sub_clip)
+                else:
+                    for w in words:
+                        word_txt = w["word"].strip()
+                        if not word_txt:
+                            continue
+                        start = w["start"]
+                        end = min(w["end"], total_duration)
+                        dur = max(0.1, end - start)
+                        img_np = render_subtitle_image(word_txt)
+                        sub_clip = (ImageClip(img_np)
+                                    .set_start(start)
+                                    .set_duration(dur)
+                                    .set_position(('center', 0.75), relative=True))
+                        subtitle_clips.append(sub_clip)
+
+            combined_clip = CompositeVideoClip([bg_video_clip] + subtitle_clips).set_audio(audio_clip)
             clip_list.append(combined_clip)
 
         final_video = concatenate_videoclips(clip_list, method="compose")
@@ -253,7 +228,7 @@ def main():
             bitrate="3000k"
         )
 
-        send_telegram_message("🎬 업그레이드된 숏츠 생성이 완료되었습니다!")
+        send_telegram_message("🎬 PPT 스타일 초단위 싱크 숏츠 작성이 완료되었습니다!")
         send_telegram_video(final_output_path)
 
     except Exception as e:
