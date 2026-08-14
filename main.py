@@ -40,11 +40,9 @@ async def generate_voice(text, output_path):
     communicate = edge_tts.Communicate(text, "ko-KR-SunHiNeural")
     await communicate.save(output_path)
 
-# 비디오 길이 부족 시 반복(loop) 및 세로(1080x1920) 강제 크롭 (검은 화면 완벽 방지)
 def process_video_clip(clip_path, duration):
     clip = VideoFileClip(clip_path)
     
-    # 비디오 길이가 음성보다 짧으면 루프 실행
     if clip.duration < duration:
         clip = loop(clip, duration=duration)
     else:
@@ -64,20 +62,20 @@ def process_video_clip(clip_path, duration):
 
     return clip.resize((target_w, target_h))
 
-# 가독성 높은 숏폼 전용 자막 생성
-def create_subtitle_clip(text, duration):
+# 자막 이미지 생성 함수
+def render_subtitle_image(text):
     target_w = 1080
-    font_path = "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf"
-    font_size = 52
+    font_path = "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf"
+    font_size = 60
     try:
         font = ImageFont.truetype(font_path, font_size)
     except:
         font = ImageFont.load_default()
 
     img_w = int(target_w * 0.85)
-    words = text.split()
     
     lines = []
+    words = text.split()
     current_line = ""
     for word in words:
         test_line = f"{current_line} {word}".strip()
@@ -102,26 +100,54 @@ def create_subtitle_clip(text, duration):
         line_w = bbox[2] - bbox[0]
         x = (img_w - line_w) // 2
 
-        stroke_width = 5
-        # 테두리(검은색)
+        stroke_width = 6
         for adj_x in range(-stroke_width, stroke_width + 1):
             for adj_y in range(-stroke_width, stroke_width + 1):
                 draw.text((x + adj_x, y + adj_y), line, font=font, fill="black")
 
-        # 본문(노란색)
         draw.text((x, y), line, font=font, fill="#FFE600")
         y += line_height
 
-    img_np = np.array(img)
-    return ImageClip(img_np).set_duration(duration).set_position(('center', 0.72), relative=True)
+    return np.array(img)
+
+# 문장을 2~3단어씩 쪼개서 짧은 단위 자막 클립들로 변환
+def create_animated_subtitles(text, total_duration):
+    words = text.split()
+    if not words:
+        return []
+
+    # 2~3단어씩 구문 묶기
+    chunks = []
+    curr = []
+    for word in words:
+        curr.append(word)
+        if len(curr) >= 2:
+            chunks.append(" ".join(curr))
+            curr = []
+    if curr:
+        chunks.append(" ".join(curr))
+
+    chunk_duration = total_duration / len(chunks)
+    subtitle_clips = []
+
+    for i, chunk in enumerate(chunks):
+        img_np = render_subtitle_image(chunk)
+        start_time = i * chunk_duration
+        sub_clip = (ImageClip(img_np)
+                    .set_start(start_time)
+                    .set_duration(chunk_duration)
+                    .set_position(('center', 0.75), relative=True))
+        subtitle_clips.append(sub_clip)
+
+    return subtitle_clips
 
 def main():
     try:
         prompt = """
-        유튜브 숏츠용 흥미로운 과학/자연 상식 대본 3문장을 만들어줘.
+        유튜브 숏츠용 흥미로운 과학/우주/자연 상식 대본 3문장을 작성해줘.
         [규칙]
-        - 반드시 시청자의 호기심을 유발하는 하나의 일관된 주제로만 작성할 것.
-        - 특수문자, 번호표시(1.,2.), 따옴표 절대로 없이 순수 한국어 문장만 3줄 작성.
+        - 반드시 시청자가 끝까지 몰입할 수 있는 하나의 일관된 주제로만 작성할 것.
+        - 숫자인덱스(1., 2. 등), 특수문자, 따옴표 없이 순수 한국어 문장만 3줄로 출력할 것.
         """
         
         response = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": prompt}])
@@ -137,12 +163,10 @@ def main():
             audio_clip = AudioFileClip(audio_path)
             duration = audio_clip.duration
 
-            # 키워드 추출 시 '바다', '우주' 등 배경 영상에 어울리는 구체적 명사 강조
             keyword_prompt = f"""
-            다음 문장의 분위기와 가장 잘 어울리는 HD 배경 비디오 검색용 영어 단어 1개만 골라줘.
-            (예시: ocean, space, forest, galaxy, deep sea)
+            다음 문장의 배경으로 어울리는 시각적 영상 검색용 영어 단어 1개만 골라줘.
             문장: '{line}'
-            답변: 단어 1개만
+            출력: 단어 1개만
             """
             keyword_res = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": keyword_prompt}])
             search_query = keyword_res.choices[0].message.content.strip().replace('"', '').replace('.', '')
@@ -156,19 +180,18 @@ def main():
                 with open(video_path, "wb") as f:
                     f.write(requests.get(video_url).content)
             else:
-                # 대체 기본 우주/바다 힐링 영상
                 video_url = "https://static-vecteezy.com/system/resources/previews/001/802/396/mp4/abstract-loop-background-free-video.mp4"
                 with open(video_path, "wb") as f:
                     f.write(requests.get(video_url).content)
 
-            # 비디오 가공 (루프 + 크롭)
             video_clip = process_video_clip(video_path, duration)
-            txt_clip = create_subtitle_clip(line, duration)
+            
+            # 자막을 단어 단위로 착-착 전환되게 생성
+            sub_clips = create_animated_subtitles(line, duration)
 
-            combined_clip = CompositeVideoClip([video_clip, txt_clip]).set_audio(audio_clip)
+            combined_clip = CompositeVideoClip([video_clip] + sub_clips).set_audio(audio_clip)
             clip_list.append(combined_clip)
 
-        # 연결 부위 매끄럽게 합성
         final_video = concatenate_videoclips(clip_list, method="compose")
         final_output_path = "final_shorts.mp4"
         
@@ -180,7 +203,7 @@ def main():
             bitrate="3000k"
         )
 
-        send_telegram_message("🎬 고화질 숏츠 영상 생성이 완료되었습니다!")
+        send_telegram_message("🎬 퀄리티 업그레이드된 숏츠 영상 생성 완료!")
         send_telegram_video(final_output_path)
 
     except Exception as e:
