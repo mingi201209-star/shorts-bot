@@ -13,17 +13,30 @@ TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
 def send_telegram_message(message):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: return
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: 
+        return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID, "text": message})
 
 def send_telegram_video(video_path):
-    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: return
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID: 
+        return
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendVideo"
-    with open(video_path, 'rb') as video_file:
-        requests.post(url, data={"chat_id": TELEGRAM_CHAT_ID}, files={"video": video_file})
+    try:
+        with open(video_path, 'rb') as video_file:
+            # 타임아웃을 120초로 설정하여 깃허브 액션 환경에서 대용량 영상 전송 끊김 방지
+            response = requests.post(
+                url, 
+                data={"chat_id": TELEGRAM_CHAT_ID}, 
+                files={"video": video_file},
+                timeout=120
+            )
+            if not response.ok:
+                send_telegram_message(f"⚠️ 영상 업로드 실패 (응답 코드: {response.status_code}): {response.text}")
+    except Exception as e:
+        send_telegram_message(f"⚠️ 영상 전송 중 에러 발생: {str(e)}")
 
-# edge-tts 음성 파일 생성 함수
+# edge-tts 고품질 한국어 음성 생성 함수
 async def generate_voice(text, output_path):
     communicate = edge_tts.Communicate(text, "ko-KR-SunHiNeural")
     await communicate.save(output_path)
@@ -94,7 +107,7 @@ def main():
         for i, line in enumerate(lines):
             audio_path = f"audio_{i}.mp3"
             
-            # edge-tts 실행
+            # edge-tts 음성 파일 생성
             asyncio.run(generate_voice(line, audio_path))
             
             audio_clip = AudioFileClip(audio_path)
@@ -130,6 +143,7 @@ def main():
         final_output_path = "final_shorts.mp4"
         final_video.write_videofile(final_output_path, fps=30, codec="libx264", audio_codec="aac")
 
+        # 안내 메시지와 영상을 연속으로 전송
         send_telegram_message("🎬 영상 생성이 완료되었습니다! 아래 파일을 확인하세요.")
         send_telegram_video(final_output_path)
 
