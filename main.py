@@ -5,7 +5,6 @@ import requests
 import openai
 import edge_tts
 import numpy as np
-from urllib.parse import quote
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
 from moviepy.video.fx.all import crop, loop
@@ -67,24 +66,39 @@ def process_video_clip(clip_path, duration):
 
     return clip.resize((target_w, target_h))
 
+def get_korean_font(size):
+    font_paths = [
+        "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf",
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    ]
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except:
+                pass
+    return ImageFont.load_default()
+
 def render_subtitle_image(text):
     target_w = 1080
-    font_path = "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf"
     font_size = 65
-    try:
-        font = ImageFont.truetype(font_path, font_size)
-    except:
-        font = ImageFont.load_default()
+    font = get_korean_font(font_size)
 
     img_w = int(target_w * 0.88)
     
     lines = []
     words = text.split()
     current_line = ""
+    
     for word in words:
         test_line = f"{current_line} {word}".strip()
-        bbox = font.getbbox(test_line)
-        w = bbox[2] - bbox[0]
+        try:
+            bbox = font.getbbox(test_line)
+            w = bbox[2] - bbox[0]
+        except:
+            w = len(test_line) * font_size * 0.6  # latin-1 에러 대비 글자수 기반 가누기
+            
         if w <= img_w:
             current_line = test_line
         else:
@@ -100,8 +114,12 @@ def render_subtitle_image(text):
 
     y = 20
     for line in lines:
-        bbox = font.getbbox(line)
-        line_w = bbox[2] - bbox[0]
+        try:
+            bbox = font.getbbox(line)
+            line_w = bbox[2] - bbox[0]
+        except:
+            line_w = len(line) * font_size * 0.6
+            
         x = (img_w - line_w) // 2
 
         stroke_width = 7
@@ -169,7 +187,6 @@ def main():
             keyword_res = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": keyword_prompt}])
             raw_keyword = keyword_res.choices[0].message.content.strip()
             
-            # 영문만 남기기
             search_query = re.sub(r'[^a-zA-Z]', '', raw_keyword)
             if not search_query:
                 search_query = "galaxy"
@@ -185,7 +202,6 @@ def main():
             if "videos" in data and len(data["videos"]) > 0:
                 video_url = data["videos"][0]["video_files"][0]["link"]
             else:
-                # Pexels 내 기본 우주 영상 URL (안전한 대체 링크)
                 video_url = "https://videos.pexels.com/video-files/856987/856987-hd_1080_1920_30fps.mp4"
 
             video_bytes = requests.get(video_url, timeout=30).content
