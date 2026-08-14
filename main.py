@@ -167,34 +167,39 @@ def create_split_subtitles(text, duration):
 
 def fetch_pexels_video(query):
     headers = {"Authorization": PEXELS_API_KEY}
-    url = f"https://api.pexels.com/videos/search?query={query}&per_page=3&orientation=portrait"
+    url = f"https://api.pexels.com/videos/search?query={query}&per_page=5&orientation=portrait"
     try:
         res = requests.get(url, headers=headers, timeout=10)
         data = res.json()
         if "videos" in data and len(data["videos"]) > 0:
+            # 상위 검색 결과 중 첫 번째 영상 반환
             return data["videos"][0]["video_files"][0]["link"]
     except Exception as e:
         print(f"Pexels fetch error for {query}: {e}")
+    # 예비 고화질 우주/바다 배경 영상
     return "https://videos.pexels.com/video-files/856987/856987-hd_1080_1920_30fps.mp4"
 
 def main():
     try:
+        # 💡 Pexels 검색어 고도화 프롬프트
         prompt = """
-        유튜브 숏츠용 사람들이 거의 모를 법한 '아주 깊고 흥미로운 잡학/미스터리/과학/역사 상식' 주제로 대본을 구성해줘.
-        뻔한 바나나 이야기 같은 것은 제외하고, '모르는 게 당연한' 수준의 신기한 주제를 선정할 것.
+        유튜브 숏츠용 사람들이 모르는 흥미롭고 깊은 '우주/과학/지구 상식' 대본을 작성해줘.
         
-        [규칙]
-        - 전체 길이가 30초 내외가 되도록 총 5개~6개 구절(scenes)로 구성할 것.
-        - 각 구절은 짧고 명확하게(15자 내외) 작성할 것.
-        - 구절마다 시각적으로 딱 맞는 정확한 Pexels 영어 검색 키워드(keyword)를 작성할 것.
+        [Pexels 검색 키워드 작성 규칙 - 매우 중요!]
+        - 고유명사(예: Point Nemo, Nemo, Kim)는 절대 검색어로 쓰지 말 것! (물고기 니모가 나오는 불상사 방지)
+        - 반드시 Pexels에 실재하는 100% 직관적이고 보편적인 2-3단어 영문 풍경/시각 키워드만 쓸 것.
+          예시: 'deep ocean aerial', 'world map vintage', 'space astronaut Earth', 'dark stormy sea', 'lonely silhouette'
+        
+        [대본 규칙]
+        - 총 5~6개 구절(scenes), 각 구절 15자 내외.
         
         응답은 오직 아래 JSON 포맷으로만 전달해:
         [
-          {"text": "지구상에서 가장 외로운 곳, '포인트 네모'를 아시나요?", "keyword": "point nemo ocean"},
-          {"text": "육지에서 무려 2,688km나 떨어져 있습니다.", "keyword": "map isolated ocean"},
-          {"text": "너무 멀어서 가장 가까운 인간은 우주 비행사입니다.", "keyword": "iss astronaut space"},
-          {"text": "수명이 다한 인공위성들의 무덤이기도 하죠.", "keyword": "satellite crashing ocean"},
-          {"text": "이곳에 가면 지구상 그 누구와도 만날 수 없습니다.", "keyword": "thinking mystery isolated"}
+          {"text": "지구상에서 가장 외로운 바다, 포인트 네모를 아시나요?", "keyword": "deep ocean aerial"},
+          {"text": "육지에서 무려 2,688km나 떨어져 있습니다.", "keyword": "world map zoom"},
+          {"text": "너무 멀어서 가장 가까운 인간은 우주 비행사입니다.", "keyword": "earth from space astronaut"},
+          {"text": "수명이 다한 인공위성들의 무덤이기도 하죠.", "keyword": "dark ocean night"},
+          {"text": "이곳에 가면 세상 그 누구와도 만날 수 없습니다.", "keyword": "lonely man silhouette"}
         ]
         """
         
@@ -213,7 +218,7 @@ def main():
 
         for idx, item in enumerate(items[:6]):
             text = item.get("text", "")
-            keyword = item.get("keyword", "mystery")
+            keyword = item.get("keyword", "nature landscape")
 
             audio_path = f"scene_{idx}.mp3"
             asyncio.run(generate_voice(text, audio_path))
@@ -229,7 +234,6 @@ def main():
             video_clip = process_video_clip(video_path, duration)
             sub_clips = create_split_subtitles(text, duration)
 
-            # 괄호 수식 정확히 교정
             combined = CompositeVideoClip([video_clip] + sub_clips).set_audio(audio_clip)
             scene_clips.append(combined)
 
@@ -244,7 +248,7 @@ def main():
             bitrate="3000k"
         )
 
-        send_telegram_message("🎬 딥한 잡학 주제 숏츠 제작 완료!")
+        send_telegram_message("🎬 키워드 매칭 보정완료 숏츠 생성 완료!")
         send_telegram_video(final_output_path)
 
     except Exception as e:
