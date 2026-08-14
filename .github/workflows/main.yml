@@ -3,7 +3,7 @@ name: Shorts Auto Generator
 on:
   workflow_dispatch: # 수동 실행 버튼
   schedule:
-    - cron: '0 0 * * *' # 매일 정해진 시간에 자동 실행하고 싶을 때 사용 (선택 사항)
+    - cron: '0 0 * * *' # 매일 정해진 시간에 자동 실행 (선택 사항)
 
 jobs:
   build:
