@@ -28,7 +28,7 @@ jobs:
         run: |
           python -m venv venv
           ./venv/bin/pip install --upgrade pip
-          ./venv/bin/pip install gTTS gtts openai requests moviepy==1.0.3 Pillow==9.5.0 numpy google-api-python-client google-auth-oauthlib google-auth-httplib2
+          ./venv/bin/pip install edge-tts openai requests moviepy==1.0.3 Pillow==9.5.0 numpy google-api-python-client google-auth-oauthlib google-auth-httplib2
 
       - name: Run Shorts Creator Script
         env:
