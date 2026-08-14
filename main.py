@@ -5,7 +5,6 @@ import requests
 import openai
 import edge_tts
 import numpy as np
-from urllib.parse import quote
 from PIL import Image, ImageDraw, ImageFont
 from moviepy.editor import VideoFileClip, AudioFileClip, ImageClip, CompositeVideoClip, concatenate_videoclips
 from moviepy.video.fx.all import crop, loop
@@ -67,25 +66,50 @@ def process_video_clip(clip_path, duration):
 
     return clip.resize((target_w, target_h))
 
+# 한글 TTF 폰트를 직접 다운로드받아 로드 (디폴트 latin-1 폰트 진입 방지)
+def get_safe_korean_font(size):
+    font_filename = "NanumGothic.ttf"
+    font_paths = [
+        font_filename,
+        "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf",
+        "/usr/share/fonts/truetype/nanum/NanumGothic.ttf"
+    ]
+    
+    if not any(os.path.exists(p) for p in font_paths):
+        try:
+            url = "https://github.com/google/fonts/raw/main/ofl/nanumgothic/NanumGothic-Bold.ttf"
+            r = requests.get(url, timeout=15)
+            with open(font_filename, "wb") as f:
+                f.write(r.content)
+        except Exception as e:
+            print(f"Font download failed: {e}")
+
+    for path in font_paths:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                pass
+                
+    return ImageFont.load_default()
+
 def render_subtitle_image(text):
     target_w = 1080
-    font_path = "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf"
     font_size = 65
-    try:
-        font = ImageFont.truetype(font_path, font_size)
-    except:
-        font = ImageFont.load_default()
+    font = get_safe_korean_font(font_size)
 
     img_w = int(target_w * 0.88)
     
     lines = []
     words = text.split()
     current_line = ""
+    
+    # latin-1 에러 차단을 위한 글자 수 기반 너비 수치 계산
     for word in words:
         test_line = f"{current_line} {word}".strip()
-        bbox = font.getbbox(test_line)
-        w = bbox[2] - bbox[0]
-        if w <= img_w:
+        estimated_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in test_line)
+            
+        if estimated_w <= img_w:
             current_line = test_line
         else:
             lines.append(current_line)
@@ -100,11 +124,10 @@ def render_subtitle_image(text):
 
     y = 20
     for line in lines:
-        bbox = font.getbbox(line)
-        line_w = bbox[2] - bbox[0]
-        x = (img_w - line_w) // 2
+        line_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in line)
+        x = max(0, int((img_w - line_w) // 2))
 
-        stroke_width = 7
+        stroke_width = 6
         for adj_x in range(-stroke_width, stroke_width + 1):
             for adj_y in range(-stroke_width, stroke_width + 1):
                 draw.text((x + adj_x, y + adj_y), line, font=font, fill="black")
@@ -169,7 +192,6 @@ def main():
             keyword_res = openai.chat.completions.create(model="gpt-4o-mini", messages=[{"role": "user", "content": keyword_prompt}])
             raw_keyword = keyword_res.choices[0].message.content.strip()
             
-            # 영문만 남기기
             search_query = re.sub(r'[^a-zA-Z]', '', raw_keyword)
             if not search_query:
                 search_query = "galaxy"
@@ -185,7 +207,6 @@ def main():
             if "videos" in data and len(data["videos"]) > 0:
                 video_url = data["videos"][0]["video_files"][0]["link"]
             else:
-                # Pexels 내 기본 우주 영상 URL (안전한 대체 링크)
                 video_url = "https://videos.pexels.com/video-files/856987/856987-hd_1080_1920_30fps.mp4"
 
             video_bytes = requests.get(video_url, timeout=30).content
