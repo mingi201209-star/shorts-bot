@@ -125,13 +125,12 @@ def render_subtitle_image(text):
     line_w = sum(font_size if ord(c) > 127 else font_size * 0.55 for c in text)
     x = max(20, int((target_w - line_w) // 2))
 
-    # 두꺼운 외곽선
+    # 두꺼운 외곽선으로 가독성 극대화
     stroke_width = 8
     for dx in range(-stroke_width, stroke_width + 1):
         for dy in range(-stroke_width, stroke_width + 1):
             draw.text((x + dx, padding + dy), text, font=font, fill="black")
 
-    # 선명한 노란색 텍스트
     draw.text((x, padding), text, font=font, fill="#FFE600")
     return np.array(img)
 
@@ -172,34 +171,41 @@ def fetch_pexels_video(query):
         res = requests.get(url, headers=headers, timeout=10)
         data = res.json()
         if "videos" in data and len(data["videos"]) > 0:
-            # 상위 검색 결과 중 첫 번째 영상 반환
-            return data["videos"][0]["video_files"][0]["link"]
+            videos = data["videos"][0]["video_files"]
+            for v in videos:
+                if v.get("width", 0) >= 1080 or v.get("quality") == "hd":
+                    return v["link"]
+            return videos[0]["link"]
     except Exception as e:
         print(f"Pexels fetch error for {query}: {e}")
-    # 예비 고화질 우주/바다 배경 영상
     return "https://videos.pexels.com/video-files/856987/856987-hd_1080_1920_30fps.mp4"
 
 def main():
     try:
-        # 💡 Pexels 검색어 고도화 프롬프트
+        # 💡 최대 1분 30초 상한선(약 12~13개 구절)을 채우는 구체적이고 깊이 있는 대본 프롬프트
         prompt = """
-        유튜브 숏츠용 사람들이 모르는 흥미롭고 깊은 '우주/과학/지구 상식' 대본을 작성해줘.
+        유튜브 숏츠용으로 사람들이 전혀 몰랐던 '아주 깊고 구체적인 과학/역사/미스터리' 상식 주제로 대본을 구성해줘.
+        단순히 겉핥기 식이 아니라 사건의 배경, 구체적인 수치, 놀라운 반전이나 이유를 상세히 서술할 것.
         
-        [Pexels 검색 키워드 작성 규칙 - 매우 중요!]
-        - 고유명사(예: Point Nemo, Nemo, Kim)는 절대 검색어로 쓰지 말 것! (물고기 니모가 나오는 불상사 방지)
-        - 반드시 Pexels에 실재하는 100% 직관적이고 보편적인 2-3단어 영문 풍경/시각 키워드만 쓸 것.
-          예시: 'deep ocean aerial', 'world map vintage', 'space astronaut Earth', 'dark stormy sea', 'lonely silhouette'
+        [규칙]
+        - 전체 총 길이가 1분 15초 ~ 1분 30초 내외가 되도록 **총 12개~13개의 구절(scenes)**로 풍성하게 구성할 것.
+        - 각 구절은 명확한 내용 전달을 위해 15자 내외로 작성할 것.
+        - Pexels 검색 키워드는 고유명사를 절대 쓰지 말고, 100% 보편적 영문 풍경/시각 키워드만 사용할 것.
         
-        [대본 규칙]
-        - 총 5~6개 구절(scenes), 각 구절 15자 내외.
-        
-        응답은 오직 아래 JSON 포맷으로만 전달해:
+        응답은 오직 아래 JSON 포맷으로만 전달해 (배열 형태):
         [
-          {"text": "지구상에서 가장 외로운 바다, 포인트 네모를 아시나요?", "keyword": "deep ocean aerial"},
-          {"text": "육지에서 무려 2,688km나 떨어져 있습니다.", "keyword": "world map zoom"},
-          {"text": "너무 멀어서 가장 가까운 인간은 우주 비행사입니다.", "keyword": "earth from space astronaut"},
-          {"text": "수명이 다한 인공위성들의 무덤이기도 하죠.", "keyword": "dark ocean night"},
-          {"text": "이곳에 가면 세상 그 누구와도 만날 수 없습니다.", "keyword": "lonely man silhouette"}
+          {"text": "지구상에서 가장 외로운 곳, 포인트 네모를 아시나요?", "keyword": "deep ocean aerial"},
+          {"text": "남태평양 한가운데 위치한 거대한 바다의 오지입니다.", "keyword": "blue ocean waves"},
+          {"text": "가장 가까운 육지에서 무려 2,688km나 떨어져 있죠.", "keyword": "world map vintage"},
+          {"text": "이곳은 영양분이 거의 없어 생물도 살기 힘든 바다의 사막입니다.", "keyword": "underwater empty sea"},
+          {"text": "인간의 발길이 완전히 닿지 않는 완벽한 고립 지대인데요,", "keyword": "isolated ocean drone"},
+          {"text": "너무 외딴곳이라 상공을 지나가는 가장 가까운 인간은,", "keyword": "iss astronaut space"},
+          {"text": "무중력 우주 정거장에 머무는 우주 비행사들뿐입니다.", "keyword": "earth view from space"},
+          {"text": "지상에서 수백 킬로미터 떨어진 우주가 더 가깝다는 뜻이죠.", "keyword": "galaxy stars night"},
+          {"text": "게다가 이곳은 수명이 다한 인공위성들의 거대한 무덤이기도 한데요,", "keyword": "satellite orbiting earth"},
+          {"text": "지구로 떨어질 때 민간 피해를 막기 위해 의도적으로 추락시키는 곳입니다.", "keyword": "dark ocean night"},
+          {"text": "지금 이 순간에도 수많은 인공위성들이 이 깊은 바다로 잠들어 가고 있습니다.", "keyword": "deep blue sea underwater"},
+          {"text": "우리가 모르는 지구의 또 다른 비밀, 정말 놀랍지 않나요?", "keyword": "mysterious universe glow"}
         ]
         """
         
@@ -216,7 +222,8 @@ def main():
 
         scene_clips = []
 
-        for idx, item in enumerate(items[:6]):
+        # 최대 13개 구절까지 수용
+        for idx, item in enumerate(items[:13]):
             text = item.get("text", "")
             keyword = item.get("keyword", "nature landscape")
 
@@ -240,15 +247,16 @@ def main():
         final_video = concatenate_videoclips(scene_clips, method="chain")
         final_output_path = "final_shorts.mp4"
         
+        # 5000k 고화질 비트레이트 유지
         final_video.write_videofile(
             final_output_path, 
             fps=30, 
             codec="libx264", 
             audio_codec="aac",
-            bitrate="3000k"
+            bitrate="5000k"
         )
 
-        send_telegram_message("🎬 키워드 매칭 보정완료 숏츠 생성 완료!")
+        send_telegram_message("🎬 최대 1분 30초 상한선 적용 완료된 고화질 숏츠 완성!")
         send_telegram_video(final_output_path)
 
     except Exception as e:
