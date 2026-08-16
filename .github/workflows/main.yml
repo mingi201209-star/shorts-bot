@@ -51,5 +51,10 @@ jobs:
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+          V3_JUDGE_MODEL: gpt-4o-mini
+          V3_MAX_API_CALLS: "12"
+          V3_MAX_COST_USD: "0.05"
+
         run: |
           python main.py
