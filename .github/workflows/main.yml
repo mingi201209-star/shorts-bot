@@ -2,6 +2,9 @@ name: Shorts Generator
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -11,10 +14,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+          ffmpeg -version
+          fc-cache -f -v
+
+      - name: Verify Korean fonts
+        run: |
+          echo "=== Korean font check ==="
+          fc-list :lang=ko family file | head -30
+
+          if ! fc-list :lang=ko | grep -qi "Noto Sans CJK\|Nanum"; then
+            echo "❌ Korean font not found"
+            exit 1
+          fi
+
+          echo "✅ Korean font detected"
 
       - name: Install dependencies
         run: |
@@ -22,15 +44,6 @@ jobs:
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
           fi
-
-      - name: Install FFmpeg and Korean fonts
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg
-          sudo apt-get install -y fonts-noto-cjk fonts-nanum
-          fc-cache -fv
-          ffmpeg -version
-          fc-match "Noto Sans CJK KR"
 
       - name: Run Shorts Generator
         env:
