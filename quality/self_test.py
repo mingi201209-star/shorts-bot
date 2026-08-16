@@ -1,11 +1,10 @@
 # quality/self_test.py
 
-from quality.consensus import (
-    build_consensus,
-)
+from quality.consensus import build_consensus
 
 from quality.review_router import (
     choose_review_route,
+    evaluate_fact_appeal,
 )
 
 from quality.rewrite_engine import (
@@ -14,38 +13,15 @@ from quality.rewrite_engine import (
 
 
 # ============================================================
-# Shorts V3 Quality System Self Test
+# Shorts V3.1 Quality System Self Test
 # ============================================================
-#
-# 목적:
-#   실제 제작 파이프라인에 연결하기 전에
-#   품질 엔진의 의사결정 로직 자체를 검증한다.
-#
-# 특징:
-#   - 영상 생성 없음
-#   - Telegram 전송 없음
-#
-# 테스트:
-#   1. 정상 PASS
-#   2. 약한 Hook
-#   3. Judge 의견 충돌
-#   4. Fact Critical Risk
-#   5. 낮은 Confidence
-#   6. Visual 문제
-#   7. REVIEW Router
-#   8. 여러 영역 동시 불확실
-#   9. Critical Risk 평균점수 은폐 방지
-#   10. 선택적 Rewrite
-#
-# ============================================================
-
 
 PASSED = 0
 FAILED = 0
 
 
 # ============================================================
-# 테스트용 Judge 결과 생성
+# 테스트용 Judge 결과
 # ============================================================
 
 def make_judge_result(
@@ -70,49 +46,29 @@ def make_judge_result(
 
 
 # ============================================================
-# ASSERT
+# Assert
 # ============================================================
 
-def assert_equal(
-    name,
-    actual,
-    expected,
-):
+def assert_equal(name, actual, expected):
 
     global PASSED
     global FAILED
 
     if actual == expected:
-
         PASSED += 1
-
-        print(
-            f"✅ PASS | {name}"
-        )
-
+        print(f"✅ PASS | {name}")
         return True
 
     FAILED += 1
 
-    print(
-        f"❌ FAIL | {name}"
-    )
-
-    print(
-        f"   expected: {expected}"
-    )
-
-    print(
-        f"   actual:   {actual}"
-    )
+    print(f"❌ FAIL | {name}")
+    print(f"   expected: {expected}")
+    print(f"   actual:   {actual}")
 
     return False
 
 
-def assert_true(
-    name,
-    condition,
-):
+def assert_true(name, condition):
 
     return assert_equal(
         name,
@@ -122,44 +78,50 @@ def assert_true(
 
 
 # ============================================================
-# 1. 정상 PASS
+# 기본 Pool 생성
 # ============================================================
 
-def test_normal_pass():
+def make_good_pool():
 
-    pool = {
-
+    return {
         "hook": [
             make_judge_result(
                 "hook",
                 9.0,
-            ),
+            )
         ],
 
         "novelty": [
             make_judge_result(
                 "novelty",
                 8.5,
-            ),
+            )
         ],
 
         "fact": [
             make_judge_result(
                 "fact",
-                9.2,
-            ),
+                9.0,
+            )
         ],
 
         "visual": [
             make_judge_result(
                 "visual",
-                8.4,
-            ),
+                8.5,
+            )
         ],
     }
 
+
+# ============================================================
+# 1. 정상 PASS
+# ============================================================
+
+def test_normal_pass():
+
     result = build_consensus(
-        pool
+        make_good_pool()
     )
 
     assert_equal(
@@ -170,41 +132,19 @@ def test_normal_pass():
 
 
 # ============================================================
-# 2. Hook 약함
+# 2. 약한 Hook
 # ============================================================
 
 def test_weak_hook():
 
-    pool = {
+    pool = make_good_pool()
 
-        "hook": [
-            make_judge_result(
-                "hook",
-                4.0,
-            ),
-        ],
-
-        "novelty": [
-            make_judge_result(
-                "novelty",
-                8.0,
-            ),
-        ],
-
-        "fact": [
-            make_judge_result(
-                "fact",
-                9.0,
-            ),
-        ],
-
-        "visual": [
-            make_judge_result(
-                "visual",
-                8.0,
-            ),
-        ],
-    }
+    pool["hook"] = [
+        make_judge_result(
+            "hook",
+            4.0,
+        )
+    ]
 
     result = build_consensus(
         pool
@@ -227,46 +167,23 @@ def test_weak_hook():
 
 
 # ============================================================
-# 3. 같은 전문 Judge끼리 심한 충돌
+# 3. Judge 심한 충돌
 # ============================================================
 
 def test_judge_disagreement():
 
-    pool = {
+    pool = make_good_pool()
 
-        "hook": [
-            make_judge_result(
-                "hook",
-                9.0,
-            ),
-
-            make_judge_result(
-                "hook",
-                4.0,
-            ),
-        ],
-
-        "novelty": [
-            make_judge_result(
-                "novelty",
-                8.5,
-            ),
-        ],
-
-        "fact": [
-            make_judge_result(
-                "fact",
-                9.0,
-            ),
-        ],
-
-        "visual": [
-            make_judge_result(
-                "visual",
-                8.5,
-            ),
-        ],
-    }
+    pool["hook"] = [
+        make_judge_result(
+            "hook",
+            9.0,
+        ),
+        make_judge_result(
+            "hook",
+            4.0,
+        ),
+    ]
 
     result = build_consensus(
         pool
@@ -281,53 +198,29 @@ def test_judge_disagreement():
     assert_true(
         "Critical disagreement 감지",
         len(
-            result[
-                "disagreements"
-            ]["critical"]
+            result["disagreements"]["critical"]
         ) > 0,
     )
 
 
 # ============================================================
-# 4. Fact Critical Risk
+# 4. Fact Critical → REVIEW
 # ============================================================
 
-def test_fact_critical():
+def test_fact_critical_review():
 
-    pool = {
+    pool = make_good_pool()
 
-        "hook": [
-            make_judge_result(
-                "hook",
-                9.5,
-            ),
-        ],
-
-        "novelty": [
-            make_judge_result(
-                "novelty",
-                9.0,
-            ),
-        ],
-
-        "fact": [
-            make_judge_result(
-                "fact",
-                8.5,
-                critical_risk=True,
-                issues=[
-                    "확인되지 않은 수치"
-                ],
-            ),
-        ],
-
-        "visual": [
-            make_judge_result(
-                "visual",
-                9.0,
-            ),
-        ],
-    }
+    pool["fact"] = [
+        make_judge_result(
+            "fact",
+            9.5,
+            critical_risk=True,
+            issues=[
+                "검증되지 않은 사실"
+            ],
+        )
+    ]
 
     result = build_consensus(
         pool
@@ -339,57 +232,67 @@ def test_fact_critical():
         "REVIEW",
     )
 
+
+# ============================================================
+# 5. Fact Critical → FACT_EXTRA_JUDGE
+# ============================================================
+
+def test_fact_critical_route():
+
+    pool = make_good_pool()
+
+    pool["fact"] = [
+        make_judge_result(
+            "fact",
+            9.0,
+            critical_risk=True,
+        )
+    ]
+
+    consensus = build_consensus(
+        pool
+    )
+
     route = choose_review_route(
-        result
+        consensus
     )
 
     assert_equal(
-        "Fact Critical → HOLD",
+        "Fact Critical → FACT_EXTRA_JUDGE",
         route["route"],
-        "HOLD",
+        "FACT_EXTRA_JUDGE",
+    )
+
+    assert_equal(
+        "Fact 재심 영역 1개",
+        route["domains"],
+        ["fact"],
     )
 
 
 # ============================================================
-# 5. 복수 Judge 낮은 Confidence
+# 6. 복수 Low Confidence
 # ============================================================
 
 def test_low_confidence():
 
-    pool = {
+    pool = make_good_pool()
 
-        "hook": [
-            make_judge_result(
-                "hook",
-                8.5,
-                confidence=0.40,
-            ),
-        ],
+    pool["hook"] = [
+        make_judge_result(
+            "hook",
+            8.5,
+            confidence=0.40,
+        )
+    ]
 
-        "novelty": [
-            make_judge_result(
-                "novelty",
-                8.5,
-                confidence=0.45,
-            ),
-        ],
-
-        "fact": [
-            make_judge_result(
-                "fact",
-                9.0,
-                confidence=0.90,
-            ),
-        ],
-
-        "visual": [
-            make_judge_result(
-                "visual",
-                8.5,
-                confidence=0.90,
-            ),
-        ],
-    }
+    pool["novelty"] = [
+        make_judge_result(
+            "novelty",
+            8.5,
+            confidence=0.45,
+        )
+    ]
 
     result = build_consensus(
         pool
@@ -404,54 +307,29 @@ def test_low_confidence():
     assert_equal(
         "Low Confidence 2개 탐지",
         len(
-            result[
-                "low_confidence"
-            ]
+            result["low_confidence"]
         ),
         2,
     )
 
 
 # ============================================================
-# 6. Visual 문제
+# 7. Visual 문제
 # ============================================================
 
 def test_visual_rewrite():
 
-    pool = {
+    pool = make_good_pool()
 
-        "hook": [
-            make_judge_result(
-                "hook",
-                8.5,
-            ),
-        ],
-
-        "novelty": [
-            make_judge_result(
-                "novelty",
-                8.5,
-            ),
-        ],
-
-        "fact": [
-            make_judge_result(
-                "fact",
-                9.0,
-            ),
-        ],
-
-        "visual": [
-            make_judge_result(
-                "visual",
-                4.0,
-                issues=[
-                    "대사와 B-roll 연결 부족",
-                    "추상적인 검색어",
-                ],
-            ),
-        ],
-    }
+    pool["visual"] = [
+        make_judge_result(
+            "visual",
+            4.0,
+            issues=[
+                "대사와 화면 연결 부족",
+            ],
+        )
+    ]
 
     result = build_consensus(
         pool
@@ -474,46 +352,23 @@ def test_visual_rewrite():
 
 
 # ============================================================
-# 7. REVIEW → EXTRA JUDGE
+# 8. 일반 REVIEW → EXTRA_JUDGE
 # ============================================================
 
 def test_review_router():
 
-    pool = {
+    pool = make_good_pool()
 
-        "hook": [
-            make_judge_result(
-                "hook",
-                9.0,
-            ),
-
-            make_judge_result(
-                "hook",
-                5.0,
-            ),
-        ],
-
-        "novelty": [
-            make_judge_result(
-                "novelty",
-                8.5,
-            ),
-        ],
-
-        "fact": [
-            make_judge_result(
-                "fact",
-                9.0,
-            ),
-        ],
-
-        "visual": [
-            make_judge_result(
-                "visual",
-                8.5,
-            ),
-        ],
-    }
+    pool["hook"] = [
+        make_judge_result(
+            "hook",
+            9.0,
+        ),
+        make_judge_result(
+            "hook",
+            5.0,
+        ),
+    ]
 
     consensus = build_consensus(
         pool
@@ -536,44 +391,36 @@ def test_review_router():
 
 
 # ============================================================
-# 8. 여러 영역 동시에 불확실
+# 9. 너무 많은 불확실 영역
 # ============================================================
 
 def test_too_many_uncertain_domains():
 
-    pool = {
+    pool = make_good_pool()
 
-        "hook": [
-            make_judge_result(
-                "hook",
-                9.0,
-                confidence=0.4,
-            ),
-        ],
+    pool["hook"] = [
+        make_judge_result(
+            "hook",
+            9.0,
+            confidence=0.4,
+        )
+    ]
 
-        "novelty": [
-            make_judge_result(
-                "novelty",
-                8.5,
-                confidence=0.4,
-            ),
-        ],
+    pool["novelty"] = [
+        make_judge_result(
+            "novelty",
+            8.5,
+            confidence=0.4,
+        )
+    ]
 
-        "fact": [
-            make_judge_result(
-                "fact",
-                9.0,
-                confidence=0.4,
-            ),
-        ],
-
-        "visual": [
-            make_judge_result(
-                "visual",
-                8.5,
-            ),
-        ],
-    }
+    pool["visual"] = [
+        make_judge_result(
+            "visual",
+            8.5,
+            confidence=0.4,
+        )
+    ]
 
     consensus = build_consensus(
         pool
@@ -591,42 +438,24 @@ def test_too_many_uncertain_domains():
 
 
 # ============================================================
-# 9. Critical Risk가 평균점수로 묻히지 않는지
+# 10. Critical Risk 평균 은폐 방지
 # ============================================================
 
 def test_critical_not_hidden_by_average():
 
-    pool = {
+    pool = make_good_pool()
 
-        "hook": [
-            make_judge_result(
-                "hook",
-                10.0,
-            ),
-        ],
+    pool["hook"][0]["score"] = 10.0
+    pool["novelty"][0]["score"] = 10.0
+    pool["visual"][0]["score"] = 10.0
 
-        "novelty": [
-            make_judge_result(
-                "novelty",
-                10.0,
-            ),
-        ],
-
-        "fact": [
-            make_judge_result(
-                "fact",
-                10.0,
-                critical_risk=True,
-            ),
-        ],
-
-        "visual": [
-            make_judge_result(
-                "visual",
-                10.0,
-            ),
-        ],
-    }
+    pool["fact"] = [
+        make_judge_result(
+            "fact",
+            10.0,
+            critical_risk=True,
+        )
+    ]
 
     consensus = build_consensus(
         pool
@@ -640,41 +469,19 @@ def test_critical_not_hidden_by_average():
 
 
 # ============================================================
-# 10. 한 영역만 낮으면 그 영역만 Rewrite
+# 11. 선택적 Rewrite
 # ============================================================
 
 def test_selective_rewrite():
 
-    pool = {
+    pool = make_good_pool()
 
-        "hook": [
-            make_judge_result(
-                "hook",
-                9.0,
-            ),
-        ],
-
-        "novelty": [
-            make_judge_result(
-                "novelty",
-                9.0,
-            ),
-        ],
-
-        "fact": [
-            make_judge_result(
-                "fact",
-                9.0,
-            ),
-        ],
-
-        "visual": [
-            make_judge_result(
-                "visual",
-                5.0,
-            ),
-        ],
-    }
+    pool["visual"] = [
+        make_judge_result(
+            "visual",
+            5.0,
+        )
+    ]
 
     consensus = build_consensus(
         pool
@@ -698,6 +505,330 @@ def test_selective_rewrite():
 
 
 # ============================================================
+# 12. Fact Appeal
+# Critical + Critical → HOLD
+# ============================================================
+
+def test_fact_appeal_hold():
+
+    merged_pool = {
+        "fact": [
+            make_judge_result(
+                "fact",
+                8.0,
+                critical_risk=True,
+            ),
+            make_judge_result(
+                "fact",
+                7.5,
+                critical_risk=True,
+            ),
+        ]
+    }
+
+    result = evaluate_fact_appeal(
+        merged_pool
+    )
+
+    assert_equal(
+        "Fact Critical 2회 → HOLD",
+        result["status"],
+        "HOLD",
+    )
+
+
+# ============================================================
+# 13. Fact Appeal
+# Critical + Normal → DISAGREEMENT
+# ============================================================
+
+def test_fact_appeal_disagreement():
+
+    merged_pool = {
+        "fact": [
+            make_judge_result(
+                "fact",
+                8.0,
+                critical_risk=True,
+            ),
+            make_judge_result(
+                "fact",
+                8.5,
+                critical_risk=False,
+            ),
+        ]
+    }
+
+    result = evaluate_fact_appeal(
+        merged_pool
+    )
+
+    assert_equal(
+        "Fact Judge 충돌 → DISAGREEMENT",
+        result["status"],
+        "DISAGREEMENT",
+    )
+
+
+# ============================================================
+# 14. Fact Appeal
+# Normal + Normal → CLEARED
+# ============================================================
+
+def test_fact_appeal_cleared():
+
+    merged_pool = {
+        "fact": [
+            make_judge_result(
+                "fact",
+                8.0,
+                critical_risk=False,
+            ),
+            make_judge_result(
+                "fact",
+                9.0,
+                critical_risk=False,
+            ),
+        ]
+    }
+
+    result = evaluate_fact_appeal(
+        merged_pool
+    )
+
+    assert_equal(
+        "Fact 둘 다 정상 → CLEARED",
+        result["status"],
+        "CLEARED",
+    )
+
+
+# ============================================================
+# 15. Fact Appeal 결과 부족
+# ============================================================
+
+def test_fact_appeal_insufficient():
+
+    merged_pool = {
+        "fact": [
+            make_judge_result(
+                "fact",
+                8.0,
+                critical_risk=True,
+            )
+        ]
+    }
+
+    result = evaluate_fact_appeal(
+        merged_pool
+    )
+
+    assert_equal(
+        "Fact 재심 결과 부족 → INSUFFICIENT",
+        result["status"],
+        "INSUFFICIENT",
+    )
+
+
+# ============================================================
+# 16. Reliability 표본 부족 보호
+# ============================================================
+
+def test_reliability_small_sample():
+
+    report = {
+        "hook": {
+            "reliability": 0.5,
+            "statistics": {
+                "evaluated": 5,
+            },
+        }
+    }
+
+    consensus = build_consensus(
+        make_good_pool(),
+        reliability_report=report,
+    )
+
+    reliability = (
+        consensus[
+            "domain_summaries"
+        ]["hook"]["reliability"]
+    )
+
+    assert_equal(
+        "표본 5개 → Reliability 1.0 고정",
+        reliability,
+        1.0,
+    )
+
+
+# ============================================================
+# 17. Reliability 10~29 보호
+# ============================================================
+
+def test_reliability_10_29():
+
+    report = {
+        "hook": {
+            "reliability": 0.5,
+            "statistics": {
+                "evaluated": 20,
+            },
+        }
+    }
+
+    consensus = build_consensus(
+        make_good_pool(),
+        reliability_report=report,
+    )
+
+    reliability = (
+        consensus[
+            "domain_summaries"
+        ]["hook"]["reliability"]
+    )
+
+    assert_equal(
+        "표본 20개 → 최소 Reliability 0.90",
+        reliability,
+        0.90,
+    )
+
+
+# ============================================================
+# 18. Reliability 30~99 보호
+# ============================================================
+
+def test_reliability_30_99():
+
+    report = {
+        "hook": {
+            "reliability": 0.5,
+            "statistics": {
+                "evaluated": 60,
+            },
+        }
+    }
+
+    consensus = build_consensus(
+        make_good_pool(),
+        reliability_report=report,
+    )
+
+    reliability = (
+        consensus[
+            "domain_summaries"
+        ]["hook"]["reliability"]
+    )
+
+    assert_equal(
+        "표본 60개 → 최소 Reliability 0.80",
+        reliability,
+        0.80,
+    )
+
+
+# ============================================================
+# 19. Reliability 100+ 본격 적용
+# ============================================================
+
+def test_reliability_100_plus():
+
+    report = {
+        "hook": {
+            "reliability": 0.55,
+            "statistics": {
+                "evaluated": 150,
+            },
+        }
+    }
+
+    consensus = build_consensus(
+        make_good_pool(),
+        reliability_report=report,
+    )
+
+    reliability = (
+        consensus[
+            "domain_summaries"
+        ]["hook"]["reliability"]
+    )
+
+    assert_equal(
+        "표본 150개 → Reliability 0.55 적용",
+        reliability,
+        0.55,
+    )
+
+
+# ============================================================
+# 20. Judge 독재 방지 상한
+# ============================================================
+
+def test_reliability_upper_limit():
+
+    report = {
+        "fact": {
+            "reliability": 5.0,
+            "statistics": {
+                "evaluated": 200,
+            },
+        }
+    }
+
+    consensus = build_consensus(
+        make_good_pool(),
+        reliability_report=report,
+    )
+
+    reliability = (
+        consensus[
+            "domain_summaries"
+        ]["fact"]["reliability"]
+    )
+
+    assert_equal(
+        "Judge Reliability 최대 1.25",
+        reliability,
+        1.25,
+    )
+
+
+# ============================================================
+# 21. Judge 완전 제거 방지 하한
+# ============================================================
+
+def test_reliability_lower_limit():
+
+    report = {
+        "visual": {
+            "reliability": 0.0,
+            "statistics": {
+                "evaluated": 200,
+            },
+        }
+    }
+
+    consensus = build_consensus(
+        make_good_pool(),
+        reliability_report=report,
+    )
+
+    reliability = (
+        consensus[
+            "domain_summaries"
+        ]["visual"]["reliability"]
+    )
+
+    assert_equal(
+        "Judge Reliability 최소 0.50",
+        reliability,
+        0.50,
+    )
+
+
+# ============================================================
 # 전체 실행
 # ============================================================
 
@@ -711,22 +842,31 @@ def run_all_tests():
 
     print("")
     print("=" * 64)
-    print(
-        "🧪 SHORTS V3 QUALITY ENGINE SELF TEST"
-    )
+    print("🧪 SHORTS V3.1 QUALITY ENGINE SELF TEST")
     print("=" * 64)
 
     tests = [
         test_normal_pass,
         test_weak_hook,
         test_judge_disagreement,
-        test_fact_critical,
+        test_fact_critical_review,
+        test_fact_critical_route,
         test_low_confidence,
         test_visual_rewrite,
         test_review_router,
         test_too_many_uncertain_domains,
         test_critical_not_hidden_by_average,
         test_selective_rewrite,
+        test_fact_appeal_hold,
+        test_fact_appeal_disagreement,
+        test_fact_appeal_cleared,
+        test_fact_appeal_insufficient,
+        test_reliability_small_sample,
+        test_reliability_10_29,
+        test_reliability_30_99,
+        test_reliability_100_plus,
+        test_reliability_upper_limit,
+        test_reliability_lower_limit,
     ]
 
     for test in tests:
@@ -737,22 +877,14 @@ def run_all_tests():
         )
 
         try:
-
             test()
 
         except Exception as e:
 
-            # 중요:
-            # global FAILED는
-            # run_all_tests() 시작 부분에서
-            # 이미 선언했으므로
-            # 여기서 다시 선언하지 않는다.
-
             FAILED += 1
 
             print(
-                f"💥 EXCEPTION | "
-                f"{test.__name__}"
+                f"💥 EXCEPTION | {test.__name__}"
             )
 
             print(
@@ -761,9 +893,7 @@ def run_all_tests():
 
     print("")
     print("=" * 64)
-    print(
-        "📊 SELF TEST RESULT"
-    )
+    print("📊 SELF TEST RESULT")
     print("=" * 64)
 
     print(
@@ -778,13 +908,8 @@ def run_all_tests():
 
         print("")
         print(
-            "🏆 QUALITY ENGINE "
+            "🏆 V3.1 QUALITY ENGINE "
             "SELF TEST PASSED"
-        )
-
-        print(
-            "다음 단계의 통합 테스트로 "
-            "진행할 수 있습니다."
         )
 
         success = True
@@ -793,12 +918,12 @@ def run_all_tests():
 
         print("")
         print(
-            "🚨 QUALITY ENGINE "
+            "🚨 V3.1 QUALITY ENGINE "
             "SELF TEST FAILED"
         )
 
         print(
-            "main.py 연결 금지."
+            "실제 API 재심 테스트 금지."
         )
 
         success = False
@@ -817,5 +942,4 @@ if __name__ == "__main__":
     success = run_all_tests()
 
     if not success:
-
         raise SystemExit(1)
