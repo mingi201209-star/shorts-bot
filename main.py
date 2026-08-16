@@ -1,10 +1,10 @@
-import os
+# main.py
+
 import time
 
 from config import (
-    get_missing_environment_variables,
-    OUTPUT_VIDEO,
     MAX_SCENES,
+    get_missing_environment_variables,
 )
 
 from content.topic_selector import (
@@ -15,10 +15,6 @@ from content.script_generator import (
     generate_script,
 )
 
-from video.video_engine import (
-    create_scene,
-)
-
 from integrations.tts import (
     create_voice,
 )
@@ -26,6 +22,21 @@ from integrations.tts import (
 from integrations.telegram import (
     send_telegram_message,
     send_telegram_video,
+    send_result_summary,
+)
+
+from video.visual_selector import (
+    enrich_visual_plan,
+    validate_visual_plan,
+)
+
+from video.video_engine import (
+    create_scene,
+)
+
+from video.renderer import (
+    render_final_video,
+    validate_total_duration,
 )
 
 
@@ -33,17 +44,14 @@ from integrations.telegram import (
 # Shorts Generator V3
 # ============================================================
 #
-# 전체 흐름
+# main.py의 책임:
 #
-# 1. 환경변수 검사
-# 2. 콘텐츠 방향 선택
-# 3. V3 소재 + 대본 생성
-# 4. V3 검증 통과
-# 5. 장면별 TTS + 영상 생성
-# 6. 전체 영상 렌더링
-# 7. Telegram 전송
+#   1. 전체 파이프라인 실행
+#   2. 각 모듈 연결
+#   3. 실패 처리
+#   4. 리소스 정리
 #
-# 각 작업은 별도 모듈이 담당한다.
+# 세부 구현은 각 모듈이 담당한다.
 #
 # ============================================================
 
@@ -58,31 +66,41 @@ def validate_environment():
         get_missing_environment_variables()
     )
 
-    if missing:
-
-        error_message = (
-            "필수 환경변수가 없습니다:\n"
-            + "\n".join(
-                f"- {item}"
-                for item in missing
-            )
-        )
+    if not missing:
 
         print(
-            f"❌ {error_message}"
+            "✅ 환경변수 검사 완료"
         )
+
+        return
+
+    error_message = (
+        "필수 환경변수가 없습니다:\n"
+        + "\n".join(
+            f"- {item}"
+            for item in missing
+        )
+    )
+
+    print(
+        f"❌ {error_message}"
+    )
+
+    # Telegram 환경변수 자체가 없는 경우도 있으므로
+    # 메시지 전송 실패는 여기서 다시 예외로 만들지 않는다.
+    try:
 
         send_telegram_message(
             "🚨 Shorts Generator 환경변수 오류\n\n"
             + error_message
         )
 
-        raise RuntimeError(
-            error_message
-        )
+    except Exception:
 
-    print(
-        "✅ 환경변수 검사 완료"
+        pass
+
+    raise RuntimeError(
+        error_message
     )
 
 
@@ -91,23 +109,34 @@ def validate_environment():
 # ============================================================
 
 def generate_scenes(
-    scenes
+    scenes,
 ):
+
+    if not scenes:
+
+        raise RuntimeError(
+            "생성할 장면이 없습니다."
+        )
 
     scene_clips = []
 
     print("")
-    print("=" * 42)
+    print("=" * 48)
     print(
-        f"🎬 총 {len(scenes)}개 장면 생성 시작"
+        f"🎬 총 {len(scenes)}개 장면 생성"
     )
-    print("=" * 42)
+    print("=" * 48)
 
-    for idx, item in enumerate(
-        scenes[:MAX_SCENES]
-    ):
+    try:
 
-        try:
+        for idx, item in enumerate(
+            scenes[:MAX_SCENES]
+        ):
+
+            print("")
+            print(
+                f"▶ SCENE {idx + 1} 시작"
+            )
 
             scene = create_scene(
                 idx,
@@ -123,227 +152,20 @@ def generate_scenes(
                 f"✅ SCENE {idx + 1} 완료"
             )
 
-        except Exception as e:
+        return scene_clips
 
-            print(
-                f"❌ SCENE {idx + 1} 실패: {e}"
-            )
+    except Exception:
 
-            # 이미 생성된 MoviePy 객체 정리
-            for clip in scene_clips:
-
-                try:
-                    clip.close()
-
-                except Exception:
-                    pass
-
-            raise
-
-    return scene_clips
-
-
-# ============================================================
-# 전체 영상 렌더링
-# ============================================================
-
-def render_final_video(
-    scene_clips
-):
-
-    if not scene_clips:
-
-        raise RuntimeError(
-            "렌더링할 장면이 없습니다."
-        )
-
-    from moviepy.editor import (
-        concatenate_videoclips,
-    )
-
-    print("")
-    print("=" * 42)
-    print(
-        "🎞️ 전체 영상 렌더링"
-    )
-    print("=" * 42)
-
-    final_video = None
-
-    try:
-
-        final_video = concatenate_videoclips(
-            scene_clips,
-            method="compose",
-        )
-
-        print(
-            f"🎬 최종 영상 길이: "
-            f"{final_video.duration:.2f}초"
-        )
-
-        final_video.write_videofile(
-
-            OUTPUT_VIDEO,
-
-            fps=30,
-
-            codec="libx264",
-
-            audio_codec="aac",
-
-            bitrate="5000k",
-
-            threads=2,
-
-            preset="medium",
-        )
-
-    finally:
-
-        if final_video is not None:
+        # 중간 실패 시 이미 생성한 clip 정리
+        for clip in scene_clips:
 
             try:
-                final_video.close()
+                clip.close()
 
             except Exception:
                 pass
 
-    if not os.path.exists(
-        OUTPUT_VIDEO
-    ):
-
-        raise RuntimeError(
-            "최종 영상 파일이 생성되지 않았습니다."
-        )
-
-    print(
-        f"✅ 최종 영상 생성 완료: "
-        f"{OUTPUT_VIDEO}"
-    )
-
-    return OUTPUT_VIDEO
-
-
-# ============================================================
-# 임시 파일 정리
-# ============================================================
-
-def cleanup():
-
-    print(
-        "🧹 임시 파일 정리"
-    )
-
-    temp_files = []
-
-    try:
-
-        for filename in os.listdir("."):
-
-            if (
-                filename.startswith("scene_")
-                and filename.endswith(".mp3")
-            ):
-
-                temp_files.append(
-                    filename
-                )
-
-            elif (
-                filename.startswith("video_")
-                and filename.endswith(".mp4")
-            ):
-
-                temp_files.append(
-                    filename
-                )
-
-            elif (
-                filename.startswith(
-                    "vertical_video_"
-                )
-                and filename.endswith(".mp4")
-            ):
-
-                temp_files.append(
-                    filename
-                )
-
-    except Exception as e:
-
-        print(
-            f"⚠️ 임시 파일 목록 확인 실패: {e}"
-        )
-
-        return
-
-    for path in temp_files:
-
-        try:
-
-            os.remove(path)
-
-            print(
-                f"삭제: {path}"
-            )
-
-        except Exception as e:
-
-            print(
-                f"⚠️ 삭제 실패 "
-                f"{path}: {e}"
-            )
-
-
-# ============================================================
-# 결과 요약
-# ============================================================
-
-def send_result_summary(
-    script_data,
-    duration,
-):
-
-    title = script_data.get(
-        "title",
-        "제목 없음",
-    )
-
-    topic = script_data.get(
-        "topic",
-        "소재 없음",
-    )
-
-    category = script_data.get(
-        "category",
-        "분야 없음",
-    )
-
-    novelty = script_data.get(
-        "novelty_score",
-        "?",
-    )
-
-    scenes = script_data.get(
-        "scenes",
-        [],
-    )
-
-    message = (
-        "🎬 Shorts 생성 완료!\n\n"
-        f"📂 분야: {category}\n"
-        f"🧠 소재: {topic}\n"
-        f"✨ 신선도: {novelty}/10\n"
-        f"📝 제목: {title}\n"
-        f"🎞️ 길이: {duration:.1f}초\n"
-        f"🎥 장면: {len(scenes)}개\n\n"
-        "📦 영상 전송 중..."
-    )
-
-    send_telegram_message(
-        message
-    )
+        raise
 
 
 # ============================================================
@@ -359,38 +181,38 @@ def main():
     try:
 
         print("")
-        print("=" * 42)
+        print("=" * 48)
         print(
             "🚀 SHORTS GENERATOR V3 START"
         )
-        print("=" * 42)
+        print("=" * 48)
 
-        # ----------------------------------------------------
-        # 1. 환경변수
-        # ----------------------------------------------------
+        # ====================================================
+        # 1. 환경변수 검사
+        # ====================================================
 
         validate_environment()
 
-        # ----------------------------------------------------
+        # ====================================================
         # 2. 콘텐츠 방향 선택
-        # ----------------------------------------------------
+        # ====================================================
 
         print("")
         print(
-            "🎯 콘텐츠 방향 선택"
+            "🎯 콘텐츠 방향 선택..."
         )
 
         topic_info = (
             choose_topic_direction()
         )
 
-        # ----------------------------------------------------
-        # 3. V3 소재 + 대본 생성
-        # ----------------------------------------------------
+        # ====================================================
+        # 3. 소재 + 대본 생성
+        # ====================================================
 
         print("")
         print(
-            "🧠 V3 콘텐츠 생성"
+            "🧠 소재 + 대본 생성..."
         )
 
         script_data = (
@@ -398,6 +220,15 @@ def main():
                 topic_info
             )
         )
+
+        if not isinstance(
+            script_data,
+            dict,
+        ):
+
+            raise RuntimeError(
+                "대본 생성 결과가 dict가 아닙니다."
+            )
 
         scenes = script_data.get(
             "scenes",
@@ -410,17 +241,100 @@ def main():
                 "AI가 장면을 생성하지 않았습니다."
             )
 
-        # ----------------------------------------------------
-        # 4. 장면 생성
-        # ----------------------------------------------------
+        print(
+            f"📝 제목: "
+            f"{script_data.get('title', '제목 없음')}"
+        )
 
-        scene_clips = generate_scenes(
+        print(
+            f"🧠 소재: "
+            f"{script_data.get('topic', '소재 없음')}"
+        )
+
+        print(
+            f"🎬 장면 수: "
+            f"{len(scenes)}"
+        )
+
+        # ====================================================
+        # 4. Visual metadata 보강
+        # ====================================================
+
+        print("")
+        print(
+            "👁️ Visual plan 구성..."
+        )
+
+        scenes = enrich_visual_plan(
             scenes
         )
 
-        # ----------------------------------------------------
-        # 5. 영상 렌더링
-        # ----------------------------------------------------
+        script_data[
+            "scenes"
+        ] = scenes
+
+        # ====================================================
+        # 5. Visual plan 검사
+        # ====================================================
+
+        visual_ok, visual_reason = (
+            validate_visual_plan(
+                scenes
+            )
+        )
+
+        if not visual_ok:
+
+            raise RuntimeError(
+                "Visual plan 검증 실패: "
+                f"{visual_reason}"
+            )
+
+        print(
+            "✅ Visual plan 검증 통과"
+        )
+
+        # ====================================================
+        # 6. 장면 생성
+        # ====================================================
+
+        scene_clips = (
+            generate_scenes(
+                scenes
+            )
+        )
+
+        # ====================================================
+        # 7. 전체 길이 검사
+        # ====================================================
+
+        print("")
+        print(
+            "⏱️ 영상 길이 검사..."
+        )
+
+        duration_ok, total_duration = (
+            validate_total_duration(
+                scene_clips
+            )
+        )
+
+        if not duration_ok:
+
+            print(
+                "⚠️ 목표 영상 길이 범위를 "
+                "벗어났습니다."
+            )
+
+            # 현재 V3 분리 단계에서는
+            # 렌더링은 계속 진행한다.
+            #
+            # 추후 script_validator에서
+            # 재작성 루프로 연결한다.
+
+        # ====================================================
+        # 8. 최종 영상 렌더링
+        # ====================================================
 
         final_path = (
             render_final_video(
@@ -428,37 +342,26 @@ def main():
             )
         )
 
-        # ----------------------------------------------------
-        # 6. 총 길이
-        # ----------------------------------------------------
-
-        total_duration = sum(
-            float(
-                clip.duration or 0
-            )
-            for clip in scene_clips
-        )
-
-        # ----------------------------------------------------
-        # 7. Telegram 결과
-        # ----------------------------------------------------
+        # ====================================================
+        # 9. Telegram 결과 요약
+        # ====================================================
 
         send_result_summary(
             script_data,
             total_duration,
         )
 
-        # ----------------------------------------------------
-        # 8. Telegram 영상
-        # ----------------------------------------------------
+        # ====================================================
+        # 10. Telegram 영상 전송
+        # ====================================================
 
         send_telegram_video(
             final_path
         )
 
-        # ----------------------------------------------------
-        # 9. 완료
-        # ----------------------------------------------------
+        # ====================================================
+        # 완료
+        # ====================================================
 
         elapsed = (
             time.time()
@@ -466,7 +369,7 @@ def main():
         )
 
         print("")
-        print("=" * 42)
+        print("=" * 48)
         print(
             "🎉 SHORTS GENERATOR V3 COMPLETE"
         )
@@ -474,16 +377,19 @@ def main():
             f"⏱️ 전체 소요시간: "
             f"{elapsed / 60:.1f}분"
         )
-        print("=" * 42)
+        print("=" * 48)
 
     except Exception as e:
 
         print("")
-        print("=" * 42)
+        print("=" * 48)
         print(
-            f"💀 SHORTS GENERATOR ERROR: {e}"
+            "💀 SHORTS GENERATOR ERROR"
         )
-        print("=" * 42)
+        print(
+            str(e)
+        )
+        print("=" * 48)
 
         try:
 
@@ -493,15 +399,16 @@ def main():
             )
 
         except Exception:
+
             pass
 
         raise
 
     finally:
 
-        # ----------------------------------------------------
-        # MoviePy 객체 정리
-        # ----------------------------------------------------
+        # ====================================================
+        # MoviePy 리소스 정리
+        # ====================================================
 
         for clip in scene_clips:
 
@@ -510,12 +417,6 @@ def main():
 
             except Exception:
                 pass
-
-        # ----------------------------------------------------
-        # 임시 파일 정리
-        # ----------------------------------------------------
-
-        cleanup()
 
 
 # ============================================================
