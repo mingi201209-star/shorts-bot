@@ -70,13 +70,29 @@ from quality.budget_guard import (
 
 
 # ============================================================
-# Shorts Generator V3.2
+# Shorts Generator V3.2.1
 # ============================================================
+#
+# V3.2.1 핵심:
+#
+# Novelty가 선택 Rewrite 1회 후에도
+# 최소 품질 기준을 넘지 못하면
+# 같은 소재를 계속 고치지 않는다.
+#
+# 현재 소재 폐기
+#       ↓
+# 새 소재 생성
+#       ↓
+# Judge부터 새로 시작
+#
+# ============================================================
+
 
 JUDGE_MODEL = os.environ.get(
     "V3_JUDGE_MODEL",
     "gpt-4o-mini",
 )
+
 
 JUDGE_TYPES = [
     "hook",
@@ -85,9 +101,27 @@ JUDGE_TYPES = [
     "visual",
 ]
 
+
+# 한 소재에 대한 최대 Rewrite
 MAX_REWRITES = 1
+
+
+# 한 소재에 대한 최대 Review
 MAX_REVIEW_ROUNDS = 1
 
+
+# ------------------------------------------------------------
+# 최초 소재 + 재생성 1회
+#
+# 즉 한 실행에서 최대 2개의 소재를 시도한다.
+# ------------------------------------------------------------
+
+MAX_TOPIC_REGENERATIONS = 1
+
+
+# ============================================================
+# 환경변수 검사
+# ============================================================
 
 def validate_environment():
 
@@ -111,6 +145,10 @@ def validate_environment():
         )
     )
 
+    print(
+        f"❌ {error_message}"
+    )
+
     try:
 
         send_telegram_message(
@@ -119,6 +157,7 @@ def validate_environment():
         )
 
     except Exception:
+
         pass
 
     raise RuntimeError(
@@ -127,7 +166,9 @@ def validate_environment():
 
 
 # ============================================================
-# 기본 Judge 4종 — 각각 정확히 1회
+# 기본 Judge 4종
+#
+# 각각 정확히 1회.
 # ============================================================
 
 def run_initial_judges(
@@ -138,7 +179,9 @@ def run_initial_judges(
 
     print("")
     print("=" * 60)
-    print("⚖️ V3.2 INITIAL JUDGES")
+    print(
+        "⚖️ V3.2.1 INITIAL JUDGES"
+    )
     print("=" * 60)
 
     for judge_type in JUDGE_TYPES:
@@ -174,6 +217,7 @@ def rerun_changed_domains(
 
     new_pool = {
         key: list(value)
+
         for key, value
         in pool_results.items()
     }
@@ -181,10 +225,12 @@ def rerun_changed_domains(
     for domain in domains:
 
         if domain not in JUDGE_TYPES:
+
             continue
 
+        print("")
         print(
-            f"🔄 수정 영역 재심: "
+            "🔄 수정 영역 재심: "
             f"{domain.upper()}"
         )
 
@@ -198,8 +244,13 @@ def rerun_changed_domains(
             result
         )
 
-        # 이전 판결 누적이 아니라
-        # 수정된 콘텐츠에 대한 새 판결로 교체.
+        # ----------------------------------------------------
+        # 수정 전 판결과 평균내지 않는다.
+        #
+        # 콘텐츠가 바뀌었으므로
+        # 해당 영역 판결은 새 결과로 교체한다.
+        # ----------------------------------------------------
+
         new_pool[
             domain
         ] = [
@@ -210,7 +261,68 @@ def rerun_changed_domains(
 
 
 # ============================================================
-# 품질 Gate
+# Weak Domain 조회
+# ============================================================
+
+def get_weak_domain(
+    consensus,
+    judge_type,
+):
+
+    for item in consensus.get(
+        "weak_domains",
+        [],
+    ):
+
+        if (
+            item.get(
+                "judge_type"
+            )
+            == judge_type
+        ):
+
+            return item
+
+    return None
+
+
+# ============================================================
+# Novelty 지속 실패 여부
+# ============================================================
+
+def has_persistent_novelty_failure(
+    consensus,
+):
+
+    novelty = get_weak_domain(
+        consensus,
+        "novelty",
+    )
+
+    if not novelty:
+
+        return False
+
+    print("")
+    print(
+        "♻️ Novelty 최소 기준 미달:"
+    )
+
+    print(
+        f"   score = "
+        f"{novelty.get('score', 0)}"
+    )
+
+    print(
+        f"   required = "
+        f"{novelty.get('minimum', 0)}"
+    )
+
+    return True
+
+
+# ============================================================
+# 품질 프로세스
 # ============================================================
 
 def run_quality_process(
@@ -223,6 +335,10 @@ def run_quality_process(
 
     rewrite_count = 0
     review_count = 0
+
+    # --------------------------------------------------------
+    # 최초 Judge
+    # --------------------------------------------------------
 
     pool_results = (
         run_initial_judges(
@@ -247,44 +363,119 @@ def run_quality_process(
             "REVIEW",
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # PASS
-        # ----------------------------------------------------
+        # ====================================================
 
         if decision == "PASS":
 
             return {
-                "status": "PASS",
+                "status":
+                    "PASS",
+
                 "script_data":
                     current_script,
+
                 "consensus":
                     consensus,
+
                 "pool_results":
                     pool_results,
+
+                "rewrite_count":
+                    rewrite_count,
+
+                "review_count":
+                    review_count,
             }
 
-        # ----------------------------------------------------
+        # ====================================================
         # REWRITE
-        # ----------------------------------------------------
+        # ====================================================
 
         if decision == "REWRITE":
+
+            # ------------------------------------------------
+            # Rewrite 한도 도달
+            # ------------------------------------------------
 
             if (
                 rewrite_count
                 >= MAX_REWRITES
             ):
 
+                # ============================================
+                # V3.2.1
+                #
+                # Novelty가 아직 약하다면
+                # 실패작을 계속 고치지 않는다.
+                #
+                # 새 소재를 요청한다.
+                # ============================================
+
+                if (
+                    has_persistent_novelty_failure(
+                        consensus
+                    )
+                ):
+
+                    return {
+                        "status":
+                            "REGENERATE_TOPIC",
+
+                        "script_data":
+                            current_script,
+
+                        "consensus":
+                            consensus,
+
+                        "pool_results":
+                            pool_results,
+
+                        "rewrite_count":
+                            rewrite_count,
+
+                        "review_count":
+                            review_count,
+
+                        "reason": (
+                            "Novelty가 선택 Rewrite 후에도 "
+                            "최소 기준을 충족하지 못했습니다. "
+                            "현재 소재를 폐기하고 "
+                            "새 소재를 탐색합니다."
+                        ),
+                    }
+
+                # ------------------------------------------------
+                # Novelty 문제가 아닌 일반 Rewrite 실패
+                # ------------------------------------------------
+
                 return {
-                    "status": "HOLD",
+                    "status":
+                        "HOLD",
+
                     "script_data":
                         current_script,
+
                     "consensus":
                         consensus,
+
                     "pool_results":
                         pool_results,
+
+                    "rewrite_count":
+                        rewrite_count,
+
+                    "review_count":
+                        review_count,
+
                     "reason":
                         "Rewrite 최대 횟수 초과",
                 }
+
+            # ------------------------------------------------
+            # 선택 Rewrite
+            # ------------------------------------------------
 
             rewrite_result = (
                 rewrite_script(
@@ -304,9 +495,24 @@ def run_quality_process(
             ):
 
                 return {
-                    "status": "HOLD",
+                    "status":
+                        "HOLD",
+
                     "script_data":
                         current_script,
+
+                    "consensus":
+                        consensus,
+
+                    "pool_results":
+                        pool_results,
+
+                    "rewrite_count":
+                        rewrite_count,
+
+                    "review_count":
+                        review_count,
+
                     "reason":
                         "Rewrite 대상 없음",
                 }
@@ -323,8 +529,10 @@ def run_quality_process(
                 ]
             )
 
-            # Rewrite 결과에도
-            # visual metadata를 다시 붙인다.
+            # ------------------------------------------------
+            # Rewrite 후 Visual metadata 재구성
+            # ------------------------------------------------
+
             current_script[
                 "scenes"
             ] = enrich_visual_plan(
@@ -345,9 +553,24 @@ def run_quality_process(
             if not visual_ok:
 
                 return {
-                    "status": "HOLD",
+                    "status":
+                        "HOLD",
+
                     "script_data":
                         current_script,
+
+                    "consensus":
+                        consensus,
+
+                    "pool_results":
+                        pool_results,
+
+                    "rewrite_count":
+                        rewrite_count,
+
+                    "review_count":
+                        review_count,
+
                     "reason": (
                         "Rewrite 후 Visual 검증 실패: "
                         f"{reason}"
@@ -355,6 +578,10 @@ def run_quality_process(
                 }
 
             rewrite_count += 1
+
+            # ------------------------------------------------
+            # 수정된 영역만 Judge 재심
+            # ------------------------------------------------
 
             pool_results = (
                 rerun_changed_domains(
@@ -366,9 +593,9 @@ def run_quality_process(
 
             continue
 
-        # ----------------------------------------------------
+        # ====================================================
         # REVIEW
-        # ----------------------------------------------------
+        # ====================================================
 
         if decision == "REVIEW":
 
@@ -378,11 +605,24 @@ def run_quality_process(
             ):
 
                 return {
-                    "status": "HOLD",
+                    "status":
+                        "HOLD",
+
                     "script_data":
                         current_script,
+
                     "consensus":
                         consensus,
+
+                    "pool_results":
+                        pool_results,
+
+                    "rewrite_count":
+                        rewrite_count,
+
+                    "review_count":
+                        review_count,
+
                     "reason":
                         "Review 최대 횟수 초과",
                 }
@@ -397,24 +637,47 @@ def run_quality_process(
                 route
             )
 
-            route_type = route.get(
-                "route"
+            route_type = (
+                route.get(
+                    "route"
+                )
             )
+
+            # ------------------------------------------------
+            # 즉시 HOLD
+            # ------------------------------------------------
 
             if route_type == "HOLD":
 
                 return {
-                    "status": "HOLD",
+                    "status":
+                        "HOLD",
+
                     "script_data":
                         current_script,
+
                     "consensus":
                         consensus,
+
+                    "pool_results":
+                        pool_results,
+
+                    "rewrite_count":
+                        rewrite_count,
+
+                    "review_count":
+                        review_count,
+
                     "reason":
                         route.get(
                             "reason",
                             "Review HOLD",
                         ),
                 }
+
+            # ------------------------------------------------
+            # 추가 Judge
+            # ------------------------------------------------
 
             if route_type in (
                 "EXTRA_JUDGE",
@@ -438,7 +701,10 @@ def run_quality_process(
 
                 review_count += 1
 
-                # Fact Appeal은 별도 안전 판단.
+                # ============================================
+                # Fact Appeal
+                # ============================================
+
                 if (
                     route_type
                     == "FACT_EXTRA_JUDGE"
@@ -450,9 +716,13 @@ def run_quality_process(
                         )
                     )
 
+                    print("")
                     print(
-                        "⚖️ Fact Appeal:",
-                        appeal,
+                        "⚖️ Fact Appeal:"
+                    )
+
+                    print(
+                        appeal
                     )
 
                     appeal_status = (
@@ -461,21 +731,31 @@ def run_quality_process(
                         )
                     )
 
-                    if (
-                        appeal_status
-                        in (
-                            "HOLD",
-                            "DISAGREEMENT",
-                            "INSUFFICIENT",
-                        )
+                    if appeal_status in (
+                        "HOLD",
+                        "DISAGREEMENT",
+                        "INSUFFICIENT",
                     ):
 
                         return {
-                            "status": "HOLD",
+                            "status":
+                                "HOLD",
+
                             "script_data":
                                 current_script,
+
                             "consensus":
                                 consensus,
+
+                            "pool_results":
+                                merged,
+
+                            "rewrite_count":
+                                rewrite_count,
+
+                            "review_count":
+                                review_count,
+
                             "reason":
                                 appeal.get(
                                     "reason",
@@ -489,20 +769,62 @@ def run_quality_process(
 
                 continue
 
+            # ------------------------------------------------
+            # 알 수 없는 Review 경로
+            # ------------------------------------------------
+
             return {
-                "status": "HOLD",
+                "status":
+                    "HOLD",
+
                 "script_data":
                     current_script,
-                "reason":
-                    f"알 수 없는 Review route: {route_type}",
+
+                "consensus":
+                    consensus,
+
+                "pool_results":
+                    pool_results,
+
+                "rewrite_count":
+                    rewrite_count,
+
+                "review_count":
+                    review_count,
+
+                "reason": (
+                    "알 수 없는 Review route: "
+                    f"{route_type}"
+                ),
             }
 
+        # ====================================================
+        # 알 수 없는 Consensus
+        # ====================================================
+
         return {
-            "status": "HOLD",
+            "status":
+                "HOLD",
+
             "script_data":
                 current_script,
-            "reason":
-                f"알 수 없는 Consensus: {decision}",
+
+            "consensus":
+                consensus,
+
+            "pool_results":
+                pool_results,
+
+            "rewrite_count":
+                rewrite_count,
+
+            "review_count":
+                review_count,
+
+            "reason": (
+                "알 수 없는 Consensus: "
+                f"{decision}"
+            ),
         }
 
 
@@ -524,9 +846,11 @@ def generate_scenes(
 
     print("")
     print("=" * 48)
+
     print(
         f"🎬 총 {len(scenes)}개 장면 생성"
     )
+
     print("=" * 48)
 
     try:
@@ -535,6 +859,7 @@ def generate_scenes(
             scenes[:MAX_SCENES]
         ):
 
+            print("")
             print(
                 f"▶ SCENE {idx + 1}"
             )
@@ -549,6 +874,10 @@ def generate_scenes(
                 scene
             )
 
+            print(
+                f"✅ SCENE {idx + 1} 완료"
+            )
+
         return scene_clips
 
     except Exception:
@@ -556,8 +885,11 @@ def generate_scenes(
         for clip in scene_clips:
 
             try:
+
                 clip.close()
+
             except Exception:
+
                 pass
 
         raise
@@ -573,108 +905,285 @@ def main():
 
     scene_clips = []
 
-    # 실행 단위 Budget 초기화
+    # --------------------------------------------------------
+    # 실행 전체 Budget 초기화
+    #
+    # 소재를 재생성하더라도 RESET하지 않는다.
+    #
+    # 즉 한 GitHub 실행 전체가
+    # 하나의 Budget을 공유한다.
+    # --------------------------------------------------------
+
     reset_budget()
 
     try:
 
         print("")
-        print("=" * 60)
+        print("=" * 64)
+
         print(
-            "🚀 SHORTS GENERATOR V3.2 AUTONOMOUS"
+            "🚀 SHORTS GENERATOR V3.2.1 AUTONOMOUS"
         )
-        print("=" * 60)
+
+        print("=" * 64)
 
         validate_environment()
 
-        # ----------------------------------------------------
-        # 1. V3가 스스로 방향 선택
-        # ----------------------------------------------------
+        final_script = None
 
-        topic_info = (
-            choose_topic_direction()
+        quality_result = None
+
+        rejected_topics = []
+
+        # ====================================================
+        # 소재 생성 + 품질 Gate
+        #
+        # 최초 1회
+        # + 실패 시 재생성 1회
+        # ====================================================
+
+        total_topic_attempts = (
+            MAX_TOPIC_REGENERATIONS
+            + 1
         )
 
-        # ----------------------------------------------------
-        # 2. V3가 스스로 소재 + 대본 생성
-        # ----------------------------------------------------
-
-        script_data = (
-            generate_script(
-                topic_info
-            )
-        )
-
-        if not isinstance(
-            script_data,
-            dict,
+        for topic_attempt in range(
+            1,
+            total_topic_attempts + 1,
         ):
 
+            print("")
+            print("=" * 64)
+
+            print(
+                "🎯 TOPIC ATTEMPT "
+                f"{topic_attempt}/"
+                f"{total_topic_attempts}"
+            )
+
+            print("=" * 64)
+
+            # ------------------------------------------------
+            # 1. 방향 선택
+            # ------------------------------------------------
+
+            topic_info = (
+                choose_topic_direction()
+            )
+
+            # ------------------------------------------------
+            # 2. 소재 + 대본 생성
+            # ------------------------------------------------
+
+            script_data = (
+                generate_script(
+                    topic_info
+                )
+            )
+
+            if not isinstance(
+                script_data,
+                dict,
+            ):
+
+                raise RuntimeError(
+                    "대본 생성 결과가 dict가 아닙니다."
+                )
+
+            current_topic = str(
+                script_data.get(
+                    "topic",
+                    "",
+                )
+            ).strip()
+
+            print("")
+            print(
+                f"📝 제목: "
+                f"{script_data.get('title', '')}"
+            )
+
+            print(
+                f"🧠 소재: "
+                f"{current_topic}"
+            )
+
+            # ------------------------------------------------
+            # 이미 이번 실행에서 폐기한 소재가
+            # 다시 나왔다면 사용하지 않는다.
+            # ------------------------------------------------
+
+            if (
+                current_topic
+                in rejected_topics
+            ):
+
+                print(
+                    "♻️ 이번 실행에서 이미 "
+                    "폐기한 소재가 다시 생성됨."
+                )
+
+                if (
+                    topic_attempt
+                    < total_topic_attempts
+                ):
+
+                    continue
+
+                raise RuntimeError(
+                    "폐기한 소재가 다시 생성되어 "
+                    "새 후보 확보에 실패했습니다."
+                )
+
+            # ------------------------------------------------
+            # 3. Visual Plan
+            # ------------------------------------------------
+
+            scenes = (
+                enrich_visual_plan(
+                    script_data.get(
+                        "scenes",
+                        [],
+                    )
+                )
+            )
+
+            script_data[
+                "scenes"
+            ] = scenes
+
+            visual_ok, visual_reason = (
+                validate_visual_plan(
+                    scenes
+                )
+            )
+
+            if not visual_ok:
+
+                raise RuntimeError(
+                    "Visual plan 검증 실패: "
+                    f"{visual_reason}"
+                )
+
+            # ------------------------------------------------
+            # 4. 품질 프로세스
+            # ------------------------------------------------
+
+            quality_result = (
+                run_quality_process(
+                    script_data
+                )
+            )
+
+            status = (
+                quality_result.get(
+                    "status"
+                )
+            )
+
+            # =================================================
+            # PASS
+            # =================================================
+
+            if status == "PASS":
+
+                final_script = (
+                    quality_result[
+                        "script_data"
+                    ]
+                )
+
+                break
+
+            # =================================================
+            # V3.2.1
+            # Novelty 실패 → 소재 폐기 → 다음 후보
+            # =================================================
+
+            if (
+                status
+                == "REGENERATE_TOPIC"
+            ):
+
+                rejected_topic = str(
+                    quality_result
+                    .get(
+                        "script_data",
+                        {}
+                    )
+                    .get(
+                        "topic",
+                        current_topic,
+                    )
+                ).strip()
+
+                if rejected_topic:
+
+                    rejected_topics.append(
+                        rejected_topic
+                    )
+
+                print("")
+                print("=" * 64)
+
+                print(
+                    "♻️ V3.2.1 TOPIC REGENERATION"
+                )
+
+                print("=" * 64)
+
+                print(
+                    "폐기 소재:",
+                    rejected_topic,
+                )
+
+                print(
+                    "이유:",
+                    quality_result.get(
+                        "reason",
+                        "",
+                    ),
+                )
+
+                print_budget_status()
+
+                if (
+                    topic_attempt
+                    < total_topic_attempts
+                ):
+
+                    print(
+                        "➡️ 새 소재 탐색 시작"
+                    )
+
+                    continue
+
+                raise RuntimeError(
+                    "Novelty 기준을 만족하는 "
+                    "소재를 확보하지 못했습니다."
+                )
+
+            # =================================================
+            # 일반 HOLD
+            # =================================================
+
             raise RuntimeError(
-                "대본 생성 결과가 dict가 아닙니다."
+                "V3.2.1 Quality Gate HOLD: "
+                f"{quality_result.get('reason', '')}"
             )
 
-        # ----------------------------------------------------
-        # 3. Visual Plan
-        # ----------------------------------------------------
+        # ====================================================
+        # 최종 Script 확인
+        # ====================================================
 
-        scenes = enrich_visual_plan(
-            script_data.get(
-                "scenes",
-                [],
-            )
-        )
-
-        script_data[
-            "scenes"
-        ] = scenes
-
-        visual_ok, visual_reason = (
-            validate_visual_plan(
-                scenes
-            )
-        )
-
-        if not visual_ok:
+        if not final_script:
 
             raise RuntimeError(
-                "Visual plan 검증 실패: "
-                f"{visual_reason}"
-            )
-
-        # ----------------------------------------------------
-        # 4. V3.2 품질 재판
-        # ----------------------------------------------------
-
-        quality = (
-            run_quality_process(
-                script_data
-            )
-        )
-
-        if (
-            quality.get(
-                "status"
-            )
-            != "PASS"
-        ):
-
-            reason = quality.get(
-                "reason",
-                "품질 Gate HOLD",
-            )
-
-            print_budget_status()
-
-            raise RuntimeError(
-                "V3.2 Quality Gate HOLD: "
-                f"{reason}"
+                "최종 PASS 대본이 없습니다."
             )
 
         script_data = (
-            quality[
-                "script_data"
-            ]
+            final_script
         )
 
         scenes = script_data.get(
@@ -683,31 +1192,42 @@ def main():
         )
 
         print("")
+        print("=" * 64)
+
         print(
-            "🏆 V3.2 QUALITY PASS"
+            "🏆 V3.2.1 QUALITY PASS"
         )
+
+        print("=" * 64)
 
         print(
             f"📝 제목: "
-            f"{script_data.get('title')}"
+            f"{script_data.get('title', '')}"
         )
 
         print(
             f"🧠 소재: "
-            f"{script_data.get('topic')}"
+            f"{script_data.get('topic', '')}"
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # 5. 실제 영상 제작
-        # ----------------------------------------------------
+        # ====================================================
 
-        scene_clips = generate_scenes(
-            scenes
+        scene_clips = (
+            generate_scenes(
+                scenes
+            )
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # 6. 영상 길이
-        # ----------------------------------------------------
+        # ====================================================
+
+        print("")
+        print(
+            "⏱️ 영상 길이 검사..."
+        )
 
         duration_ok, total_duration = (
             validate_total_duration(
@@ -721,9 +1241,9 @@ def main():
                 "⚠️ 목표 영상 길이 범위 이탈"
             )
 
-        # ----------------------------------------------------
+        # ====================================================
         # 7. 렌더링
-        # ----------------------------------------------------
+        # ====================================================
 
         final_path = (
             render_final_video(
@@ -731,9 +1251,9 @@ def main():
             )
         )
 
-        # ----------------------------------------------------
+        # ====================================================
         # 8. Telegram
-        # ----------------------------------------------------
+        # ====================================================
 
         send_result_summary(
             script_data,
@@ -744,6 +1264,10 @@ def main():
             final_path
         )
 
+        # ====================================================
+        # 비용
+        # ====================================================
+
         print_budget_status()
 
         elapsed = (
@@ -752,31 +1276,45 @@ def main():
         )
 
         print("")
-        print("=" * 60)
+        print("=" * 64)
+
         print(
-            "🎉 V3.2 AUTONOMOUS SHORT COMPLETE"
+            "🎉 V3.2.1 AUTONOMOUS SHORT COMPLETE"
         )
+
         print(
-            f"⏱️ {elapsed / 60:.1f}분"
+            f"⏱️ 전체 소요시간: "
+            f"{elapsed / 60:.1f}분"
         )
-        print("=" * 60)
+
+        print("=" * 64)
 
     except Exception as e:
 
         print("")
-        print("=" * 60)
-        print("💀 V3.2 ERROR")
-        print(str(e))
-        print("=" * 60)
+        print("=" * 64)
+
+        print(
+            "💀 V3.2.1 ERROR"
+        )
+
+        print(
+            str(e)
+        )
+
+        print("=" * 64)
+
+        print_budget_status()
 
         try:
 
             send_telegram_message(
-                "🚨 V3.2 Shorts 생성 실패\n\n"
+                "🚨 V3.2.1 Shorts 생성 실패\n\n"
                 f"{str(e)[:500]}"
             )
 
         except Exception:
+
             pass
 
         raise
@@ -786,11 +1324,18 @@ def main():
         for clip in scene_clips:
 
             try:
+
                 clip.close()
 
             except Exception:
+
                 pass
 
 
+# ============================================================
+# 실행
+# ============================================================
+
 if __name__ == "__main__":
+
     main()
