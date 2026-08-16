@@ -4,20 +4,25 @@ from statistics import mean
 
 
 # ============================================================
-# Consensus Engine V3
+# Consensus Engine V3.1
 # ============================================================
 #
 # 책임:
 #   - Judge Pool 결과 통합
-#   - 불일치 감지
 #   - confidence 반영
+#   - Judge 간 불일치 감지
 #   - critical risk 처리
+#   - 장기 Judge reliability 반영 준비
 #   - PASS / REWRITE / REVIEW 결정
 #
-# 절대 하지 않는 것:
-#   - 대본 직접 수정
-#   - Judge 재호출
-#   - Validator 규칙 변경
+# 중요:
+#   Judge reliability는 표본 수에 따라 제한적으로 반영한다.
+#
+# 표본:
+#   < 10    → 1.00 고정
+#   10~29   → 0.90 ~ 1.10
+#   30~99   → 0.80 ~ 1.20
+#   100+    → 0.50 ~ 1.25
 #
 # ============================================================
 
@@ -32,7 +37,7 @@ DISAGREEMENT_CRITICAL = 3.5
 
 
 # ============================================================
-# 전문 영역 중요도
+# 전문 영역 기본 중요도
 # ============================================================
 
 DOMAIN_WEIGHTS = {
@@ -53,19 +58,195 @@ CRITICAL_DOMAINS = {
 
 
 # ============================================================
+# 안전한 숫자 변환
+# ============================================================
+
+def safe_float(
+    value,
+    default=0.0,
+):
+
+    try:
+        return float(value)
+
+    except Exception:
+        return default
+
+
+def safe_int(
+    value,
+    default=0,
+):
+
+    try:
+        return int(value)
+
+    except Exception:
+        return default
+
+
+# ============================================================
+# Reliability 안전 제한
+# ============================================================
+
+def clamp(
+    value,
+    minimum,
+    maximum,
+):
+
+    return max(
+        minimum,
+        min(
+            value,
+            maximum,
+        ),
+    )
+
+
+# ============================================================
+# 표본에 따른 실제 적용 Reliability
+# ============================================================
+
+def get_effective_reliability(
+    judge_type,
+    reliability_report=None,
+):
+
+    # --------------------------------------------------------
+    # Reliability 시스템을 사용하지 않는 경우
+    # --------------------------------------------------------
+
+    if not isinstance(
+        reliability_report,
+        dict,
+    ):
+
+        return 1.0
+
+    judge_data = reliability_report.get(
+        judge_type
+    )
+
+    if not isinstance(
+        judge_data,
+        dict,
+    ):
+
+        return 1.0
+
+    raw_reliability = safe_float(
+        judge_data.get(
+            "reliability",
+            1.0,
+        ),
+        1.0,
+    )
+
+    statistics = judge_data.get(
+        "statistics",
+        {},
+    )
+
+    if not isinstance(
+        statistics,
+        dict,
+    ):
+
+        statistics = {}
+
+    samples = safe_int(
+        statistics.get(
+            "evaluated",
+            0,
+        ),
+        0,
+    )
+
+    # --------------------------------------------------------
+    # 표본 10개 미만
+    #
+    # Judge 권한 변경 금지.
+    # --------------------------------------------------------
+
+    if samples < 10:
+
+        return 1.0
+
+    # --------------------------------------------------------
+    # 10 ~ 29
+    #
+    # 최대 ±10%
+    # --------------------------------------------------------
+
+    if samples < 30:
+
+        return round(
+            clamp(
+                raw_reliability,
+                0.90,
+                1.10,
+            ),
+            3,
+        )
+
+    # --------------------------------------------------------
+    # 30 ~ 99
+    #
+    # 최대 ±20%
+    # --------------------------------------------------------
+
+    if samples < 100:
+
+        return round(
+            clamp(
+                raw_reliability,
+                0.80,
+                1.20,
+            ),
+            3,
+        )
+
+    # --------------------------------------------------------
+    # 100+
+    #
+    # 장기 데이터가 충분할 경우
+    # 전체 허용 범위 사용.
+    # --------------------------------------------------------
+
+    return round(
+        clamp(
+            raw_reliability,
+            0.50,
+            1.25,
+        ),
+        3,
+    )
+
+
+# ============================================================
 # 한 전문영역 요약
 # ============================================================
 
 def summarize_domain(
     judge_type,
     results,
+    reliability_report=None,
 ):
+
+    reliability = (
+        get_effective_reliability(
+            judge_type,
+            reliability_report,
+        )
+    )
 
     if not results:
 
         return {
             "judge_type": judge_type,
             "score": 0.0,
+            "adjusted_score": 0.0,
             "confidence": 0.0,
             "disagreement": 10.0,
             "critical_risk": True,
@@ -73,6 +254,7 @@ def summarize_domain(
             "issues": [
                 "Judge 결과 없음"
             ],
+            "reliability": reliability,
         }
 
     scores = []
@@ -83,25 +265,25 @@ def summarize_domain(
 
     for result in results:
 
-        try:
-            score = float(
-                result.get(
-                    "score",
-                    0.0,
-                )
-            )
-        except Exception:
-            score = 0.0
+        if not isinstance(
+            result,
+            dict,
+        ):
+            continue
 
-        try:
-            confidence = float(
-                result.get(
-                    "confidence",
-                    0.0,
-                )
+        score = safe_float(
+            result.get(
+                "score",
+                0.0,
             )
-        except Exception:
-            confidence = 0.0
+        )
+
+        confidence = safe_float(
+            result.get(
+                "confidence",
+                0.0,
+            )
+        )
 
         scores.append(
             score
@@ -115,16 +297,43 @@ def summarize_domain(
             "critical_risk",
             False,
         ):
+
             critical_risk = True
 
-        for issue in result.get(
+        result_issues = result.get(
             "issues",
             [],
+        )
+
+        if isinstance(
+            result_issues,
+            list,
         ):
-            if issue:
-                issues.append(
-                    str(issue)
-                )
+
+            for issue in result_issues:
+
+                if issue:
+
+                    issues.append(
+                        str(issue)
+                    )
+
+    # 비정상 Judge 결과만 들어온 경우
+    if not scores:
+
+        return {
+            "judge_type": judge_type,
+            "score": 0.0,
+            "adjusted_score": 0.0,
+            "confidence": 0.0,
+            "disagreement": 10.0,
+            "critical_risk": True,
+            "review_count": 0,
+            "issues": [
+                "유효한 Judge 결과 없음"
+            ],
+            "reliability": reliability,
+        }
 
     score_avg = mean(
         scores
@@ -141,43 +350,69 @@ def summarize_domain(
         else 0.0
     )
 
-    # 낮은 confidence의 판단은
-    # 점수 영향력을 줄임
+    # --------------------------------------------------------
+    # Confidence 보정
+    # --------------------------------------------------------
+    #
+    # 낮은 confidence 판단은
+    # 점수 영향력을 줄인다.
+    #
+    # 최소 0.5를 유지하는 이유:
+    # confidence 하나만으로 Judge 판단을
+    # 완전히 제거하지 않기 위해서.
+    # --------------------------------------------------------
+
+    confidence_factor = max(
+        0.5,
+        min(
+            confidence_avg,
+            1.0,
+        ),
+    )
+
     adjusted_score = (
         score_avg
-        * max(
-            0.5,
-            confidence_avg,
-        )
+        * confidence_factor
     )
 
     return {
         "judge_type": judge_type,
+
         "score": round(
             score_avg,
             3,
         ),
+
         "adjusted_score": round(
             adjusted_score,
             3,
         ),
+
         "confidence": round(
             confidence_avg,
             3,
         ),
+
         "disagreement": round(
             disagreement,
             3,
         ),
-        "critical_risk": critical_risk,
+
+        "critical_risk":
+            critical_risk,
+
         "review_count": len(
-            results
+            scores
         ),
+
         "issues": list(
             dict.fromkeys(
                 issues
             )
         ),
+
+        # Judge의 장기 신뢰도
+        "reliability": reliability,
     }
 
 
@@ -187,6 +422,7 @@ def summarize_domain(
 
 def summarize_pool(
     pool_results,
+    reliability_report=None,
 ):
 
     summaries = {}
@@ -200,13 +436,42 @@ def summarize_pool(
         ] = summarize_domain(
             judge_type,
             results,
+            reliability_report,
         )
 
     return summaries
 
 
 # ============================================================
-# 전체 weighted score
+# 최종 Judge Weight
+# ============================================================
+
+def calculate_domain_weight(
+    judge_type,
+    summary,
+):
+
+    base_weight = DOMAIN_WEIGHTS.get(
+        judge_type,
+        1.0,
+    )
+
+    reliability = safe_float(
+        summary.get(
+            "reliability",
+            1.0,
+        ),
+        1.0,
+    )
+
+    return (
+        base_weight
+        * reliability
+    )
+
+
+# ============================================================
+# 전체 Weighted Score
 # ============================================================
 
 def calculate_weighted_score(
@@ -220,14 +485,16 @@ def calculate_weighted_score(
         summaries.items()
     ):
 
-        weight = DOMAIN_WEIGHTS.get(
+        weight = calculate_domain_weight(
             judge_type,
-            1.0,
+            summary,
         )
 
-        score = summary.get(
-            "adjusted_score",
-            0.0,
+        score = safe_float(
+            summary.get(
+                "adjusted_score",
+                0.0,
+            )
         )
 
         weighted_total += (
@@ -237,10 +504,12 @@ def calculate_weighted_score(
         total_weight += weight
 
     if total_weight <= 0:
+
         return 0.0
 
     return round(
-        weighted_total / total_weight,
+        weighted_total
+        / total_weight,
         3,
     )
 
@@ -260,7 +529,7 @@ def detect_disagreements(
         summaries.items()
     ):
 
-        disagreement = float(
+        disagreement = safe_float(
             summary.get(
                 "disagreement",
                 0.0,
@@ -273,8 +542,11 @@ def detect_disagreements(
         ):
 
             critical.append({
-                "judge_type": judge_type,
-                "disagreement": disagreement,
+                "judge_type":
+                    judge_type,
+
+                "disagreement":
+                    disagreement,
             })
 
         elif (
@@ -283,8 +555,11 @@ def detect_disagreements(
         ):
 
             warnings.append({
-                "judge_type": judge_type,
-                "disagreement": disagreement,
+                "judge_type":
+                    judge_type,
+
+                "disagreement":
+                    disagreement,
             })
 
     return {
@@ -294,7 +569,7 @@ def detect_disagreements(
 
 
 # ============================================================
-# 낮은 confidence 탐지
+# 낮은 Confidence 탐지
 # ============================================================
 
 def detect_low_confidence(
@@ -303,17 +578,24 @@ def detect_low_confidence(
 
     return [
         {
-            "judge_type": judge_type,
-            "confidence": summary.get(
-                "confidence",
-                0.0,
-            ),
+            "judge_type":
+                judge_type,
+
+            "confidence":
+                summary.get(
+                    "confidence",
+                    0.0,
+                ),
         }
+
         for judge_type, summary
         in summaries.items()
-        if summary.get(
-            "confidence",
-            0.0,
+
+        if safe_float(
+            summary.get(
+                "confidence",
+                0.0,
+            )
         ) < MIN_CONFIDENCE
     ]
 
@@ -339,18 +621,57 @@ def detect_critical_risks(
             continue
 
         risks.append({
-            "judge_type": judge_type,
+            "judge_type":
+                judge_type,
+
             "hard_block": (
                 judge_type
                 in CRITICAL_DOMAINS
             ),
-            "issues": summary.get(
-                "issues",
-                [],
-            ),
+
+            "issues":
+                summary.get(
+                    "issues",
+                    [],
+                ),
         })
 
     return risks
+
+
+# ============================================================
+# Judge Reliability 경고
+# ============================================================
+
+def detect_low_reliability(
+    summaries,
+):
+
+    warnings = []
+
+    for judge_type, summary in (
+        summaries.items()
+    ):
+
+        reliability = safe_float(
+            summary.get(
+                "reliability",
+                1.0,
+            ),
+            1.0,
+        )
+
+        if reliability < 0.80:
+
+            warnings.append({
+                "judge_type":
+                    judge_type,
+
+                "reliability":
+                    reliability,
+            })
+
+    return warnings
 
 
 # ============================================================
@@ -359,10 +680,12 @@ def detect_critical_risks(
 
 def build_consensus(
     pool_results,
+    reliability_report=None,
 ):
 
     summaries = summarize_pool(
-        pool_results
+        pool_results,
+        reliability_report,
     )
 
     weighted_score = (
@@ -389,11 +712,17 @@ def build_consensus(
         )
     )
 
+    low_reliability = (
+        detect_low_reliability(
+            summaries
+        )
+    )
+
     reasons = []
 
-    # --------------------------------------------------------
-    # FACT critical risk는 자동 PASS 금지
-    # --------------------------------------------------------
+    # ========================================================
+    # 1. FACT Critical Risk
+    # ========================================================
 
     hard_block = any(
         item.get(
@@ -411,9 +740,9 @@ def build_consensus(
             "사실성 영역에 critical risk가 있습니다."
         )
 
-    # --------------------------------------------------------
-    # Judge 간 심한 충돌
-    # --------------------------------------------------------
+    # ========================================================
+    # 2. Judge 간 심한 충돌
+    # ========================================================
 
     elif disagreements[
         "critical"
@@ -425,9 +754,9 @@ def build_consensus(
             "전문 Judge 간 심한 의견 충돌이 있습니다."
         )
 
-    # --------------------------------------------------------
-    # confidence 부족
-    # --------------------------------------------------------
+    # ========================================================
+    # 3. 복수 영역 Low Confidence
+    # ========================================================
 
     elif len(
         low_confidence
@@ -439,9 +768,9 @@ def build_consensus(
             "복수 전문 영역에서 Judge 확신도가 낮습니다."
         )
 
-    # --------------------------------------------------------
-    # 점수 기반
-    # --------------------------------------------------------
+    # ========================================================
+    # 4. 점수 기반
+    # ========================================================
 
     elif (
         weighted_score
@@ -473,9 +802,9 @@ def build_consensus(
             "종합 품질 점수가 낮아 재작성 필요성이 큽니다."
         )
 
-    # --------------------------------------------------------
-    # 경고성 disagreement는 PASS라도 기록
-    # --------------------------------------------------------
+    # ========================================================
+    # 경고 기록
+    # ========================================================
 
     if disagreements[
         "warnings"
@@ -485,14 +814,36 @@ def build_consensus(
             "일부 전문 영역에서 Judge 의견 차이가 있습니다."
         )
 
+    if low_reliability:
+
+        reasons.append(
+            "장기 신뢰도가 낮은 Judge가 포함되어 있습니다."
+        )
+
     return {
-        "decision": decision,
-        "weighted_score": weighted_score,
-        "domain_summaries": summaries,
-        "disagreements": disagreements,
-        "low_confidence": low_confidence,
-        "critical_risks": critical_risks,
-        "reasons": reasons,
+        "decision":
+            decision,
+
+        "weighted_score":
+            weighted_score,
+
+        "domain_summaries":
+            summaries,
+
+        "disagreements":
+            disagreements,
+
+        "low_confidence":
+            low_confidence,
+
+        "critical_risks":
+            critical_risks,
+
+        "low_reliability":
+            low_reliability,
+
+        "reasons":
+            reasons,
     }
 
 
@@ -505,11 +856,11 @@ def print_consensus(
 ):
 
     print("")
-    print("=" * 58)
+    print("=" * 64)
     print(
-        "🧠 V3 CONSENSUS"
+        "🧠 V3.1 CONSENSUS"
     )
-    print("=" * 58)
+    print("=" * 64)
 
     print(
         "결정:",
@@ -541,9 +892,12 @@ def print_consensus(
 
         print(
             f" - {judge_type}: "
+            f"score "
             f"{summary.get('score', 0):.2f} "
             f"| confidence "
             f"{summary.get('confidence', 0):.2f} "
+            f"| reliability "
+            f"{summary.get('reliability', 1):.2f} "
             f"| disagreement "
             f"{summary.get('disagreement', 0):.2f}"
         )
@@ -584,4 +938,26 @@ def print_consensus(
                 f" - {risk['judge_type']}"
             )
 
-    print("=" * 58)
+    low_reliability = (
+        consensus.get(
+            "low_reliability",
+            [],
+        )
+    )
+
+    if low_reliability:
+
+        print("")
+        print(
+            "⚠️ Low reliability Judges:"
+        )
+
+        for item in low_reliability:
+
+            print(
+                f" - "
+                f"{item['judge_type']}: "
+                f"{item['reliability']:.2f}"
+            )
+
+    print("=" * 64)
