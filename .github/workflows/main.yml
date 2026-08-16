@@ -1,9 +1,7 @@
-name: Shorts Automation Trigger
+name: Shorts Generator
 
 on:
   workflow_dispatch:
-  repository_dispatch:
-    types: [trigger-shorts]
 
 jobs:
   build:
@@ -11,24 +9,28 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.11"
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
 
-      # 👇 여기 추가
-      - name: Install FFmpeg
+      - name: Install FFmpeg and Korean fonts
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg
+          sudo apt-get install -y fonts-noto-cjk fonts-nanum
+          fc-cache -fv
           ffmpeg -version
+          fc-match "Noto Sans CJK KR"
 
       - name: Run Shorts Generator
         env:
