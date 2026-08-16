@@ -1,3 +1,5 @@
+# content/script_generator.py
+
 import json
 import re
 
@@ -14,35 +16,15 @@ from content.topic_selector import (
     get_recent_topic_names,
 )
 
-
-# ============================================================
-# V3 Shorts Script Generator
-# ============================================================
-#
-# 책임:
-#
-# 1. 구체적인 소재 발굴
-# 2. 소재 신선도 검사
-# 3. 대중성 / 감정 자극 검사
-# 4. 첫 3초 후킹 검사
-# 5. 대본 생성
-# 6. 장면 구조 검사
-# 7. Pexels 검색어 검사
-#
-# 하지 않는 것:
-#
-# - 영상 다운로드
-# - TTS
-# - 자막 렌더링
-# - 영상 합성
-# - Telegram
-#
-# ============================================================
+from quality.budget_guard import (
+    authorize_call,
+    record_usage,
+    print_budget_status,
+)
 
 
-# ============================================================
-# V3 후킹 기준
-# ============================================================
+MODEL = "gpt-4o-mini"
+
 
 HOOK_MIN_SCORE = 8
 
@@ -75,10 +57,6 @@ HOOK_REQUIRED_SIGNALS = [
 ]
 
 
-# ============================================================
-# 대중성 필터
-# ============================================================
-
 TRAFFIC_REQUIRED_SIGNALS = [
     "공포",
     "위험",
@@ -93,12 +71,7 @@ TRAFFIC_REQUIRED_SIGNALS = [
 ]
 
 
-# ============================================================
-# 명백한 상식 소재
-# ============================================================
-
 COMMON_KNOWLEDGE_KEYWORDS = [
-
     "지구는 둥글",
     "태양은 동쪽",
     "물은 100도",
@@ -119,10 +92,6 @@ COMMON_KNOWLEDGE_KEYWORDS = [
 ]
 
 
-# ============================================================
-# JSON 추출
-# ============================================================
-
 def extract_json(text):
 
     if not text:
@@ -130,7 +99,9 @@ def extract_json(text):
             "AI 응답이 비어 있습니다."
         )
 
-    text = text.strip()
+    text = str(
+        text
+    ).strip()
 
     text = re.sub(
         r"```json",
@@ -143,18 +114,14 @@ def extract_json(text):
         r"```",
         "",
         text,
-    )
+    ).strip()
 
-    text = text.strip()
-
-    # 전체 JSON
     try:
         return json.loads(text)
 
     except Exception:
         pass
 
-    # 배열
     start = text.find("[")
     end = text.rfind("]")
 
@@ -172,7 +139,6 @@ def extract_json(text):
         except Exception:
             pass
 
-    # 객체
     start = text.find("{")
     end = text.rfind("}")
 
@@ -195,10 +161,6 @@ def extract_json(text):
     )
 
 
-# ============================================================
-# 너무 흔한 소재 검사
-# ============================================================
-
 def looks_too_common(topic):
 
     if not topic:
@@ -210,7 +172,9 @@ def looks_too_common(topic):
         .lower()
     )
 
-    for keyword in COMMON_KNOWLEDGE_KEYWORDS:
+    for keyword in (
+        COMMON_KNOWLEDGE_KEYWORDS
+    ):
 
         normalized_keyword = (
             keyword
@@ -218,79 +182,86 @@ def looks_too_common(topic):
             .lower()
         )
 
-        if normalized_keyword in normalized:
+        if (
+            normalized_keyword
+            in normalized
+        ):
             return True
 
     return False
 
 
-# ============================================================
-# 후킹 검사
-# ============================================================
-
 def validate_hook(scene):
 
-    if not isinstance(scene, dict):
-        return False, "첫 장면 데이터가 없음"
+    if not isinstance(
+        scene,
+        dict,
+    ):
+        return (
+            False,
+            "첫 장면 데이터가 없음",
+        )
 
     text = str(
-        scene.get("text", "")
+        scene.get(
+            "text",
+            "",
+        )
     ).strip()
 
     keyword = str(
-        scene.get("keyword", "")
+        scene.get(
+            "keyword",
+            "",
+        )
     ).strip()
 
     if not text:
-        return False, "첫 장면 대사가 없음"
+        return (
+            False,
+            "첫 장면 대사가 없음",
+        )
 
     if not keyword:
-        return False, "첫 장면 검색어가 없음"
+        return (
+            False,
+            "첫 장면 검색어가 없음",
+        )
 
-    # --------------------------------------------------------
-    # 설명조 오프닝 차단
-    # --------------------------------------------------------
-
-    for banned in HOOK_BANNED_PATTERNS:
+    for banned in (
+        HOOK_BANNED_PATTERNS
+    ):
 
         if banned in text:
-            return False, (
-                f"설명조 오프닝 금지 표현: {banned}"
-            )
 
-    # --------------------------------------------------------
-    # 질문/반전/위험 신호
-    # --------------------------------------------------------
+            return (
+                False,
+                f"설명조 오프닝 금지 표현: {banned}",
+            )
 
     signal_count = sum(
         1
-        for signal in HOOK_REQUIRED_SIGNALS
+        for signal
+        in HOOK_REQUIRED_SIGNALS
         if signal in text
     )
 
-    # 최소 하나의 강한 신호 필요
     if signal_count < 1:
 
-        return False, (
-            "첫 장면에 강한 호기심 신호가 없음"
+        return (
+            False,
+            "첫 장면에 강한 호기심 신호가 없음",
         )
-
-    # --------------------------------------------------------
-    # 너무 짧은 후킹 차단
-    # --------------------------------------------------------
 
     if len(text) < 12:
 
-        return False, (
-            "첫 장면 대사가 지나치게 짧음"
+        return (
+            False,
+            "첫 장면 대사가 지나치게 짧음",
         )
 
     return True, "통과"
 
-
-# ============================================================
-# 대중성 검사
-# ============================================================
 
 def validate_traffic_potential(
     title,
@@ -303,101 +274,122 @@ def validate_traffic_potential(
         str(topic),
     ])
 
-    # 제목/소재 자체에 강한 관심 신호가 있는지 확인
     signal_count = sum(
         1
-        for signal in TRAFFIC_REQUIRED_SIGNALS
+        for signal
+        in TRAFFIC_REQUIRED_SIGNALS
         if signal in combined_text
     )
 
-    # 첫 장면까지 포함
     if scenes:
 
         first_text = str(
-            scenes[0].get("text", "")
+            scenes[0].get(
+                "text",
+                "",
+            )
         )
 
         signal_count += sum(
             1
-            for signal in TRAFFIC_REQUIRED_SIGNALS
+            for signal
+            in TRAFFIC_REQUIRED_SIGNALS
             if signal in first_text
         )
 
     if signal_count <= 0:
 
-        return False, (
-            "대중적 관심을 유발하는 "
-            "감정/호기심 신호 부족"
+        return (
+            False,
+            "대중적 관심을 유발하는 감정/호기심 신호 부족",
         )
 
     return True, "통과"
 
 
-# ============================================================
-# 장면 구조 검사
-# ============================================================
+def validate_scenes(
+    scenes,
+):
 
-def validate_scenes(scenes):
+    if not isinstance(
+        scenes,
+        list,
+    ):
 
-    if not isinstance(scenes, list):
-
-        return False, (
-            "scenes가 배열이 아님"
+        return (
+            False,
+            "scenes가 배열이 아님",
         )
 
     if len(scenes) < MIN_SCENES:
 
-        return False, (
-            f"장면 수 부족: {len(scenes)}"
+        return (
+            False,
+            f"장면 수 부족: {len(scenes)}",
         )
 
     if len(scenes) > MAX_SCENES:
 
-        return False, (
-            f"장면 수 초과: {len(scenes)}"
+        return (
+            False,
+            f"장면 수 초과: {len(scenes)}",
         )
 
-    for idx, scene in enumerate(scenes):
+    for idx, scene in enumerate(
+        scenes
+    ):
 
-        if not isinstance(scene, dict):
+        if not isinstance(
+            scene,
+            dict,
+        ):
 
-            return False, (
-                f"{idx + 1}번 장면이 객체가 아님"
+            return (
+                False,
+                f"{idx + 1}번 장면이 객체가 아님",
             )
 
         text = str(
-            scene.get("text", "")
+            scene.get(
+                "text",
+                "",
+            )
         ).strip()
 
         keyword = str(
-            scene.get("keyword", "")
+            scene.get(
+                "keyword",
+                "",
+            )
         ).strip()
 
         if not text:
 
-            return False, (
-                f"{idx + 1}번 장면 대사가 없음"
+            return (
+                False,
+                f"{idx + 1}번 장면 대사가 없음",
             )
 
         if not keyword:
 
-            return False, (
-                f"{idx + 1}번 장면 검색어가 없음"
+            return (
+                False,
+                f"{idx + 1}번 장면 검색어가 없음",
             )
 
-        # keyword는 영어 검색어를 기대
         if not re.search(
             r"[A-Za-z]",
             keyword,
         ):
 
-            return False, (
-                f"{idx + 1}번 검색어가 영어가 아님: "
-                f"{keyword}"
+            return (
+                False,
+                f"{idx + 1}번 검색어가 영어가 아님: {keyword}",
             )
 
-        # 너무 추상적인 검색어 차단
-        normalized = keyword.lower()
+        normalized = (
+            keyword.lower()
+        )
 
         bad_keywords = [
             "science",
@@ -412,31 +404,40 @@ def validate_scenes(scenes):
 
         if normalized in bad_keywords:
 
-            return False, (
-                f"{idx + 1}번 검색어가 너무 추상적임: "
-                f"{keyword}"
+            return (
+                False,
+                f"{idx + 1}번 검색어가 너무 추상적임: {keyword}",
             )
 
     return True, "통과"
 
 
-# ============================================================
-# 검색어 다양성 검사
-# ============================================================
-
-def validate_keyword_variety(scenes):
+def validate_keyword_variety(
+    scenes,
+):
 
     keywords = [
-        str(scene.get("keyword", "")).lower()
+        str(
+            scene.get(
+                "keyword",
+                "",
+            )
+        ).lower()
+
         for scene in scenes
     ]
 
     if not keywords:
-        return False, "검색어 없음"
 
-    unique_count = len(set(keywords))
+        return (
+            False,
+            "검색어 없음",
+        )
 
-    # 최소 절반 이상은 서로 달라야 함
+    unique_count = len(
+        set(keywords)
+    )
+
     required = max(
         6,
         len(keywords) // 2,
@@ -444,31 +445,40 @@ def validate_keyword_variety(scenes):
 
     if unique_count < required:
 
-        return False, (
-            "검색어 반복이 지나치게 많음"
+        return (
+            False,
+            "검색어 반복이 지나치게 많음",
         )
 
     return True, "통과"
 
 
-# ============================================================
-# V3 전체 검사
-# ============================================================
+def validate_script(
+    result,
+):
 
-def validate_script(result):
+    if not isinstance(
+        result,
+        dict,
+    ):
 
-    if not isinstance(result, dict):
-
-        return False, (
-            "AI 결과가 JSON 객체가 아님"
+        return (
+            False,
+            "AI 결과가 JSON 객체가 아님",
         )
 
     title = str(
-        result.get("title", "")
+        result.get(
+            "title",
+            "",
+        )
     ).strip()
 
     topic = str(
-        result.get("topic", "")
+        result.get(
+            "topic",
+            "",
+        )
     ).strip()
 
     scenes = result.get(
@@ -487,12 +497,7 @@ def validate_script(result):
         )
 
     except Exception:
-
         novelty_score = 0
-
-    # --------------------------------------------------------
-    # 기본값
-    # --------------------------------------------------------
 
     if not title:
         return False, "제목 없음"
@@ -500,94 +505,93 @@ def validate_script(result):
     if not topic:
         return False, "소재 없음"
 
-    # --------------------------------------------------------
-    # 상식 필터
-    # --------------------------------------------------------
-
     if looks_too_common(topic):
 
-        return False, (
-            "너무 흔한 상식 소재"
+        return (
+            False,
+            "너무 흔한 상식 소재",
         )
 
-    # --------------------------------------------------------
-    # 신선도
-    # --------------------------------------------------------
+    if (
+        novelty_score
+        < MIN_NOVELTY_SCORE
+    ):
 
-    if novelty_score < MIN_NOVELTY_SCORE:
-
-        return False, (
-            f"신선도 부족: "
-            f"{novelty_score}/10"
+        return (
+            False,
+            f"신선도 부족: {novelty_score}/10",
         )
 
-    # --------------------------------------------------------
-    # 장면
-    # --------------------------------------------------------
-
-    valid, reason = validate_scenes(
-        scenes
+    valid, reason = (
+        validate_scenes(
+            scenes
+        )
     )
 
     if not valid:
         return False, reason
-
-    # --------------------------------------------------------
-    # 첫 3초 후킹
-    # --------------------------------------------------------
 
     valid, reason = validate_hook(
         scenes[0]
     )
 
     if not valid:
-        return False, (
-            f"후킹 실패: {reason}"
+
+        return (
+            False,
+            f"후킹 실패: {reason}",
         )
 
-    # --------------------------------------------------------
-    # 대중성
-    # --------------------------------------------------------
-
-    valid, reason = validate_traffic_potential(
-        title,
-        topic,
-        scenes,
+    valid, reason = (
+        validate_traffic_potential(
+            title,
+            topic,
+            scenes,
+        )
     )
 
     if not valid:
-        return False, (
-            f"트래픽 필터 실패: {reason}"
+
+        return (
+            False,
+            f"트래픽 필터 실패: {reason}",
         )
 
-    # --------------------------------------------------------
-    # 검색어 다양성
-    # --------------------------------------------------------
-
-    valid, reason = validate_keyword_variety(
-        scenes
+    valid, reason = (
+        validate_keyword_variety(
+            scenes
+        )
     )
 
     if not valid:
         return False, reason
 
-    return True, "V3 전체 검사 통과"
+    return (
+        True,
+        "V3 전체 검사 통과",
+    )
 
 
-# ============================================================
-# AI 대본 생성
-# ============================================================
+def generate_script(
+    topic_info,
+):
 
-def generate_script(topic_info):
+    category = (
+        topic_info["category"]
+    )
 
-    category = topic_info["category"]
-    direction = topic_info["topic"]
+    direction = (
+        topic_info["topic"]
+    )
 
-    recent_topics = get_recent_topic_names()
+    recent_topics = (
+        get_recent_topic_names()
+    )
 
     recent_text = "\n".join(
         f"- {item}"
-        for item in recent_topics[-20:]
+        for item
+        in recent_topics[-20:]
     )
 
     print(
@@ -613,7 +617,6 @@ def generate_script(topic_info):
 분야:
 {category}
 
-
 ============================================================
 V3 핵심 목표
 ============================================================
@@ -630,7 +633,6 @@ V3 핵심 목표
 라고 느껴야 한다.
 
 단순히 대상을 보여주고 설명하는 영상은 실패다.
-
 
 ============================================================
 [절대 금지 오프닝]
@@ -654,7 +656,6 @@ V3 핵심 목표
 
 중 하나로 시작한다.
 
-
 ============================================================
 [소재 트래픽]
 ============================================================
@@ -676,7 +677,6 @@ V3 핵심 목표
 단순한 산업 기술 설명이나
 교과서적인 안전 교육은 피한다.
 
-
 ============================================================
 [신선도]
 ============================================================
@@ -690,7 +690,6 @@ novelty_score는 1~10.
 한국의 일반적인 성인이
 이미 대부분 알고 있을 내용이면
 소재 자체를 바꿔라.
-
 
 ============================================================
 [스토리]
@@ -713,7 +712,6 @@ novelty_score는 1~10.
 
 설명만 이어지는 구간을 만들지 마라.
 
-
 ============================================================
 [시각 설계]
 ============================================================
@@ -727,29 +725,19 @@ novelty_score는 1~10.
 예:
 
 train railway curve
-
 tractor huge tire field
-
 ship dry dock hull
-
 bridge expansion joint
-
 underwater animal hunting
 
 금지:
 
 science
-
 technology
-
 nature
-
 interesting
-
 amazing
-
 documentary
-
 
 ============================================================
 [장면]
@@ -765,7 +753,6 @@ documentary
 가능하면 같은 종류의 B-roll을
 연속해서 반복하지 마라.
 
-
 ============================================================
 [길이]
 ============================================================
@@ -774,7 +761,6 @@ documentary
 
 전체 대사는 TTS 기준으로
 충분한 분량을 작성한다.
-
 
 ============================================================
 [사실성]
@@ -788,7 +774,6 @@ documentary
 
 과장된 사실 금지.
 
-
 ============================================================
 [이전 소재]
 ============================================================
@@ -797,7 +782,6 @@ documentary
 사실상 같은 소재는 금지한다.
 
 {recent_text}
-
 
 ============================================================
 [출력]
@@ -827,29 +811,65 @@ JSON 외 설명 금지.
 
         try:
 
-            response = openai.chat.completions.create(
+            # ================================================
+            # V3.2 Budget Guard
+            # ================================================
 
-                model="gpt-4o-mini",
-
-                messages=[
-                    {
-                        "role": "system",
-                        "content": (
-                            "너는 V3 Shorts 엔진의 "
-                            "콘텐츠 디렉터다. "
-                            "평범한 설명 영상보다 "
-                            "강한 호기심과 의외성을 "
-                            "가진 실제 소재를 선택한다."
-                        ),
-                    },
-                    {
-                        "role": "user",
-                        "content": prompt,
-                    },
-                ],
-
-                temperature=1.0,
+            call_number = (
+                authorize_call(
+                    MODEL
+                )
             )
+
+            print(
+                f"💳 Script API call "
+                f"authorized: #{call_number}"
+            )
+
+            response = (
+                openai
+                .chat
+                .completions
+                .create(
+                    model=MODEL,
+
+                    messages=[
+                        {
+                            "role":
+                                "system",
+
+                            "content": (
+                                "너는 V3 Shorts 엔진의 "
+                                "콘텐츠 디렉터다. "
+                                "평범한 설명 영상보다 "
+                                "강한 호기심과 의외성을 "
+                                "가진 실제 소재를 선택한다."
+                            ),
+                        },
+                        {
+                            "role":
+                                "user",
+
+                            "content":
+                                prompt,
+                        },
+                    ],
+
+                    temperature=1.0,
+                )
+            )
+
+            usage = record_usage(
+                MODEL,
+                response,
+            )
+
+            print(
+                "💰 Script call:"
+                f" ${usage['cost_usd']:.6f}"
+            )
+
+            print_budget_status()
 
             content = (
                 response
@@ -863,6 +883,15 @@ JSON 외 설명 금지.
                 content
             )
 
+            if not isinstance(
+                result,
+                dict,
+            ):
+
+                raise ValueError(
+                    "AI 결과가 객체가 아닙니다."
+                )
+
             actual_topic = str(
                 result.get(
                     "topic",
@@ -870,9 +899,11 @@ JSON 외 설명 금지.
                 )
             ).strip()
 
-            novelty_score = result.get(
-                "novelty_score",
-                0,
+            novelty_score = (
+                result.get(
+                    "novelty_score",
+                    0,
+                )
             )
 
             try:
@@ -883,12 +914,13 @@ JSON 외 설명 금지.
             except Exception:
                 novelty_score = 0
 
-            result["novelty_score"] = (
-                novelty_score
-            )
+            result[
+                "novelty_score"
+            ] = novelty_score
 
             print(
-                f"🧠 소재: {actual_topic}"
+                f"🧠 소재: "
+                f"{actual_topic}"
             )
 
             print(
@@ -896,11 +928,10 @@ JSON 외 설명 금지.
                 f"{novelty_score}/10"
             )
 
-            # ------------------------------------------------
-            # 최근 소재 중복
-            # ------------------------------------------------
-
-            if actual_topic in recent_topics:
+            if (
+                actual_topic
+                in recent_topics
+            ):
 
                 print(
                     "🚫 최근 사용 소재 → 폐기"
@@ -908,29 +939,26 @@ JSON 외 설명 금지.
 
                 continue
 
-            # ------------------------------------------------
-            # V3 검사
-            # ------------------------------------------------
-
-            valid, reason = validate_script(
-                result
+            valid, reason = (
+                validate_script(
+                    result
+                )
             )
 
             if not valid:
 
                 print(
-                    f"🚫 V3 검사 실패: {reason}"
+                    f"🚫 V3 검사 실패: "
+                    f"{reason}"
                 )
 
                 continue
 
-            # ------------------------------------------------
-            # 정리
-            # ------------------------------------------------
-
             cleaned_scenes = []
 
-            for scene in result["scenes"]:
+            for scene in (
+                result["scenes"]
+            ):
 
                 cleaned_scenes.append({
                     "text": str(
@@ -943,7 +971,9 @@ JSON 외 설명 금지.
                 })
 
             result["scenes"] = (
-                cleaned_scenes[:MAX_SCENES]
+                cleaned_scenes[
+                    :MAX_SCENES
+                ]
             )
 
             result["title"] = str(
@@ -953,8 +983,13 @@ JSON 외 설명 금지.
                 )
             ).strip()
 
-            result["topic"] = actual_topic
-            result["category"] = category
+            result[
+                "topic"
+            ] = actual_topic
+
+            result[
+                "category"
+            ] = category
 
             print(
                 "======================================"
@@ -965,7 +1000,8 @@ JSON 외 설명 금지.
             )
 
             print(
-                f"🧠 소재: {actual_topic}"
+                f"🧠 소재: "
+                f"{actual_topic}"
             )
 
             print(
@@ -998,4 +1034,4 @@ JSON 외 설명 금지.
     raise RuntimeError(
         "V3 기준을 통과하는 "
         "소재를 찾지 못했습니다."
-      )
+)
