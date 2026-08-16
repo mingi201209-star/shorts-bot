@@ -17,13 +17,18 @@ from video.video_engine import create_scene
 # Shorts Generator
 # ============================================================
 #
-# 역할:
-#   1. 주제 선택
-#   2. OpenAI 대본 생성
-#   3. 한국어 TTS 생성
-#   4. video_engine을 이용한 장면 생성
-#   5. 전체 장면 합성
-#   6. Telegram으로 결과 전송
+# 제작 엔진
+#
+# 1. 소재 방향 선택
+# 2. "이미 다 아는 거 아님?" 1차 필터
+# 3. AI가 구체적인 실제 소재 발굴
+# 4. 대본 생성
+# 5. 시각 검색어 생성
+# 6. TTS
+# 7. 장면 생성
+# 8. 75~90초 검증
+# 9. 최종 합성
+# 10. Telegram 전송
 #
 # ============================================================
 
@@ -37,8 +42,6 @@ PEXELS_API_KEY = os.environ.get("PEXELS_API_KEY")
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-
-# OpenAI API 키
 openai.api_key = OPENAI_KEY
 
 
@@ -48,8 +51,8 @@ openai.api_key = OPENAI_KEY
 
 FPS = 30
 
+MIN_SCENES = 12
 MAX_SCENES = 13
-MIN_SCENES = 10
 
 TARGET_MIN_SECONDS = 75
 TARGET_MAX_SECONDS = 90
@@ -62,7 +65,7 @@ OUTPUT_VIDEO = "final_shorts.mp4"
 
 RECENT_TOPICS_FILE = "recent_topics.json"
 
-MAX_RECENT_TOPICS = 10
+MAX_RECENT_TOPICS = 20
 
 
 # ============================================================
@@ -70,7 +73,6 @@ MAX_RECENT_TOPICS = 10
 # ============================================================
 
 def log(message):
-    """GitHub Actions 로그 출력"""
 
     now = datetime.now().strftime("%H:%M:%S")
 
@@ -85,7 +87,6 @@ def log(message):
 # ============================================================
 
 def send_telegram_message(message):
-    """Telegram 텍스트 메시지 전송"""
 
     if not TELEGRAM_BOT_TOKEN:
         log("⚠️ TELEGRAM_BOT_TOKEN 없음")
@@ -134,7 +135,6 @@ def send_telegram_message(message):
 # ============================================================
 
 def send_telegram_video(video_path):
-    """완성된 영상을 Telegram으로 전송"""
 
     if not TELEGRAM_BOT_TOKEN:
         log("⚠️ TELEGRAM_BOT_TOKEN 없음")
@@ -259,144 +259,93 @@ def validate_environment():
 
 
 # ============================================================
-# 7. 토픽 풀
+# 7. 소재 방향 풀
+# ============================================================
+#
+# 중요한 변경:
+#
+# 예전처럼
+#
+# "우주에서 일어나는 이상한 현상"
+#
+# 같은 너무 넓은 주제를 바로 영상 소재로 사용하지 않는다.
+#
+# 이건 "탐색 방향"일 뿐이다.
+#
+# 실제 영상 소재는 AI가 별도로 발굴한다.
+#
 # ============================================================
 
 TOPIC_POOL = {
 
     "과학": [
-        "우주에서 일어나는 이상한 현상",
-        "지구에서 실제로 일어나는 극한 자연현상",
-        "인간의 몸에서 일어나는 놀라운 현상",
-        "동물의 특이한 생존 방식",
-        "바다 속에서 발견되는 이상한 현상",
-        "빛과 소리에 관한 놀라운 과학",
-        "시간과 공간에 관한 과학적 사실",
-        "중력과 관련된 흥미로운 현상",
-        "물질의 이상한 성질",
-        "실험으로 밝혀진 놀라운 과학",
-        "기후와 대기의 특이한 현상",
-        "지구 내부에서 일어나는 현상"
+        "사람들이 원리를 잘 모르는 일상 속 물리 현상",
+        "눈앞에서 볼 수 있지만 이유를 모르는 자연 현상",
+        "작은 장치 하나가 큰 문제를 해결하는 과학",
+        "겉보기와 실제 작동 방식이 완전히 다른 현상",
+        "자연이 스스로 문제를 해결하는 방식",
+        "극한 환경에서 생기는 의외의 물리 현상",
+        "평범한 물건에 숨어 있는 과학적 설계"
     ],
 
     "역사": [
-        "역사 속에서 실제로 일어난 이상한 사건",
-        "고대 문명의 특이한 기술",
-        "사라진 도시와 문명",
-        "과거 사람들이 사용했던 기묘한 물건",
-        "역사적으로 가장 이상했던 법과 제도",
-        "전쟁에서 실제로 사용된 특이한 전략",
-        "과거의 생활 방식",
-        "역사 속 미스터리",
-        "유명한 사건의 숨겨진 뒷이야기",
-        "과거의 과학 기술",
-        "역사 속 재난",
-        "사라진 기록과 유물"
+        "현재는 사라졌지만 당시에는 실제로 사용되던 기술",
+        "역사적으로 사람들이 문제를 해결했던 의외의 방법",
+        "유명한 사건보다 그 뒤에 숨어 있는 기술",
+        "과거의 생활에서 지금과 완전히 달랐던 방식",
+        "실제로 존재했던 기묘한 시설과 그 용도",
+        "전쟁이나 재난에서 탄생한 의외의 기술"
     ],
 
     "지리": [
-        "지구에서 가장 외딴 장소",
-        "세계에서 가장 극단적인 지역",
-        "지도에서 보면 이상한 장소",
-        "국경과 영토에 관한 특이한 사실",
-        "세계의 독특한 섬",
-        "사람이 살기 힘든 지역",
-        "지구에서 가장 추운 곳",
-        "지구에서 가장 뜨거운 곳",
-        "세계의 특이한 자연 지형",
-        "세계의 숨겨진 장소",
-        "바다와 관련된 지리적 미스터리",
-        "도시의 이상한 지리"
+        "지도에서 보면 이상하지만 실제 이유가 있는 장소",
+        "사람들이 자주 지나치지만 이유를 모르는 지형",
+        "세계의 극단적인 환경에 적응한 시설",
+        "국경이나 도시의 위치가 특이하게 결정된 이유",
+        "자연환경 때문에 만들어진 독특한 시설",
+        "일반적인 상식과 다른 세계의 지리 현상"
     ],
 
     "기술": [
-        "우리가 매일 사용하는 기술의 탄생 과정",
-        "인터넷의 숨겨진 원리",
-        "스마트폰에 들어 있는 기술",
-        "인공지능의 흥미로운 원리",
-        "컴퓨터의 역사",
-        "우주 기술",
-        "자동차 기술",
-        "비행 기술",
-        "통신 기술",
-        "로봇 기술",
-        "반도체 기술",
-        "일상 속에 숨어 있는 첨단 기술"
+        "매일 보지만 작동 원리를 모르는 기술",
+        "거대한 시설이 의외로 단순한 원리로 움직이는 사례",
+        "고장처럼 보이지만 사실 정상적으로 작동하는 기술",
+        "사람 대신 기계가 반복적인 문제를 해결하는 기술",
+        "극한 환경에서 사용되는 특수 기술",
+        "평범한 물건 속에 숨겨진 의외의 기술"
     ],
 
     "자연": [
-        "동물이 보여주는 놀라운 행동",
-        "식물의 이상한 생존 전략",
-        "세계의 희귀한 생물",
-        "극한 환경에서 살아가는 생명체",
-        "바다 생물의 특이한 능력",
-        "곤충의 놀라운 능력",
-        "새들의 특이한 행동",
-        "자연에서 발견되는 기묘한 현상",
-        "생태계의 숨겨진 관계",
-        "동물의 의사소통",
-        "자연에서 일어나는 대규모 현상",
-        "인간이 잘 모르는 자연의 법칙"
-    ],
-
-    "미스터리": [
-        "아직 완전히 설명되지 않은 현상",
-        "사라진 장소에 관한 이야기",
-        "정체가 밝혀지기까지 오래 걸린 사건",
-        "이상한 기록으로 남은 사건",
-        "과학적으로 조사된 미스터리",
-        "바다에서 발견된 미스터리",
-        "하늘에서 발견된 이상 현상",
-        "고대의 미스터리",
-        "정체불명의 물체",
-        "실제로 존재하는 이상한 장소",
-        "역사 속 미해결 사건",
-        "사람들이 오랫동안 오해했던 미스터리"
+        "동물이 인간이 예상하지 못한 방식으로 살아남는 사례",
+        "생물이 극한 환경에 적응한 독특한 방법",
+        "겉보기에는 이상하지만 생존에 도움이 되는 행동",
+        "자연에서 실제로 일어나는 이상한 현상",
+        "사람들이 잘 모르는 생태계의 숨은 관계",
+        "동물이나 식물의 독특한 문제 해결 방식"
     ],
 
     "생활": [
-        "일상에서 아무도 알려주지 않는 과학",
-        "우리가 매일 보는 물건의 비밀",
-        "음식에 관한 놀라운 사실",
-        "수면에 관한 흥미로운 사실",
-        "소비자가 잘 모르는 제품의 원리",
-        "집 안에서 일어나는 과학",
-        "도시 생활의 숨겨진 원리",
-        "교통에 관한 신기한 사실",
-        "건축물의 특이한 설계",
-        "사람들의 일상 행동에 관한 과학"
+        "매일 보지만 이유를 모르는 생활 속 장치",
+        "고장처럼 보이지만 사실 정상인 물건",
+        "평범한 제품에 숨겨진 의외의 설계",
+        "도시에서 사람들이 무심코 지나치는 시설",
+        "일상에서 반복되지만 아무도 이유를 묻지 않는 현상",
+        "생활 속에서 실제로 유용한 의외의 과학"
     ],
 
-    "의학_인체": [
-        "인간의 뇌에서 일어나는 신기한 현상",
-        "인간의 감각에 관한 사실",
-        "수면 중 몸에서 일어나는 일",
-        "기억과 관련된 흥미로운 현상",
-        "운동할 때 몸에서 일어나는 변화",
-        "통증과 관련된 과학",
-        "인체의 놀라운 방어 시스템",
-        "심장과 혈액에 관한 과학",
-        "눈과 시각에 관한 현상",
-        "귀와 청각에 관한 현상"
-    ],
-
-    "경제_사회": [
-        "돈의 역사",
-        "화폐에 숨겨진 기술",
-        "경제에서 일어나는 이상한 현상",
-        "사람들이 돈을 사용하는 방식",
-        "기업의 독특한 전략",
-        "도시와 경제의 관계",
-        "소비 심리에 관한 과학",
-        "가격이 결정되는 방식",
-        "세계 경제의 특이한 사례",
-        "역사 속 경제 사건"
+    "산업_공학": [
+        "도로와 철도에 숨어 있는 의외의 설계",
+        "건설 현장에서 일부러 이상하게 만든 구조",
+        "거대한 산업시설이 작동하는 의외의 방식",
+        "농기계에 들어간 예상 밖의 기술",
+        "배와 항공기에 숨겨진 특수 설계",
+        "물이거나 바람이거나 중력을 이용해 문제를 해결하는 구조"
     ]
 }
 
 
 # ============================================================
-# 8. 전체 토픽 생성
+# 8. 전체 방향 풀
 # ============================================================
 
 def flatten_topic_pool():
@@ -421,7 +370,71 @@ ALL_TOPICS = flatten_topic_pool()
 
 
 # ============================================================
-# 9. 최근 주제 불러오기
+# 9. 너무 흔한 소재 차단 목록
+# ============================================================
+#
+# AI가 "놀랍다"고 착각하기 쉬운 소재를 차단한다.
+#
+# 완벽한 필터가 아니라 1차 방어선이다.
+#
+# ============================================================
+
+COMMON_KNOWLEDGE_PATTERNS = [
+
+    "하늘이 파란 이유",
+
+    "무지개가 생기는 이유",
+
+    "비가 오는 이유",
+
+    "번개가 치는 이유",
+
+    "구름이 생기는 이유",
+
+    "지구가 둥근 이유",
+
+    "중력이 존재하는 이유",
+
+    "태양이 뜨고 지는 이유",
+
+    "달의 위상",
+
+    "물은 100도에서 끓는다",
+
+    "얼음이 물에 뜨는 이유",
+
+    "소리가 진공에서 전달되지 않는 이유",
+
+    "비행기가 뜨는 기본 원리",
+
+    "자동차 안전벨트의 기본 원리",
+
+    "전자레인지가 음식을 데우는 원리",
+
+    "냉장고가 차가워지는 원리",
+
+    "세탁기가 돌아가는 원리",
+
+    "휴대폰이 인터넷에 연결되는 기본 원리",
+
+    "GPS의 기본 원리",
+
+    "신호등의 기본 원리",
+
+    "지하철이 달리는 원리",
+
+    "기차가 레일 위를 달리는 이유",
+
+    "트랙터 바퀴에 물을 넣는 이유",
+
+    "자전거가 넘어지지 않는 기본 원리",
+
+    "비행기 날개가 양력을 만드는 기본 원리"
+]
+
+
+# ============================================================
+# 10. 최근 소재 불러오기
 # ============================================================
 
 def load_recent_topics():
@@ -449,14 +462,14 @@ def load_recent_topics():
     except Exception as e:
 
         log(
-            f"⚠️ 최근 주제 읽기 실패: {e}"
+            f"⚠️ 최근 소재 읽기 실패: {e}"
         )
 
     return []
 
 
 # ============================================================
-# 10. 최근 주제 저장
+# 11. 최근 소재 저장
 # ============================================================
 
 def save_recent_topics(topics):
@@ -479,12 +492,12 @@ def save_recent_topics(topics):
     except Exception as e:
 
         log(
-            f"⚠️ 최근 주제 저장 실패: {e}"
+            f"⚠️ 최근 소재 저장 실패: {e}"
         )
 
 
 # ============================================================
-# 11. 주제 선택
+# 12. 방향 선택
 # ============================================================
 
 def choose_topic():
@@ -497,17 +510,13 @@ def choose_topic():
 
         if isinstance(item, dict):
 
-            name = item.get(
+            topic = item.get(
                 "topic",
                 ""
             )
 
-            if name:
-                recent_names.append(name)
-
-        elif isinstance(item, str):
-
-            recent_names.append(item)
+            if topic:
+                recent_names.append(topic)
 
     candidates = [
         item
@@ -517,11 +526,6 @@ def choose_topic():
 
     if not candidates:
 
-        log(
-            "♻️ 모든 주제를 사용했으므로 "
-            "전체 풀에서 다시 선택합니다."
-        )
-
         candidates = ALL_TOPICS
 
     selected = random.choice(
@@ -529,38 +533,30 @@ def choose_topic():
     )
 
     log(
-        f"🎯 분야: {selected['category']}"
+        f"🎯 탐색 분야: {selected['category']}"
     )
 
     log(
-        f"🎯 방향: {selected['topic']}"
-    )
-
-    recent_topics.append(
-        selected
-    )
-
-    save_recent_topics(
-        recent_topics
+        f"🎯 탐색 방향: {selected['topic']}"
     )
 
     return selected
 
 
 # ============================================================
-# 12. JSON 추출
+# 13. JSON 추출
 # ============================================================
 
 def extract_json(text):
 
     if not text:
+
         raise ValueError(
             "AI 응답이 비어 있습니다."
         )
 
     text = text.strip()
 
-    # Markdown 코드블록 제거
     text = re.sub(
         r"```json",
         "",
@@ -576,7 +572,6 @@ def extract_json(text):
 
     text = text.strip()
 
-    # 전체 JSON
     try:
 
         return json.loads(text)
@@ -584,7 +579,6 @@ def extract_json(text):
     except Exception:
         pass
 
-    # 배열
     start = text.find("[")
     end = text.rfind("]")
 
@@ -594,18 +588,15 @@ def extract_json(text):
         and end > start
     ):
 
-        candidate = text[
-            start:end + 1
-        ]
-
         try:
 
-            return json.loads(candidate)
+            return json.loads(
+                text[start:end + 1]
+            )
 
         except Exception:
             pass
 
-    # 객체
     start = text.find("{")
     end = text.rfind("}")
 
@@ -615,13 +606,11 @@ def extract_json(text):
         and end > start
     ):
 
-        candidate = text[
-            start:end + 1
-        ]
-
         try:
 
-            return json.loads(candidate)
+            return json.loads(
+                text[start:end + 1]
+            )
 
         except Exception:
             pass
@@ -632,251 +621,584 @@ def extract_json(text):
 
 
 # ============================================================
-# 13. AI 대본 생성
+# 14. AI 대본 생성
 # ============================================================
 
 def generate_script(topic_info):
 
     category = topic_info["category"]
+    direction = topic_info["topic"]
 
-    topic = topic_info["topic"]
+    recent_topics = load_recent_topics()
+
+    recent_text = "\n".join(
+        [
+            str(item.get("topic", ""))
+            for item in recent_topics
+            if isinstance(item, dict)
+        ]
+    )
 
     log(
-        "🧠 AI 대본 생성 시작..."
+        "🧠 AI 소재 발굴 + 대본 생성 시작..."
     )
 
     prompt = f"""
-너는 유튜브 Shorts 전문 대본 작가다.
+너는 유튜브 Shorts의
+'숨겨진 이유를 찾아주는 지식 콘텐츠'
+전문 작가다.
 
-분야:
+이번 탐색 분야:
 {category}
 
-영상 방향:
-{topic}
+이번 탐색 방향:
+{direction}
 
-반드시 위 방향에 맞는
-하나의 구체적인 실제 소재를 선택해라.
 
-이전에 사용한 소재를 반복하지 마라.
+============================================================
+[최우선 규칙 — 이미 다 아는 거 필터]
+============================================================
 
-사람들이 처음 들었을 때
-"뭐라고?"
-"진짜?"
-"왜?"
-라는 반응을 할 만한 소재를 선택해라.
+이번 작업에서 가장 중요한 것은
+'사람들이 이미 너무 많이 알고 있는 소재를 피하는 것'이다.
 
-단순한 잡학 나열이 아니라
-하나의 이야기처럼 이어져야 한다.
+시청자가 제목을 보는 순간
+"그거 나도 아는데?"
+라고 말할 가능성이 높은 소재는 탈락시킨다.
 
-영상 길이는 75~90초를 목표로 한다.
+예:
 
-장면 수는 12~13개다.
+- 하늘이 파란 이유
+- 무지개가 생기는 이유
+- 비행기가 나는 기본 원리
+- 전자레인지가 작동하는 기본 원리
+- 냉장고가 차가워지는 원리
+- 지구가 둥근 이유
+- 중력의 기본 원리
+
+이런 소재는 사용하지 마라.
+
+대신
+
+'매일 볼 수 있지만 왜 그런지 모르는 것'
+
+'이상하게 생겼지만 실제로는 이유가 있는 것'
+
+'고장처럼 보이지만 정상적인 것'
+
+'일부러 불편하거나 이상하게 만들어진 것'
+
+'사람들이 기능을 다른 이유로 착각하는 것'
+
+'시설물이나 기계의 숨겨진 구조'
+
+같은 소재를 우선한다.
+
+
+============================================================
+[콘텐츠 엔진]
+============================================================
+
+다음 구조를 사용한다.
+
+1. 이상한 장면
+2. "왜 이렇게 하지?"라는 질문
+3. 사람들이 예상하는 일반적인 이유
+4. 그런데 실제 문제는 따로 있음
+5. 기술/자연/역사적 해결책 등장
+6. 원리 설명
+7. 예상 밖의 디테일
+8. 마지막에 의미를 다시 뒤집음
+
+핵심은 단순한 정보 전달이 아니라
+
+"아, 그래서 저렇게 생긴 거였구나."
+
+라는 인식 전환이다.
+
+
+============================================================
+[소재 선정]
+============================================================
+
+반드시 하나의 구체적인 실제 소재를 선택한다.
+
+추상적인 주제는 안 된다.
+
+나쁜 예:
+
+"자동차 기술"
+
+"우주의 신비"
+
+"동물의 놀라운 능력"
+
+좋은 예:
+
+"도로 옆에 일부러 만들어 놓은 작은 계단 구조"
+
+"농기계가 먼지를 스스로 털어내는 방식"
+
+"배를 만들 때 거대한 구덩이에 물을 넣는 이유"
+
+처럼 하나의 실제 대상을 선택한다.
+
+
+============================================================
+[기존 영상과 중복 금지]
+============================================================
+
+다음은 이미 분석/제작했던 소재이므로
+절대 반복하지 않는다.
+
+- 기차 커브의 캔트
+- 한강 교각 세굴
+- 고속도로 비탈면 소단
+- 조선소 드라이 도크
+- 트랙터 바퀴 물 채우기
+- 농기계 라디에이터 자동 청소
+- 레오파드 물범
+- 헤어리 크로아상
+- 초대형 에어 시더
+
+
+============================================================
+[최근 제작 소재]
+============================================================
+
+{recent_text}
+
+
+============================================================
+[사실성]
+============================================================
+
+실제로 존재하는 현상, 시설, 기술, 생물 또는 사건만 사용한다.
+
+확인되지 않은 인터넷 괴담을 사실처럼 말하지 않는다.
+
+가짜 통계와 가짜 연구 결과를 만들지 않는다.
+
+정확한 숫자를 확신할 수 없다면
+숫자를 억지로 만들지 않는다.
+
+
+============================================================
+[영상 길이]
+============================================================
+
+목표:
+
+75~90초
+
+장면:
+
+12~13개
 
 각 장면은 짧고 강하게 작성한다.
 
-검증되지 않은 인터넷 괴담을
-사실처럼 말하지 마라.
+한 장면에 너무 많은 정보를 넣지 않는다.
 
-과학, 역사, 지리, 기술 등의
-확인 가능한 소재를 우선한다.
 
-숫자가 필요할 경우
-지나치게 세밀한 가짜 숫자를 만들지 마라.
+============================================================
+[대본 구조]
+============================================================
 
-Pexels 영상 검색을 위해
-각 장면마다 영어 keyword를 작성한다.
+SCENE 1
+가장 이상하거나 충격적인 장면.
 
-keyword는 일반적인 시각 키워드로 작성한다.
+SCENE 2
+"그런데 왜?"라는 질문.
 
-예:
-deep ocean
-night city
-old laboratory
-space stars
-forest animal
+SCENE 3~5
+문제와 배경.
 
-고유명사는 가급적 사용하지 마라.
+SCENE 6~9
+해결 방법과 원리.
+
+SCENE 10~11
+가장 의외인 사실.
+
+SCENE 12~13
+전체 의미를 정리하면서
+시청자가 처음 장면을 다시 생각하게 만든다.
+
+
+============================================================
+[후킹]
+============================================================
+
+첫 문장은 설명하지 말고
+호기심을 만들어라.
+
+좋은 방향:
+
+"이건 고장 난 게 아닙니다."
+
+"일부러 이렇게 만들어 놓은 겁니다."
+
+"사실 이 구조물은 무너지는 걸 전제로 합니다."
+
+"여기에는 이상한 이유가 하나 있습니다."
+
+단, 소재와 맞지 않는 억지 후킹은 금지한다.
+
+
+============================================================
+[Pexels 검색어]
+============================================================
+
+각 장면마다 영어 검색어를 만든다.
+
+2~5개의 영어 단어.
+
+반드시 실제로 화면에 보여줄 수 있는
+구체적인 장면이어야 한다.
+
+좋은 예:
+
+"tractor radiator cleaning"
+
+"railway curved track"
+
+"bridge concrete pillar"
+
+"construction slope road"
+
+"dry dock shipyard"
+
+"farm tractor field"
+
+나쁜 예:
+
+"technology"
+
+"science"
+
+"interesting"
+
+"amazing"
+
+"nature"
+
+"history"
+
+"space"
+
+
+============================================================
+[대사와 화면의 1:1 대응]
+============================================================
+
+text가
+
+"기둥 앞에서 물살이 갈라집니다."
+
+라면
+
+keyword는
+
+"river bridge pillar"
+
+처럼 실제 화면에
+기둥과 물이 나와야 한다.
+
+대사와 관계없는 영상을 검색하지 않는다.
+
+
+============================================================
+[제목]
+============================================================
+
+제목은 Shorts 스타일로 만든다.
+
+좋은 제목:
+
+"무너질 걸 알고 만든 계단"
+
+"왜 이 기계는 먼지를 반대로 뿜을까?"
+
+"배를 만들려고 거대한 구덩이를 판 이유"
+
+나쁜 제목:
+
+"놀라운 과학 이야기"
+
+"신기한 기술"
+
+"재미있는 사실"
+
+
+============================================================
+[출력]
+============================================================
 
 반드시 JSON 객체 하나만 출력한다.
 
-형식:
-
 {{
   "title": "영상 제목",
-  "topic": "실제 선택한 소재",
+  "topic": "실제 선택한 구체적 소재",
   "category": "{category}",
+  "novelty_reason": "왜 사람들이 잘 모를 만한지",
   "scenes": [
     {{
-      "text": "장면 대사",
-      "keyword": "english visual keyword"
+      "text": "짧은 대사",
+      "keyword": "specific visual English search query"
     }}
   ]
 }}
 
-JSON 앞뒤에 설명을 붙이지 마라.
+반드시 12~13개의 scenes를 만든다.
+
+JSON 외의 설명은 출력하지 않는다.
 """
 
-    try:
+    response = openai.chat.completions.create(
 
-        response = openai.chat.completions.create(
+        model="gpt-4o-mini",
 
-            model="gpt-4o-mini",
-
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "너는 사실 기반 "
-                        "유튜브 Shorts 대본 전문가다."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-
-            temperature=1.0
-        )
-
-        content = (
-            response
-            .choices[0]
-            .message
-            .content
-        )
-
-        data = extract_json(
-            content
-        )
-
-        if isinstance(data, list):
-
-            result = {
-                "title": topic,
-                "topic": topic,
-                "category": category,
-                "scenes": data
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "너는 사실 기반 "
+                    "유튜브 Shorts 소재 발굴 및 "
+                    "대본 전문가다. "
+                    "가장 중요한 목표는 "
+                    "'이미 다 아는 상식'을 피하고 "
+                    "'일상에서 보지만 이유를 모르는 "
+                    "구체적인 소재'를 찾는 것이다."
+                )
+            },
+            {
+                "role": "user",
+                "content": prompt
             }
+        ],
 
-        else:
+        temperature=1.0
+    )
 
-            result = data
+    content = (
+        response
+        .choices[0]
+        .message
+        .content
+        .strip()
+    )
+
+    result = extract_json(
+        content
+    )
+
+    if not isinstance(
+        result,
+        dict
+    ):
+
+        raise ValueError(
+            "AI 결과가 객체가 아닙니다."
+        )
+
+    scenes = result.get(
+        "scenes",
+        []
+    )
+
+    if not isinstance(
+        scenes,
+        list
+    ):
+
+        raise ValueError(
+            "scenes가 배열이 아닙니다."
+        )
+
+    cleaned = []
+
+    for scene in scenes:
 
         if not isinstance(
-            result,
+            scene,
             dict
         ):
 
+            continue
+
+        text = str(
+            scene.get(
+                "text",
+                ""
+            )
+        ).strip()
+
+        keyword = str(
+            scene.get(
+                "keyword",
+                ""
+            )
+        ).strip()
+
+        if not text:
+            continue
+
+        if not keyword:
             raise ValueError(
-                "AI 결과가 객체가 아닙니다."
+                "검색어가 없는 장면이 있습니다."
             )
 
-        scenes = result.get(
-            "scenes",
-            []
+        cleaned.append(
+            {
+                "text": text,
+                "keyword": keyword
+            }
         )
 
+    if len(cleaned) < MIN_SCENES:
+
+        raise ValueError(
+            f"장면 수 부족: "
+            f"{len(cleaned)}개"
+        )
+
+    result["scenes"] = cleaned[
+        :MAX_SCENES
+    ]
+
+    title = str(
+        result.get(
+            "title",
+            ""
+        )
+    ).strip()
+
+    topic = str(
+        result.get(
+            "topic",
+            ""
+        )
+    ).strip()
+
+    if not title:
+        raise ValueError(
+            "AI가 제목을 만들지 않았습니다."
+        )
+
+    if not topic:
+        raise ValueError(
+            "AI가 실제 소재를 만들지 않았습니다."
+        )
+
+    # --------------------------------------------------------
+    # 흔한 소재 필터
+    # --------------------------------------------------------
+
+    topic_lower = topic.lower()
+
+    for banned in COMMON_KNOWLEDGE_PATTERNS:
+
+        if banned.lower() in topic_lower:
+
+            raise ValueError(
+                "🚫 이미 너무 잘 알려진 소재로 판단됨: "
+                f"{topic}"
+            )
+
+    # --------------------------------------------------------
+    # 최근 소재 중복 검사
+    # --------------------------------------------------------
+
+    for item in load_recent_topics():
+
         if not isinstance(
-            scenes,
-            list
+            item,
+            dict
+        ):
+            continue
+
+        old_topic = str(
+            item.get(
+                "topic",
+                ""
+            )
+        ).strip()
+
+        if not old_topic:
+            continue
+
+        if (
+            topic == old_topic
+            or topic in old_topic
+            or old_topic in topic
         ):
 
             raise ValueError(
-                "scenes가 배열이 아닙니다."
+                "🚫 최근 소재와 중복됨: "
+                f"{topic}"
             )
 
-        clean_scenes = []
+    result["category"] = category
 
-        for scene in scenes:
+    log("")
+    log("======================================")
+    log("🧠 AI 소재 발굴 결과")
+    log("======================================")
 
-            if not isinstance(
-                scene,
-                dict
-            ):
+    log(
+        f"📌 제목: {title}"
+    )
 
-                continue
+    log(
+        f"🔎 실제 소재: {topic}"
+    )
 
-            text = str(
-                scene.get(
-                    "text",
-                    ""
-                )
-            ).strip()
+    log(
+        "💡 신규성 이유: "
+        f"{result.get('novelty_reason', '없음')}"
+    )
 
-            keyword = str(
-                scene.get(
-                    "keyword",
-                    "nature landscape"
-                )
-            ).strip()
+    log(
+        f"🎬 장면 수: "
+        f"{len(result['scenes'])}"
+    )
 
-            if not text:
-                continue
+    log("")
 
-            if not keyword:
-                keyword = "nature landscape"
-
-            clean_scenes.append(
-                {
-                    "text": text,
-                    "keyword": keyword
-                }
-            )
-
-        if len(clean_scenes) < MIN_SCENES:
-
-            raise ValueError(
-                "장면 수 부족: "
-                f"{len(clean_scenes)}개"
-            )
-
-        result["scenes"] = (
-            clean_scenes[:MAX_SCENES]
-        )
-
-        if not result.get("title"):
-
-            result["title"] = topic
-
-        if not result.get("topic"):
-
-            result["topic"] = topic
-
-        if not result.get("category"):
-
-            result["category"] = category
+    for idx, scene in enumerate(
+        result["scenes"]
+    ):
 
         log(
-            "✅ 대본 생성 완료"
+            f"{idx + 1:02d}. "
+            f"{scene['keyword']}"
         )
 
-        log(
-            f"📝 제목: {result['title']}"
-        )
+    log("")
 
-        log(
-            f"🧠 소재: {result['topic']}"
-        )
+    # --------------------------------------------------------
+    # 최근 소재 기록
+    # --------------------------------------------------------
 
-        log(
-            f"🎬 장면 수: "
-            f"{len(result['scenes'])}"
-        )
+    recent = load_recent_topics()
 
-        return result
+    recent.append(
+        {
+            "topic": topic,
+            "title": title,
+            "category": category,
+            "created_at": datetime.now().isoformat()
+        }
+    )
 
-    except Exception as e:
+    save_recent_topics(
+        recent
+    )
 
-        log(
-            f"❌ AI 대본 생성 실패: {e}"
-        )
-
-        raise
+    return result
 
 
 # ============================================================
-# 14. TTS
+# 15. TTS
 # ============================================================
 
 async def generate_voice(
@@ -919,415 +1241,57 @@ def create_voice(
         )
 
 
-## ============================================================
-# 15. 대본 생성
+# ============================================================
+# 16. 총 영상 길이 확인
 # ============================================================
 
-def generate_script(topic_info):
+def check_total_duration(
+    scene_clips
+):
 
-    category = topic_info["category"]
-    topic = topic_info["topic"]
+    if not scene_clips:
 
-    log(
-        "🧠 AI에게 새로운 대본 요청 중..."
+        raise RuntimeError(
+            "장면이 없습니다."
+        )
+
+    total_duration = sum(
+        float(
+            clip.duration or 0
+        )
+        for clip in scene_clips
     )
 
-    prompt = f"""
-너는 유튜브 Shorts 전문 대본 작가이자
-영상 검색 키워드 설계 전문가다.
-
-이번 영상의 분야:
-{category}
-
-이번 영상의 방향:
-{topic}
-
-
-============================================================
-[가장 중요한 목표]
-============================================================
-
-대본의 내용과 영상 화면이 반드시 서로 관련되어야 한다.
-
-예를 들어 대본이
-
-"밤하늘에서 별이 폭발하면 엄청난 빛이 발생합니다."
-
-라고 한다면
-
-좋은 keyword:
-"star explosion night sky"
-"supernova space"
-"exploding star galaxy"
-
-나쁜 keyword:
-"space"
-"science"
-"stars"
-"galaxy"
-"technology"
-
-처럼 너무 넓은 단어를 사용하지 마라.
-
-
-============================================================
-[소재 선택]
-============================================================
-
-이번 영상에서는 위 방향에 맞는
-구체적인 하나의 실제 소재를 선택한다.
-
-이전 영상의 소재를 반복하지 마라.
-
-단순한 잡학 상식 모음이 아니라
-하나의 소재를 중심으로 이야기를 진행한다.
-
-사실 여부가 확인되지 않은 괴담이나
-인터넷 루머는 사용하지 마라.
-
-
-============================================================
-[영상 길이]
-============================================================
-
-총 길이:
-75초 ~ 90초
-
-장면 수:
-12 ~ 13개
-
-각 장면은 짧고 강하게 작성한다.
-
-한 장면의 대사는
-대략 12 ~ 25자 정도를 목표로 한다.
-
-필요한 경우 조금 길어도 된다.
-
-
-============================================================
-[장면 구성]
-============================================================
-
-1번:
-강력한 후킹
-
-2번:
-무슨 현상인지 설명
-
-3~5번:
-배경과 원리
-
-6~9번:
-구체적인 사례 / 숫자 / 과정
-
-10~11번:
-가장 놀라운 사실 또는 반전
-
-12~13번:
-결론과 여운
-
-
-============================================================
-[영상 검색어 — 매우 중요]
-============================================================
-
-각 장면에는 반드시
-"그 장면에서 화면에 실제로 보여줄 수 있는 것"
-을 검색어로 작성한다.
-
-keyword는 Pexels에서 사용할
-영어 검색어다.
-
-검색어는 2~5개의 영어 단어로 작성한다.
-
-반드시 구체적인 명사와 행동을 포함한다.
-
-좋은 예:
-
-"exploding star space"
-"astronaut inside spacecraft"
-"deep ocean underwater"
-"volcano eruption aerial"
-"lightning storm night"
-"human brain scan"
-"old medieval battlefield"
-"ancient stone ruins"
-"rocket launch sky"
-"solar flare sun"
-
-나쁜 예:
-
-"space"
-"science"
-"history"
-"technology"
-"mystery"
-"nature"
-"interesting science"
-"amazing"
-"information"
-
-특히 다음과 같은
-너무 넓은 단독 검색어는 절대 사용하지 마라:
-
-space
-science
-history
-technology
-nature
-ocean
-animal
-human
-sky
-earth
-
-
-============================================================
-[검색어와 대사의 관계]
-============================================================
-
-각 keyword는 반드시
-그 장면의 text와 직접적인 시각적 관계가 있어야 한다.
-
-예:
-
-text:
-"태양에서는 거대한 폭발이 일어납니다."
-
-keyword:
-"solar flare sun"
-
-가능하면 이렇게 작성한다.
-
-text:
-"심해에는 빛이 거의 도달하지 않습니다."
-
-keyword:
-"deep ocean underwater"
-
-잘못된 예:
-
-text:
-"심해에는 빛이 거의 도달하지 않습니다."
-
-keyword:
-"space galaxy"
-
-절대 이런 식으로
-대사와 관계없는 영상을 검색하지 마라.
-
-
-============================================================
-[고유명사]
-============================================================
-
-Pexels 검색에서 검색 결과가 너무 제한될 수 있으므로
-사람 이름이나 특정 사건명 같은 고유명사는
-가능하면 사용하지 마라.
-
-대신 장면을 시각적으로 표현할 수 있는
-일반 영어 검색어를 사용한다.
-
-
-============================================================
-[숫자와 사실]
-============================================================
-
-확실하지 않은 숫자를 만들어내지 마라.
-
-숫자가 필요하면
-널리 알려진 범위 수준으로 표현한다.
-
-사실처럼 보이는 가짜 통계나
-가짜 연구 결과를 만들지 마라.
-
-
-============================================================
-[출력 형식]
-============================================================
-
-반드시 JSON 객체 하나만 출력한다.
-
-JSON 외의 설명은 절대 출력하지 마라.
-
-형식:
-
-{{
-  "title": "영상 제목",
-  "topic": "선택한 실제 소재",
-  "category": "{category}",
-  "scenes": [
-    {{
-      "text": "짧은 대사",
-      "keyword": "specific visual English search query"
-    }}
-  ]
-}}
-
-반드시 12~13개의 scenes를 생성한다.
-
-각 scene의 keyword는 서로 똑같지 않도록 한다.
-
-keyword는 반드시 영어로 작성한다.
-
-keyword는 반드시 실제 영상으로 찾을 수 있는
-구체적인 장면이어야 한다.
-"""
-
-    try:
-
-        response = openai.chat.completions.create(
-
-            model="gpt-4o-mini",
-
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "너는 사실 기반 유튜브 Shorts "
-                        "대본 작가이자 Pexels 영상 검색 "
-                        "키워드 전문가다. "
-                        "대본과 영상 검색어의 시각적 "
-                        "일치도를 가장 중요하게 생각한다."
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-
-            temperature=1.0
+    log(
+        f"⏱️ 현재 총 영상 길이: "
+        f"{total_duration:.2f}초"
+    )
+
+    if total_duration < TARGET_MIN_SECONDS:
+
+        raise RuntimeError(
+            f"영상이 너무 짧습니다: "
+            f"{total_duration:.2f}초 "
+            f"(최소 {TARGET_MIN_SECONDS}초)"
         )
 
-        content = (
-            response
-            .choices[0]
-            .message
-            .content
-            .strip()
+    if total_duration > TARGET_MAX_SECONDS:
+
+        raise RuntimeError(
+            f"영상이 너무 깁니다: "
+            f"{total_duration:.2f}초 "
+            f"(최대 {TARGET_MAX_SECONDS}초)"
         )
 
-        data = extract_json(content)
+    log(
+        "✅ 영상 길이 조건 통과"
+    )
 
-        if isinstance(data, list):
-
-            items = data
-
-            result = {
-                "title": topic,
-                "topic": topic,
-                "category": category,
-                "scenes": items
-            }
-
-        else:
-
-            result = data
-
-        scenes = result.get(
-            "scenes",
-            []
-        )
-
-        if not isinstance(
-            scenes,
-            list
-        ):
-
-            raise ValueError(
-                "scenes가 배열이 아닙니다."
-            )
-
-        cleaned_scenes = []
-
-        for scene in scenes:
-
-            if not isinstance(
-                scene,
-                dict
-            ):
-                continue
-
-            text = str(
-                scene.get(
-                    "text",
-                    ""
-                )
-            ).strip()
-
-            keyword = str(
-                scene.get(
-                    "keyword",
-                    ""
-                )
-            ).strip()
-
-            if not text:
-                continue
-
-            if not keyword:
-                keyword = "nature landscape"
-
-            cleaned_scenes.append(
-                {
-                    "text": text,
-                    "keyword": keyword
-                }
-            )
-
-        scenes = cleaned_scenes
-
-        if len(scenes) < MIN_SCENES:
-
-            raise ValueError(
-                f"장면 수 부족: {len(scenes)}"
-            )
-
-        result["scenes"] = scenes[
-            :MAX_SCENES
-        ]
-
-        log(
-            f"✅ 대본 생성 완료: "
-            f"{len(result['scenes'])}개 장면"
-        )
-
-        log(
-            f"📌 실제 소재: "
-            f"{result.get('topic', '미상')}"
-        )
-
-        # ----------------------------------------
-        # 검색어 확인 로그
-        # ----------------------------------------
-
-        log(
-            "🔎 장면별 Pexels 검색어:"
-        )
-
-        for idx, scene in enumerate(
-            result["scenes"]
-        ):
-
-            log(
-                f"   {idx + 1}. "
-                f"{scene['keyword']}"
-            )
-
-        return result
-
-    except Exception as e:
-
-        log(
-            f"AI 대본 생성 실패: {e}"
-        )
-
-        raise
+    return total_duration
 
 
 # ============================================================
-# 16. 최종 영상 렌더링
+# 17. 최종 영상 렌더링
 # ============================================================
 
 def render_final_video(
@@ -1394,7 +1358,7 @@ def render_final_video(
 
 
 # ============================================================
-# 17. 결과 요약
+# 18. 결과 요약
 # ============================================================
 
 def send_result_summary(
@@ -1422,6 +1386,11 @@ def send_result_summary(
         []
     )
 
+    novelty = script_data.get(
+        "novelty_reason",
+        ""
+    )
+
     message = (
         "🎬 Shorts 생성 완료!\n\n"
         f"📂 분야: {category}\n"
@@ -1429,6 +1398,7 @@ def send_result_summary(
         f"📝 제목: {title}\n"
         f"🎞️ 길이: {duration:.1f}초\n"
         f"🎥 장면: {len(scenes)}개\n\n"
+        f"💡 신규성: {novelty}\n\n"
         "📦 영상 전송 중..."
     )
 
@@ -1438,7 +1408,7 @@ def send_result_summary(
 
 
 # ============================================================
-# 18. 임시 파일 정리
+# 19. 임시 파일 정리
 # ============================================================
 
 def cleanup_temp_files():
@@ -1485,7 +1455,7 @@ def cleanup_temp_files():
 
 
 # ============================================================
-# 19. 메인
+# 20. 메인
 # ============================================================
 
 def main():
@@ -1515,13 +1485,13 @@ def main():
         validate_environment()
 
         # ----------------------------------------------------
-        # 주제
+        # 탐색 방향
         # ----------------------------------------------------
 
         topic_info = choose_topic()
 
         # ----------------------------------------------------
-        # 대본
+        # AI 소재 + 대본
         # ----------------------------------------------------
 
         script_data = generate_script(
@@ -1553,33 +1523,19 @@ def main():
 
             try:
 
-                # ★ 중요 ★
-                #
-                # video_engine.py의 create_scene()
-                # 함수는 다음 4개 인자를 받는다.
-                #
-                # create_scene(
-                #     idx,
-                #     item,
-                #     create_voice,
-                #     requests
-                # )
-                #
-                # 기존 코드의
-                #
-                #     create_voice,
-                #     requests
-                #
-                # 를 함수 바깥에 따로 적어버린 것이
-                # "takes 4 positional arguments but 7"
-                # 오류의 원인이었다.
-
                 scene = create_scene(
                     idx,
                     item,
                     create_voice,
                     requests
                 )
+
+                if scene is None:
+
+                    raise RuntimeError(
+                        "create_scene()가 "
+                        "None을 반환했습니다."
+                    )
 
                 scene_clips.append(
                     scene
@@ -1598,7 +1554,7 @@ def main():
                 raise
 
         # ----------------------------------------------------
-        # 총 길이
+        # 총 길이 검증
         # ----------------------------------------------------
 
         total_duration = (
@@ -1704,7 +1660,7 @@ def main():
 
 
 # ============================================================
-# 20. 실행
+# 21. 실행
 # ============================================================
 
 if __name__ == "__main__":
