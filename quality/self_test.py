@@ -22,19 +22,20 @@ from quality.rewrite_engine import (
 #   품질 엔진의 의사결정 로직 자체를 검증한다.
 #
 # 특징:
-#   - OpenAI API 호출 없음
 #   - 영상 생성 없음
 #   - Telegram 전송 없음
 #
 # 테스트:
 #   1. 정상 PASS
 #   2. 약한 Hook
-#   3. Judge 충돌
+#   3. Judge 의견 충돌
 #   4. Fact Critical Risk
 #   5. 낮은 Confidence
 #   6. Visual 문제
 #   7. REVIEW Router
-#   8. Rewrite Domain 선택
+#   8. 여러 영역 동시 불확실
+#   9. Critical Risk 평균점수 은폐 방지
+#   10. 선택적 Rewrite
 #
 # ============================================================
 
@@ -44,7 +45,7 @@ FAILED = 0
 
 
 # ============================================================
-# 테스트 유틸
+# 테스트용 Judge 결과 생성
 # ============================================================
 
 def make_judge_result(
@@ -67,6 +68,10 @@ def make_judge_result(
         "critical_risk": critical_risk,
     }
 
+
+# ============================================================
+# ASSERT
+# ============================================================
 
 def assert_equal(
     name,
@@ -123,6 +128,7 @@ def assert_true(
 def test_normal_pass():
 
     pool = {
+
         "hook": [
             make_judge_result(
                 "hook",
@@ -170,6 +176,7 @@ def test_normal_pass():
 def test_weak_hook():
 
     pool = {
+
         "hook": [
             make_judge_result(
                 "hook",
@@ -226,6 +233,7 @@ def test_weak_hook():
 def test_judge_disagreement():
 
     pool = {
+
         "hook": [
             make_judge_result(
                 "hook",
@@ -287,6 +295,7 @@ def test_judge_disagreement():
 def test_fact_critical():
 
     pool = {
+
         "hook": [
             make_judge_result(
                 "hook",
@@ -348,6 +357,7 @@ def test_fact_critical():
 def test_low_confidence():
 
     pool = {
+
         "hook": [
             make_judge_result(
                 "hook",
@@ -409,6 +419,7 @@ def test_low_confidence():
 def test_visual_rewrite():
 
     pool = {
+
         "hook": [
             make_judge_result(
                 "hook",
@@ -469,6 +480,7 @@ def test_visual_rewrite():
 def test_review_router():
 
     pool = {
+
         "hook": [
             make_judge_result(
                 "hook",
@@ -530,6 +542,7 @@ def test_review_router():
 def test_too_many_uncertain_domains():
 
     pool = {
+
         "hook": [
             make_judge_result(
                 "hook",
@@ -584,6 +597,7 @@ def test_too_many_uncertain_domains():
 def test_critical_not_hidden_by_average():
 
     pool = {
+
         "hook": [
             make_judge_result(
                 "hook",
@@ -632,6 +646,7 @@ def test_critical_not_hidden_by_average():
 def test_selective_rewrite():
 
     pool = {
+
         "hook": [
             make_judge_result(
                 "hook",
@@ -696,7 +711,9 @@ def run_all_tests():
 
     print("")
     print("=" * 64)
-    print("🧪 SHORTS V3 QUALITY ENGINE SELF TEST")
+    print(
+        "🧪 SHORTS V3 QUALITY ENGINE SELF TEST"
+    )
     print("=" * 64)
 
     tests = [
@@ -725,7 +742,11 @@ def run_all_tests():
 
         except Exception as e:
 
-            global FAILED
+            # 중요:
+            # global FAILED는
+            # run_all_tests() 시작 부분에서
+            # 이미 선언했으므로
+            # 여기서 다시 선언하지 않는다.
 
             FAILED += 1
 
@@ -740,7 +761,9 @@ def run_all_tests():
 
     print("")
     print("=" * 64)
-    print("📊 SELF TEST RESULT")
+    print(
+        "📊 SELF TEST RESULT"
+    )
     print("=" * 64)
 
     print(
@@ -755,7 +778,8 @@ def run_all_tests():
 
         print("")
         print(
-            "🏆 QUALITY ENGINE SELF TEST PASSED"
+            "🏆 QUALITY ENGINE "
+            "SELF TEST PASSED"
         )
 
         print(
@@ -769,7 +793,8 @@ def run_all_tests():
 
         print("")
         print(
-            "🚨 QUALITY ENGINE SELF TEST FAILED"
+            "🚨 QUALITY ENGINE "
+            "SELF TEST FAILED"
         )
 
         print(
