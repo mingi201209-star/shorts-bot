@@ -2,9 +2,6 @@ name: Shorts Generator
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
 
 jobs:
   build:
@@ -29,6 +26,7 @@ jobs:
       - name: Verify Korean fonts
         run: |
           echo "=== Korean font check ==="
+
           fc-list :lang=ko family file | head -30
 
           if ! fc-list :lang=ko | grep -qi "Noto Sans CJK\|Nanum"; then
@@ -38,23 +36,44 @@ jobs:
 
           echo "✅ Korean font detected"
 
-      - name: Install dependencies
+      - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
+
           if [ -f requirements.txt ]; then
             pip install -r requirements.txt
+          else
+            echo "❌ requirements.txt not found"
+            exit 1
           fi
 
-      - name: Run Shorts Generator
+      - name: Run Shorts Generator V3.2
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
+          # ================================================
+          # V3.2 Quality / Budget Guard
+          # ================================================
+
           V3_JUDGE_MODEL: gpt-4o-mini
+
+          # 한 번의 Shorts 실행에서
+          # Generator + Judge + Rewrite 전체 API 호출 상한
           V3_MAX_API_CALLS: "12"
+
+          # 한 번의 Shorts 실행당 추적 비용 상한
           V3_MAX_COST_USD: "0.05"
 
         run: |
+          echo "========================================"
+          echo "🚀 START SHORTS GENERATOR V3.2"
+          echo "========================================"
+
           python main.py
+
+          echo "========================================"
+          echo "✅ SHORTS GENERATOR V3.2 FINISHED"
+          echo "========================================"
