@@ -6,33 +6,38 @@ import hashlib
 from datetime import datetime, timezone
 from collections import Counter
 
+from quality.run_tracker import (
+    load_run_history,
+)
+
 
 # ============================================================
-# V3 Failure Monitor
+# V3.1 Failure Monitor
 # ============================================================
 #
 # 목적:
-#   "같은 실패가 반복될 때 결과물만 계속 고치지 말고,
-#    엔진 자체의 문제 가능성을 탐지한다."
+#   반복되는 실패가
+#   - 콘텐츠 문제인지
+#   - 시스템 문제인지
+#   - Validator 문제인지
+#   - Judge 문제인지
+#   탐지한다.
 #
-# 이 모듈은:
-#   - 오류를 기록한다.
-#   - 같은 오류를 fingerprint로 묶는다.
-#   - 최근 발생률을 계산한다.
-#   - 연속 실패를 탐지한다.
-#   - 의심되는 엔진/모듈을 표시한다.
+# V3.1 변경:
+#   실패율의 분모를 failure_history가 아니라
+#   run_tracker의 실제 완료 RUN(SUCCESS + FAILED)로 계산한다.
 #
-# 이 모듈은 절대로:
-#   - 코드를 자동 수정하지 않는다.
-#   - Validator 기준을 자동 변경하지 않는다.
-#   - AI Judge 판단을 자동 채택하지 않는다.
+# 절대 하지 않는 것:
+#   - 코드 자동 수정
+#   - Validator 기준 자동 변경
+#   - Judge 결과 자동 채택
 #
 # ============================================================
 
 
 FAILURE_HISTORY_FILE = "data/failure_history.json"
 
-MAX_HISTORY = 1000
+MAX_HISTORY = 2000
 
 RECENT_WINDOW = 20
 
@@ -58,7 +63,7 @@ UNKNOWN_FAILURE = "UNKNOWN_FAILURE"
 
 
 # ============================================================
-# 데이터 디렉터리
+# 기본 유틸
 # ============================================================
 
 def ensure_data_directory():
@@ -68,16 +73,11 @@ def ensure_data_directory():
     )
 
     if directory:
-
         os.makedirs(
             directory,
-            exist_ok=True
+            exist_ok=True,
         )
 
-
-# ============================================================
-# 시간
-# ============================================================
 
 def utc_now():
 
@@ -85,10 +85,6 @@ def utc_now():
         timezone.utc
     ).isoformat()
 
-
-# ============================================================
-# 문자열 정규화
-# ============================================================
 
 def normalize_string(value):
 
@@ -104,7 +100,7 @@ def normalize_string(value):
 
 
 # ============================================================
-# fingerprint 생성
+# Fingerprint
 # ============================================================
 
 def create_fingerprint(
@@ -112,7 +108,7 @@ def create_fingerprint(
     module,
     error_type,
     rule_id=None,
-    judge_id=None
+    judge_id=None,
 ):
 
     raw = "|".join([
@@ -129,7 +125,7 @@ def create_fingerprint(
 
 
 # ============================================================
-# 기록 불러오기
+# Failure History
 # ============================================================
 
 def load_failure_history():
@@ -146,7 +142,7 @@ def load_failure_history():
         with open(
             FAILURE_HISTORY_FILE,
             "r",
-            encoding="utf-8"
+            encoding="utf-8",
         ) as f:
 
             data = json.load(f)
@@ -162,10 +158,6 @@ def load_failure_history():
 
     return []
 
-
-# ============================================================
-# 기록 저장
-# ============================================================
 
 def save_failure_history(history):
 
@@ -185,19 +177,19 @@ def save_failure_history(history):
         with open(
             temp_path,
             "w",
-            encoding="utf-8"
+            encoding="utf-8",
         ) as f:
 
             json.dump(
                 history,
                 f,
                 ensure_ascii=False,
-                indent=2
+                indent=2,
             )
 
         os.replace(
             temp_path,
-            FAILURE_HISTORY_FILE
+            FAILURE_HISTORY_FILE,
         )
 
     except Exception as e:
@@ -220,17 +212,25 @@ def save_failure_history(history):
 def classify_failure(
     stage,
     module,
-    error_type
+    error_type,
 ):
 
-    stage_n = normalize_string(stage)
-    module_n = normalize_string(module)
-    error_n = normalize_string(error_type)
+    stage_n = normalize_string(
+        stage
+    )
+
+    module_n = normalize_string(
+        module
+    )
+
+    error_n = normalize_string(
+        error_type
+    )
 
     combined = " ".join([
         stage_n,
         module_n,
-        error_n
+        error_n,
     ])
 
     # --------------------------------------------------------
@@ -245,7 +245,7 @@ def classify_failure(
         return VALIDATOR_SUSPECT
 
     # --------------------------------------------------------
-    # Judge 관련
+    # Judge 자체 의심
     # --------------------------------------------------------
 
     if (
@@ -276,6 +276,8 @@ def classify_failure(
         "video_downloader",
         "audio",
         "moviepy",
+        "http",
+        "api",
     ]
 
     if any(
@@ -301,6 +303,8 @@ def classify_failure(
         "visual_match",
         "retention",
         "opening",
+        "traffic",
+        "story",
     ]
 
     if any(
@@ -328,7 +332,7 @@ def record_failure(
     rule_id=None,
     judge_id=None,
     failure_class=None,
-    metadata=None
+    metadata=None,
 ):
 
     if not failure_class:
@@ -336,7 +340,7 @@ def record_failure(
         failure_class = classify_failure(
             stage,
             module,
-            error_type
+            error_type,
         )
 
     fingerprint = create_fingerprint(
@@ -344,7 +348,7 @@ def record_failure(
         module,
         error_type,
         rule_id,
-        judge_id
+        judge_id,
     )
 
     event = {
@@ -358,9 +362,7 @@ def record_failure(
         "error_type": str(
             error_type
         ),
-        "failure_class": (
-            failure_class
-        ),
+        "failure_class": failure_class,
         "fingerprint": fingerprint,
         "message": str(message)[:1000],
         "rule_id": rule_id,
@@ -369,7 +371,7 @@ def record_failure(
             metadata
             if isinstance(metadata, dict)
             else {}
-        )
+        ),
     }
 
     history = load_failure_history()
@@ -386,65 +388,89 @@ def record_failure(
 
 
 # ============================================================
-# 최근 RUN 추출
+# 실제 완료 RUN 가져오기
 # ============================================================
 
-def get_recent_runs(
-    history,
-    window=RECENT_WINDOW
+def get_recent_finished_runs(
+    window=RECENT_WINDOW,
+    engine_version=None,
 ):
 
-    run_ids = []
+    run_history = load_run_history()
 
-    for item in reversed(history):
+    finished = []
 
-        run_id = item.get(
-            "run_id"
+    for item in run_history:
+
+        status = item.get(
+            "status"
         )
 
-        if not run_id:
+        if status not in (
+            "SUCCESS",
+            "FAILED",
+        ):
             continue
 
-        if run_id not in run_ids:
-
-            run_ids.append(
-                run_id
+        if (
+            engine_version is not None
+            and str(
+                item.get(
+                    "engine_version",
+                    ""
+                )
             )
+            != str(engine_version)
+        ):
+            continue
 
-        if len(run_ids) >= window:
-            break
+        finished.append(
+            item
+        )
 
-    return list(
-        reversed(run_ids)
-    )
+    return finished[
+        -window:
+    ]
 
 
 # ============================================================
-# 특정 fingerprint 통계
+# Fingerprint 통계
 # ============================================================
 
 def analyze_fingerprint(
     fingerprint,
-    window=RECENT_WINDOW
+    window=RECENT_WINDOW,
+    engine_version=None,
 ):
 
-    history = load_failure_history()
+    failure_history = (
+        load_failure_history()
+    )
 
-    if not history:
+    recent_runs = (
+        get_recent_finished_runs(
+            window=window,
+            engine_version=engine_version,
+        )
+    )
+
+    if not recent_runs:
 
         return {
             "fingerprint": fingerprint,
-            "status": "NORMAL",
+            "status": "NO_DATA",
             "count": 0,
             "rate": 0.0,
             "streak": 0,
-            "recent_runs": 0
+            "recent_runs": 0,
         }
 
-    recent_run_ids = get_recent_runs(
-        history,
-        window
-    )
+    recent_run_ids = [
+        item.get(
+            "run_id"
+        )
+        for item in recent_runs
+    ]
 
     recent_run_set = set(
         recent_run_ids
@@ -452,21 +478,27 @@ def analyze_fingerprint(
 
     matching_events = [
         item
-        for item in history
+        for item in failure_history
         if (
-            item.get("fingerprint")
+            item.get(
+                "fingerprint"
+            )
             == fingerprint
-            and item.get("run_id")
+            and item.get(
+                "run_id"
+            )
             in recent_run_set
         )
     ]
 
     failed_runs = {
-        item.get("run_id")
+        item.get(
+            "run_id"
+        )
         for item in matching_events
     }
 
-    run_count = len(
+    total_runs = len(
         recent_run_ids
     )
 
@@ -475,13 +507,14 @@ def analyze_fingerprint(
     )
 
     rate = (
-        failure_count / run_count
-        if run_count
+        failure_count
+        / total_runs
+        if total_runs
         else 0.0
     )
 
     # --------------------------------------------------------
-    # 연속 실패 계산
+    # 연속 발생 횟수
     # --------------------------------------------------------
 
     streak = 0
@@ -496,24 +529,36 @@ def analyze_fingerprint(
             break
 
     # --------------------------------------------------------
-    # 상태 결정
+    # 상태
     # --------------------------------------------------------
 
     status = "NORMAL"
 
     if (
-        failure_count >= CRITICAL_COUNT
-        and rate >= CRITICAL_RATE
-    ) or streak >= CRITICAL_STREAK:
+        (
+            failure_count
+            >= CRITICAL_COUNT
+            and rate
+            >= CRITICAL_RATE
+        )
+        or streak
+        >= CRITICAL_STREAK
+    ):
 
         status = (
             "SUSPECTED_ENGINE_ISSUE"
         )
 
     elif (
-        failure_count >= WARNING_COUNT
-        and rate >= WARNING_RATE
-    ) or streak >= WARNING_STREAK:
+        (
+            failure_count
+            >= WARNING_COUNT
+            and rate
+            >= WARNING_RATE
+        )
+        or streak
+        >= WARNING_STREAK
+    ):
 
         status = "WARNING"
 
@@ -521,18 +566,21 @@ def analyze_fingerprint(
         "fingerprint": fingerprint,
         "status": status,
         "count": failure_count,
-        "rate": round(rate, 3),
+        "rate": round(
+            rate,
+            3,
+        ),
         "streak": streak,
-        "recent_runs": run_count
+        "recent_runs": total_runs,
     }
 
 
 # ============================================================
-# 특정 실패 기록 + 즉시 분석
+# 기록 + 즉시 분석
 # ============================================================
 
 def record_and_analyze_failure(
-    **kwargs
+    **kwargs,
 ):
 
     event = record_failure(
@@ -540,42 +588,62 @@ def record_and_analyze_failure(
     )
 
     analysis = analyze_fingerprint(
-        event["fingerprint"]
+        event["fingerprint"],
+        engine_version=event[
+            "engine_version"
+        ],
     )
 
     return {
         "event": event,
-        "analysis": analysis
+        "analysis": analysis,
     }
 
 
 # ============================================================
-# 모듈별 반복 실패 분석
+# 모듈별 통계
 # ============================================================
 
 def analyze_modules(
-    window=RECENT_WINDOW
+    window=RECENT_WINDOW,
+    engine_version=None,
 ):
 
-    history = load_failure_history()
-
-    recent_run_ids = get_recent_runs(
-        history,
-        window
+    failure_history = (
+        load_failure_history()
     )
+
+    recent_runs = (
+        get_recent_finished_runs(
+            window=window,
+            engine_version=engine_version,
+        )
+    )
+
+    recent_run_ids = [
+        item.get(
+            "run_id"
+        )
+        for item in recent_runs
+    ]
 
     recent_run_set = set(
         recent_run_ids
     )
 
+    total_runs = len(
+        recent_run_ids
+    )
+
     module_runs = {}
 
-    for item in history:
+    for item in failure_history:
 
-        if (
-            item.get("run_id")
-            not in recent_run_set
-        ):
+        run_id = item.get(
+            "run_id"
+        )
+
+        if run_id not in recent_run_set:
             continue
 
         module = item.get(
@@ -587,14 +655,10 @@ def analyze_modules(
             module,
             set()
         ).add(
-            item.get("run_id")
+            run_id
         )
 
     results = []
-
-    total_runs = len(
-        recent_run_ids
-    )
 
     for module, failed_runs in (
         module_runs.items()
@@ -633,54 +697,64 @@ def analyze_modules(
             "failed_runs": count,
             "rate": round(
                 rate,
-                3
+                3,
             ),
-            "status": status
+            "status": status,
         })
 
     results.sort(
         key=lambda item: (
             item["failed_runs"],
-            item["rate"]
+            item["rate"],
         ),
-        reverse=True
+        reverse=True,
     )
 
     return results
 
 
 # ============================================================
-# 실패 클래스 분석
+# 실패 종류별 분석
 # ============================================================
 
 def analyze_failure_classes(
-    window=RECENT_WINDOW
+    window=RECENT_WINDOW,
+    engine_version=None,
 ):
 
-    history = load_failure_history()
-
-    recent_run_ids = get_recent_runs(
-        history,
-        window
+    failure_history = (
+        load_failure_history()
     )
 
-    recent_run_set = set(
-        recent_run_ids
+    recent_runs = (
+        get_recent_finished_runs(
+            window=window,
+            engine_version=engine_version,
+        )
     )
+
+    recent_run_ids = {
+        item.get(
+            "run_id"
+        )
+        for item in recent_runs
+    }
 
     counts = Counter()
 
-    for item in history:
+    for item in failure_history:
 
         if (
-            item.get("run_id")
-            not in recent_run_set
+            item.get(
+                "run_id"
+            )
+            not in recent_run_ids
         ):
             continue
 
         failure_class = item.get(
             "failure_class",
-            UNKNOWN_FAILURE
+            UNKNOWN_FAILURE,
         )
 
         counts[
@@ -693,27 +767,105 @@ def analyze_failure_classes(
 
 
 # ============================================================
+# 버전 간 오류율 비교
+# ============================================================
+
+def compare_engine_versions(
+    fingerprint,
+    old_version,
+    new_version,
+    window=RECENT_WINDOW,
+):
+
+    old_stats = analyze_fingerprint(
+        fingerprint,
+        window=window,
+        engine_version=old_version,
+    )
+
+    new_stats = analyze_fingerprint(
+        fingerprint,
+        window=window,
+        engine_version=new_version,
+    )
+
+    old_rate = old_stats.get(
+        "rate",
+        0.0,
+    )
+
+    new_rate = new_stats.get(
+        "rate",
+        0.0,
+    )
+
+    delta = (
+        new_rate
+        - old_rate
+    )
+
+    regression = False
+
+    # 단순 임계값.
+    # 추후 regression.py에서 더 정교하게 교체.
+    if (
+        new_stats.get(
+            "recent_runs",
+            0,
+        )
+        >= 5
+        and delta
+        >= 0.25
+    ):
+
+        regression = True
+
+    return {
+        "fingerprint": fingerprint,
+        "old_version": old_version,
+        "new_version": new_version,
+        "old_rate": old_rate,
+        "new_rate": new_rate,
+        "delta": round(
+            delta,
+            3,
+        ),
+        "regression_suspected": (
+            regression
+        ),
+    }
+
+
+# ============================================================
 # 전체 Health Report
 # ============================================================
 
 def build_health_report(
-    window=RECENT_WINDOW
+    window=RECENT_WINDOW,
+    engine_version=None,
 ):
 
-    history = load_failure_history()
+    recent_runs = (
+        get_recent_finished_runs(
+            window=window,
+            engine_version=engine_version,
+        )
+    )
 
-    if not history:
+    if not recent_runs:
 
         return {
-            "status": "HEALTHY",
+            "status": "NO_DATA",
+            "engine_version": engine_version,
             "recent_runs": 0,
             "suspected_modules": [],
             "warnings": [],
-            "failure_classes": {}
+            "failure_classes": {},
         }
 
     modules = analyze_modules(
-        window
+        window=window,
+        engine_version=engine_version,
     )
 
     suspected = [
@@ -744,13 +896,9 @@ def build_health_report(
 
         overall_status = "HEALTHY"
 
-    recent_runs = get_recent_runs(
-        history,
-        window
-    )
-
     return {
         "status": overall_status,
+        "engine_version": engine_version,
         "recent_runs": len(
             recent_runs
         ),
@@ -758,47 +906,60 @@ def build_health_report(
         "warnings": warnings,
         "failure_classes":
             analyze_failure_classes(
-                window
-            )
+                window=window,
+                engine_version=engine_version,
+            ),
     }
 
 
 # ============================================================
-# 콘솔 리포트
+# 콘솔 출력
 # ============================================================
 
 def print_health_report(
-    report=None
+    report=None,
 ):
 
     if report is None:
 
-        report = build_health_report()
+        report = (
+            build_health_report()
+        )
 
     print("")
-    print("=" * 55)
-    print("🩺 V3 FAILURE MONITOR")
-    print("=" * 55)
+    print("=" * 58)
+    print(
+        "🩺 V3.1 FAILURE MONITOR"
+    )
+    print("=" * 58)
 
     print(
         "상태:",
         report.get(
             "status",
             "UNKNOWN"
-        )
+        ),
     )
 
     print(
-        "분석 RUN:",
+        "엔진:",
+        report.get(
+            "engine_version",
+            "ALL"
+        ),
+    )
+
+    print(
+        "완료 RUN:",
         report.get(
             "recent_runs",
-            0
-        )
+            0,
+        ),
     )
 
     suspected = report.get(
         "suspected_modules",
-        []
+        [],
     )
 
     if suspected:
@@ -812,14 +973,15 @@ def print_health_report(
 
             print(
                 f" - {item['module']} "
-                f"| 실패 {item['failed_runs']}회 "
-                f"| 발생률 "
+                f"| 실패 RUN "
+                f"{item['failed_runs']}회 "
+                f"| 실제 발생률 "
                 f"{item['rate'] * 100:.1f}%"
             )
 
     warnings = report.get(
         "warnings",
-        []
+        [],
     )
 
     if warnings:
@@ -833,14 +995,15 @@ def print_health_report(
 
             print(
                 f" - {item['module']} "
-                f"| 실패 {item['failed_runs']}회 "
-                f"| 발생률 "
+                f"| 실패 RUN "
+                f"{item['failed_runs']}회 "
+                f"| 실제 발생률 "
                 f"{item['rate'] * 100:.1f}%"
             )
 
     classes = report.get(
         "failure_classes",
-        {}
+        {},
     )
 
     if classes:
@@ -858,4 +1021,4 @@ def print_health_report(
                 f" - {key}: {value}"
             )
 
-    print("=" * 55)
+    print("=" * 58)
