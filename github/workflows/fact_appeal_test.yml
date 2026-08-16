@@ -1,0 +1,31 @@
+name: V3 Fact Appeal Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fact-appeal-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Run V3.1 Fact Appeal test
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          V3_JUDGE_MODEL: gpt-4o-mini
+        run: |
+          python -m quality.fact_appeal_test
