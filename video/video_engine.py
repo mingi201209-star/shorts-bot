@@ -2,7 +2,6 @@
 
 import os
 import subprocess
-import tempfile
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -20,8 +19,13 @@ from video.video_downloader import (
 )
 
 
+# ============================================================
+# 영상 기본 설정
+# ============================================================
+
 VIDEO_WIDTH = 1080
 VIDEO_HEIGHT = 1920
+FPS = 30
 
 
 # ============================================================
@@ -29,89 +33,257 @@ VIDEO_HEIGHT = 1920
 # ============================================================
 
 def get_safe_korean_font(size):
+    """
+    GitHub Actions / Ubuntu 환경에서
+    한글이 □□□ 로 깨지는 문제를 방지한다.
+
+    우선순위:
+    1. Noto Sans CJK
+    2. NanumGothic
+    3. 프로젝트 내부 fonts 폴더
+
+    한글 폰트를 찾지 못하면
+    DejaVuSans 같은 폰트를 억지로 사용하지 않고
+    오류를 발생시킨다.
+    """
+
     font_paths = [
-        "NanumGothic.ttf",
-        "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf",
-        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+
+        # ----------------------------------------------------
+        # Ubuntu / GitHub Actions
+        # fonts-noto-cjk 설치 시 사용
+        # ----------------------------------------------------
+
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
+
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Medium.ttc",
+
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-KR.ttc",
+
+        # ----------------------------------------------------
+        # NanumGothic
+        # ----------------------------------------------------
+
         "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-        "/usr/share/fonts/truetype/nanum/NanumGothicCoding.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+
+        "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
+
+        "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf",
+
+        # ----------------------------------------------------
+        # 프로젝트 내부 fonts 폴더
+        # ----------------------------------------------------
+
+        "fonts/NotoSansCJK-Regular.ttc",
+
+        "fonts/NotoSansCJK-Bold.ttc",
+
+        "fonts/NanumGothic.ttf",
+
+        "fonts/NanumGothicBold.ttf",
     ]
 
     for path in font_paths:
-        if os.path.exists(path):
-            try:
-                return ImageFont.truetype(path, size)
-            except Exception:
-                pass
 
-    print("⚠️ 한글 폰트를 찾지 못했습니다. 기본 폰트를 사용합니다.")
+        if not os.path.exists(path):
+            continue
 
-    return ImageFont.load_default()
+        try:
+
+            font = ImageFont.truetype(
+                path,
+                size
+            )
+
+            print(
+                f"✅ 한글 폰트 사용: {path}"
+            )
+
+            return font
+
+        except Exception as e:
+
+            print(
+                f"⚠️ 폰트 로드 실패: "
+                f"{path} / {e}"
+            )
+
+    raise RuntimeError(
+        "❌ 한글 폰트를 찾지 못했습니다.\n"
+        "GitHub Actions에서는 fonts-noto-cjk 설치가 필요합니다."
+    )
 
 
 # ============================================================
-# 자막 이미지
+# 자막 이미지 생성
 # ============================================================
 
 def render_subtitle_image(text):
+
     text = str(text).strip()
 
-    target_w = VIDEO_WIDTH
+    if not text:
+        return np.zeros(
+            (
+                120,
+                VIDEO_WIDTH,
+                4
+            ),
+            dtype=np.uint8
+        )
+
+    # --------------------------------------------------------
+    # 자막 폰트
+    # --------------------------------------------------------
+
     font_size = 70
 
-    font = get_safe_korean_font(font_size)
+    font = get_safe_korean_font(
+        font_size
+    )
+
+    # --------------------------------------------------------
+    # 기본 설정
+    # --------------------------------------------------------
+
+    target_w = VIDEO_WIDTH
 
     padding_x = 40
     padding_y = 30
 
     # --------------------------------------------------------
-    # 글자 크기 계산
+    # 텍스트 크기 계산
     # --------------------------------------------------------
 
+    dummy = Image.new(
+        "RGBA",
+        (10, 10),
+        (0, 0, 0, 0)
+    )
+
+    draw = ImageDraw.Draw(
+        dummy
+    )
+
     try:
-        dummy = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(dummy)
 
         bbox = draw.textbbox(
             (0, 0),
             text,
             font=font,
-            stroke_width=2,
+            stroke_width=2
         )
 
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
+        text_width = (
+            bbox[2] - bbox[0]
+        )
+
+        text_height = (
+            bbox[3] - bbox[1]
+        )
 
     except Exception:
-        text_width = len(text) * font_size
+
+        text_width = (
+            len(text)
+            * font_size
+        )
+
         text_height = font_size
+
+    # --------------------------------------------------------
+    # 너무 긴 자막 방지
+    # --------------------------------------------------------
+
+    max_text_width = (
+        target_w
+        - padding_x * 2
+    )
+
+    if text_width > max_text_width:
+
+        # 글자가 너무 길면
+        # 폰트 크기를 조금씩 줄인다.
+
+        current_size = font_size
+
+        while (
+            text_width > max_text_width
+            and current_size > 40
+        ):
+
+            current_size -= 2
+
+            font = get_safe_korean_font(
+                current_size
+            )
+
+            bbox = draw.textbbox(
+                (0, 0),
+                text,
+                font=font,
+                stroke_width=2
+            )
+
+            text_width = (
+                bbox[2] - bbox[0]
+            )
+
+            text_height = (
+                bbox[3] - bbox[1]
+            )
+
+    # --------------------------------------------------------
+    # 자막 이미지 높이
+    # --------------------------------------------------------
 
     img_h = max(
         120,
-        text_height + padding_y * 2,
+        text_height
+        + padding_y * 2
     )
 
     img = Image.new(
         "RGBA",
-        (target_w, img_h),
-        (0, 0, 0, 0),
+        (
+            target_w,
+            img_h
+        ),
+        (0, 0, 0, 0)
     )
 
-    draw = ImageDraw.Draw(img)
+    draw = ImageDraw.Draw(
+        img
+    )
+
+    # --------------------------------------------------------
+    # 중앙 정렬
+    # --------------------------------------------------------
 
     x = max(
         padding_x,
-        int((target_w - text_width) / 2),
+        int(
+            (
+                target_w
+                - text_width
+            ) / 2
+        )
     )
 
     y = max(
         10,
-        int((img_h - text_height) / 2) - 4,
+        int(
+            (
+                img_h
+                - text_height
+            ) / 2
+        ) - 4
     )
 
     # --------------------------------------------------------
-    # 검은 외곽선
+    # 검은 외곽선 + 노란 본문
     # --------------------------------------------------------
 
     draw.text(
@@ -120,7 +292,7 @@ def render_subtitle_image(text):
         font=font,
         fill="#FFE600",
         stroke_width=9,
-        stroke_fill="black",
+        stroke_fill="black"
     )
 
     # --------------------------------------------------------
@@ -133,17 +305,23 @@ def render_subtitle_image(text):
         font=font,
         fill="#FFE600",
         stroke_width=2,
-        stroke_fill="#FFE600",
+        stroke_fill="#FFE600"
     )
 
-    return np.array(img)
+    return np.array(
+        img
+    )
 
 
 # ============================================================
 # 자막 분할
 # ============================================================
 
-def create_split_subtitles(text, duration):
+def create_split_subtitles(
+    text,
+    duration
+):
+
     text = str(text).strip()
 
     if not text:
@@ -159,38 +337,75 @@ def create_split_subtitles(text, duration):
     current = []
 
     # --------------------------------------------------------
-    # 기본적으로 2~4단어씩 분할
+    # 2~4단어 정도씩 분할
     # --------------------------------------------------------
 
     for word in words:
-        current.append(word)
+
+        current.append(
+            word
+        )
 
         if len(current) >= 3:
-            chunks.append(" ".join(current))
+
+            chunks.append(
+                " ".join(current)
+            )
+
             current = []
 
     if current:
-        chunks.append(" ".join(current))
+
+        chunks.append(
+            " ".join(current)
+        )
 
     if not chunks:
-        chunks = [text]
 
-    chunk_duration = duration / len(chunks)
+        chunks = [
+            text
+        ]
+
+    chunk_duration = (
+        duration
+        / len(chunks)
+    )
 
     subtitle_clips = []
 
-    for idx, chunk in enumerate(chunks):
+    for idx, chunk in enumerate(
+        chunks
+    ):
 
-        subtitle_image = render_subtitle_image(chunk)
-
-        clip = (
-            ImageClip(subtitle_image)
-            .set_start(idx * chunk_duration)
-            .set_duration(chunk_duration)
-            .set_position(("center", 0.70), relative=True)
+        subtitle_image = (
+            render_subtitle_image(
+                chunk
+            )
         )
 
-        subtitle_clips.append(clip)
+        clip = (
+            ImageClip(
+                subtitle_image
+            )
+            .set_start(
+                idx
+                * chunk_duration
+            )
+            .set_duration(
+                chunk_duration
+            )
+            .set_position(
+                (
+                    "center",
+                    0.70
+                ),
+                relative=True
+            )
+        )
+
+        subtitle_clips.append(
+            clip
+        )
 
     return subtitle_clips
 
@@ -200,57 +415,68 @@ def create_split_subtitles(text, duration):
 # ============================================================
 
 def check_ffmpeg():
+
     try:
+
         result = subprocess.run(
-            ["ffmpeg", "-version"],
+            [
+                "ffmpeg",
+                "-version"
+            ],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=10,
+            timeout=10
         )
 
-        return result.returncode == 0
+        return (
+            result.returncode
+            == 0
+        )
 
     except Exception:
+
         return False
 
 
 # ============================================================
-# 영상 길이/비율 처리
-#
-# MoviePy의 resize()를 사용하지 않는다.
-# 이유:
-# Pillow 최신 버전에서는 Image.ANTIALIAS가 삭제되었고
-# 구버전 MoviePy가 이를 호출하면 오류가 발생한다.
+# 세로 영상 변환
 # ============================================================
 
 def prepare_vertical_video(
     input_path,
     output_path,
-    duration,
+    duration
 ):
-    if not os.path.exists(input_path):
+
+    if not os.path.exists(
+        input_path
+    ):
+
         raise FileNotFoundError(
-            f"원본 영상 파일이 없습니다: {input_path}"
+            f"원본 영상 파일이 없습니다: "
+            f"{input_path}"
         )
 
     if not check_ffmpeg():
+
         raise RuntimeError(
             "FFmpeg를 찾을 수 없습니다."
         )
 
-    duration = float(duration)
+    duration = float(
+        duration
+    )
 
     if duration <= 0:
+
         raise ValueError(
-            f"잘못된 영상 길이: {duration}"
+            f"잘못된 영상 길이: "
+            f"{duration}"
         )
 
     # --------------------------------------------------------
-    # FFmpeg scale + crop
-    #
-    # 원본 비율을 유지하면서 화면을 꽉 채우고
-    # 중앙을 9:16으로 크롭한다.
+    # 9:16 세로 크롭
     # --------------------------------------------------------
 
     vf = (
@@ -265,7 +491,9 @@ def prepare_vertical_video(
     )
 
     command = [
+
         "ffmpeg",
+
         "-y",
 
         "-i",
@@ -294,33 +522,42 @@ def prepare_vertical_video(
         "-movflags",
         "+faststart",
 
-        output_path,
+        output_path
     ]
 
-    print("🎞️ FFmpeg 세로 영상 변환 시작...")
+    print(
+        "🎞️ FFmpeg 세로 영상 변환 시작..."
+    )
 
     result = subprocess.run(
         command,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
+        text=True
     )
 
     if result.returncode != 0:
 
-        print(result.stderr[-4000:])
+        print(
+            result.stderr[-4000:]
+        )
 
         raise RuntimeError(
             "FFmpeg 영상 변환 실패"
         )
 
-    if not os.path.exists(output_path):
+    if not os.path.exists(
+        output_path
+    ):
+
         raise RuntimeError(
-            "FFmpeg 변환 결과 파일이 생성되지 않았습니다."
+            "FFmpeg 변환 결과 파일이 "
+            "생성되지 않았습니다."
         )
 
     print(
-        f"✅ 세로 영상 생성 완료: {output_path}"
+        f"✅ 세로 영상 생성 완료: "
+        f"{output_path}"
     )
 
     return output_path
@@ -332,11 +569,15 @@ def prepare_vertical_video(
 
 def load_video_for_scene(
     video_path,
-    duration,
+    duration
 ):
-    clip = VideoFileClip(video_path)
+
+    clip = VideoFileClip(
+        video_path
+    )
 
     if clip.duration <= 0:
+
         clip.close()
 
         raise RuntimeError(
@@ -348,20 +589,21 @@ def load_video_for_scene(
     # --------------------------------------------------------
 
     if clip.duration > duration:
+
         clip = clip.subclip(
             0,
-            duration,
+            duration
         )
 
     # --------------------------------------------------------
     # 영상이 음성보다 짧은 경우
-    #
-    # 부족한 부분은 loop 방식으로 반복한다.
     # --------------------------------------------------------
 
     elif clip.duration < duration:
 
-        original_duration = clip.duration
+        original_duration = (
+            clip.duration
+        )
 
         clips = []
 
@@ -371,34 +613,45 @@ def load_video_for_scene(
 
             part_duration = min(
                 original_duration,
-                remaining,
+                remaining
             )
 
             clips.append(
                 clip.subclip(
                     0,
-                    part_duration,
+                    part_duration
                 )
             )
 
-            remaining -= part_duration
+            remaining -= (
+                part_duration
+            )
 
-        from moviepy.editor import concatenate_videoclips
+        from moviepy.editor import (
+            concatenate_videoclips
+        )
 
         clip = concatenate_videoclips(
             clips,
-            method="compose",
+            method="compose"
         )
 
-    return clip.set_duration(duration)
+    return clip.set_duration(
+        duration
+    )
 
 
 # ============================================================
 # 임시 영상 파일명
 # ============================================================
 
-def get_processed_video_path(idx):
-    return f"vertical_video_{idx}.mp4"
+def get_processed_video_path(
+    idx
+):
+
+    return (
+        f"vertical_video_{idx}.mp4"
+    )
 
 
 # ============================================================
@@ -409,86 +662,114 @@ def create_scene(
     idx,
     item,
     create_voice,
-    requests_module,
+    requests_module
 ):
-    """
-    main.py와 호환되는 장면 생성 함수
 
-    호출:
-        create_scene(
-            idx,
-            item,
-            create_voice,
-            requests_module
-        )
-    """
+    if not isinstance(
+        item,
+        dict
+    ):
 
-    if not isinstance(item, dict):
         raise TypeError(
-            f"scene item은 dict여야 합니다. "
+            "scene item은 dict여야 합니다. "
             f"현재 타입: {type(item)}"
         )
 
     # --------------------------------------------------------
-    # 데이터
+    # 대본 데이터
     # --------------------------------------------------------
 
     text = str(
         item.get(
             "text",
-            "",
+            ""
         )
     ).strip()
 
     keyword = str(
         item.get(
             "keyword",
-            "nature landscape",
+            "nature landscape"
         )
     ).strip()
 
     if not text:
+
         raise ValueError(
-            f"{idx + 1}번 장면의 text가 비어 있습니다."
+            f"{idx + 1}번 장면의 "
+            "text가 비어 있습니다."
         )
 
     if not keyword:
-        keyword = "nature landscape"
+
+        keyword = (
+            "nature landscape"
+        )
 
     print("")
-    print("=" * 42)
-    print(f"🎬 SCENE {idx + 1}")
-    print("=" * 42)
+    print(
+        "=" * 42
+    )
 
-    print(f"대사: {text}")
-    print(f"검색어: {keyword}")
+    print(
+        f"🎬 SCENE {idx + 1}"
+    )
+
+    print(
+        "=" * 42
+    )
+
+    print(
+        f"대사: {text}"
+    )
+
+    print(
+        f"검색어: {keyword}"
+    )
 
     # --------------------------------------------------------
     # 파일명
     # --------------------------------------------------------
 
-    audio_path = f"scene_{idx}.mp3"
-    source_video_path = f"video_{idx}.mp4"
-    vertical_video_path = get_processed_video_path(idx)
+    audio_path = (
+        f"scene_{idx}.mp3"
+    )
+
+    source_video_path = (
+        f"video_{idx}.mp4"
+    )
+
+    vertical_video_path = (
+        get_processed_video_path(
+            idx
+        )
+    )
 
     # --------------------------------------------------------
     # TTS
     # --------------------------------------------------------
 
-    print("🎙️ TTS 생성 시작...")
+    print(
+        "🎙️ TTS 생성 시작..."
+    )
 
     create_voice(
         text,
-        audio_path,
+        audio_path
     )
 
-    if not os.path.exists(audio_path):
+    if not os.path.exists(
+        audio_path
+    ):
+
         raise RuntimeError(
-            f"TTS 파일이 생성되지 않았습니다: {audio_path}"
+            "TTS 파일이 생성되지 않았습니다: "
+            f"{audio_path}"
         )
 
     print(
-        f"✅ TTS 생성 완료: {audio_path}"
+        f"✅ TTS 생성 완료: "
+        f"{audio_path}"
     )
 
     # --------------------------------------------------------
@@ -498,6 +779,7 @@ def create_scene(
     audio_clip = None
 
     try:
+
         audio_clip = AudioFileClip(
             audio_path
         )
@@ -509,10 +791,12 @@ def create_scene(
     except Exception as e:
 
         raise RuntimeError(
-            f"TTS 오디오를 읽을 수 없습니다: {e}"
+            "TTS 오디오를 읽을 수 없습니다: "
+            f"{e}"
         )
 
     if duration <= 0:
+
         audio_clip.close()
 
         raise RuntimeError(
@@ -520,26 +804,32 @@ def create_scene(
         )
 
     print(
-        f"⏱️ 장면 길이: {duration:.2f}초"
+        f"⏱️ 장면 길이: "
+        f"{duration:.2f}초"
     )
 
     # --------------------------------------------------------
-    # Pexels
+    # Pexels 검색
     # --------------------------------------------------------
 
     print(
-        f"🔎 Pexels 검색: {keyword}"
+        f"🔎 Pexels 검색: "
+        f"{keyword}"
     )
 
-    video_url = fetch_pexels_video(
-        keyword
+    video_url = (
+        fetch_pexels_video(
+            keyword
+        )
     )
 
     if not video_url:
+
         audio_clip.close()
 
         raise RuntimeError(
-            f"Pexels에서 영상을 찾지 못했습니다: {keyword}"
+            "Pexels에서 영상을 찾지 못했습니다: "
+            f"{keyword}"
         )
 
     print(
@@ -550,36 +840,40 @@ def create_scene(
     # 영상 다운로드
     # --------------------------------------------------------
 
-    print("⬇️ 영상 다운로드 시작...")
+    print(
+        "⬇️ 영상 다운로드 시작..."
+    )
 
     download_video(
         video_url,
         source_video_path,
-        requests_module,
+        requests_module
     )
 
-    if not os.path.exists(source_video_path):
+    if not os.path.exists(
+        source_video_path
+    ):
+
         audio_clip.close()
 
         raise RuntimeError(
-            f"영상 다운로드 실패: {source_video_path}"
+            "영상 다운로드 실패: "
+            f"{source_video_path}"
         )
 
     print(
-        f"✅ 영상 다운로드 완료: {source_video_path}"
+        f"✅ 영상 다운로드 완료: "
+        f"{source_video_path}"
     )
 
     # --------------------------------------------------------
     # 9:16 변환
-    #
-    # MoviePy resize 사용 금지
-    # FFmpeg 사용
     # --------------------------------------------------------
 
     prepare_vertical_video(
         source_video_path,
         vertical_video_path,
-        duration,
+        duration
     )
 
     # --------------------------------------------------------
@@ -590,9 +884,11 @@ def create_scene(
 
     try:
 
-        video_clip = load_video_for_scene(
-            vertical_video_path,
-            duration,
+        video_clip = (
+            load_video_for_scene(
+                vertical_video_path,
+                duration
+            )
         )
 
     except Exception:
@@ -605,15 +901,20 @@ def create_scene(
     # 자막
     # --------------------------------------------------------
 
-    print("💬 자막 생성...")
+    print(
+        "💬 자막 생성..."
+    )
 
-    subtitle_clips = create_split_subtitles(
-        text,
-        duration,
+    subtitle_clips = (
+        create_split_subtitles(
+            text,
+            duration
+        )
     )
 
     print(
-        f"✅ 자막 {len(subtitle_clips)}개 생성"
+        f"✅ 자막 "
+        f"{len(subtitle_clips)}개 생성"
     )
 
     # --------------------------------------------------------
@@ -632,8 +933,8 @@ def create_scene(
         layers,
         size=(
             VIDEO_WIDTH,
-            VIDEO_HEIGHT,
-        ),
+            VIDEO_HEIGHT
+        )
     )
 
     # --------------------------------------------------------
@@ -642,13 +943,13 @@ def create_scene(
 
     combined = (
         combined
-        .set_audio(audio_clip)
-        .set_duration(duration)
+        .set_audio(
+            audio_clip
+        )
+        .set_duration(
+            duration
+        )
     )
-
-    # --------------------------------------------------------
-    # 최종 장면
-    # --------------------------------------------------------
 
     print(
         f"✅ SCENE {idx + 1} 생성 완료"
@@ -661,17 +962,19 @@ def create_scene(
 # 장면 정리
 # ============================================================
 
-def close_scene(scene):
-    """
-    장면 MoviePy 리소스 정리
-    """
+def close_scene(
+    scene
+):
 
     if scene is None:
         return
 
     try:
+
         scene.close()
+
     except Exception:
+
         pass
 
 
@@ -681,24 +984,36 @@ def close_scene(scene):
 
 def cleanup_scene_files(
     idx,
-    remove_source=True,
+    remove_source=True
 ):
+
     files = [
+
         f"scene_{idx}.mp3",
+
         f"video_{idx}.mp4",
+
         f"vertical_video_{idx}.mp4",
     ]
 
     for path in files:
 
-        if not remove_source and path == f"video_{idx}.mp4":
+        if (
+            not remove_source
+            and path
+            == f"video_{idx}.mp4"
+        ):
             continue
 
         try:
 
-            if os.path.exists(path):
+            if os.path.exists(
+                path
+            ):
 
-                os.remove(path)
+                os.remove(
+                    path
+                )
 
                 print(
                     f"🧹 삭제: {path}"
@@ -718,41 +1033,58 @@ def cleanup_scene_files(
 
 def combine_scenes(
     scenes,
-    output_path="shorts_final.mp4",
+    output_path="shorts_final.mp4"
 ):
-    """
-    생성된 장면들을 하나의 Shorts 영상으로 결합
-    """
 
     if not scenes:
+
         raise ValueError(
             "결합할 장면이 없습니다."
         )
 
     print("")
-    print("=" * 42)
-    print("🎬 전체 장면 결합")
-    print("=" * 42)
+    print(
+        "=" * 42
+    )
 
-    from moviepy.editor import concatenate_videoclips
+    print(
+        "🎬 전체 장면 결합"
+    )
+
+    print(
+        "=" * 42
+    )
+
+    from moviepy.editor import (
+        concatenate_videoclips
+    )
 
     final_clip = None
 
     try:
 
-        final_clip = concatenate_videoclips(
-            scenes,
-            method="compose",
+        final_clip = (
+            concatenate_videoclips(
+                scenes,
+                method="compose"
+            )
         )
 
         final_clip.write_videofile(
+
             output_path,
-            fps=30,
+
+            fps=FPS,
+
             codec="libx264",
+
             audio_codec="aac",
+
             preset="medium",
+
             threads=2,
-            logger="bar",
+
+            logger="bar"
         )
 
     finally:
@@ -760,21 +1092,38 @@ def combine_scenes(
         if final_clip is not None:
 
             try:
+
                 final_clip.close()
+
             except Exception:
+
                 pass
 
-    if not os.path.exists(output_path):
+    if not os.path.exists(
+        output_path
+    ):
+
         raise RuntimeError(
-            f"최종 영상이 생성되지 않았습니다: {output_path}"
+            "최종 영상이 생성되지 않았습니다: "
+            f"{output_path}"
         )
 
     print("")
-    print("=" * 42)
-    print("🎉 전체 영상 생성 완료")
-    print("=" * 42)
     print(
-        f"📦 출력 파일: {output_path}"
+        "=" * 42
+    )
+
+    print(
+        "🎉 전체 영상 생성 완료"
+    )
+
+    print(
+        "=" * 42
+    )
+
+    print(
+        f"📦 출력 파일: "
+        f"{output_path}"
     )
 
     return output_path
