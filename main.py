@@ -70,20 +70,21 @@ from quality.budget_guard import (
 
 
 # ============================================================
-# Shorts Generator V3.2.1
+# Shorts Generator V3.2.1.1
 # ============================================================
 #
-# V3.2.1 핵심:
+# V3.2.1:
+#   Novelty가 Rewrite 후에도 실패하면 소재 폐기.
 #
-# Novelty가 선택 Rewrite 1회 후에도
-# 최소 품질 기준을 넘지 못하면
-# 같은 소재를 계속 고치지 않는다.
+# V3.2.1.1:
+#   소재 폐기 시 실제 Novelty Judge의
 #
-# 현재 소재 폐기
-#       ↓
-# 새 소재 생성
-#       ↓
-# Judge부터 새로 시작
+#   - 점수
+#   - confidence
+#   - reason
+#   - issues
+#
+#   를 다음 소재 Generator에 피드백한다.
 #
 # ============================================================
 
@@ -102,18 +103,19 @@ JUDGE_TYPES = [
 ]
 
 
-# 한 소재에 대한 최대 Rewrite
+# 한 소재 최대 Rewrite
 MAX_REWRITES = 1
 
 
-# 한 소재에 대한 최대 Review
+# 한 소재 최대 추가 Review
 MAX_REVIEW_ROUNDS = 1
 
 
 # ------------------------------------------------------------
 # 최초 소재 + 재생성 1회
 #
-# 즉 한 실행에서 최대 2개의 소재를 시도한다.
+# 이번 패치 효과 검증을 위해
+# 재생성 횟수는 아직 늘리지 않는다.
 # ------------------------------------------------------------
 
 MAX_TOPIC_REGENERATIONS = 1
@@ -167,8 +169,6 @@ def validate_environment():
 
 # ============================================================
 # 기본 Judge 4종
-#
-# 각각 정확히 1회.
 # ============================================================
 
 def run_initial_judges(
@@ -180,7 +180,7 @@ def run_initial_judges(
     print("")
     print("=" * 60)
     print(
-        "⚖️ V3.2.1 INITIAL JUDGES"
+        "⚖️ V3.2.1.1 INITIAL JUDGES"
     )
     print("=" * 60)
 
@@ -206,7 +206,7 @@ def run_initial_judges(
 
 
 # ============================================================
-# Rewrite된 영역만 재심
+# 수정 영역만 재심
 # ============================================================
 
 def rerun_changed_domains(
@@ -244,13 +244,8 @@ def rerun_changed_domains(
             result
         )
 
-        # ----------------------------------------------------
-        # 수정 전 판결과 평균내지 않는다.
-        #
-        # 콘텐츠가 바뀌었으므로
-        # 해당 영역 판결은 새 결과로 교체한다.
-        # ----------------------------------------------------
-
+        # 콘텐츠가 수정되었으므로
+        # 예전 판정과 평균내지 않는다.
         new_pool[
             domain
         ] = [
@@ -287,7 +282,7 @@ def get_weak_domain(
 
 
 # ============================================================
-# Novelty 지속 실패 여부
+# Novelty 지속 실패
 # ============================================================
 
 def has_persistent_novelty_failure(
@@ -309,16 +304,242 @@ def has_persistent_novelty_failure(
     )
 
     print(
-        f"   score = "
-        f"{novelty.get('score', 0)}"
+        "   score =",
+        novelty.get(
+            "score",
+            0,
+        ),
     )
 
     print(
-        f"   required = "
-        f"{novelty.get('minimum', 0)}"
+        "   required =",
+        novelty.get(
+            "minimum",
+            0,
+        ),
     )
 
     return True
+
+
+# ============================================================
+# V3.2.1.1
+# Novelty Judge 피드백 추출
+# ============================================================
+
+def extract_novelty_feedback(
+    quality_result,
+):
+
+    consensus = (
+        quality_result.get(
+            "consensus",
+            {},
+        )
+        or {}
+    )
+
+    pool_results = (
+        quality_result.get(
+            "pool_results",
+            {},
+        )
+        or {}
+    )
+
+    script_data = (
+        quality_result.get(
+            "script_data",
+            {},
+        )
+        or {}
+    )
+
+    # --------------------------------------------------------
+    # Consensus Novelty 요약
+    # --------------------------------------------------------
+
+    novelty_summary = (
+        consensus
+        .get(
+            "domain_summaries",
+            {},
+        )
+        .get(
+            "novelty",
+            {},
+        )
+        or {}
+    )
+
+    weak_novelty = (
+        get_weak_domain(
+            consensus,
+            "novelty",
+        )
+        or {}
+    )
+
+    # --------------------------------------------------------
+    # 가장 최근 Novelty Judge 결과
+    # --------------------------------------------------------
+
+    novelty_results = (
+        pool_results.get(
+            "novelty",
+            [],
+        )
+        or []
+    )
+
+    latest_judge = {}
+
+    if novelty_results:
+
+        candidate = (
+            novelty_results[-1]
+        )
+
+        if isinstance(
+            candidate,
+            dict,
+        ):
+
+            latest_judge = (
+                candidate
+            )
+
+    feedback = {
+        "rejected_topic":
+            script_data.get(
+                "topic",
+                "",
+            ),
+
+        "rejected_title":
+            script_data.get(
+                "title",
+                "",
+            ),
+
+        "novelty_score":
+            novelty_summary.get(
+                "score",
+                latest_judge.get(
+                    "score",
+                    0,
+                ),
+            ),
+
+        "required_score":
+            weak_novelty.get(
+                "minimum",
+                6.5,
+            ),
+
+        "confidence":
+            novelty_summary.get(
+                "confidence",
+                latest_judge.get(
+                    "confidence",
+                    0,
+                ),
+            ),
+
+        "reason":
+            latest_judge.get(
+                "reason",
+                "",
+            ),
+
+        "issues":
+            latest_judge.get(
+                "issues",
+                [],
+            ),
+
+        "instruction": (
+            "이전 후보가 Novelty 부족으로 탈락했습니다. "
+            "제목만 바꾸지 말고 핵심 대상, 현상 또는 "
+            "메커니즘 자체가 다른 더 신선한 소재를 선택하세요."
+        ),
+    }
+
+    return feedback
+
+
+# ============================================================
+# Feedback 로그
+# ============================================================
+
+def print_generation_feedback(
+    feedback,
+):
+
+    if not feedback:
+
+        return
+
+    print("")
+    print("=" * 64)
+
+    print(
+        "🧠 V3.2.1.1 NOVELTY FEEDBACK"
+    )
+
+    print("=" * 64)
+
+    print(
+        "탈락 소재:",
+        feedback.get(
+            "rejected_topic",
+            "",
+        ),
+    )
+
+    print(
+        "Novelty:",
+        feedback.get(
+            "novelty_score",
+            0,
+        ),
+        "/",
+        feedback.get(
+            "required_score",
+            0,
+        ),
+    )
+
+    reason = feedback.get(
+        "reason",
+        "",
+    )
+
+    if reason:
+
+        print(
+            "Judge 이유:",
+            reason,
+        )
+
+    issues = feedback.get(
+        "issues",
+        [],
+    )
+
+    if issues:
+
+        print(
+            "문제:"
+        )
+
+        for issue in issues:
+
+            print(
+                f" - {issue}"
+            )
+
+    print("=" * 64)
 
 
 # ============================================================
@@ -335,10 +556,6 @@ def run_quality_process(
 
     rewrite_count = 0
     review_count = 0
-
-    # --------------------------------------------------------
-    # 최초 Judge
-    # --------------------------------------------------------
 
     pool_results = (
         run_initial_judges(
@@ -395,22 +612,13 @@ def run_quality_process(
 
         if decision == "REWRITE":
 
-            # ------------------------------------------------
-            # Rewrite 한도 도달
-            # ------------------------------------------------
-
             if (
                 rewrite_count
                 >= MAX_REWRITES
             ):
 
                 # ============================================
-                # V3.2.1
-                #
-                # Novelty가 아직 약하다면
-                # 실패작을 계속 고치지 않는다.
-                #
-                # 새 소재를 요청한다.
+                # Novelty 지속 실패
                 # ============================================
 
                 if (
@@ -442,13 +650,10 @@ def run_quality_process(
                             "Novelty가 선택 Rewrite 후에도 "
                             "최소 기준을 충족하지 못했습니다. "
                             "현재 소재를 폐기하고 "
+                            "Novelty Judge 피드백을 사용해 "
                             "새 소재를 탐색합니다."
                         ),
                     }
-
-                # ------------------------------------------------
-                # Novelty 문제가 아닌 일반 Rewrite 실패
-                # ------------------------------------------------
 
                 return {
                     "status":
@@ -530,7 +735,7 @@ def run_quality_process(
             )
 
             # ------------------------------------------------
-            # Rewrite 후 Visual metadata 재구성
+            # Rewrite 후 Visual metadata 재생성
             # ------------------------------------------------
 
             current_script[
@@ -578,10 +783,6 @@ def run_quality_process(
                 }
 
             rewrite_count += 1
-
-            # ------------------------------------------------
-            # 수정된 영역만 Judge 재심
-            # ------------------------------------------------
 
             pool_results = (
                 rerun_changed_domains(
@@ -769,10 +970,6 @@ def run_quality_process(
 
                 continue
 
-            # ------------------------------------------------
-            # 알 수 없는 Review 경로
-            # ------------------------------------------------
-
             return {
                 "status":
                     "HOLD",
@@ -905,15 +1102,7 @@ def main():
 
     scene_clips = []
 
-    # --------------------------------------------------------
-    # 실행 전체 Budget 초기화
-    #
-    # 소재를 재생성하더라도 RESET하지 않는다.
-    #
-    # 즉 한 GitHub 실행 전체가
-    # 하나의 Budget을 공유한다.
-    # --------------------------------------------------------
-
+    # 한 GitHub 실행 전체가 하나의 Budget 공유
     reset_budget()
 
     try:
@@ -922,7 +1111,8 @@ def main():
         print("=" * 64)
 
         print(
-            "🚀 SHORTS GENERATOR V3.2.1 AUTONOMOUS"
+            "🚀 SHORTS GENERATOR "
+            "V3.2.1.1 AUTONOMOUS"
         )
 
         print("=" * 64)
@@ -935,17 +1125,20 @@ def main():
 
         rejected_topics = []
 
-        # ====================================================
-        # 소재 생성 + 품질 Gate
-        #
-        # 최초 1회
-        # + 실패 시 재생성 1회
-        # ====================================================
+        # ----------------------------------------------------
+        # 다음 생성에 전달할 Novelty 피드백
+        # ----------------------------------------------------
+
+        generation_feedback = None
 
         total_topic_attempts = (
             MAX_TOPIC_REGENERATIONS
             + 1
         )
+
+        # ====================================================
+        # 소재 생성 + 품질 Gate
+        # ====================================================
 
         for topic_attempt in range(
             1,
@@ -973,11 +1166,20 @@ def main():
 
             # ------------------------------------------------
             # 2. 소재 + 대본 생성
+            #
+            # V3.2.1.1:
+            # 이전 Novelty 실패 이유 전달
             # ------------------------------------------------
 
             script_data = (
                 generate_script(
-                    topic_info
+                    topic_info,
+                    generation_feedback=(
+                        generation_feedback
+                    ),
+                    rejected_topics=(
+                        rejected_topics
+                    ),
                 )
             )
 
@@ -1009,8 +1211,7 @@ def main():
             )
 
             # ------------------------------------------------
-            # 이미 이번 실행에서 폐기한 소재가
-            # 다시 나왔다면 사용하지 않는다.
+            # 정확히 같은 폐기 소재 재등장 방지
             # ------------------------------------------------
 
             if (
@@ -1096,8 +1297,13 @@ def main():
                 break
 
             # =================================================
-            # V3.2.1
-            # Novelty 실패 → 소재 폐기 → 다음 후보
+            # V3.2.1.1
+            #
+            # Novelty 실패:
+            #
+            # 1. 소재 폐기
+            # 2. 실제 Novelty Judge 피드백 추출
+            # 3. 다음 Generator에게 전달
             # =================================================
 
             if (
@@ -1117,17 +1323,36 @@ def main():
                     )
                 ).strip()
 
-                if rejected_topic:
+                if (
+                    rejected_topic
+                    and rejected_topic
+                    not in rejected_topics
+                ):
 
                     rejected_topics.append(
                         rejected_topic
                     )
 
+                # --------------------------------------------
+                # 실제 Judge 피드백 추출
+                # --------------------------------------------
+
+                generation_feedback = (
+                    extract_novelty_feedback(
+                        quality_result
+                    )
+                )
+
+                print_generation_feedback(
+                    generation_feedback
+                )
+
                 print("")
                 print("=" * 64)
 
                 print(
-                    "♻️ V3.2.1 TOPIC REGENERATION"
+                    "♻️ V3.2.1.1 "
+                    "FEEDBACK TOPIC REGENERATION"
                 )
 
                 print("=" * 64)
@@ -1152,8 +1377,10 @@ def main():
                     < total_topic_attempts
                 ):
 
+                    print("")
                     print(
-                        "➡️ 새 소재 탐색 시작"
+                        "➡️ Novelty Judge의 실패 이유를 "
+                        "반영해 새 소재를 탐색합니다."
                     )
 
                     continue
@@ -1168,12 +1395,12 @@ def main():
             # =================================================
 
             raise RuntimeError(
-                "V3.2.1 Quality Gate HOLD: "
+                "V3.2.1.1 Quality Gate HOLD: "
                 f"{quality_result.get('reason', '')}"
             )
 
         # ====================================================
-        # 최종 Script 확인
+        # 최종 Script
         # ====================================================
 
         if not final_script:
@@ -1195,7 +1422,7 @@ def main():
         print("=" * 64)
 
         print(
-            "🏆 V3.2.1 QUALITY PASS"
+            "🏆 V3.2.1.1 QUALITY PASS"
         )
 
         print("=" * 64)
@@ -1211,7 +1438,7 @@ def main():
         )
 
         # ====================================================
-        # 5. 실제 영상 제작
+        # 5. 영상 제작
         # ====================================================
 
         scene_clips = (
@@ -1221,7 +1448,7 @@ def main():
         )
 
         # ====================================================
-        # 6. 영상 길이
+        # 6. 길이 검사
         # ====================================================
 
         print("")
@@ -1279,7 +1506,8 @@ def main():
         print("=" * 64)
 
         print(
-            "🎉 V3.2.1 AUTONOMOUS SHORT COMPLETE"
+            "🎉 V3.2.1.1 AUTONOMOUS "
+            "SHORT COMPLETE"
         )
 
         print(
@@ -1295,7 +1523,7 @@ def main():
         print("=" * 64)
 
         print(
-            "💀 V3.2.1 ERROR"
+            "💀 V3.2.1.1 ERROR"
         )
 
         print(
@@ -1309,7 +1537,7 @@ def main():
         try:
 
             send_telegram_message(
-                "🚨 V3.2.1 Shorts 생성 실패\n\n"
+                "🚨 V3.2.1.1 Shorts 생성 실패\n\n"
                 f"{str(e)[:500]}"
             )
 
