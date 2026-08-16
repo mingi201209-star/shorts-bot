@@ -1,12 +1,10 @@
+# quality/budget_guard.py
+
 import os
 import threading
 
 
-# ============================================================
-# V3.2 Budget Guard
-# ============================================================
-
-DEFAULT_MAX_CALLS = 8
+DEFAULT_MAX_CALLS = 12
 DEFAULT_MAX_COST_USD = 0.05
 
 
@@ -35,6 +33,7 @@ class BudgetExceededError(RuntimeError):
 
 
 def _read_int(name, default):
+
     try:
         return int(
             os.environ.get(
@@ -47,6 +46,7 @@ def _read_int(name, default):
 
 
 def _read_float(name, default):
+
     try:
         return float(
             os.environ.get(
@@ -68,6 +68,7 @@ def get_limits():
                 DEFAULT_MAX_CALLS,
             ),
         ),
+
         "max_cost_usd": max(
             0.001,
             _read_float(
@@ -81,19 +82,20 @@ def get_limits():
 def get_price(model):
 
     if model not in MODEL_PRICES:
+
         raise BudgetExceededError(
             f"가격표에 없는 모델입니다: {model}. "
             "비용을 알 수 없는 모델의 호출을 차단합니다."
         )
 
-    return MODEL_PRICES[model]
+    return MODEL_PRICES[
+        model
+    ]
 
 
-# ============================================================
-# API 호출 직전 검사
-# ============================================================
-
-def authorize_call(model):
+def authorize_call(
+    model,
+):
 
     get_price(model)
 
@@ -101,37 +103,41 @@ def authorize_call(model):
 
     with _lock:
 
-        if _state["calls"] >= limits["max_calls"]:
+        if (
+            _state["calls"]
+            >= limits["max_calls"]
+        ):
+
             raise BudgetExceededError(
                 "V3 API 호출 횟수 한도 초과: "
                 f"{_state['calls']}/"
                 f"{limits['max_calls']}"
             )
 
-        if _state["cost_usd"] >= limits["max_cost_usd"]:
+        if (
+            _state["cost_usd"]
+            >= limits["max_cost_usd"]
+        ):
+
             raise BudgetExceededError(
-                "V3 비용 한도 초과: "
+                "V3 API 비용 한도 초과: "
                 f"${_state['cost_usd']:.6f}/"
                 f"${limits['max_cost_usd']:.6f}"
             )
 
-        # 호출 슬롯을 API 요청 전에 소비한다.
-        # API 오류/예외가 발생해도 무한 재시도 방지.
         _state["calls"] += 1
 
         return _state["calls"]
 
-
-# ============================================================
-# 실제 API usage 기록
-# ============================================================
 
 def record_usage(
     model,
     response,
 ):
 
-    price = get_price(model)
+    price = get_price(
+        model
+    )
 
     usage = getattr(
         response,
@@ -140,6 +146,7 @@ def record_usage(
     )
 
     if usage is None:
+
         raise RuntimeError(
             "OpenAI 응답에 usage 정보가 없습니다."
         )
@@ -171,6 +178,7 @@ def record_usage(
     )
 
     if details is not None:
+
         cached_tokens = int(
             getattr(
                 details,
@@ -196,60 +204,81 @@ def record_usage(
     cost = (
         uncached_tokens
         * price["input"]
+
         + cached_tokens
         * price["cached_input"]
+
         + output_tokens
         * price["output"]
     )
 
     with _lock:
 
-        _state["input_tokens"] += input_tokens
+        _state[
+            "input_tokens"
+        ] += input_tokens
 
         _state[
             "cached_input_tokens"
         ] += cached_tokens
 
-        _state["output_tokens"] += output_tokens
+        _state[
+            "output_tokens"
+        ] += output_tokens
 
-        _state["cost_usd"] += cost
+        _state[
+            "cost_usd"
+        ] += cost
 
-        # 실제 호출 하나가 예상보다 커서
-        # 한도를 넘었더라도 기록은 남긴다.
         over_budget = (
             _state["cost_usd"]
-            > get_limits()["max_cost_usd"]
+            > get_limits()[
+                "max_cost_usd"
+            ]
         )
 
     return {
-        "input_tokens": input_tokens,
-        "cached_input_tokens": cached_tokens,
-        "output_tokens": output_tokens,
-        "cost_usd": cost,
-        "over_budget": over_budget,
+        "input_tokens":
+            input_tokens,
+
+        "cached_input_tokens":
+            cached_tokens,
+
+        "output_tokens":
+            output_tokens,
+
+        "cost_usd":
+            cost,
+
+        "over_budget":
+            over_budget,
     }
 
 
 def get_budget_status():
 
     with _lock:
-        state = dict(_state)
+        state = dict(
+            _state
+        )
 
-    limits = get_limits()
-
-    state.update(limits)
+    state.update(
+        get_limits()
+    )
 
     return state
 
 
 def print_budget_status():
 
-    status = get_budget_status()
+    status = (
+        get_budget_status()
+    )
 
     print("")
-    print("=" * 50)
+    print("=" * 52)
     print("💰 V3.2 API BUDGET")
-    print("=" * 50)
+    print("=" * 52)
 
     print(
         "Calls:",
@@ -264,7 +293,9 @@ def print_budget_status():
 
     print(
         "Cached input:",
-        status["cached_input_tokens"],
+        status[
+            "cached_input_tokens"
+        ],
     )
 
     print(
@@ -282,14 +313,27 @@ def print_budget_status():
         f"${status['max_cost_usd']:.6f}",
     )
 
-    print("=" * 50)
+    print("=" * 52)
 
 
 def reset_budget():
 
     with _lock:
+
         _state["calls"] = 0
-        _state["input_tokens"] = 0
-        _state["cached_input_tokens"] = 0
-        _state["output_tokens"] = 0
-        _state["cost_usd"] = 0.0
+
+        _state[
+            "input_tokens"
+        ] = 0
+
+        _state[
+            "cached_input_tokens"
+        ] = 0
+
+        _state[
+            "output_tokens"
+        ] = 0
+
+        _state[
+            "cost_usd"
+        ] = 0.0
