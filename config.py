@@ -39,22 +39,22 @@ TARGET_MAX_SECONDS = 90
 
 
 # ============================================================
-# TTS V2
+# TTS V3 - 자연스러운 한국어 내레이션
 # ============================================================
 #
-# Edge TTS prosody 값은 문자열 형식이어야 한다.
-# 예: +8%, +0%, +0Hz
-# 환경변수로 바로 조절 가능하게 유지한다.
+# 기본 음성은 Hyunsu Multilingual 남성 음성으로 변경한다.
+# +8%는 다소 급하게 들릴 수 있어 기본 속도를 +3%로 낮춘다.
+# 환경변수로 voice / rate / volume / pitch를 즉시 조절할 수 있다.
 # ============================================================
 
 TTS_VOICE = os.environ.get(
     "TTS_VOICE",
-    "ko-KR-InJoonNeural",
+    "ko-KR-HyunsuMultilingualNeural",
 )
 
 TTS_RATE = os.environ.get(
     "TTS_RATE",
-    "+8%",
+    "+3%",
 )
 
 TTS_VOLUME = os.environ.get(
