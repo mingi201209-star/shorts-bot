@@ -91,6 +91,34 @@ HUMAN_CENTRIC_SLUG_TERMS = {
     "costume", "cosplay",
 }
 
+# Pexels가 긴 검색어에서 0건을 반환할 때 의미를 최대한 유지하면서
+# 검색어를 단계적으로 단순화하기 위해 제거할 수 있는 수식/행동 단어.
+GENERAL_FALLBACK_DROP_TERMS = {
+    "teamwork", "together", "working", "work",
+    "unexpected", "strategic", "strategy", "movement", "moving",
+    "successful", "success", "communicating", "communication",
+    "close", "up", "closeup", "time", "lapse", "timelapse",
+    "optimal", "sharing", "captured", "carrying", "surrounding",
+    "large", "special", "amazing", "interesting",
+}
+
+NATURE_FALLBACK_ALIASES = {
+    "ant": "ants",
+    "ants": "ants",
+    "insect": "insects",
+    "insects": "insects",
+    "aphid": "aphids",
+    "aphids": "aphids",
+    "plant": "plants",
+    "plants": "plants",
+    "tree": "trees",
+    "trees": "trees",
+    "bird": "birds",
+    "birds": "birds",
+    "animal": "animals",
+    "animals": "animals",
+}
+
 
 SAFE_FALLBACKS = {
     "ancient roman": "ancient roman ruins stone",
@@ -465,6 +493,48 @@ def _fallback_query_for_lock(lock):
     )
 
 
+def _general_fallback_queries(query):
+    """
+    긴 Pexels 검색어가 0건일 때 의미를 최대한 보존하며 2~3단계로 단순화한다.
+    예: ant colony teamwork -> ant colony -> ants
+    """
+    normalized = normalize_search_query(query)
+    words = normalized.split()
+    if not words:
+        return []
+
+    variants = []
+
+    reduced_words = [
+        word for word in words
+        if word not in GENERAL_FALLBACK_DROP_TERMS
+    ]
+    if len(reduced_words) >= 2:
+        reduced_query = " ".join(reduced_words[:4])
+        if reduced_query != normalized:
+            variants.append(reduced_query)
+
+        if len(reduced_words) > 2:
+            shorter_query = " ".join(reduced_words[:2])
+            if shorter_query not in variants and shorter_query != normalized:
+                variants.append(shorter_query)
+    elif len(words) > 2:
+        first_two = " ".join(words[:2])
+        if first_two != normalized:
+            variants.append(first_two)
+
+    # 자연/생물/식물/사물 검색은 마지막 안전망으로 핵심 주제 1개만 남긴다.
+    # 사람 중심 후보 필터는 이 fallback 검색에도 그대로 적용된다.
+    for word in words:
+        if word in NATURE_OBJECT_TERMS:
+            subject = NATURE_FALLBACK_ALIASES.get(word, word)
+            if subject not in variants and subject != normalized:
+                variants.append(subject)
+            break
+
+    return variants[:3]
+
+
 def fetch_pexels_video(query):
     """
     video_engine.py와 호환되는 단일 URL 인터페이스.
@@ -480,6 +550,7 @@ def fetch_pexels_video(query):
     비역사 자연/생물/식물/사물 장면은:
     - 사람이 검색 의도에 없을 때 사람 중심 후보를 우선 제외한다.
     - 필터 뒤에도 Pexels의 원래 관련도 순서는 보존한다.
+    - 긴 검색어가 0건이면 의미를 보존한 짧은 검색어로 단계적으로 재검색한다.
     """
     original_query = str(query).strip()
     normalized_original = normalize_search_query(original_query)
@@ -502,8 +573,18 @@ def fetch_pexels_video(query):
         fallback = _fallback_query_for_lock(context_lock)
         if fallback not in queries:
             queries.append(fallback)
+    else:
+        for fallback in _general_fallback_queries(effective_query):
+            if fallback not in queries:
+                queries.append(fallback)
 
     for search_query in queries:
+        if search_query != effective_query:
+            print(
+                "🔁 Pexels fallback search: "
+                f"{effective_query} -> {search_query}"
+            )
+
         candidates = search_pexels_candidates(
             search_query,
             per_page=PEXELS_SEARCH_PER_PAGE,
@@ -524,6 +605,11 @@ def fetch_pexels_video(query):
             if historical:
                 print(
                     "🛡️ 역사 영상 후보 차단/없음: "
+                    f"{search_query}"
+                )
+            else:
+                print(
+                    "⚠️ Pexels 영상 후보 없음: "
                     f"{search_query}"
                 )
             continue
