@@ -159,16 +159,16 @@ jobs:
                   )
 
               polite_check = '''        polite_ending = text.rstrip(" .!?…~\\\"'”’")
-          if not (
-              polite_ending.endswith("요")
-              or polite_ending.endswith("니다")
-              or polite_ending.endswith("십시오")
-          ):
-              return False, (
-                  f"{idx + 1}번 장면 대사가 존댓말 종결이 아님: {text}"
-              )
+        if not (
+            polite_ending.endswith("요")
+            or polite_ending.endswith("니다")
+            or polite_ending.endswith("십시오")
+        ):
+            return False, (
+                f"{idx + 1}번 장면 대사가 존댓말 종결이 아님: {text}"
+            )
 
-          '''
+'''
               script_source = script_source.replace(
                   visual_marker,
                   polite_check + visual_marker,
