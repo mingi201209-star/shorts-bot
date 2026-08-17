@@ -27,6 +27,7 @@ from config import (
 #   - 자막 이미지 렌더링
 #   - 자막 문장 분할
 #   - MoviePy 자막 클립 생성
+#   - 실제 장면 프레임을 보고 자막 안전 위치 선택
 #
 # 중요:
 #   한글 폰트가 없으면 절대 기본 폰트로 fallback하지 않는다.
@@ -42,16 +43,11 @@ from config import (
 def get_korean_font(size):
 
     candidates = [
-        # GitHub Actions / Ubuntu
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc",
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-
-        # Nanum
         "/usr/share/fonts/truetype/nanum/NanumGothicExtraBold.ttf",
         "/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf",
         "/usr/share/fonts/truetype/nanum/NanumGothic.ttf",
-
-        # 프로젝트 내부에 직접 넣어둔 경우
         "fonts/NotoSansCJK-Bold.ttc",
         "fonts/NotoSansCJK-Regular.ttc",
         "fonts/NanumGothicExtraBold.ttf",
@@ -166,10 +162,6 @@ def render_subtitle_image(text):
         - padding_x * 2
     )
 
-    # --------------------------------------------------------
-    # 화면을 넘으면 폰트 크기 자동 축소
-    # --------------------------------------------------------
-
     while True:
 
         (
@@ -230,10 +222,6 @@ def render_subtitle_image(text):
         - bbox[1]
     )
 
-    # --------------------------------------------------------
-    # 노란 글씨 + 검은 외곽선
-    # --------------------------------------------------------
-
     draw.text(
         (x, y),
         text,
@@ -246,6 +234,234 @@ def render_subtitle_image(text):
     return np.array(
         img
     )
+
+
+# ============================================================
+# 자막 안전 위치
+# ============================================================
+
+SUBTITLE_POSITION_CANDIDATES = (
+    ("top", 0.16),
+    ("middle", 0.45),
+    ("bottom", 0.70),
+)
+
+# 기존 하단 배치를 기본으로 유지하되 실제 프레임의 시각 정보가
+# 더 복잡할 때만 위쪽 후보로 이동한다.
+SUBTITLE_POSITION_BIAS = {
+    "top": 0.030,
+    "middle": 0.015,
+    "bottom": 0.000,
+}
+
+
+def _visual_region_score(frame, y_top, band_height):
+    frame = np.asarray(frame)
+
+    if frame.ndim != 3 or frame.shape[2] < 3:
+        return 999.0
+
+    height, width = frame.shape[:2]
+
+    if height <= 0 or width <= 0:
+        return 999.0
+
+    x1 = int(width * 0.07)
+    x2 = int(width * 0.93)
+    y1 = max(0, int(y_top))
+    y2 = min(height, int(y_top + band_height))
+
+    if x2 <= x1 or y2 <= y1:
+        return 999.0
+
+    region = frame[
+        y1:y2,
+        x1:x2,
+        :3,
+    ].astype(np.float32)
+
+    if region.size <= 0:
+        return 999.0
+
+    region = region[::4, ::4]
+
+    r = region[:, :, 0]
+    g = region[:, :, 1]
+    b = region[:, :, 2]
+
+    gray = (
+        0.299 * r
+        + 0.587 * g
+        + 0.114 * b
+    )
+
+    edge_x = (
+        np.mean(
+            np.abs(
+                np.diff(
+                    gray,
+                    axis=1,
+                )
+            )
+        )
+        if gray.shape[1] > 1
+        else 0.0
+    )
+
+    edge_y = (
+        np.mean(
+            np.abs(
+                np.diff(
+                    gray,
+                    axis=0,
+                )
+            )
+        )
+        if gray.shape[0] > 1
+        else 0.0
+    )
+
+    edge_score = (
+        edge_x + edge_y
+    ) / 510.0
+
+    contrast_score = (
+        float(np.std(gray))
+        / 255.0
+    )
+
+    max_rgb = np.maximum.reduce(
+        [r, g, b]
+    )
+    min_rgb = np.minimum.reduce(
+        [r, g, b]
+    )
+
+    skin_mask = (
+        (r > 95)
+        & (g > 40)
+        & (b > 20)
+        & ((max_rgb - min_rgb) > 15)
+        & (np.abs(r - g) > 15)
+        & (r > g)
+        & (r > b)
+    )
+
+    skin_ratio = float(
+        np.mean(
+            skin_mask
+        )
+    )
+
+    return (
+        edge_score * 1.7
+        + contrast_score * 0.55
+        + skin_ratio * 1.4
+    )
+
+
+def choose_safe_subtitle_y(
+    video_clip,
+    subtitle_height=180,
+):
+    default_y = int(
+        VIDEO_HEIGHT * 0.70
+    )
+
+    if video_clip is None:
+        return default_y
+
+    try:
+        duration = float(
+            video_clip.duration or 0
+        )
+    except Exception:
+        duration = 0.0
+
+    if duration <= 0:
+        return default_y
+
+    sample_times = [
+        max(
+            0.0,
+            min(
+                duration - 0.01,
+                duration * ratio,
+            ),
+        )
+        for ratio in (
+            0.20,
+            0.50,
+            0.80,
+        )
+    ]
+
+    candidate_scores = {}
+
+    for name, ratio in SUBTITLE_POSITION_CANDIDATES:
+
+        y_top = int(
+            VIDEO_HEIGHT * ratio
+        )
+
+        scores = []
+
+        for sample_time in sample_times:
+
+            try:
+                frame = video_clip.get_frame(
+                    sample_time
+                )
+            except Exception:
+                continue
+
+            scores.append(
+                _visual_region_score(
+                    frame,
+                    y_top,
+                    subtitle_height,
+                )
+            )
+
+        if not scores:
+            continue
+
+        candidate_scores[name] = (
+            float(np.mean(scores))
+            + SUBTITLE_POSITION_BIAS.get(
+                name,
+                0.0,
+            )
+        )
+
+    if not candidate_scores:
+        return default_y
+
+    best_name = min(
+        candidate_scores,
+        key=candidate_scores.get,
+    )
+
+    ratio_map = dict(
+        SUBTITLE_POSITION_CANDIDATES
+    )
+
+    best_y = int(
+        VIDEO_HEIGHT
+        * ratio_map[best_name]
+    )
+
+    print(
+        "🧭 Subtitle safe-area: "
+        + " / ".join(
+            f"{name}={score:.3f}"
+            for name, score
+            in candidate_scores.items()
+        )
+        + f" -> {best_name}"
+    )
+
+    return best_y
 
 
 # ============================================================
@@ -298,7 +514,6 @@ def _rebalance_subtitle_chunks(chunks):
     if len(chunks) < 2:
         return chunks
 
-    # 마지막에 1~2어절짜리 아주 짧은 조각만 홀로 남는 것을 줄인다.
     last = chunks[-1]
     previous = chunks[-2]
 
@@ -340,7 +555,6 @@ def split_subtitle_text(text):
         clean_word = word.lstrip("“\"'‘(")
         current_text = " ".join(current_words).strip()
 
-        # 접속어가 새 의미 단위를 시작하면 그 앞에서 끊는다.
         if (
             current_words
             and clean_word in CONNECTIVE_WORDS
@@ -352,7 +566,6 @@ def split_subtitle_text(text):
         candidate_words = current_words + [word]
         candidate = " ".join(candidate_words).strip()
 
-        # 최대 길이를 넘기기 전에 기존 의미 단위를 확정한다.
         if (
             current_words
             and _visible_len(candidate) > SUBTITLE_MAX_CHARS
@@ -362,12 +575,10 @@ def split_subtitle_text(text):
         current_words.append(word)
         current_text = " ".join(current_words).strip()
 
-        # 강한 문장부호는 바로 끊는다.
         if _ends_strong(word):
             flush()
             continue
 
-        # 쉼표 등은 충분한 길이가 쌓였을 때만 자연스러운 호흡으로 사용한다.
         if (
             _ends_soft(word)
             and _visible_len(current_text) >= SOFT_BREAK_MIN_CHARS
@@ -391,6 +602,7 @@ def split_subtitle_text(text):
 def create_subtitle_clips(
     text,
     duration,
+    video_clip=None,
 ):
 
     chunks = split_subtitle_text(
@@ -411,12 +623,6 @@ def create_subtitle_clips(
             "자막 duration이 0 이하입니다."
         )
 
-    # --------------------------------------------------------
-    # 자막 길이에 비례해 노출 시간을 배분한다.
-    # 짧은 조각과 긴 조각을 똑같은 시간 동안 띄우던 현상을 줄인다.
-    # TTS word timestamp 없이도 마지막 자막은 장면 끝에 정확히 맞춘다.
-    # --------------------------------------------------------
-
     weights = [
         max(
             4,
@@ -424,14 +630,15 @@ def create_subtitle_clips(
         )
         for chunk in chunks
     ]
+
     total_weight = float(
         sum(weights)
     )
 
     clips = []
 
-    subtitle_y = int(
-        VIDEO_HEIGHT * 0.70
+    subtitle_y = choose_safe_subtitle_y(
+        video_clip,
     )
 
     start = 0.0
