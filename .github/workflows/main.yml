@@ -79,6 +79,12 @@ jobs:
               "NOVELTY_HARD_REGENERATE_SCORE = 4.0",
               "main.py NOVELTY_HARD_REGENERATE_SCORE",
           )
+          set_regex(
+              Path("config.py"),
+              r"^MAX_SCRIPT_ATTEMPTS\s*=\s*\d+\s*$",
+              "MAX_SCRIPT_ATTEMPTS = 5",
+              "config.py MAX_SCRIPT_ATTEMPTS",
+          )
 
           explorer_path = Path("content/candidate_explorer.py")
           explorer_source = explorer_path.read_text(encoding="utf-8")
@@ -171,6 +177,61 @@ jobs:
                   1,
               )
 
+          # main 단계의 visual_selector와 같은 수준으로 추상 검색어를
+          # Script Generator 안에서 먼저 걸러 재시도하게 한다.
+          if "meaningful_keyword_words" not in script_source:
+              abstract_marker = "        if normalized in BAD_VISUAL_KEYWORDS:\n"
+              if script_source.count(abstract_marker) != 1:
+                  raise RuntimeError(
+                      "script_generator.py concrete keyword 검사 삽입 위치를 찾지 못했습니다."
+                  )
+
+              concrete_keyword_check = "\n".join([
+                  "        generic_keyword_words = {",
+                  '            "science", "technology", "nature", "interesting",',
+                  '            "amazing", "documentary", "background", "concept",',
+                  '            "future", "innovation", "beautiful", "cool",',
+                  '            "information", "education", "abstract",',
+                  "        }",
+                  "        meaningful_keyword_words = [",
+                  "            word",
+                  "            for word in words",
+                  "            if word not in generic_keyword_words",
+                  "        ]",
+                  "        if len(meaningful_keyword_words) < 2:",
+                  "            return False, (",
+                  '                f"{idx + 1}번 검색어가 구체적 시각 대상 부족: {keyword}"',
+                  "            )",
+                  "",
+                  "",
+              ])
+              script_source = script_source.replace(
+                  abstract_marker,
+                  concrete_keyword_check + abstract_marker,
+                  1,
+              )
+
+          # 재시도할 때 같은 오류를 반복하지 않도록 직전 실패 이유를
+          # 다음 Script prompt에 직접 전달한다.
+          if "[RETRY FEEDBACK]" not in script_source:
+              content_lock_marker = "[CONTENT LOCK]\n"
+              if script_source.count(content_lock_marker) != 1:
+                  raise RuntimeError(
+                      "script_generator.py retry feedback 삽입 위치를 찾지 못했습니다."
+                  )
+
+              retry_feedback = """[RETRY FEEDBACK]
+          직전 생성 실패 이유: {last_error or "없음"}
+          재시도 중이라면 위 오류를 반드시 고친다.
+          특히 Scene 수와 keyword의 구체성을 같은 오류로 반복하지 마라.
+
+          """
+              script_source = script_source.replace(
+                  content_lock_marker,
+                  retry_feedback + content_lock_marker,
+                  1,
+              )
+
           script_path.write_text(script_source, encoding="utf-8")
 
           rewrite_path = Path("quality/rewrite_engine.py")
@@ -197,13 +258,14 @@ jobs:
 
           rewrite_path.write_text(rewrite_source, encoding="utf-8")
 
-          print("✅ Runtime production + polite narration hotfix applied")
+          print("✅ Runtime production + polite narration + visual retry hotfix applied")
           PY
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
+          grep -n "MAX_SCRIPT_ATTEMPTS" config.py
           grep -n "temperature=0.5" content/candidate_explorer.py
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
-          grep -n "NARRATION TONE\|존댓말 종결" content/script_generator.py
+          grep -n "NARRATION TONE\|존댓말 종결\|RETRY FEEDBACK\|meaningful_keyword_words" content/script_generator.py
           grep -n "모든 scene text는 자연스러운 한국어 존댓말" quality/rewrite_engine.py
           grep -n "TTS_VOICE\|TTS_RATE" config.py
 
