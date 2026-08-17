@@ -120,13 +120,132 @@ jobs:
 
           consensus_path.write_text(consensus_source, encoding="utf-8")
 
-          print("✅ Runtime production hotfix applied")
+          # ------------------------------------------------------------
+          # Korean narration tone: 자연스러운 존댓말 강제
+          # ------------------------------------------------------------
+          script_path = Path("content/script_generator.py")
+          script_source = script_path.read_text(encoding="utf-8")
+
+          story_anchor = '''[STORY]
+          Hook → Curiosity → Explanation → Reveal → Payoff의 흐름을 만든다.
+          첫 장면부터 본론에 들어간다.
+          "오늘은", "알아보겠습니다", "혹시 알고 계셨나요" 같은 도입은 금지한다.
+          후반부는 단순 요약이 아니라 처음 질문을 실제 답으로 보상해야 한다.
+          '''
+
+          story_with_tone = '''[STORY]
+          Hook → Curiosity → Explanation → Reveal → Payoff의 흐름을 만든다.
+          첫 장면부터 본론에 들어간다.
+          "오늘은", "알아보겠습니다", "혹시 알고 계셨나요" 같은 도입은 금지한다.
+          후반부는 단순 요약이 아니라 처음 질문을 실제 답으로 보상해야 한다.
+
+          [NARRATION TONE]
+          모든 Scene의 text는 시청자에게 설명하는 자연스러운 한국어 존댓말로 쓴다.
+          반말/해라체/문어체 종결인 "~다", "~이다", "~했다", "~한다"는 사용하지 않는다.
+          "~습니다/~입니다"만 기계적으로 반복하지 말고
+          "~는데요", "~죠", "~까요?", "~해요"를 문맥에 맞게 섞는다.
+          과한 감탄, 호들갑, 억지 친근함은 피한다.
+          짧고 또렷한 다큐멘터리 내레이션처럼 말한다.
+          문장부호를 자연스럽게 사용해 TTS가 쉬어 읽을 지점을 만든다.
+          '''
+
+          story_count = script_source.count(story_anchor)
+          if story_count != 1:
+              raise RuntimeError(
+                  "script_generator.py NARRATION TONE 패치 대상이 "
+                  f"정확히 1개가 아닙니다. (count={story_count})"
+              )
+          script_source = script_source.replace(
+              story_anchor,
+              story_with_tone,
+              1,
+          )
+
+          polite_anchor = '''        if not text:
+              return False, f"{idx + 1}번 장면 대사가 없음"
+
+          if len(visual_goal) < 8:
+          '''
+
+          polite_replacement = '''        if not text:
+              return False, f"{idx + 1}번 장면 대사가 없음"
+
+          polite_ending = text.rstrip(" .!?…~\\\"'”’")
+          if not (
+              polite_ending.endswith("요")
+              or polite_ending.endswith("니다")
+              or polite_ending.endswith("십시오")
+          ):
+              return False, (
+                  f"{idx + 1}번 장면 대사가 존댓말 종결이 아님: {text}"
+              )
+
+          if len(visual_goal) < 8:
+          '''
+
+          polite_count = script_source.count(polite_anchor)
+          if polite_count != 1:
+              raise RuntimeError(
+                  "script_generator.py 존댓말 검사 패치 대상이 "
+                  f"정확히 1개가 아닙니다. (count={polite_count})"
+              )
+          script_source = script_source.replace(
+              polite_anchor,
+              polite_replacement,
+              1,
+          )
+
+          script_path.write_text(script_source, encoding="utf-8")
+
+          rewrite_path = Path("quality/rewrite_engine.py")
+          rewrite_source = rewrite_path.read_text(encoding="utf-8")
+
+          rewrite_anchor = '''- 기존 JSON 구조를 유지한다.
+          - Candidate metadata를 재작성하지 않는다.
+
+          수정된 전체 JSON 객체만 출력한다.
+          '''
+
+          rewrite_with_tone = '''- 기존 JSON 구조를 유지한다.
+          - Candidate metadata를 재작성하지 않는다.
+          - 모든 scene text는 자연스러운 한국어 존댓말을 유지한다.
+          - 반말/해라체 종결인 "~다", "~이다", "~했다", "~한다"로 바꾸지 않는다.
+          - "~습니다/~입니다"만 반복하지 말고 "~는데요", "~죠", "~까요?", "~해요"를 자연스럽게 섞는다.
+          - 과한 유튜버식 감탄보다 차분하고 또렷한 다큐멘터리 내레이션을 우선한다.
+
+          수정된 전체 JSON 객체만 출력한다.
+          '''
+
+          rewrite_count = rewrite_source.count(rewrite_anchor)
+          if rewrite_count != 1:
+              raise RuntimeError(
+                  "rewrite_engine.py 존댓말 패치 대상이 "
+                  f"정확히 1개가 아닙니다. (count={rewrite_count})"
+              )
+          rewrite_source = rewrite_source.replace(
+              rewrite_anchor,
+              rewrite_with_tone,
+              1,
+          )
+
+          rewrite_path.write_text(rewrite_source, encoding="utf-8")
+
+          print("✅ Runtime production + polite narration hotfix applied")
           PY
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "temperature=0.5" content/candidate_explorer.py
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
-          python -m py_compile main.py content/candidate_explorer.py quality/consensus.py
+          grep -n "NARRATION TONE\|존댓말 종결" content/script_generator.py
+          grep -n "모든 scene text는 자연스러운 한국어 존댓말" quality/rewrite_engine.py
+          grep -n "TTS_VOICE\|TTS_RATE" config.py
+          python -m py_compile \
+            main.py \
+            config.py \
+            content/candidate_explorer.py \
+            content/script_generator.py \
+            quality/consensus.py \
+            quality/rewrite_engine.py
 
       - name: Run Shorts Generator V3.2
         env:
