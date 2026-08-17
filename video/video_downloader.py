@@ -63,6 +63,34 @@ MODERN_SLUG_TERMS = {
     "cosplay",
 }
 
+# 자연/생물/식물/사물 중심 검색인데 사람을 요구하지 않은 경우,
+# 사람 중심 B-roll이 끼는 것을 줄이기 위한 무료 메타데이터 필터.
+NATURE_OBJECT_TERMS = {
+    "ant", "ants", "insect", "insects", "aphid", "aphids",
+    "plant", "plants", "leaf", "leaves", "root", "roots",
+    "soil", "fungus", "fungi", "mushroom", "mushrooms",
+    "seed", "seeds", "flower", "flowers", "tree", "trees",
+    "forest", "garden", "nature", "colony", "colonies",
+    "animal", "animals", "bird", "birds", "fish",
+}
+
+EXPLICIT_HUMAN_INTENT_TERMS = {
+    "person", "people", "man", "men", "woman", "women",
+    "girl", "boy", "human", "humans", "scientist", "scientists",
+    "researcher", "researchers", "doctor", "doctors",
+    "worker", "workers", "farmer", "farmers",
+    "laboratory", "lab", "holding", "hands",
+}
+
+HUMAN_CENTRIC_SLUG_TERMS = {
+    "person", "people", "man", "men", "woman", "women",
+    "girl", "boy", "human", "humans", "scientist", "scientists",
+    "researcher", "researchers", "doctor", "doctors",
+    "worker", "workers", "farmer", "farmers", "portrait",
+    "holding", "laboratory", "hospital", "office", "festival",
+    "costume", "cosplay",
+}
+
 
 SAFE_FALLBACKS = {
     "ancient roman": "ancient roman ruins stone",
@@ -223,6 +251,36 @@ def _historical_candidate_safe(candidate):
     return not bool(words & MODERN_SLUG_TERMS)
 
 
+def _is_nature_object_query(query):
+    return contains_any_term(
+        query,
+        NATURE_OBJECT_TERMS,
+    )
+
+
+def _has_explicit_human_intent(query):
+    return contains_any_term(
+        query,
+        EXPLICIT_HUMAN_INTENT_TERMS,
+    )
+
+
+def _human_centric_candidate(candidate):
+    slug = _page_slug(
+        candidate.get("page_url")
+    )
+    if not slug:
+        return False
+
+    words = set(
+        slug.split()
+    )
+    return bool(
+        words
+        & HUMAN_CENTRIC_SLUG_TERMS
+    )
+
+
 def search_pexels_candidates(query, per_page=None):
     """Pexels 검색 결과의 원래 관련도 순서를 보존한다."""
     if not PEXELS_API_KEY:
@@ -308,6 +366,7 @@ def choose_best_candidate(
     relevant_top_n=None,
     *,
     historical=False,
+    subject_filter_query=None,
 ):
     if not candidates:
         return None
@@ -335,6 +394,39 @@ def choose_best_candidate(
             ordered = safe
         else:
             return None
+
+    # 자연/생물/식물/사물 장면인데 사람이 명시되지 않았다면
+    # Pexels slug가 사람 중심으로 보이는 후보를 우선 제외한다.
+    if (
+        not historical
+        and subject_filter_query
+        and _is_nature_object_query(subject_filter_query)
+        and not _has_explicit_human_intent(subject_filter_query)
+    ):
+        before_count = len(ordered)
+        subject_safe = [
+            item for item in ordered
+            if not _human_centric_candidate(item)
+        ]
+
+        if subject_safe:
+            removed_count = (
+                before_count
+                - len(subject_safe)
+            )
+            if removed_count > 0:
+                print(
+                    "🧭 Subject visual filter: "
+                    "nature/object query -> "
+                    "human-centric clips excluded "
+                    f"({removed_count}/{before_count})"
+                )
+            ordered = subject_safe
+        elif before_count:
+            print(
+                "⚠️ Subject visual filter fallback: "
+                "사람 중심 후보만 있어 원래 관련도 목록을 사용합니다."
+            )
 
     relevant_pool = ordered[:max(1, int(relevant_top_n))]
     if not relevant_pool:
@@ -384,6 +476,10 @@ def fetch_pexels_video(query):
     4) 같은 clip 재사용 차단
     5) 필요 시 유적/문헌 안전 fallback
     순서로 선택한다.
+
+    비역사 자연/생물/식물/사물 장면은:
+    - 사람이 검색 의도에 없을 때 사람 중심 후보를 우선 제외한다.
+    - 필터 뒤에도 Pexels의 원래 관련도 순서는 보존한다.
     """
     original_query = str(query).strip()
     normalized_original = normalize_search_query(original_query)
@@ -421,6 +517,7 @@ def fetch_pexels_video(query):
                 else PEXELS_RELEVANT_TOP_N
             ),
             historical=historical,
+            subject_filter_query=search_query,
         )
 
         if not best:
