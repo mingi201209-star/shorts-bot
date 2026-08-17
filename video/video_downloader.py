@@ -1,12 +1,19 @@
-# video/video_downloader.py
-
 import os
+
 import requests
 
-from config import PEXELS_API_KEY
+from config import (
+    PEXELS_API_KEY,
+    PEXELS_SEARCH_PER_PAGE,
+    PEXELS_RELEVANT_TOP_N,
+    PEXELS_MIN_DURATION,
+)
 
 
-PEXELS_VIDEO_API = "https://api.pexels.com/videos/search"
+# Pexels 최신 Video Search 경로
+PEXELS_VIDEO_API = (
+    "https://api.pexels.com/v1/videos/search"
+)
 
 
 # ============================================================
@@ -15,22 +22,9 @@ PEXELS_VIDEO_API = "https://api.pexels.com/videos/search"
 
 def search_pexels_candidates(
     query,
-    per_page=8,
+    per_page=None,
 ):
-    """
-    하나의 검색어로 여러 영상 후보를 가져온다.
-
-    반환값 예:
-    [
-        {
-            "id": 123,
-            "url": "...",
-            "width": 1080,
-            "height": 1920,
-            "duration": 12.3
-        }
-    ]
-    """
+    """Pexels 검색 결과의 원래 관련도 순서를 보존한다."""
 
     if not PEXELS_API_KEY:
         raise RuntimeError(
@@ -44,14 +38,19 @@ def search_pexels_candidates(
             "Pexels 검색어가 비어 있습니다."
         )
 
+    if per_page is None:
+        per_page = PEXELS_SEARCH_PER_PAGE
+
     headers = {
-        "Authorization": PEXELS_API_KEY
+        "Authorization": PEXELS_API_KEY,
     }
 
     params = {
         "query": query,
-        "per_page": per_page,
+        "per_page": int(per_page),
         "orientation": "portrait",
+        "size": "medium",
+        "locale": "en-US",
     }
 
     response = requests.get(
@@ -76,27 +75,22 @@ def search_pexels_candidates(
 
     candidates = []
 
-    for video in videos:
+    for position, video in enumerate(
+        videos,
+        start=1,
+    ):
 
         files = video.get(
             "video_files",
             [],
         )
 
-        # 가능한 파일 중 세로/고해상도 우선
-        files = sorted(
-            files,
-            key=lambda item: (
-                item.get("height", 0),
-                item.get("width", 0),
-            ),
-            reverse=True,
-        )
-
         if not files:
             continue
 
-        selected_file = None
+        # 하나의 Pexels 결과 안에서는 화질 좋은 세로 파일을 고른다.
+        # 하지만 서로 다른 검색 결과끼리의 관련도 순서는 여기서 바꾸지 않는다.
+        valid_files = []
 
         for file_info in files:
 
@@ -114,117 +108,210 @@ def search_pexels_candidates(
                 ) or 0
             )
 
-            link = file_info.get(
-                "link",
-                "",
-            )
+            link = str(
+                file_info.get(
+                    "link",
+                    "",
+                )
+            ).strip()
 
             if not link:
                 continue
 
-            if height >= width:
-                selected_file = file_info
-                break
+            if width <= 0 or height <= 0:
+                continue
 
-        if selected_file is None:
-            selected_file = files[0]
+            valid_files.append({
+                "width": width,
+                "height": height,
+                "link": link,
+            })
 
-        link = selected_file.get(
-            "link",
-            "",
+        if not valid_files:
+            continue
+
+        portrait_files = [
+            item
+            for item in valid_files
+            if item["height"] >= item["width"]
+        ]
+
+        pool = (
+            portrait_files
+            if portrait_files
+            else valid_files
         )
 
-        if not link:
-            continue
+        selected_file = max(
+            pool,
+            key=lambda item: (
+                item["height"] * item["width"],
+                item["height"],
+            ),
+        )
 
         candidates.append({
             "id": video.get("id"),
-            "url": link,
-            "width": selected_file.get(
-                "width",
-                0,
-            ),
-            "height": selected_file.get(
-                "height",
-                0,
-            ),
-            "duration": video.get(
-                "duration",
-                0,
+            "url": selected_file["link"],
+            "width": selected_file["width"],
+            "height": selected_file["height"],
+            "duration": float(
+                video.get(
+                    "duration",
+                    0,
+                ) or 0
             ),
             "query": query,
+            "search_position": position,
         })
 
     return candidates
 
 
 # ============================================================
-# 기본 후보 선택
+# 후보 선택
 # ============================================================
 
 def choose_best_candidate(
     candidates,
+    relevant_top_n=None,
 ):
     """
-    현재 단계에서는 세로형 + 해상도 기준으로 선택.
+    Pexels 관련도 순위 상위 후보만 남긴 뒤 화질을 비교한다.
 
-    다음 V3 단계에서 Gemini 또는 별도 영상 분석기가
-    이 후보 리스트를 받아 실제 장면 맥락까지 검사하게 된다.
+    핵심:
+    검색 결과 8개 전체를 해상도순으로 다시 섞지 않는다.
     """
 
     if not candidates:
         return None
 
-    ranked = sorted(
-        candidates,
-        key=lambda item: (
-            item.get("height", 0),
-            item.get("width", 0),
-            item.get("duration", 0),
-        ),
-        reverse=True,
+    if relevant_top_n is None:
+        relevant_top_n = (
+            PEXELS_RELEVANT_TOP_N
+        )
+
+    relevant_top_n = max(
+        1,
+        int(relevant_top_n),
     )
 
-    return ranked[0]
+    # search_position 기준으로 원래 검색 순서를 명시적으로 복원한다.
+    ordered = sorted(
+        candidates,
+        key=lambda item: int(
+            item.get(
+                "search_position",
+                9999,
+            )
+        ),
+    )
+
+    relevant_pool = ordered[
+        :relevant_top_n
+    ]
+
+    # 너무 짧은 영상은 가능하면 제외하되,
+    # 전부 짧을 경우 검색 결과 자체를 버리지는 않는다.
+    long_enough = [
+        item
+        for item in relevant_pool
+        if float(
+            item.get(
+                "duration",
+                0,
+            ) or 0
+        ) >= PEXELS_MIN_DURATION
+    ]
+
+    quality_pool = (
+        long_enough
+        if long_enough
+        else relevant_pool
+    )
+
+    def quality_key(item):
+
+        width = int(
+            item.get(
+                "width",
+                0,
+            ) or 0
+        )
+
+        height = int(
+            item.get(
+                "height",
+                0,
+            ) or 0
+        )
+
+        duration = float(
+            item.get(
+                "duration",
+                0,
+            ) or 0
+        )
+
+        portrait_bonus = (
+            1
+            if height >= width
+            else 0
+        )
+
+        resolution = (
+            width * height
+        )
+
+        # 관련도는 이미 상위 N개로 잘랐기 때문에
+        # 여기서는 실제 영상 품질만 비교한다.
+        return (
+            portrait_bonus,
+            resolution,
+            min(duration, 20.0),
+        )
+
+    return max(
+        quality_pool,
+        key=quality_key,
+    )
 
 
 # ============================================================
 # 기존 호환 함수
 # ============================================================
 
-def fetch_pexels_video(
-    query,
-):
-    """
-    기존 video_engine.py와의 호환을 유지한다.
-
-    후보 여러 개를 검색한 뒤
-    현재 기준에서 가장 좋은 후보의 URL을 반환한다.
-    """
+def fetch_pexels_video(query):
+    """video_engine.py와 호환되는 단일 URL 인터페이스."""
 
     candidates = search_pexels_candidates(
         query,
-        per_page=8,
+        per_page=PEXELS_SEARCH_PER_PAGE,
     )
 
     best = choose_best_candidate(
-        candidates
+        candidates,
+        relevant_top_n=(
+            PEXELS_RELEVANT_TOP_N
+        ),
     )
 
     if not best:
         return None
 
     print(
-        f"🎥 Pexels 후보 {len(candidates)}개 중 선택"
+        "🎥 Pexels 검색 후보 "
+        f"{len(candidates)}개 / "
+        f"관련도 상위 {PEXELS_RELEVANT_TOP_N}개 안에서 선택"
     )
 
     print(
-        f"✅ 선택 URL ID: {best.get('id')}"
+        "✅ 선택 URL ID: "
+        f"{best.get('id')} "
+        f"| search rank {best.get('search_position')}"
     )
 
-    return best[
-        "url"
-    ]
+    return best["url"]
 
 
 # ============================================================
@@ -236,9 +323,7 @@ def download_video(
     output_path,
     requests_module=requests,
 ):
-    """
-    영상 URL을 로컬 MP4로 저장한다.
-    """
+    """영상 URL을 로컬 MP4로 저장한다."""
 
     if not video_url:
         raise ValueError(
@@ -273,14 +358,15 @@ def download_video(
         output_path
     ):
         raise RuntimeError(
-            f"영상 파일 생성 실패: {output_path}"
+            "영상 파일 생성 실패: "
+            f"{output_path}"
         )
 
     if os.path.getsize(
         output_path
     ) <= 0:
         raise RuntimeError(
-            f"다운로드된 영상이 비어 있습니다: "
+            "다운로드된 영상이 비어 있습니다: "
             f"{output_path}"
         )
 
