@@ -121,8 +121,6 @@ def _normalize_fact_token(token):
     if len(token) <= 1:
         return ""
 
-    # 조사/인용형/연결형을 가볍게 제거해
-    # "효과가" vs "효과는", "없었다는" vs "없었다고"를 잡는다.
     changed = True
     while changed:
         changed = False
@@ -184,10 +182,10 @@ def _scene_texts(script_data):
 def find_persistent_fact_issues(consensus, rewritten_script):
     """
     Fact Judge가 구체적으로 지적한 주장/표현이 Rewrite 뒤에도
-    거의 같은 핵심어로 남아 있는지 Python 수준에서 확인한다.
+    거의 같은 핵심어로 남아 있는지 가볍게 확인한다.
 
-    완전한 사실 검증기가 아니라,
-    'Judge가 고치라고 한 문장을 그대로 남기는' 실패를 막는 guard다.
+    이 검사는 사실 판정기가 아니라 재작성 힌트를 만드는 보조 guard다.
+    최종 판정은 Rewrite 후 다시 실행되는 Fact Judge가 맡는다.
     """
     issues = _fact_issue_list(consensus)
     if not issues:
@@ -203,7 +201,6 @@ def find_persistent_fact_issues(consensus, rewritten_script):
     for issue in issues:
         issue_tokens = _fact_tokens(issue)
 
-        # 너무 추상적인 issue는 이 guard에서 강제로 판정하지 않는다.
         if len(issue_tokens) < 2:
             continue
 
@@ -212,12 +209,10 @@ def find_persistent_fact_issues(consensus, rewritten_script):
         for tokens in scene_tokens:
             overlap = issue_tokens & tokens
 
-            # 핵심어 2개 이상이 그대로 남으면 unresolved로 본다.
             if len(overlap) >= 2:
                 matched = True
                 break
 
-            # 긴 고유 핵심어 하나가 그대로 남은 경우도 잡는다.
             if any(
                 len(token) >= 5 and token in tokens
                 for token in issue_tokens
@@ -556,7 +551,7 @@ def rewrite_script(
 
         print(
             "🚫 Fact Rewrite Guard: "
-            "지적된 표현이 아직 남아 있습니다."
+            "지적된 표현과 핵심어가 아직 겹칩니다."
         )
         for issue in persistent:
             print(f" - {issue}")
@@ -564,11 +559,12 @@ def rewrite_script(
         retry_fact_issues = persistent
 
         if attempt >= max_attempts:
-            raise ValueError(
-                "Fact Rewrite 검증 실패: "
-                "Judge가 지적한 핵심 주장이 "
-                "최대 재시도 후에도 남아 있습니다."
+            print(
+                "⚠️ Fact Rewrite Guard 보조 검사가 여전히 겹침을 감지했습니다. "
+                "토큰 겹침만으로 실패시키지 않고, 기존 post-rewrite Fact Judge가 "
+                "수정된 문장의 실제 사실성을 다시 판정합니다."
             )
+            break
 
     return {
         "changed": True,
