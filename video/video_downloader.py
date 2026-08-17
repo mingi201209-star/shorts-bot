@@ -36,7 +36,7 @@ HISTORICAL_RISK_TERMS = {
     "costume", "festival", "cosplay", "tourist", "tourists",
     "street", "city", "interaction", "interactions",
     "society", "atmosphere", "suffering", "victim", "victims",
-    "actions", "action",
+    "actions", "action", "blood", "drink", "drinking",
 }
 
 # Pexels에서 시대가 틀려도 오해를 만들 가능성이 비교적 낮은 시각 자료.
