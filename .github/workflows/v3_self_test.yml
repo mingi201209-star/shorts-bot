@@ -29,10 +29,15 @@ jobs:
 
       - name: Compile V3 pipeline files
         run: |
+          python -m py_compile config.py
           python -m py_compile main.py
           python -m py_compile content/candidate_gate.py
           python -m py_compile content/candidate_explorer.py
           python -m py_compile content/script_generator.py
+          python -m py_compile integrations/tts.py
+          python -m py_compile video/visual_selector.py
+          python -m py_compile video/video_downloader.py
+          python -m py_compile video/video_engine.py
           python -m py_compile quality/rewrite_engine.py
           python -m py_compile quality/judge.py
           python -m py_compile quality/consensus.py
