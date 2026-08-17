@@ -254,7 +254,26 @@ jobs:
 
           rewrite_path.write_text(rewrite_source, encoding="utf-8")
 
-          print("✅ Runtime production + polite narration + visual retry hotfix applied")
+          main_path = Path("main.py")
+          main_source = main_path.read_text(encoding="utf-8")
+          review_pattern = re.compile(
+              r'(if\s*\(\s*review_count\s*>=\s*MAX_REVIEW_ROUNDS\s*\):.*?'
+              r'"status":\s*)"HOLD"(,.*?"reason":\s*"Review 최대 횟수 초과",\s*\})',
+              flags=re.DOTALL,
+          )
+          main_source, count = review_pattern.subn(
+              r'\1"REGENERATE_TOPIC"\2',
+              main_source,
+              count=1,
+          )
+          if count != 1:
+              raise RuntimeError(
+                  "main.py Review limit fallback 패치 대상이 정확히 1개가 아닙니다. "
+                  f"(count={count})"
+              )
+          main_path.write_text(main_source, encoding="utf-8")
+
+          print("✅ Runtime production + polite narration + visual retry + review fallback hotfix applied")
           PY
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
@@ -263,6 +282,7 @@ jobs:
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
           grep -n "NARRATION TONE\|존댓말 종결\|RETRY FEEDBACK\|meaningful_keyword_words" content/script_generator.py
           grep -n "모든 scene text는 자연스러운 한국어 존댓말" quality/rewrite_engine.py
+          grep -n "Review 최대 횟수 초과" main.py
           grep -n "TTS_VOICE\|TTS_RATE" config.py
 
           python -m py_compile \
