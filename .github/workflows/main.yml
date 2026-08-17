@@ -287,7 +287,7 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
           V3_JUDGE_MODEL: gpt-4o-mini
-          V3_MAX_API_CALLS: "30"
+          V3_MAX_API_CALLS: "45"
           V3_MAX_COST_USD: "0.05"
 
         run: |
