@@ -155,6 +155,7 @@ jobs:
                   '        polite_ending = text.rstrip(" .!?…~")',
                   "        if not (",
                   '            polite_ending.endswith("요")',
+                  '            or polite_ending.endswith("죠")',
                   '            or polite_ending.endswith("니다")',
                   '            or polite_ending.endswith("십시오")',
                   "        ):",
