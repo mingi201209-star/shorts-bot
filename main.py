@@ -78,13 +78,11 @@ from quality.budget_guard import (
 # Shorts Generator V3.2.1.2
 # ============================================================
 #
-# 핵심 구조:
-#
 # Topic Direction
 #       ↓
 # Candidate Explorer
 #       ↓
-# Winner + Runner-up
+# Winner + Independent Runner-up
 #       ↓
 # Script Generator
 #       ↓
@@ -101,22 +99,36 @@ from quality.budget_guard import (
 # Consensus
 #       ↓
 # PASS / REWRITE / REVIEW
+#
+#
+# Fact 경로:
+#
+# Fact 문제
 #       ↓
-# Video Production
+# Fact Extra Judge
+#       ↓
+# Fact Appeal
+#       ↓
+# FACT_CRITICAL
+#       ↓
+# Independent Runner-up
+#       ↓
+# 새 Script
+#       ↓
+# 새 Visual Plan
+#       ↓
+# 4 Judge 전체 재심
 #
 #
-# V3.2.1.2 1차 통합:
+# 중요:
 #
-# - Novelty Pre-Gate 제거
-# - Candidate Explorer 연결
-# - Script Generator에 Winner 전달
-# - 4 Judge를 동일 심사 단계로 통합
+# Runner-up은 일반적인 2등 후보가 아니다.
 #
+# Winner의 핵심 Fact가 최종적으로 무너졌을 때만
+# 사용하는 독립 비상 백업이다.
 #
-# 다음 단계:
-#
-# - Fact-critical Winner 실패 시
-#   Runner-up 승격 / 재심 경로
+# Hook / Novelty / Visual 문제 때문에
+# Runner-up으로 갈아타지 않는다.
 #
 # ============================================================
 
@@ -130,13 +142,6 @@ JUDGE_MODEL = os.environ.get(
 # ============================================================
 # Judge Committee
 # ============================================================
-#
-# 4명의 전문 Judge가 동일 단계에서 독립 심사한다.
-#
-# Novelty만 먼저 통과시켜야 하는
-# Pre-Gate 구조는 더 이상 사용하지 않는다.
-#
-# ============================================================
 
 JUDGE_TYPES = [
     "hook",
@@ -145,30 +150,18 @@ JUDGE_TYPES = [
     "visual",
 ]
 
-
 ALL_JUDGE_TYPES = JUDGE_TYPES
 
 
 # ============================================================
-# 한 소재에 대한 최대 Rewrite
+# Quality limits
 # ============================================================
 
 MAX_REWRITES = 1
 
-
-# ============================================================
-# 한 소재에 대한 최대 Review
-# ============================================================
-
 MAX_REVIEW_ROUNDS = 1
 
-
-# ============================================================
-# Candidate Explorer 재탐색 횟수
-#
 # 최초 시도 + 재탐색 1회
-# ============================================================
-
 MAX_TOPIC_REGENERATIONS = 1
 
 
@@ -219,13 +212,7 @@ def validate_environment():
 
 
 # ============================================================
-# Judge Committee
-# ============================================================
-#
-# Hook / Novelty / Fact / Visual
-#
-# 각각 정확히 1회 실행한다.
-#
+# 최초 Judge Committee
 # ============================================================
 
 def run_initial_judges(
@@ -243,9 +230,7 @@ def run_initial_judges(
 
     print("=" * 60)
 
-    for judge_type in (
-        JUDGE_TYPES
-    ):
+    for judge_type in JUDGE_TYPES:
 
         print("")
 
@@ -273,7 +258,7 @@ def run_initial_judges(
 
 
 # ============================================================
-# 수정된 영역만 재심
+# 수정된 영역만 Judge 재심
 # ============================================================
 
 def rerun_changed_domains(
@@ -284,16 +269,13 @@ def rerun_changed_domains(
 
     new_pool = {
         key: list(value)
-
         for key, value
         in pool_results.items()
     }
 
     for domain in domains:
 
-        if domain not in (
-            ALL_JUDGE_TYPES
-        ):
+        if domain not in ALL_JUDGE_TYPES:
 
             continue
 
@@ -314,12 +296,8 @@ def rerun_changed_domains(
             result
         )
 
-        # ----------------------------------------------------
-        # Script가 수정되었으므로
-        # 해당 영역의 이전 판결은
-        # 새로운 판결로 교체한다.
-        # ----------------------------------------------------
-
+        # Script가 바뀌었으므로
+        # 해당 영역의 이전 판결을 새 판결로 교체한다.
         new_pool[
             domain
         ] = [
@@ -359,12 +337,12 @@ def get_weak_domain(
 # Novelty 지속 실패 여부
 # ============================================================
 #
-# Novelty Pre-Gate는 제거되었다.
+# Novelty Pre-Gate는 없다.
 #
-# 하지만 Script Rewrite 후에도
-# Novelty가 Consensus 최소 기준 아래라면
+# 다만 Script Rewrite 후에도
+# Novelty가 Consensus 최소 기준을 통과하지 못하면
 # 소재 자체가 약할 가능성이 있으므로
-# Candidate Explorer 재탐색을 요청할 수 있다.
+# Explorer 재탐색 대상으로 보낸다.
 #
 # ============================================================
 
@@ -388,12 +366,12 @@ def has_persistent_novelty_failure(
     )
 
     print(
-        f"   score = "
+        "   score = "
         f"{novelty.get('score', 0)}"
     )
 
     print(
-        f"   required = "
+        "   required = "
         f"{novelty.get('minimum', 0)}"
     )
 
@@ -404,10 +382,14 @@ def has_persistent_novelty_failure(
 # 품질 프로세스
 # ============================================================
 #
-# Candidate Explorer가 선택한 Winner로
-# Script가 생성된 뒤
+# Candidate Explorer가 선택한 후보로 만들어진 Script를
 #
-# 4 Judge가 동일 단계에서 심사한다.
+# Hook
+# Novelty
+# Fact
+# Visual
+#
+# 4명의 Judge가 동일 단계에서 심사한다.
 #
 # ============================================================
 
@@ -422,9 +404,9 @@ def run_quality_process(
     rewrite_count = 0
     review_count = 0
 
-    # --------------------------------------------------------
+    # ========================================================
     # 최초 Judge Committee
-    # --------------------------------------------------------
+    # ========================================================
 
     pool_results = (
         run_initial_judges(
@@ -490,11 +472,10 @@ def run_quality_process(
                 >= MAX_REWRITES
             ):
 
-                # ------------------------------------------------
-                # Script 수정 이후에도
-                # Novelty가 최소 기준 아래라면
-                # 소재 자체 재탐색 요청.
-                # ------------------------------------------------
+                # --------------------------------------------
+                # Novelty가 Rewrite 후에도 약하면
+                # 소재 자체를 새로 탐색한다.
+                # --------------------------------------------
 
                 if (
                     has_persistent_novelty_failure(
@@ -609,7 +590,7 @@ def run_quality_process(
             )
 
             # ------------------------------------------------
-            # Rewrite 후 Visual metadata 재구성
+            # Rewrite 후 Visual metadata 재생성
             # ------------------------------------------------
 
             current_script[
@@ -659,7 +640,7 @@ def run_quality_process(
             rewrite_count += 1
 
             # ------------------------------------------------
-            # 수정된 영역만 Judge 재실행
+            # 실제 수정된 영역만 재심
             # ------------------------------------------------
 
             pool_results = (
@@ -723,7 +704,7 @@ def run_quality_process(
             )
 
             # ------------------------------------------------
-            # 즉시 HOLD
+            # Review Router가 즉시 HOLD
             # ------------------------------------------------
 
             if route_type == "HOLD":
@@ -755,7 +736,7 @@ def run_quality_process(
                 }
 
             # ------------------------------------------------
-            # 추가 Judge
+            # Extra Judge
             # ------------------------------------------------
 
             if route_type in (
@@ -781,7 +762,7 @@ def run_quality_process(
                 review_count += 1
 
                 # ============================================
-                # Fact Appeal
+                # FACT EXTRA JUDGE → FACT APPEAL
                 # ============================================
 
                 if (
@@ -811,6 +792,17 @@ def run_quality_process(
                         )
                     )
 
+                    # ========================================
+                    # V3.2.1.2 핵심
+                    #
+                    # Fact Extra Judge와 Fact Appeal까지
+                    # 거쳤는데도 사실성이 해결되지 않으면
+                    # 일반 HOLD와 구별한다.
+                    #
+                    # 이 신호만 Runner-up fallback을
+                    # 사용할 수 있다.
+                    # ========================================
+
                     if appeal_status in (
                         "HOLD",
                         "DISAGREEMENT",
@@ -820,6 +812,12 @@ def run_quality_process(
                         return {
                             "status":
                                 "HOLD",
+
+                            "failure_type":
+                                "FACT_CRITICAL",
+
+                            "fact_appeal_status":
+                                appeal_status,
 
                             "script_data":
                                 current_script,
@@ -909,6 +907,298 @@ def run_quality_process(
 
 
 # ============================================================
+# Runner-up Fact Fallback
+# ============================================================
+#
+# Runner-up은 아래 조건에서만 사용한다.
+#
+# Winner
+#   ↓
+# Fact Extra Judge
+#   ↓
+# Fact Appeal
+#   ↓
+# FACT_CRITICAL
+#
+#
+# Hook 실패 → 사용 금지
+# Novelty 실패 → 사용 금지
+# Visual 실패 → 사용 금지
+# 일반 Rewrite 실패 → 사용 금지
+#
+#
+# Runner-up을 사용하면
+# 기존 Winner의 Script/Judge 결과는 재사용하지 않는다.
+#
+# Runner-up으로 완전히 새 Script를 만든 뒤
+# Visual Plan과 4 Judge를 처음부터 다시 수행한다.
+#
+# ============================================================
+
+def try_runner_up_fallback(
+    topic_info,
+    runner_up,
+    failed_quality_result,
+):
+
+    failure_type = (
+        failed_quality_result.get(
+            "failure_type"
+        )
+    )
+
+    # --------------------------------------------------------
+    # Fact-critical이 아니면 fallback 금지
+    # --------------------------------------------------------
+
+    if (
+        failure_type
+        != "FACT_CRITICAL"
+    ):
+
+        return None
+
+    # --------------------------------------------------------
+    # Runner-up 없음
+    # --------------------------------------------------------
+
+    if not runner_up:
+
+        print("")
+
+        print(
+            "⚠️ FACT_CRITICAL이지만 "
+            "사용 가능한 Runner-up이 없습니다."
+        )
+
+        return None
+
+    runner_topic = str(
+        runner_up.get(
+            "topic",
+            "",
+        )
+    ).strip()
+
+    if not runner_topic:
+
+        print("")
+
+        print(
+            "⚠️ Runner-up topic이 비어 있습니다."
+        )
+
+        return None
+
+    print("")
+    print("=" * 64)
+
+    print(
+        "🛟 V3.2.1.2 RUNNER-UP FACT FALLBACK"
+    )
+
+    print("=" * 64)
+
+    failed_script = (
+        failed_quality_result.get(
+            "script_data",
+            {},
+        )
+    )
+
+    failed_topic = str(
+        failed_script.get(
+            "topic",
+            "",
+        )
+    ).strip()
+
+    print(
+        "💀 실패 Winner:",
+        failed_topic,
+    )
+
+    print(
+        "⚠️ 실패 이유:",
+        failed_quality_result.get(
+            "reason",
+            "",
+        ),
+    )
+
+    print(
+        "🛟 승격 Runner-up:",
+        runner_topic,
+    )
+
+    backup_independence = str(
+        runner_up.get(
+            "backup_independence",
+            "",
+        )
+    ).strip()
+
+    if backup_independence:
+
+        print(
+            "🔗 Backup Independence:",
+            backup_independence,
+        )
+
+    print_budget_status()
+
+    # ========================================================
+    # 1. Runner-up으로 완전히 새 Script 생성
+    # ========================================================
+
+    runner_script = (
+        generate_script(
+            topic_info,
+            runner_up,
+        )
+    )
+
+    if not isinstance(
+        runner_script,
+        dict,
+    ):
+
+        raise RuntimeError(
+            "Runner-up 대본 생성 결과가 "
+            "dict가 아닙니다."
+        )
+
+    # --------------------------------------------------------
+    # Runner-up Candidate Lock 확인
+    # --------------------------------------------------------
+
+    generated_topic = str(
+        runner_script.get(
+            "topic",
+            "",
+        )
+    ).strip()
+
+    if (
+        generated_topic
+        != runner_topic
+    ):
+
+        raise RuntimeError(
+            "Runner-up Script Generator의 topic이 "
+            "Candidate Explorer Runner-up과 "
+            "일치하지 않습니다."
+        )
+
+    print("")
+
+    print(
+        "📝 Runner-up 제목:",
+        runner_script.get(
+            "title",
+            "",
+        ),
+    )
+
+    # ========================================================
+    # 2. Runner-up Visual Plan
+    # ========================================================
+
+    scenes = (
+        enrich_visual_plan(
+            runner_script.get(
+                "scenes",
+                [],
+            )
+        )
+    )
+
+    runner_script[
+        "scenes"
+    ] = scenes
+
+    visual_ok, visual_reason = (
+        validate_visual_plan(
+            scenes
+        )
+    )
+
+    if not visual_ok:
+
+        print("")
+
+        print(
+            "🚫 Runner-up Visual Plan 실패:",
+            visual_reason,
+        )
+
+        return {
+            "status":
+                "HOLD",
+
+            "failure_type":
+                "RUNNER_UP_FAILED",
+
+            "script_data":
+                runner_script,
+
+            "reason": (
+                "Runner-up Visual Plan 검증 실패: "
+                f"{visual_reason}"
+            ),
+        }
+
+    # ========================================================
+    # 3. Runner-up 4 Judge 전체 재심
+    # ========================================================
+
+    print("")
+    print("=" * 64)
+
+    print(
+        "⚖️ RUNNER-UP JUDGE COMMITTEE RESTART"
+    )
+
+    print("=" * 64)
+
+    runner_quality = (
+        run_quality_process(
+            runner_script
+        )
+    )
+
+    # ========================================================
+    # 임시 lineage 정보
+    #
+    # 정식 V4 Lineage 도입 전까지
+    # fallback의 출처를 최소한으로 기록한다.
+    # ========================================================
+
+    runner_quality[
+        "fallback_used"
+    ] = True
+
+    runner_quality[
+        "fallback_from_topic"
+    ] = failed_topic
+
+    runner_quality[
+        "fallback_to_topic"
+    ] = runner_topic
+
+    # --------------------------------------------------------
+    # 중요:
+    #
+    # Runner-up도 FACT_CRITICAL이라고 해서
+    # 다시 다른 fallback을 호출하지 않는다.
+    #
+    # fallback은 한 번뿐이다.
+    # --------------------------------------------------------
+
+    return runner_quality
+
+
+# ============================================================
 # 장면 생성
 # ============================================================
 
@@ -987,13 +1277,16 @@ def main():
     scene_clips = []
 
     # --------------------------------------------------------
-    # 실행 전체 Budget 초기화
+    # 실행 전체가 하나의 Budget을 공유한다.
     #
-    # Candidate Explorer 재탐색,
-    # Script Retry,
-    # Judge,
-    # Rewrite,
-    # Review 모두 하나의 Budget을 공유한다.
+    # Explorer
+    # Script Generator
+    # Judges
+    # Rewrite
+    # Review
+    # Runner-up fallback
+    #
+    # 모두 같은 Budget Guard 아래에서 실행된다.
     # --------------------------------------------------------
 
     reset_budget()
@@ -1017,22 +1310,13 @@ def main():
 
         rejected_topics = []
 
-        # ----------------------------------------------------
-        # Runner-up은 1차 통합에서는 보관만 한다.
-        #
-        # 다음 패치에서
-        # Fact-critical fallback에 사용한다.
-        # ----------------------------------------------------
-
-        selected_runner_up = None
-
         total_topic_attempts = (
             MAX_TOPIC_REGENERATIONS
             + 1
         )
 
         # ====================================================
-        # Candidate Explorer 루프
+        # Candidate Explorer Loop
         # ====================================================
 
         for topic_attempt in range(
@@ -1052,7 +1336,7 @@ def main():
             print("=" * 64)
 
             # =================================================
-            # 1. 넓은 탐색 방향 선택
+            # 1. 넓은 탐색 방향
             # =================================================
 
             topic_info = (
@@ -1060,7 +1344,7 @@ def main():
             )
 
             # =================================================
-            # 2. 최근 실제 사용 소재
+            # 2. 최근 실제 콘텐츠
             # =================================================
 
             recent_topics = (
@@ -1086,7 +1370,7 @@ def main():
             )
 
             # ------------------------------------------------
-            # Explorer가 Winner를 만들지 못함
+            # Explorer가 Winner를 선택하지 못함
             # ------------------------------------------------
 
             if (
@@ -1126,6 +1410,7 @@ def main():
                 ):
 
                     print("")
+
                     print(
                         "➡️ 다른 방향으로 재탐색"
                     )
@@ -1140,7 +1425,7 @@ def main():
                 )
 
             # =================================================
-            # 4. Winner / Runner-up
+            # 4. Winner + Independent Runner-up
             # =================================================
 
             winner = (
@@ -1153,10 +1438,6 @@ def main():
                 explorer_result.get(
                     "runner_up"
                 )
-            )
-
-            selected_runner_up = (
-                runner_up
             )
 
             current_topic = str(
@@ -1174,6 +1455,7 @@ def main():
                 )
 
             print("")
+
             print(
                 "🏆 Winner:",
                 current_topic,
@@ -1204,7 +1486,7 @@ def main():
                 )
 
             # ------------------------------------------------
-            # 이미 이번 실행에서 폐기한 Winner 방지
+            # 이미 이번 실행에서 죽은 소재인지 확인
             # ------------------------------------------------
 
             if (
@@ -1230,10 +1512,7 @@ def main():
                 )
 
             # =================================================
-            # 5. Script Generator
-            #
-            # Candidate Explorer Winner를
-            # 그대로 전달한다.
+            # 5. Winner Script Generator
             # =================================================
 
             script_data = (
@@ -1253,8 +1532,7 @@ def main():
                 )
 
             # ------------------------------------------------
-            # Script Generator가 topic을 재선택하지
-            # 않았는지 방어적으로 검사한다.
+            # Candidate Lock 확인
             # ------------------------------------------------
 
             generated_topic = str(
@@ -1278,17 +1556,20 @@ def main():
             print("")
 
             print(
-                f"📝 제목: "
-                f"{script_data.get('title', '')}"
+                "📝 제목:",
+                script_data.get(
+                    "title",
+                    "",
+                ),
             )
 
             print(
-                f"🧠 소재: "
-                f"{current_topic}"
+                "🧠 소재:",
+                current_topic,
             )
 
             # =================================================
-            # 6. Visual Plan
+            # 6. Winner Visual Plan
             # =================================================
 
             scenes = (
@@ -1318,10 +1599,7 @@ def main():
                 )
 
             # =================================================
-            # 7. Judge Committee + Consensus
-            #
-            # Hook / Novelty / Fact / Visual
-            # 모두 동일 단계에서 실행.
+            # 7. Winner Judge Committee
             # =================================================
 
             quality_result = (
@@ -1329,6 +1607,48 @@ def main():
                     script_data
                 )
             )
+
+            # =================================================
+            # 8. FACT_CRITICAL → Runner-up Fallback
+            # =================================================
+
+            if (
+                quality_result.get(
+                    "failure_type"
+                )
+                == "FACT_CRITICAL"
+            ):
+
+                # --------------------------------------------
+                # Fact로 죽은 Winner는
+                # 이후 Explorer가 다시 고르지 못하게 한다.
+                # --------------------------------------------
+
+                if (
+                    current_topic
+                    not in rejected_topics
+                ):
+
+                    rejected_topics.append(
+                        current_topic
+                    )
+
+                fallback_result = (
+                    try_runner_up_fallback(
+                        topic_info,
+                        runner_up,
+                        quality_result,
+                    )
+                )
+
+                if (
+                    fallback_result
+                    is not None
+                ):
+
+                    quality_result = (
+                        fallback_result
+                    )
 
             status = (
                 quality_result.get(
@@ -1338,4 +1658,357 @@ def main():
 
             # =================================================
             # PASS
-           
+            # =================================================
+
+            if status == "PASS":
+
+                final_script = (
+                    quality_result[
+                        "script_data"
+                    ]
+                )
+
+                if quality_result.get(
+                    "fallback_used",
+                    False,
+                ):
+
+                    print("")
+                    print("=" * 64)
+
+                    print(
+                        "🛟 RUNNER-UP FALLBACK PASS"
+                    )
+
+                    print(
+                        "From:",
+                        quality_result.get(
+                            "fallback_from_topic",
+                            "",
+                        ),
+                    )
+
+                    print(
+                        "To:",
+                        quality_result.get(
+                            "fallback_to_topic",
+                            "",
+                        ),
+                    )
+
+                    print("=" * 64)
+
+                break
+
+            # =================================================
+            # Novelty persistent failure
+            #
+            # Winner 또는 Runner-up이
+            # Novelty 문제로 살아남지 못한 경우
+            # 새 Explorer 실행.
+            # =================================================
+
+            if (
+                status
+                == "REGENERATE_TOPIC"
+            ):
+
+                rejected_topic = str(
+                    quality_result
+                    .get(
+                        "script_data",
+                        {}
+                    )
+                    .get(
+                        "topic",
+                        current_topic,
+                    )
+                ).strip()
+
+                if rejected_topic:
+
+                    if (
+                        rejected_topic
+                        not in rejected_topics
+                    ):
+
+                        rejected_topics.append(
+                            rejected_topic
+                        )
+
+                print("")
+                print("=" * 64)
+
+                print(
+                    "♻️ CANDIDATE REGENERATION"
+                )
+
+                print("=" * 64)
+
+                print(
+                    "폐기 소재:",
+                    rejected_topic,
+                )
+
+                print(
+                    "이유:",
+                    quality_result.get(
+                        "reason",
+                        "",
+                    ),
+                )
+
+                print_budget_status()
+
+                if (
+                    topic_attempt
+                    < total_topic_attempts
+                ):
+
+                    print("")
+
+                    print(
+                        "➡️ Candidate Explorer 재탐색"
+                    )
+
+                    continue
+
+                raise RuntimeError(
+                    "Judge Committee 통과가 가능한 "
+                    "Winner를 확보하지 못했습니다."
+                )
+
+            # =================================================
+            # Runner-up도 실패
+            # =================================================
+
+            if (
+                quality_result.get(
+                    "fallback_used",
+                    False,
+                )
+            ):
+
+                fallback_topic = str(
+                    quality_result.get(
+                        "fallback_to_topic",
+                        "",
+                    )
+                ).strip()
+
+                if (
+                    fallback_topic
+                    and fallback_topic
+                    not in rejected_topics
+                ):
+
+                    rejected_topics.append(
+                        fallback_topic
+                    )
+
+                print("")
+                print("=" * 64)
+
+                print(
+                    "🚫 RUNNER-UP FALLBACK FAILED"
+                )
+
+                print("=" * 64)
+
+                print(
+                    "Runner-up:",
+                    fallback_topic,
+                )
+
+                print(
+                    "Reason:",
+                    quality_result.get(
+                        "reason",
+                        "",
+                    ),
+                )
+
+            # =================================================
+            # 일반 HOLD
+            # =================================================
+
+            raise RuntimeError(
+                "V3.2.1.2 Quality Gate HOLD: "
+                f"{quality_result.get('reason', '')}"
+            )
+
+        # ====================================================
+        # 최종 PASS Script
+        # ====================================================
+
+        if not final_script:
+
+            raise RuntimeError(
+                "최종 PASS 대본이 없습니다."
+            )
+
+        script_data = (
+            final_script
+        )
+
+        scenes = script_data.get(
+            "scenes",
+            [],
+        )
+
+        print("")
+        print("=" * 64)
+
+        print(
+            "🏆 V3.2.1.2 QUALITY PASS"
+        )
+
+        print("=" * 64)
+
+        print(
+            "📝 제목:",
+            script_data.get(
+                "title",
+                "",
+            ),
+        )
+
+        print(
+            "🧠 소재:",
+            script_data.get(
+                "topic",
+                "",
+            ),
+        )
+
+        # ====================================================
+        # 9. 실제 영상 제작
+        # ====================================================
+
+        scene_clips = (
+            generate_scenes(
+                scenes
+            )
+        )
+
+        # ====================================================
+        # 10. 영상 길이 검사
+        # ====================================================
+
+        print("")
+
+        print(
+            "⏱️ 영상 길이 검사..."
+        )
+
+        duration_ok, total_duration = (
+            validate_total_duration(
+                scene_clips
+            )
+        )
+
+        if not duration_ok:
+
+            print(
+                "⚠️ 목표 영상 길이 범위 이탈"
+            )
+
+        # ====================================================
+        # 11. 렌더링
+        # ====================================================
+
+        final_path = (
+            render_final_video(
+                scene_clips
+            )
+        )
+
+        # ====================================================
+        # 12. Telegram
+        # ====================================================
+
+        send_result_summary(
+            script_data,
+            total_duration,
+        )
+
+        send_telegram_video(
+            final_path
+        )
+
+        # ====================================================
+        # 최종 Budget
+        # ====================================================
+
+        print_budget_status()
+
+        elapsed = (
+            time.time()
+            - start_time
+        )
+
+        print("")
+        print("=" * 64)
+
+        print(
+            "🎉 V3.2.1.2 "
+            "AUTONOMOUS SHORT COMPLETE"
+        )
+
+        print(
+            "⏱️ 전체 소요시간: "
+            f"{elapsed / 60:.1f}분"
+        )
+
+        print("=" * 64)
+
+    except Exception as e:
+
+        print("")
+        print("=" * 64)
+
+        print(
+            "💀 V3.2.1.2 ERROR"
+        )
+
+        print(
+            str(e)
+        )
+
+        print("=" * 64)
+
+        print_budget_status()
+
+        try:
+
+            send_telegram_message(
+                "🚨 V3.2.1.2 Shorts 생성 실패\n\n"
+                f"{str(e)[:500]}"
+            )
+
+        except Exception:
+
+            pass
+
+        raise
+
+    finally:
+
+        for clip in scene_clips:
+
+            try:
+
+                clip.close()
+
+            except Exception:
+
+                pass
+
+
+# ============================================================
+# 실행
+# ============================================================
+
+if __name__ == "__main__":
+
+    main()
