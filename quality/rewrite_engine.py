@@ -1,5 +1,6 @@
 # quality/rewrite_engine.py
 
+import copy
 import json
 import re
 
@@ -25,9 +26,28 @@ SUPPORTED_DOMAINS = {
 }
 
 
+# ============================================================
+# Candidate Explorer가 확정한 계약
+#
+# Rewrite Engine은 이 값들을 변경할 권한이 없다.
+# ============================================================
+
+IMMUTABLE_CANDIDATE_FIELDS = (
+    "topic",
+    "category",
+    "angle",
+    "core_question",
+    "micro_narrative",
+    "fact_check_focus",
+    "visual_proof",
+    "candidate_selection_reason",
+)
+
+
 def extract_json(text):
 
     if not text:
+
         raise ValueError(
             "Rewrite 응답이 비어 있습니다."
         )
@@ -50,7 +70,10 @@ def extract_json(text):
     ).strip()
 
     try:
-        return json.loads(text)
+
+        return json.loads(
+            text
+        )
 
     except Exception:
         pass
@@ -72,6 +95,10 @@ def extract_json(text):
         "Rewrite 응답에서 JSON을 찾지 못했습니다."
     )
 
+
+# ============================================================
+# Rewrite Domain 결정
+# ============================================================
 
 def find_rewrite_domains(
     consensus,
@@ -187,6 +214,10 @@ def collect_domain_issues(
     return result
 
 
+# ============================================================
+# Rewrite Prompt
+# ============================================================
+
 def build_rewrite_prompt(
     script_data,
     consensus,
@@ -206,80 +237,207 @@ def build_rewrite_prompt(
 
         domain_rules.append("""
 [HOOK 수정]
-- 첫 1~3초의 대사만 우선 개선한다.
-- 설명형 오프닝 금지.
-- 질문, 위험, 반전, 정보 공백 중 하나를 강화한다.
-- 본문 핵심 사실을 왜곡하지 않는다.
+
+- 첫 1~3초 표현을 우선 개선한다.
+- 설명형 오프닝을 피한다.
+- 정보 공백과 구체성을 강화한다.
+- Candidate의 핵심 질문이나 사실은 바꾸지 않는다.
 """)
 
     if "novelty" in domains:
 
         domain_rules.append("""
 [NOVELTY 수정]
-- 소재 자체가 너무 평범하면 더 구체적이고 의외적인 각도로 좁힌다.
-- 단순히 자극적인 제목으로 포장하지 않는다.
-- 필요하다면 title/topic과 관련 장면 일부만 수정한다.
+
+중요:
+
+새 소재를 탐색하지 마라.
+새 Story Angle을 만들지 마라.
+
+Candidate Explorer가 결정한
+
+- topic
+- angle
+- core_question
+- micro_narrative
+
+는 변경할 수 없다.
+
+
+허용:
+
+- 같은 Story Angle 안에서
+  예상 밖 요소를 더 일찍 공개
+- Reveal 순서 개선
+- 평범한 설명 문장 축소
+- 구체적 표현 강화
+- title 개선
+- scene text 개선
+
+
+현재 Candidate 자체가 너무 평범하여
+Story Angle을 바꾸지 않고는 해결할 수 없다면
+
+Rewrite가 새로운 topic을 만들어
+억지로 살리려고 하지 마라.
 """)
 
     if "fact" in domains:
 
         domain_rules.append("""
 [FACT 수정]
-- 근거 불명확한 숫자, 단정, 과장 표현을 제거한다.
+
+- 근거 불명확한 숫자를 제거한다.
+- 과도한 단정을 완화한다.
+- 인과관계를 과장하지 않는다.
 - 불확실한 사실은 확정적으로 쓰지 않는다.
-- 핵심 재미를 유지하되 정확성을 우선한다.
+- Candidate 소재와 Core Question은 유지한다.
 """)
 
     if "visual" in domains:
 
         domain_rules.append("""
 [VISUAL 수정]
+
 - 대사는 가급적 유지한다.
 - visual_goal / visual_type / keyword를 우선 수정한다.
-- keyword는 실제 화면에서 보여줄 수 있는 2~5단어 영어 검색어로 만든다.
+- keyword는 실제로 화면에서 보여줄 수 있는
+  2~5단어 영어 검색어를 사용한다.
 - 단순 단어 매칭을 피한다.
 """)
 
     return f"""
 너는 Shorts V3의 선택적 Rewrite Engine이다.
 
-전체 대본을 새로 만들지 마라.
+전체 콘텐츠를 새로 기획하지 마라.
 
-정상인 부분은 최대한 보존하고,
-지정된 문제 영역만 수정한다.
+Candidate Explorer가 결정한
 
-수정 대상:
+"무엇을 이야기할 것인가"
+
+는 이미 확정되었다.
+
+
+너의 역할은
+
+"그 후보를 어떻게 더 잘 표현할 것인가"
+
+이다.
+
+
+============================================================
+IMMUTABLE CANDIDATE CONTRACT
+============================================================
+
+다음 값은 절대 수정하지 마라.
+
+- topic
+- category
+- angle
+- core_question
+- micro_narrative
+- fact_check_focus
+- visual_proof
+- candidate_selection_reason
+
+
+특히 Novelty 문제를 해결하려고
+새 topic이나 새 angle을 만들면 안 된다.
+
+
+============================================================
+수정 대상
+============================================================
+
 {json.dumps(
     domains,
     ensure_ascii=False
 )}
 
-문제:
+
+============================================================
+Judge 문제
+============================================================
+
 {json.dumps(
     issues,
     ensure_ascii=False,
     indent=2
 )}
 
-현재 대본:
+
+============================================================
+현재 Script
+============================================================
+
 {json.dumps(
     script_data,
     ensure_ascii=False,
     indent=2
 )}
 
+
+============================================================
+Domain Rules
+============================================================
+
 {chr(10).join(domain_rules)}
 
-절대 규칙:
+
+============================================================
+ABSOLUTE RULES
+============================================================
+
+- 정상 영역은 최대한 보존한다.
 - scenes 개수는 가능하면 유지한다.
-- 정상 scene을 불필요하게 바꾸지 않는다.
 - 사실을 새로 만들어내지 않는다.
 - keyword는 영어.
-- 기존 JSON 구조 유지.
+- 기존 JSON 구조를 유지한다.
+- Candidate metadata를 재작성하지 않는다.
 
 수정된 전체 JSON 객체만 출력한다.
 """
 
+
+# ============================================================
+# Candidate Contract 복원
+# ============================================================
+
+def restore_candidate_contract(
+    original_script,
+    rewritten_script,
+):
+
+    # LLM이 Prompt를 무시하더라도
+    # Python 코드에서 원래 Candidate 값을 강제 복원한다.
+
+    for field in (
+        IMMUTABLE_CANDIDATE_FIELDS
+    ):
+
+        if field in original_script:
+
+            rewritten_script[
+                field
+            ] = copy.deepcopy(
+                original_script[
+                    field
+                ]
+            )
+
+        else:
+
+            rewritten_script.pop(
+                field,
+                None,
+            )
+
+    return rewritten_script
+
+
+# ============================================================
+# Rewrite
+# ============================================================
 
 def rewrite_script(
     script_data,
@@ -306,8 +464,12 @@ def rewrite_script(
     if not domains:
 
         return {
-            "changed": False,
-            "domains": [],
+            "changed":
+                False,
+
+            "domains":
+                [],
+
             "script_data":
                 script_data,
         }
@@ -327,7 +489,7 @@ def rewrite_script(
     )
 
     print(
-        f"💳 Rewrite API call "
+        "💳 Rewrite API call "
         f"authorized: #{call_number}"
     )
 
@@ -346,10 +508,12 @@ def rewrite_script(
                     "content": (
                         "너는 부분 수정 전용 "
                         "Shorts Rewrite Engine이다. "
-                        "정상 부분은 보존하고 "
-                        "문제 영역만 수정한다."
+                        "Candidate Explorer가 결정한 "
+                        "소재와 Story Angle은 "
+                        "절대로 변경하지 않는다."
                     ),
                 },
+
                 {
                     "role":
                         "user",
@@ -363,9 +527,11 @@ def rewrite_script(
         )
     )
 
-    usage = record_usage(
-        model,
-        response,
+    usage = (
+        record_usage(
+            model,
+            response,
+        )
     )
 
     print(
@@ -383,8 +549,10 @@ def rewrite_script(
         .strip()
     )
 
-    rewritten = extract_json(
-        content
+    rewritten = (
+        extract_json(
+            content
+        )
     )
 
     if not isinstance(
@@ -396,9 +564,24 @@ def rewrite_script(
             "Rewrite 결과가 dict가 아닙니다."
         )
 
+    # ========================================================
+    # Python-level Candidate Lock
+    # ========================================================
+
+    rewritten = (
+        restore_candidate_contract(
+            script_data,
+            rewritten,
+        )
+    )
+
     return {
-        "changed": True,
-        "domains": domains,
+        "changed":
+            True,
+
+        "domains":
+            domains,
+
         "script_data":
             rewritten,
     }
@@ -410,7 +593,11 @@ def print_rewrite_result(
 
     print("")
     print("=" * 54)
-    print("🔧 V3.2 REWRITE ENGINE")
+
+    print(
+        "🔧 V3.2 REWRITE ENGINE"
+    )
+
     print("=" * 54)
 
     if not result.get(
@@ -422,6 +609,7 @@ def print_rewrite_result(
         )
 
         print("=" * 54)
+
         return
 
     print(
@@ -432,6 +620,10 @@ def print_rewrite_result(
                 [],
             )
         ),
+    )
+
+    print(
+        "🔒 Candidate Contract 유지"
     )
 
     print(
