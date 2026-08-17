@@ -1,6 +1,7 @@
 # video/subtitle_engine.py
 
 import os
+import re
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -251,85 +252,136 @@ def render_subtitle_image(text):
 # 자막 문장 분할
 # ============================================================
 
+SUBTITLE_MAX_CHARS = 16
+SOFT_BREAK_MIN_CHARS = 7
+CONNECTIVE_WORDS = {
+    "하지만", "그런데", "그래서", "반면", "그리고",
+    "또한", "즉", "특히", "결국",
+}
+
+
+def _visible_len(text):
+    return len(
+        re.sub(
+            r"\s+",
+            "",
+            str(text or ""),
+        )
+    )
+
+
+def _ends_strong(word):
+    return bool(
+        re.search(
+            r"[.!?…]+[\"'”’)]*$",
+            word,
+        )
+    )
+
+
+def _ends_soft(word):
+    return bool(
+        re.search(
+            r"[,;:]+[\"'”’)]*$",
+            word,
+        )
+    )
+
+
+def _rebalance_subtitle_chunks(chunks):
+    chunks = [
+        chunk.strip()
+        for chunk in chunks
+        if chunk and chunk.strip()
+    ]
+
+    if len(chunks) < 2:
+        return chunks
+
+    # 마지막에 1~2어절짜리 아주 짧은 조각만 홀로 남는 것을 줄인다.
+    last = chunks[-1]
+    previous = chunks[-2]
+
+    if (
+        _visible_len(last) <= 4
+        and _visible_len(previous) <= SUBTITLE_MAX_CHARS - 3
+    ):
+        merged = f"{previous} {last}".strip()
+        if _visible_len(merged) <= SUBTITLE_MAX_CHARS + 2:
+            chunks[-2:] = [merged]
+
+    return chunks
+
+
 def split_subtitle_text(text):
 
-    text = str(text).strip()
+    text = re.sub(
+        r"\s+",
+        " ",
+        str(text or "").strip(),
+    )
 
     if not text:
         return []
 
-    # --------------------------------------------------------
-    # 문장부호 기준 우선 분리
-    # --------------------------------------------------------
-
-    normalized = (
-        text
-        .replace("!", "!\n")
-        .replace("?", "?\n")
-        .replace(".", ".\n")
-    )
-
-    sentences = [
-        part.strip()
-        for part in normalized.split("\n")
-        if part.strip()
-    ]
-
-    if not sentences:
-        sentences = [text]
-
+    words = text.split()
     chunks = []
+    current_words = []
 
-    # --------------------------------------------------------
-    # 너무 긴 문장은 의미 단위에 가깝게 줄임
-    # --------------------------------------------------------
-
-    for sentence in sentences:
-
-        if len(sentence) <= 16:
-
+    def flush():
+        nonlocal current_words
+        if current_words:
             chunks.append(
-                sentence
+                " ".join(current_words).strip()
             )
+            current_words = []
 
+    for word in words:
+        clean_word = word.lstrip("“\"'‘(")
+        current_text = " ".join(current_words).strip()
+
+        # 접속어가 새 의미 단위를 시작하면 그 앞에서 끊는다.
+        if (
+            current_words
+            and clean_word in CONNECTIVE_WORDS
+            and _visible_len(current_text) >= SOFT_BREAK_MIN_CHARS
+        ):
+            flush()
+            current_text = ""
+
+        candidate_words = current_words + [word]
+        candidate = " ".join(candidate_words).strip()
+
+        # 최대 길이를 넘기기 전에 기존 의미 단위를 확정한다.
+        if (
+            current_words
+            and _visible_len(candidate) > SUBTITLE_MAX_CHARS
+        ):
+            flush()
+
+        current_words.append(word)
+        current_text = " ".join(current_words).strip()
+
+        # 강한 문장부호는 바로 끊는다.
+        if _ends_strong(word):
+            flush()
             continue
 
-        words = sentence.split()
+        # 쉼표 등은 충분한 길이가 쌓였을 때만 자연스러운 호흡으로 사용한다.
+        if (
+            _ends_soft(word)
+            and _visible_len(current_text) >= SOFT_BREAK_MIN_CHARS
+        ):
+            flush()
 
-        current = ""
-
-        for word in words:
-
-            candidate = (
-                f"{current} {word}".strip()
-            )
-
-            if (
-                len(candidate) > 16
-                and current
-            ):
-
-                chunks.append(
-                    current
-                )
-
-                current = word
-
-            else:
-
-                current = candidate
-
-        if current:
-
-            chunks.append(
-                current
-            )
+    flush()
 
     if not chunks:
-
         chunks = [text]
 
-    return chunks
+    return _rebalance_subtitle_chunks(
+        chunks
+    )
 
 
 # ============================================================
@@ -360,15 +412,20 @@ def create_subtitle_clips(
         )
 
     # --------------------------------------------------------
-    # 현재는 균등 배분
-    #
-    # 추후 V4에서 TTS word timestamp 기반으로
-    # 정확한 싱크 가능
+    # 자막 길이에 비례해 노출 시간을 배분한다.
+    # 짧은 조각과 긴 조각을 똑같은 시간 동안 띄우던 현상을 줄인다.
+    # TTS word timestamp 없이도 마지막 자막은 장면 끝에 정확히 맞춘다.
     # --------------------------------------------------------
 
-    chunk_duration = (
-        duration
-        / len(chunks)
+    weights = [
+        max(
+            4,
+            _visible_len(chunk),
+        )
+        for chunk in chunks
+    ]
+    total_weight = float(
+        sum(weights)
     )
 
     clips = []
@@ -377,9 +434,23 @@ def create_subtitle_clips(
         VIDEO_HEIGHT * 0.70
     )
 
-    for idx, chunk in enumerate(
-        chunks
+    start = 0.0
+
+    for idx, (chunk, weight) in enumerate(
+        zip(chunks, weights)
     ):
+
+        if idx == len(chunks) - 1:
+            chunk_duration = max(
+                0.01,
+                duration - start,
+            )
+        else:
+            chunk_duration = (
+                duration
+                * weight
+                / total_weight
+            )
 
         image = render_subtitle_image(
             chunk
@@ -390,7 +461,7 @@ def create_subtitle_clips(
                 image
             )
             .set_start(
-                idx * chunk_duration
+                start
             )
             .set_duration(
                 chunk_duration
@@ -406,5 +477,7 @@ def create_subtitle_clips(
         clips.append(
             clip
         )
+
+        start += chunk_duration
 
     return clips
