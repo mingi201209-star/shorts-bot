@@ -22,49 +22,6 @@ from quality.budget_guard import (
 )
 
 
-# ============================================================
-# V3.2.1.2 Shorts Script Generator
-# ============================================================
-#
-# 책임:
-#
-# Candidate Explorer가 확정한 Winner를 받아
-# 실제 12~13 Scene Shorts 대본으로 확장한다.
-#
-#
-# 하는 것:
-#
-# - 제목 작성
-# - Scene 대사 작성
-# - Scene별 B-roll 검색 keyword 작성
-# - 기본적인 Script 구조 검증
-#
-#
-# 하지 않는 것:
-#
-# - 새로운 소재 탐색
-# - Winner 교체
-# - Novelty 자기평가
-# - 최근 소재 비교
-# - Candidate 재선정
-# - Fact 검증 완료 선언
-#
-#
-# 핵심 구조:
-#
-# Candidate Explorer
-#       ↓
-# Winner
-#       ↓
-# Script Generator
-#       ↓
-# Script
-#       ↓
-# Judge Committee
-#
-# ============================================================
-
-
 MODEL = os.environ.get(
     "V3_SCRIPT_MODEL",
     "gpt-4o-mini",
@@ -74,10 +31,6 @@ MODEL = os.environ.get(
 if OPENAI_KEY:
     openai.api_key = OPENAI_KEY
 
-
-# ============================================================
-# 첫 장면 Hard 차단 표현
-# ============================================================
 
 HOOK_BANNED_PATTERNS = [
     "있는 모습",
@@ -92,10 +45,6 @@ HOOK_BANNED_PATTERNS = [
 ]
 
 
-# ============================================================
-# 지나치게 추상적인 B-roll 검색어
-# ============================================================
-
 BAD_VISUAL_KEYWORDS = [
     "science",
     "technology",
@@ -109,7 +58,7 @@ BAD_VISUAL_KEYWORDS = [
 
 
 # ============================================================
-# JSON 추출
+# JSON
 # ============================================================
 
 def extract_json(text):
@@ -120,9 +69,7 @@ def extract_json(text):
             "Script Generator 응답이 비어 있습니다."
         )
 
-    text = str(
-        text
-    ).strip()
+    text = str(text).strip()
 
     text = re.sub(
         r"```json",
@@ -135,42 +82,20 @@ def extract_json(text):
         r"```",
         "",
         text,
-    )
-
-    text = text.strip()
-
-    # --------------------------------------------------------
-    # 전체 JSON
-    # --------------------------------------------------------
+    ).strip()
 
     try:
 
-        result = json.loads(
-            text
-        )
+        result = json.loads(text)
 
-        if isinstance(
-            result,
-            dict,
-        ):
-
+        if isinstance(result, dict):
             return result
 
     except Exception:
-
         pass
 
-    # --------------------------------------------------------
-    # JSON 객체 추출
-    # --------------------------------------------------------
-
-    start = text.find(
-        "{"
-    )
-
-    end = text.rfind(
-        "}"
-    )
+    start = text.find("{")
+    end = text.rfind("}")
 
     if (
         start != -1
@@ -181,20 +106,13 @@ def extract_json(text):
         try:
 
             result = json.loads(
-                text[
-                    start:end + 1
-                ]
+                text[start:end + 1]
             )
 
-            if isinstance(
-                result,
-                dict,
-            ):
-
+            if isinstance(result, dict):
                 return result
 
         except Exception:
-
             pass
 
     raise ValueError(
@@ -203,19 +121,12 @@ def extract_json(text):
     )
 
 
-# ============================================================
-# 문자열 필드 검사
-# ============================================================
-
 def require_nonempty_string(
     value,
     field_name,
 ):
 
-    if not isinstance(
-        value,
-        str,
-    ):
+    if not isinstance(value, str):
 
         raise ValueError(
             f"{field_name}은 문자열이어야 합니다."
@@ -233,17 +144,12 @@ def require_nonempty_string(
 
 
 # ============================================================
-# Candidate Winner 검사
+# Candidate Lock Validation
 # ============================================================
 
-def validate_candidate(
-    candidate,
-):
+def validate_candidate(candidate):
 
-    if not isinstance(
-        candidate,
-        dict,
-    ):
+    if not isinstance(candidate, dict):
 
         raise TypeError(
             "candidate는 dict여야 합니다."
@@ -268,16 +174,12 @@ def validate_candidate(
             )
 
     topic = require_nonempty_string(
-        candidate.get(
-            "topic"
-        ),
+        candidate.get("topic"),
         "candidate.topic",
     )
 
     angle = require_nonempty_string(
-        candidate.get(
-            "angle"
-        ),
+        candidate.get("angle"),
         "candidate.angle",
     )
 
@@ -294,10 +196,7 @@ def validate_candidate(
         "micro_narrative"
     )
 
-    if not isinstance(
-        micro,
-        dict,
-    ):
+    if not isinstance(micro, dict):
 
         raise ValueError(
             "candidate.micro_narrative는 "
@@ -315,15 +214,20 @@ def validate_candidate(
 
         clean_micro[field] = (
             require_nonempty_string(
-                micro.get(
-                    field
-                ),
+                micro.get(field),
                 (
                     "candidate.micro_narrative."
                     f"{field}"
                 ),
             )
         )
+
+    # ========================================================
+    # fact_check_focus
+    #
+    # 빈 배열 허용.
+    # 별도 검증이 필요한 핵심 Claim이 없다면 []
+    # ========================================================
 
     fact_check_focus = (
         candidate.get(
@@ -343,18 +247,15 @@ def validate_candidate(
 
     fact_check_focus = [
         str(item).strip()
-
         for item in fact_check_focus
-
         if str(item).strip()
     ]
 
-    if not fact_check_focus:
-
-        raise ValueError(
-            "candidate.fact_check_focus가 "
-            "비어 있습니다."
-        )
+    # ========================================================
+    # visual_proof
+    #
+    # 최소 하나는 필수.
+    # ========================================================
 
     visual_proof = (
         candidate.get(
@@ -374,9 +275,7 @@ def validate_candidate(
 
     visual_proof = [
         str(item).strip()
-
         for item in visual_proof
-
         if str(item).strip()
     ]
 
@@ -417,17 +316,12 @@ def validate_candidate(
 
 
 # ============================================================
-# 첫 장면 검사
+# Hook
 # ============================================================
 
-def validate_hook(
-    scene,
-):
+def validate_hook(scene):
 
-    if not isinstance(
-        scene,
-        dict,
-    ):
+    if not isinstance(scene, dict):
 
         return (
             False,
@@ -462,9 +356,7 @@ def validate_hook(
             "첫 장면 검색어가 없음",
         )
 
-    for banned in (
-        HOOK_BANNED_PATTERNS
-    ):
+    for banned in HOOK_BANNED_PATTERNS:
 
         if banned in text:
 
@@ -483,10 +375,6 @@ def validate_hook(
             "첫 장면 대사가 지나치게 짧음",
         )
 
-    # --------------------------------------------------------
-    # 실제 Hook 품질은 Hook Judge가 판단한다.
-    # --------------------------------------------------------
-
     return (
         True,
         "하드 후킹 검사 통과",
@@ -494,17 +382,12 @@ def validate_hook(
 
 
 # ============================================================
-# Scene 구조 검사
+# Scenes
 # ============================================================
 
-def validate_scenes(
-    scenes,
-):
+def validate_scenes(scenes):
 
-    if not isinstance(
-        scenes,
-        list,
-    ):
+    if not isinstance(scenes, list):
 
         return (
             False,
@@ -531,14 +414,9 @@ def validate_scenes(
             ),
         )
 
-    for idx, scene in enumerate(
-        scenes
-    ):
+    for idx, scene in enumerate(scenes):
 
-        if not isinstance(
-            scene,
-            dict,
-        ):
+        if not isinstance(scene, dict):
 
             return (
                 False,
@@ -582,10 +460,6 @@ def validate_scenes(
                 ),
             )
 
-        # ----------------------------------------------------
-        # B-roll keyword는 영어 검색어
-        # ----------------------------------------------------
-
         if not re.search(
             r"[A-Za-z]",
             keyword,
@@ -606,9 +480,7 @@ def validate_scenes(
             .strip()
         )
 
-        if normalized in (
-            BAD_VISUAL_KEYWORDS
-        ):
+        if normalized in BAD_VISUAL_KEYWORDS:
 
             return (
                 False,
@@ -625,13 +497,7 @@ def validate_scenes(
     )
 
 
-# ============================================================
-# Keyword 다양성 검사
-# ============================================================
-
-def validate_keyword_variety(
-    scenes,
-):
+def validate_keyword_variety(scenes):
 
     keywords = [
         str(
@@ -654,9 +520,7 @@ def validate_keyword_variety(
         )
 
     unique_count = len(
-        set(
-            keywords
-        )
+        set(keywords)
     )
 
     required = max(
@@ -681,18 +545,9 @@ def validate_keyword_variety(
     )
 
 
-# ============================================================
-# Script Hard Validator
-# ============================================================
+def validate_script(result):
 
-def validate_script(
-    result,
-):
-
-    if not isinstance(
-        result,
-        dict,
-    ):
+    if not isinstance(result, dict):
 
         return (
             False,
@@ -766,13 +621,7 @@ def validate_script(
     )
 
 
-# ============================================================
-# Candidate Context
-# ============================================================
-
-def build_candidate_context(
-    candidate,
-):
+def build_candidate_context(candidate):
 
     return json.dumps(
         candidate,
@@ -782,7 +631,7 @@ def build_candidate_context(
 
 
 # ============================================================
-# AI 대본 생성
+# Script Generator
 # ============================================================
 
 def generate_script(
@@ -790,10 +639,7 @@ def generate_script(
     candidate,
 ):
 
-    if not isinstance(
-        topic_info,
-        dict,
-    ):
+    if not isinstance(topic_info, dict):
 
         raise TypeError(
             "topic_info는 dict여야 합니다."
@@ -872,10 +718,6 @@ def generate_script(
         core_question,
     )
 
-    # ========================================================
-    # Script 생성 Retry
-    # ========================================================
-
     last_error = None
 
     for attempt in range(
@@ -884,6 +726,7 @@ def generate_script(
     ):
 
         print("")
+
         print(
             "📝 Script 작성 "
             f"{attempt}/"
@@ -891,33 +734,34 @@ def generate_script(
         )
 
         prompt = f"""
-너는 유튜브 Shorts 전문 Script Writer다.
+너는 YouTube Shorts 전문 Script Writer다.
 
 Candidate Explorer가 이미
 무엇을 이야기할지 결정했다.
 
 너는 새로운 소재를 탐색하지 않는다.
 
-너의 역할은 확정된 Winner를
+확정된 Winner를
 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초 길이의
-12~13 Scene Shorts 대본으로 발전시키는 것이다.
+
+{MIN_SCENES}~{MAX_SCENES} Scene
+
+Shorts Script로 발전시킨다.
 
 
 ============================================================
-[ABSOLUTE CONTENT LOCK]
+ABSOLUTE CONTENT LOCK
 ============================================================
 
-아래 Candidate는 이미 선발이 끝난 Winner다.
+Candidate는 이미 선발된 Winner다.
 
-소재를 새로 선택하지 마라.
+다음을 바꾸지 마라.
 
-다른 소재로 바꾸지 마라.
-
-핵심 질문을 바꾸지 마라.
-
-Reveal의 핵심 메커니즘을 바꾸지 마라.
-
-Payoff를 다른 결론으로 교체하지 마라.
+- topic
+- angle
+- core_question
+- 핵심 Reveal
+- Payoff
 
 
 더 재미있게 만들겠다는 이유로
@@ -925,32 +769,30 @@ Payoff를 다른 결론으로 교체하지 마라.
 - 새로운 원인
 - 새로운 역사적 기원
 - 새로운 숫자
-- 새로운 연구
+- 새로운 연구 결과
 - 새로운 숨겨진 목적
-- 다른 메커니즘
+- 다른 Mechanism
 
 을 만들어내지 마라.
 
-
-Candidate Explorer가 정한
 
 HOOK
 CORE QUESTION
 REVEAL
 PAYOFF
 
-의 논리적 관계를 보존하라.
+의 논리적 관계를 보존한다.
 
 
 ============================================================
-[CANDIDATE WINNER]
+CANDIDATE WINNER
 ============================================================
 
 {candidate_context}
 
 
 ============================================================
-[CONTEXT]
+CONTEXT
 ============================================================
 
 넓은 분야:
@@ -959,18 +801,18 @@ PAYOFF
 초기 탐색 방향:
 {direction}
 
-확정된 소재:
+확정 소재:
 {topic}
 
-확정된 Angle:
+확정 Angle:
 {angle}
 
-확정된 Core Question:
+확정 Core Question:
 {core_question}
 
 
 ============================================================
-[MICRO NARRATIVE — STORY SPINE]
+MICRO NARRATIVE
 ============================================================
 
 HOOK:
@@ -986,56 +828,44 @@ PAYOFF:
 {micro["payoff"]}
 
 
-이 네 요소는 이야기의 척추다.
-
-표현은 자연스럽게 다듬을 수 있지만
-핵심 의미를 다른 방향으로 바꾸지 마라.
+표현은 자연스럽게 변경할 수 있지만
+핵심 의미는 바꾸지 마라.
 
 
 ============================================================
-[STORY DESIGN]
+STORY DESIGN
 ============================================================
 
-대본은 단순한 설명 목록이 아니다.
+단순 설명 목록을 만들지 마라.
 
 시청자가 계속 다음 정보를 알고 싶도록
-정보 공개 순서를 설계하라.
+정보 공개 순서를 설계한다.
 
 
 권장 흐름:
 
-1. 강한 Hook
-2. Core Question 형성
-3. 직관적인 예상 또는 일반적 오해
-4. 실제 문제 또는 구조
-5. Reveal로 접근
-6. 핵심 메커니즘 설명
-7. 구체적인 시각적 사례
-8. 처음의 질문과 다시 연결
-9. Payoff
-10. 짧고 강한 마무리
-
-
-정확히 이 번호대로
-Scene을 만들 필요는 없다.
-
-하지만
-
 Hook
-→ Curiosity
-→ Explanation
+→ Core Question
+→ 예상 또는 오해
+→ 실제 문제
+→ Reveal 접근
+→ Mechanism
+→ 시각적 사례
+→ 처음 질문과 재연결
 → Payoff
 
-의 긴장 구조는 유지해야 한다.
+
+정확히 이 순서를 기계적으로 사용할 필요는 없다.
 
 
 ============================================================
-[HOOK]
+HOOK
 ============================================================
 
-첫 Scene에서 바로 본론에 들어가라.
+첫 Scene부터 본론에 들어간다.
 
-금지:
+
+금지 예:
 
 "오늘은 ~에 대해 알아보겠습니다."
 
@@ -1045,53 +875,43 @@ Hook
 
 "혹시 알고 계셨나요?"
 
-같은 일반적인 도입.
 
-
-첫 장면은
-Candidate의 실제 Hook을 사용하여
-
-과장 없이
-즉시 정보 공백을 만들어야 한다.
+Candidate의 실제 Hook을 이용해
+과장 없이 즉시 정보 공백을 만든다.
 
 
 ============================================================
-[PAYOFF]
+PAYOFF
 ============================================================
 
-Hook보다 Payoff가 약해지면 실패다.
+Hook보다 Payoff가 약하면 실패다.
 
-후반부가 단순 요약으로 끝나지 않게 하라.
+후반부를 단순 요약으로 끝내지 마라.
 
-마지막에는
-
-"아, 그래서 처음에 저랬던 거구나."
-
-라는 느낌이 들도록
-
-첫 Hook 또는 Core Question과
-Reveal을 다시 연결하라.
+처음 Hook 또는 Core Question과
+Reveal을 다시 연결한다.
 
 
 ============================================================
-[FACT DISCIPLINE]
+FACT DISCIPLINE
 ============================================================
 
-Candidate에 없는 새로운 사실을
+Candidate에 없는 핵심 사실을
 무리하게 추가하지 마라.
 
-특히 다음을 지어내지 마라.
+
+특히 발명 금지:
 
 - 구체적인 연도
 - 퍼센트
 - 연구 결과
-- 역사적 인물의 의도
-- 설계자의 숨겨진 목적
+- 역사 인물의 의도
+- 숨겨진 설계 목적
 - 세계 최초 기록
-- "~때문에 만들어졌다" 식의 단정
+- "~때문에 만들어졌다" 같은 인과 단정
 
 
-후단 Fact Judge가 검증해야 할 내용:
+후단 Fact Judge 확인 대상:
 
 {json.dumps(
     candidate["fact_check_focus"],
@@ -1100,15 +920,17 @@ Candidate에 없는 새로운 사실을
 )}
 
 
-이 주장들은 이야기에서 사용할 수 있지만
-확신을 과장하지 마라.
+배열이 비어 있다면
+별도 Fact Risk Claim이 지정되지 않았다는 뜻이다.
+
+그렇다고 새로운 사실을 자유롭게 만들어도 된다는 뜻은 아니다.
 
 
 ============================================================
-[VISUAL STORYTELLING]
+VISUAL STORYTELLING
 ============================================================
 
-Candidate Explorer가 제안한 Visual Proof:
+Visual Proof:
 
 {json.dumps(
     candidate["visual_proof"],
@@ -1117,59 +939,50 @@ Candidate Explorer가 제안한 Visual Proof:
 )}
 
 
-각 Scene의 keyword는
-대사를 그대로 영어로 번역하는 것이 아니다.
+keyword는 대사를 영어로 번역하는 것이 아니다.
 
-그 Scene에서 실제로 보여줘야 할
+실제로 화면에서 보여줄
 
 - 대상
 - 구조
 - 행동
 - 환경
+- 과정
 - 비교
-- 메커니즘
+- Mechanism
 
 을 검색할 수 있는
-구체적인 영어 B-roll 검색어를 작성하라.
+구체적인 영어 B-roll 검색어를 작성한다.
 
 
-좋은 검색어:
+좋은 예:
 
 train railway curve
-
 ship dry dock hull
-
 bridge expansion joint
-
 skyscraper wind damper
-
 factory conveyor belt close up
 
 
-나쁜 검색어:
+나쁜 예:
 
 science
-
 technology
-
 interesting
-
 amazing
-
 documentary
-
 background
 
 
-가능하면 같은 B-roll 유형이
-연속해서 반복되지 않게 하라.
+같은 B-roll 유형을
+연속 반복하지 마라.
 
 
 ============================================================
-[SCENES]
+SCENES
 ============================================================
 
-장면 수:
+장면:
 
 {MIN_SCENES}~{MAX_SCENES}개.
 
@@ -1182,18 +995,15 @@ background
 를 가진다.
 
 
-첫 Scene이 가장 강한
-정보 공백을 가져야 한다.
+첫 Scene이 가장 강한 정보 공백을 가진다.
 
-중간 Scene은
-실제 구조나 과정의 이해를 증가시켜야 한다.
+중간은 이해를 증가시킨다.
 
-후반 Scene은
-Reveal과 Payoff를 연결해야 한다.
+후반은 Reveal과 Payoff를 연결한다.
 
 
 ============================================================
-[LENGTH]
+LENGTH
 ============================================================
 
 전체 영상 목표:
@@ -1201,36 +1011,32 @@ Reveal과 Payoff를 연결해야 한다.
 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초.
 
 
-12~13개의 지나치게 짧은 문장을
-억지로 나누지 마라.
+지나치게 짧은 문장을
+억지로 {MIN_SCENES}~{MAX_SCENES}개로 쪼개지 마라.
 
-TTS로 읽었을 때
-전체 목표 길이에 충분한 분량을 작성하라.
+TTS로 읽을 때
+목표 길이에 충분한 분량이어야 한다.
 
 
 ============================================================
-[TITLE]
+TITLE
 ============================================================
 
-제목은 Candidate의 실제 질문과
-Reveal에 기반해야 한다.
+Candidate의 실제 질문과 Reveal에 기반한다.
 
 내용보다 강한 약속을 하지 마라.
 
-Clickbait를 위해
 Candidate에 없는 사실을 암시하지 마라.
 
 
 ============================================================
-[OUTPUT]
+OUTPUT
 ============================================================
 
-반드시 JSON 객체 하나만 출력한다.
+JSON 객체 하나만 출력한다.
 
-JSON 외 설명 금지.
-
+설명 금지.
 Markdown 금지.
-
 코드블록 금지.
 
 
@@ -1247,25 +1053,20 @@ Markdown 금지.
 }}
 
 
-중요:
-
 topic,
 angle,
 core_question,
+micro_narrative,
 fact_check_focus,
 visual_proof
 
-필드는 출력할 필요가 없다.
+는 출력하지 않아도 된다.
 
-이 값들은 코드가
-Candidate Explorer의 확정값을 다시 붙인다.
+코드가 Candidate Explorer의
+확정값을 다시 붙인다.
 """
 
         try:
-
-            # =================================================
-            # Budget Guard
-            # =================================================
 
             call_number = (
                 authorize_call(
@@ -1278,10 +1079,6 @@ Candidate Explorer의 확정값을 다시 붙인다.
                 f"authorized: "
                 f"#{call_number}"
             )
-
-            # =================================================
-            # OpenAI
-            # =================================================
 
             response = (
                 openai
@@ -1323,10 +1120,6 @@ Candidate Explorer의 확정값을 다시 붙인다.
                 )
             )
 
-            # =================================================
-            # 비용 기록
-            # =================================================
-
             usage = (
                 record_usage(
                     MODEL,
@@ -1340,10 +1133,6 @@ Candidate Explorer의 확정값을 다시 붙인다.
             )
 
             print_budget_status()
-
-            # =================================================
-            # 응답 파싱
-            # =================================================
 
             content = (
                 response
@@ -1365,10 +1154,6 @@ Candidate Explorer의 확정값을 다시 붙인다.
                 )
             )
 
-            # =================================================
-            # Hard Validation
-            # =================================================
-
             valid, reason = (
                 validate_script(
                     generated
@@ -1386,31 +1171,21 @@ Candidate Explorer의 확정값을 다시 붙인다.
 
                 continue
 
-            # =================================================
-            # Scene 정리
-            # =================================================
-
             cleaned_scenes = []
 
-            for scene in (
-                generated[
-                    "scenes"
-                ]
-            ):
+            for scene in generated[
+                "scenes"
+            ]:
 
                 cleaned_scenes.append({
                     "text":
                         str(
-                            scene[
-                                "text"
-                            ]
+                            scene["text"]
                         ).strip(),
 
                     "keyword":
                         str(
-                            scene[
-                                "keyword"
-                            ]
+                            scene["keyword"]
                         ).strip(),
                 })
 
@@ -1421,33 +1196,24 @@ Candidate Explorer의 확정값을 다시 붙인다.
             )
 
             # =================================================
-            # 중요:
-            #
-            # Candidate 핵심 정보는
-            # 생성 AI의 출력이 아니라
-            # Explorer 결과에서 직접 복사한다.
+            # Candidate의 핵심 값은
+            # AI 출력이 아닌 Explorer 결과를 사용.
             # =================================================
 
             result = {
                 "title":
                     str(
-                        generated[
-                            "title"
-                        ]
+                        generated["title"]
                     ).strip(),
 
                 "topic":
-                    candidate[
-                        "topic"
-                    ],
+                    candidate["topic"],
 
                 "category":
                     category,
 
                 "angle":
-                    candidate[
-                        "angle"
-                    ],
+                    candidate["angle"],
 
                 "core_question":
                     candidate[
@@ -1479,10 +1245,6 @@ Candidate Explorer의 확정값을 다시 붙인다.
                     cleaned_scenes,
             }
 
-            # =================================================
-            # 성공
-            # =================================================
-
             print("")
             print("=" * 62)
 
@@ -1492,28 +1254,23 @@ Candidate Explorer의 확정값을 다시 붙인다.
 
             print(
                 "🧠 소재:",
-                result[
-                    "topic"
-                ],
+                result["topic"],
             )
 
             print(
                 "📝 제목:",
-                result[
-                    "title"
-                ],
+                result["title"],
             )
 
             print(
                 "🎬 장면:",
                 len(
-                    result[
-                        "scenes"
-                    ]
+                    result["scenes"]
                 ),
             )
 
             print("")
+
             print(
                 "➡️ 다음 단계: "
                 "독립 Judge Committee"
@@ -1525,18 +1282,12 @@ Candidate Explorer의 확정값을 다시 붙인다.
 
         except Exception as e:
 
-            last_error = str(
-                e
-            )
+            last_error = str(e)
 
             print(
                 "⚠️ Script 생성 실패: "
                 f"{e}"
             )
-
-    # ========================================================
-    # 모든 Script 시도 실패
-    # ========================================================
 
     raise RuntimeError(
         "V3.2.1.2 Script Generator가 "
