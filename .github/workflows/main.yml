@@ -67,9 +67,6 @@ jobs:
                   )
               path.write_text(updated, encoding="utf-8")
 
-          # ------------------------------------------------------------
-          # Production policy
-          # ------------------------------------------------------------
           set_regex(
               Path("main.py"),
               r"^MAX_TOPIC_REGENERATIONS\s*=\s*\d+\s*$",
@@ -121,14 +118,10 @@ jobs:
               )
           consensus_path.write_text(consensus_source, encoding="utf-8")
 
-          # ------------------------------------------------------------
-          # Korean narration tone: 자연스러운 존댓말 강제
-          # exact-whitespace anchor 대신 안정적인 marker 기반으로 적용한다.
-          # ------------------------------------------------------------
           script_path = Path("content/script_generator.py")
           script_source = script_path.read_text(encoding="utf-8")
 
-          narration_block = '''
+          narration_block = """
           [NARRATION TONE]
           모든 Scene의 text는 시청자에게 설명하는 자연스러운 한국어 존댓말로 쓴다.
           반말/해라체/문어체 종결인 "~다", "~이다", "~했다", "~한다"는 사용하지 않는다.
@@ -137,7 +130,7 @@ jobs:
           과한 감탄, 호들갑, 억지 친근함은 피한다.
           짧고 또렷한 다큐멘터리 내레이션처럼 말한다.
           문장부호를 자연스럽게 사용해 TTS가 쉬어 읽을 지점을 만든다.
-          '''
+          """
 
           if "[NARRATION TONE]" not in script_source:
               fact_marker = "\n[FACT]\n"
@@ -158,17 +151,19 @@ jobs:
                       "script_generator.py 존댓말 검사 삽입 위치를 찾지 못했습니다."
                   )
 
-              polite_check = '''        polite_ending = text.rstrip(" .!?…~\\\"'”’")
-        if not (
-            polite_ending.endswith("요")
-            or polite_ending.endswith("니다")
-            or polite_ending.endswith("십시오")
-        ):
-            return False, (
-                f"{idx + 1}번 장면 대사가 존댓말 종결이 아님: {text}"
-            )
-
-'''
+              polite_check = "\n".join([
+                  '        polite_ending = text.rstrip(" .!?…~")',
+                  "        if not (",
+                  '            polite_ending.endswith("요")',
+                  '            or polite_ending.endswith("니다")',
+                  '            or polite_ending.endswith("십시오")',
+                  "        ):",
+                  "            return False, (",
+                  '                f"{idx + 1}번 장면 대사가 존댓말 종결이 아님: {text}"',
+                  "            )",
+                  "",
+                  "",
+              ])
               script_source = script_source.replace(
                   visual_marker,
                   polite_check + visual_marker,
@@ -187,12 +182,12 @@ jobs:
                       "rewrite_engine.py 존댓말 규칙 삽입 위치를 찾지 못했습니다."
                   )
 
-              rewrite_tone = '''- 모든 scene text는 자연스러운 한국어 존댓말을 유지한다.
+              rewrite_tone = """- 모든 scene text는 자연스러운 한국어 존댓말을 유지한다.
           - 반말/해라체 종결인 "~다", "~이다", "~했다", "~한다"로 바꾸지 않는다.
           - "~습니다/~입니다"만 반복하지 말고 "~는데요", "~죠", "~까요?", "~해요"를 자연스럽게 섞는다.
           - 과한 유튜버식 감탄보다 차분하고 또렷한 다큐멘터리 내레이션을 우선한다.
 
-          '''
+          """
               rewrite_source = rewrite_source.replace(
                   rewrite_marker,
                   rewrite_tone + rewrite_marker,
