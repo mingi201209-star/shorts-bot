@@ -1,5 +1,6 @@
 import os
 import re
+from urllib.parse import urlparse
 
 import requests
 
@@ -11,408 +12,274 @@ from config import (
 )
 
 
-# Pexels 최신 Video Search 경로
-PEXELS_VIDEO_API = (
-    "https://api.pexels.com/v1/videos/search"
-)
+PEXELS_VIDEO_API = "https://api.pexels.com/v1/videos/search"
 
-
-# ============================================================
-# Scene Context Lock
-# ============================================================
-#
-# 한 영상 안에서 첫 장면들이 "ancient roman" 같은 시대/대상을
-# 확정하면 이후의 짧고 일반적인 검색어에도 그 맥락을 유지한다.
-#
-# 예:
-#   ancient roman road ...
-#   -> 이후 "laying stones gravel road"도
-#      "ancient roman stones gravel road"로 잠근다.
-#
-# 단, "modern road ..."처럼 장면이 현대 비교 화면을 명시하면
-# 그 장면만 historical lock을 적용하지 않는다.
-# ============================================================
-
+# 한 번의 Shorts 실행 동안 유지되는 시대 문맥/중복 방지 상태.
 ACTIVE_CONTEXT_LOCK = None
+USED_VIDEO_IDS = set()
 
 
 EXPLICIT_MODERN_TERMS = {
-    "modern",
-    "contemporary",
-    "current",
-    "today",
-    "highway",
-    "motorway",
-    "asphalt",
-    "excavator",
-    "bulldozer",
-    "paver",
+    "modern", "contemporary", "current", "today",
+    "highway", "motorway", "asphalt",
+    "excavator", "bulldozer", "paver",
+}
+
+# 역사 장면에서 그대로 검색하면 현대 B-roll로 새기 쉬운 단어.
+HISTORICAL_RISK_TERMS = {
+    "person", "people", "man", "men", "woman", "women",
+    "girl", "boy", "crowd", "doctor", "patient", "nurse",
+    "worker", "workers", "construction", "constructing",
+    "building", "build", "laying", "paving", "pave",
+    "installing", "installation", "research", "laboratory",
+    "lab", "burning", "incense", "clothing", "clothes",
+    "costume", "festival", "cosplay", "tourist", "tourists",
+    "street", "city", "interaction", "interactions",
+    "society", "atmosphere", "suffering", "victim", "victims",
+    "actions", "action",
+}
+
+# Pexels에서 시대가 틀려도 오해를 만들 가능성이 비교적 낮은 시각 자료.
+HISTORICAL_SAFE_ANCHORS = {
+    "road", "roads", "stone", "stones", "gravel",
+    "bridge", "bridges", "aqueduct", "aqueducts",
+    "wall", "walls", "ruin", "ruins", "castle", "castles",
+    "church", "cathedral", "temple", "tomb", "pyramid",
+    "mosaic", "fresco", "sculpture", "statue", "artifact",
+    "artifacts", "pottery", "manuscript", "manuscripts",
+    "parchment", "painting", "paintings", "illustration",
+    "illustrations", "document", "documents", "record",
+    "records", "archive", "archives", "relief",
+}
+
+# Pexels 페이지 URL slug에서 이 단어가 보이면 역사 장면 후보에서 제외.
+# 재현행사도 실제 시대 영상처럼 오해될 수 있으므로 보수적으로 차단한다.
+MODERN_SLUG_TERMS = {
+    "person", "people", "man", "men", "woman", "women",
+    "girl", "boy", "doctor", "nurse", "patient", "hospital",
+    "car", "cars", "traffic", "smartphone", "phone", "laptop",
+    "office", "worker", "workers", "construction", "street",
+    "city", "tourist", "tourists", "festival", "costume",
+    "cosplay",
 }
 
 
-HISTORICAL_ACTION_TERMS = {
-    "construction",
-    "constructing",
-    "worker",
-    "workers",
-    "building",
-    "build",
-    "laying",
-    "paving",
-    "pave",
-    "installing",
-    "installation",
-}
-
-
-SAFE_OBJECT_HINTS = {
-    "road",
-    "roads",
-    "stone",
-    "stones",
-    "gravel",
-    "brick",
-    "bricks",
-    "bridge",
-    "bridges",
-    "wall",
-    "walls",
-    "aqueduct",
-    "aqueducts",
-    "ruin",
-    "ruins",
-    "temple",
-    "temples",
-    "path",
-    "paths",
-    "pavement",
-    "foundation",
-    "foundations",
+SAFE_FALLBACKS = {
+    "ancient roman": "ancient roman ruins stone",
+    "ancient egypt": "ancient egypt ruins relief",
+    "ancient greek": "ancient greek ruins sculpture",
+    "medieval historical": "medieval castle ruins manuscript",
+    "ancient": "ancient ruins artifact stone",
+    "historical": "historical manuscript archive artifact",
 }
 
 
 def normalize_search_query(query):
     query = str(query or "").strip().lower()
-    query = re.sub(
-        r"[^a-z0-9\s-]",
-        " ",
-        query,
-    )
-    query = re.sub(
-        r"\s+",
-        " ",
-        query,
-    ).strip()
-    return query
+    query = re.sub(r"[^a-z0-9\s-]", " ", query)
+    return re.sub(r"\s+", " ", query).strip()
 
 
 def contains_any_term(query, terms):
-    words = set(
-        normalize_search_query(query).split()
-    )
-    return bool(
-        words.intersection(terms)
-    )
+    return bool(set(normalize_search_query(query).split()) & set(terms))
 
 
 def detect_context_lock(query):
     query = normalize_search_query(query)
-
     if not query:
         return None
-
     if "roman" in query:
         return "ancient roman"
-
-    if (
-        "egyptian" in query
-        or "ancient egypt" in query
-    ):
+    if "egyptian" in query or "ancient egypt" in query:
         return "ancient egypt"
-
-    if (
-        "greek" in query
-        and "ancient" in query
-    ):
+    if "greek" in query and "ancient" in query:
         return "ancient greek"
-
     if "medieval" in query:
         return "medieval historical"
-
     if "ancient" in query:
         return "ancient"
-
     if "historical" in query:
         return "historical"
-
     return None
 
 
 def has_explicit_modern_override(query):
     query = normalize_search_query(query)
-
     if not query:
         return False
-
-    # historical/ancient와 modern이 함께 들어간 비교 검색어는
-    # 원문 검색어를 그대로 보존한다.
-    historical = detect_context_lock(query)
-
-    if historical:
+    # "ancient ... modern comparison"처럼 역사 키워드가 함께 있으면
+    # 역사 장면으로 간주하고 lock을 유지한다.
+    if detect_context_lock(query):
         return False
-
-    return contains_any_term(
-        query,
-        EXPLICIT_MODERN_TERMS,
-    )
+    return contains_any_term(query, EXPLICIT_MODERN_TERMS)
 
 
 def get_context_lock(query):
     global ACTIVE_CONTEXT_LOCK
 
     query = normalize_search_query(query)
-
-    if not query:
+    if not query or has_explicit_modern_override(query):
         return None
 
-    if has_explicit_modern_override(query):
-        return None
-
-    detected = detect_context_lock(
-        query
-    )
-
+    detected = detect_context_lock(query)
     if detected:
-        # 이미 "ancient roman"처럼 더 구체적인 lock이 있는데
-        # 이후 장면에서 "ancient"만 들어왔다고 정보량을 낮추지 않는다.
         if (
             ACTIVE_CONTEXT_LOCK
             and ACTIVE_CONTEXT_LOCK != "ancient"
             and detected == "ancient"
         ):
             return ACTIVE_CONTEXT_LOCK
-
         ACTIVE_CONTEXT_LOCK = detected
         return detected
 
     return ACTIVE_CONTEXT_LOCK
 
 
+def _dedupe_words(words):
+    seen = set()
+    result = []
+    for word in words:
+        if word and word not in seen:
+            seen.add(word)
+            result.append(word)
+    return result
+
+
+def _safe_historical_query(original, lock):
+    words = original.split()
+    lock_words = lock.split()
+    word_set = set(words)
+
+    safe_anchors = [
+        word for word in words
+        if word in HISTORICAL_SAFE_ANCHORS
+    ]
+
+    risky = bool(word_set & HISTORICAL_RISK_TERMS)
+
+    # 역사 장면인데 구체적인 유물/건축/문헌 anchor가 없으면
+    # 사람/행동 B-roll 대신 시대가 틀리지 않는 안전 자료로 후퇴한다.
+    if risky or not safe_anchors:
+        if safe_anchors:
+            # 로마 도로/성/문헌처럼 안전한 대상은 살리고,
+            # workers/doctor/people 등의 위험 단어는 버린다.
+            words = lock_words + safe_anchors
+            if any(
+                item in safe_anchors
+                for item in ("road", "roads", "stone", "stones", "bridge", "aqueduct")
+            ):
+                words.append("ruins")
+            elif any(
+                item in safe_anchors
+                for item in ("painting", "illustration", "manuscript", "document", "record")
+            ):
+                words.append("historical")
+        else:
+            words = SAFE_FALLBACKS.get(
+                lock,
+                "historical manuscript ruins artifact",
+            ).split()
+    else:
+        words = lock_words + words
+
+    return " ".join(_dedupe_words(words)[:7]).strip()
+
+
 def build_context_locked_query(query):
     """
-    한 영상 안에서 시대/대상 맥락을 유지한다.
-
-    역사적 제작 과정은 Pexels에 정확한 재연 영상이 부족할 수 있으므로
-    "workers / construction / laying" 같은 일반 작업 키워드가
-    현대 공사 영상을 끌어오는 경우를 줄이기 위해 실제 남아 있는
-    구조물/재료 중심 검색어로 안전하게 바꾼다.
+    시대 문맥을 유지하면서 현대 B-roll로 새기 쉬운 검색어를
+    유물/건축/문헌 중심의 보수적인 검색어로 바꾼다.
     """
-
-    original = normalize_search_query(
-        query
-    )
-
+    original = normalize_search_query(query)
     if not original:
         return "", None
 
-    if has_explicit_modern_override(
-        original
-    ):
+    if has_explicit_modern_override(original):
         return original, None
 
-    lock = get_context_lock(
-        original
-    )
-
+    lock = get_context_lock(original)
     if not lock:
         return original, None
 
-    words = original.split()
-    word_set = set(words)
-
-    lock_words = lock.split()
-
-    for token in reversed(lock_words):
-        if token not in word_set:
-            words.insert(0, token)
-            word_set.add(token)
-
-    # 고대/역사 장면에서 일반적인 현대 작업자 B-roll로 빠지는 것을 막는다.
-    # 과정 자체보다 실제 유물/재료/구조를 우선 검색한다.
-    if word_set.intersection(
-        HISTORICAL_ACTION_TERMS
-    ):
-        filtered = [
-            word
-            for word in words
-            if word not in HISTORICAL_ACTION_TERMS
-        ]
-
-        object_words = [
-            word
-            for word in filtered
-            if (
-                word in SAFE_OBJECT_HINTS
-                or word in lock_words
-            )
-        ]
-
-        # object 힌트가 너무 적으면 원래의 비-action 명사를 유지한다.
-        if len(object_words) < 3:
-            object_words = filtered
-
-        words = object_words
-
-    # 중복 제거, 순서 보존
-    seen = set()
-    cleaned = []
-
-    for word in words:
-        if word in seen:
-            continue
-        seen.add(word)
-        cleaned.append(word)
-
-    # Pexels 검색은 너무 길면 오히려 관련도가 흔들리므로
-    # 핵심 문맥 + 대상 위주로 7토큰 이내로 제한한다.
-    cleaned = cleaned[:7]
-
-    effective = " ".join(
-        cleaned
-    ).strip()
-
-    if not effective:
-        effective = original
-
-    return effective, lock
+    return _safe_historical_query(original, lock), lock
 
 
-# ============================================================
-# Pexels 후보 검색
-# ============================================================
+def _page_slug(url):
+    try:
+        path = urlparse(str(url or "")).path.lower()
+    except Exception:
+        return ""
+    path = re.sub(r"[^a-z0-9-]+", " ", path)
+    return path.replace("-", " ")
 
-def search_pexels_candidates(
-    query,
-    per_page=None,
-):
+
+def _historical_candidate_safe(candidate):
+    slug = _page_slug(candidate.get("page_url"))
+    if not slug:
+        # 메타데이터가 없다고 바로 버리지는 않는다.
+        return True
+
+    words = set(slug.split())
+    return not bool(words & MODERN_SLUG_TERMS)
+
+
+def search_pexels_candidates(query, per_page=None):
     """Pexels 검색 결과의 원래 관련도 순서를 보존한다."""
-
     if not PEXELS_API_KEY:
-        raise RuntimeError(
-            "PEXELS_API_KEY가 없습니다."
-        )
+        raise RuntimeError("PEXELS_API_KEY가 없습니다.")
 
     query = str(query).strip()
-
     if not query:
-        raise ValueError(
-            "Pexels 검색어가 비어 있습니다."
-        )
+        raise ValueError("Pexels 검색어가 비어 있습니다.")
 
     if per_page is None:
         per_page = PEXELS_SEARCH_PER_PAGE
 
-    headers = {
-        "Authorization": PEXELS_API_KEY,
-    }
-
-    params = {
-        "query": query,
-        "per_page": int(per_page),
-        "orientation": "portrait",
-        "size": "medium",
-        "locale": "en-US",
-    }
-
     response = requests.get(
         PEXELS_VIDEO_API,
-        headers=headers,
-        params=params,
+        headers={"Authorization": PEXELS_API_KEY},
+        params={
+            "query": query,
+            "per_page": int(per_page),
+            "orientation": "portrait",
+            "locale": "en-US",
+        },
         timeout=30,
     )
 
     if not response.ok:
         raise RuntimeError(
-            "Pexels 검색 실패: "
-            f"HTTP {response.status_code}"
+            f"Pexels 검색 실패: HTTP {response.status_code}"
         )
-
-    data = response.json()
-
-    videos = data.get(
-        "videos",
-        [],
-    )
 
     candidates = []
 
     for position, video in enumerate(
-        videos,
+        response.json().get("videos", []),
         start=1,
     ):
-
-        files = video.get(
-            "video_files",
-            [],
-        )
-
-        if not files:
-            continue
-
-        # 하나의 Pexels 결과 안에서는 화질 좋은 세로 파일을 고른다.
-        # 하지만 서로 다른 검색 결과끼리의 관련도 순서는 여기서 바꾸지 않는다.
         valid_files = []
 
-        for file_info in files:
+        for file_info in video.get("video_files", []):
+            width = int(file_info.get("width", 0) or 0)
+            height = int(file_info.get("height", 0) or 0)
+            link = str(file_info.get("link", "")).strip()
 
-            width = int(
-                file_info.get(
-                    "width",
-                    0,
-                ) or 0
-            )
-
-            height = int(
-                file_info.get(
-                    "height",
-                    0,
-                ) or 0
-            )
-
-            link = str(
-                file_info.get(
-                    "link",
-                    "",
-                )
-            ).strip()
-
-            if not link:
-                continue
-
-            if width <= 0 or height <= 0:
-                continue
-
-            valid_files.append({
-                "width": width,
-                "height": height,
-                "link": link,
-            })
+            if link and width > 0 and height > 0:
+                valid_files.append({
+                    "width": width,
+                    "height": height,
+                    "link": link,
+                })
 
         if not valid_files:
             continue
 
         portrait_files = [
-            item
-            for item in valid_files
+            item for item in valid_files
             if item["height"] >= item["width"]
         ]
-
-        pool = (
-            portrait_files
-            if portrait_files
-            else valid_files
-        )
-
+        pool = portrait_files or valid_files
         selected_file = max(
             pool,
             key=lambda item: (
@@ -424,14 +291,11 @@ def search_pexels_candidates(
         candidates.append({
             "id": video.get("id"),
             "url": selected_file["link"],
+            "page_url": str(video.get("url", "") or ""),
+            "thumbnail": str(video.get("image", "") or ""),
             "width": selected_file["width"],
             "height": selected_file["height"],
-            "duration": float(
-                video.get(
-                    "duration",
-                    0,
-                ) or 0
-            ),
+            "duration": float(video.get("duration", 0) or 0),
             "query": query,
             "search_position": position,
         })
@@ -439,185 +303,153 @@ def search_pexels_candidates(
     return candidates
 
 
-# ============================================================
-# 후보 선택
-# ============================================================
-
 def choose_best_candidate(
     candidates,
     relevant_top_n=None,
+    *,
+    historical=False,
 ):
-    """
-    Pexels 관련도 순위 상위 후보만 남긴 뒤 화질을 비교한다.
-
-    핵심:
-    검색 결과 전체를 해상도순으로 다시 섞지 않는다.
-    """
-
     if not candidates:
         return None
 
     if relevant_top_n is None:
-        relevant_top_n = (
-            PEXELS_RELEVANT_TOP_N
-        )
-
-    relevant_top_n = max(
-        1,
-        int(relevant_top_n),
-    )
+        relevant_top_n = PEXELS_RELEVANT_TOP_N
 
     ordered = sorted(
         candidates,
-        key=lambda item: int(
-            item.get(
-                "search_position",
-                9999,
-            )
-        ),
+        key=lambda item: int(item.get("search_position", 9999)),
     )
 
-    relevant_pool = ordered[
-        :relevant_top_n
+    # 같은 Shorts 안에서 같은 Pexels clip을 재사용하지 않는다.
+    ordered = [
+        item for item in ordered
+        if item.get("id") not in USED_VIDEO_IDS
     ]
+
+    if historical:
+        safe = [
+            item for item in ordered
+            if _historical_candidate_safe(item)
+        ]
+        if safe:
+            ordered = safe
+        else:
+            return None
+
+    relevant_pool = ordered[:max(1, int(relevant_top_n))]
+    if not relevant_pool:
+        return None
 
     long_enough = [
-        item
-        for item in relevant_pool
-        if float(
-            item.get(
-                "duration",
-                0,
-            ) or 0
-        ) >= PEXELS_MIN_DURATION
+        item for item in relevant_pool
+        if float(item.get("duration", 0) or 0) >= PEXELS_MIN_DURATION
     ]
+    pool = long_enough or relevant_pool
 
-    quality_pool = (
-        long_enough
-        if long_enough
-        else relevant_pool
-    )
+    if historical:
+        # 역사 장면은 관련도 순서를 화질보다 우선한다.
+        return min(
+            pool,
+            key=lambda item: int(item.get("search_position", 9999)),
+        )
 
     def quality_key(item):
-
-        width = int(
-            item.get(
-                "width",
-                0,
-            ) or 0
-        )
-
-        height = int(
-            item.get(
-                "height",
-                0,
-            ) or 0
-        )
-
-        duration = float(
-            item.get(
-                "duration",
-                0,
-            ) or 0
-        )
-
-        portrait_bonus = (
-            1
-            if height >= width
-            else 0
-        )
-
-        resolution = (
-            width * height
-        )
-
+        width = int(item.get("width", 0) or 0)
+        height = int(item.get("height", 0) or 0)
+        duration = float(item.get("duration", 0) or 0)
         return (
-            portrait_bonus,
-            resolution,
+            1 if height >= width else 0,
+            width * height,
             min(duration, 20.0),
         )
 
-    return max(
-        quality_pool,
-        key=quality_key,
+    return max(pool, key=quality_key)
+
+
+def _fallback_query_for_lock(lock):
+    return SAFE_FALLBACKS.get(
+        lock,
+        "historical manuscript ruins artifact",
     )
 
-
-# ============================================================
-# 기존 호환 함수
-# ============================================================
 
 def fetch_pexels_video(query):
     """
     video_engine.py와 호환되는 단일 URL 인터페이스.
 
-    historical context가 감지되면 같은 영상 안에서 그 시대/대상을
-    유지하고, Pexels 관련도 1순위 결과를 우선한다.
+    역사 장면은:
+    1) 시대 lock
+    2) 사람/현대 공사/재현행사 위험 검색어 제거
+    3) Pexels page slug의 명백한 현대 후보 차단
+    4) 같은 clip 재사용 차단
+    5) 필요 시 유적/문헌 안전 fallback
+    순서로 선택한다.
     """
-
-    original_query = str(
-        query
-    ).strip()
-
-    effective_query, context_lock = (
-        build_context_locked_query(
-            original_query
-        )
+    original_query = str(query).strip()
+    normalized_original = normalize_search_query(original_query)
+    effective_query, context_lock = build_context_locked_query(
+        original_query
     )
 
-    if effective_query != normalize_search_query(
-        original_query
-    ):
+    if effective_query != normalized_original:
         print(
             "🔒 Pexels context lock: "
             f"{original_query} -> {effective_query}"
         )
-
     elif context_lock:
-        print(
-            "🔒 Pexels context lock 유지: "
-            f"{context_lock}"
+        print(f"🔒 Pexels context lock 유지: {context_lock}")
+
+    historical = bool(context_lock)
+    queries = [effective_query]
+
+    if historical:
+        fallback = _fallback_query_for_lock(context_lock)
+        if fallback not in queries:
+            queries.append(fallback)
+
+    for search_query in queries:
+        candidates = search_pexels_candidates(
+            search_query,
+            per_page=PEXELS_SEARCH_PER_PAGE,
         )
 
-    candidates = search_pexels_candidates(
-        effective_query,
-        per_page=PEXELS_SEARCH_PER_PAGE,
-    )
+        best = choose_best_candidate(
+            candidates,
+            relevant_top_n=(
+                min(3, PEXELS_RELEVANT_TOP_N)
+                if historical
+                else PEXELS_RELEVANT_TOP_N
+            ),
+            historical=historical,
+        )
 
-    # 역사/시대 잠금 장면은 검색 결과를 화질 때문에 2~3위로 넘기지 않는다.
-    # Pexels 검색 관련도 1순위를 그대로 우선해 장면 이탈 가능성을 낮춘다.
-    relevant_top_n = (
-        1
-        if context_lock
-        else PEXELS_RELEVANT_TOP_N
-    )
+        if not best:
+            if historical:
+                print(
+                    "🛡️ 역사 영상 후보 차단/없음: "
+                    f"{search_query}"
+                )
+            continue
 
-    best = choose_best_candidate(
-        candidates,
-        relevant_top_n=relevant_top_n,
-    )
+        video_id = best.get("id")
+        if video_id is not None:
+            USED_VIDEO_IDS.add(video_id)
 
-    if not best:
-        return None
+        print(
+            "🎥 Pexels 검색 후보 "
+            f"{len(candidates)}개 / "
+            f"선택 rank {best.get('search_position')}"
+        )
+        print(
+            "✅ 선택 URL ID: "
+            f"{video_id} | "
+            f"history_safe={historical}"
+        )
 
-    print(
-        "🎥 Pexels 검색 후보 "
-        f"{len(candidates)}개 / "
-        f"관련도 상위 {relevant_top_n}개 안에서 선택"
-    )
+        return best["url"]
 
-    print(
-        "✅ 선택 URL ID: "
-        f"{best.get('id')} "
-        f"| search rank {best.get('search_position')}"
-    )
+    return None
 
-    return best["url"]
-
-
-# ============================================================
-# 영상 다운로드
-# ============================================================
 
 def download_video(
     video_url,
@@ -625,11 +457,8 @@ def download_video(
     requests_module=requests,
 ):
     """영상 URL을 로컬 MP4로 저장한다."""
-
     if not video_url:
-        raise ValueError(
-            "다운로드할 영상 URL이 없습니다."
-        )
+        raise ValueError("다운로드할 영상 URL이 없습니다.")
 
     response = requests_module.get(
         video_url,
@@ -639,36 +468,24 @@ def download_video(
 
     if not response.ok:
         raise RuntimeError(
-            "영상 다운로드 실패: "
-            f"HTTP {response.status_code}"
+            f"영상 다운로드 실패: HTTP {response.status_code}"
         )
 
-    with open(
-        output_path,
-        "wb",
-    ) as f:
-
+    with open(output_path, "wb") as f:
         for chunk in response.iter_content(
             chunk_size=1024 * 1024,
         ):
-
             if chunk:
                 f.write(chunk)
 
-    if not os.path.exists(
-        output_path
-    ):
+    if not os.path.exists(output_path):
         raise RuntimeError(
-            "영상 파일 생성 실패: "
-            f"{output_path}"
+            f"영상 파일 생성 실패: {output_path}"
         )
 
-    if os.path.getsize(
-        output_path
-    ) <= 0:
+    if os.path.getsize(output_path) <= 0:
         raise RuntimeError(
-            "다운로드된 영상이 비어 있습니다: "
-            f"{output_path}"
+            f"다운로드된 영상이 비어 있습니다: {output_path}"
         )
 
     return output_path
