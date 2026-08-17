@@ -47,6 +47,40 @@ jobs:
             exit 1
           fi
 
+      - name: Apply V3.2.1.2 quality policy hotfix
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("main.py")
+          source = path.read_text(encoding="utf-8")
+
+          replacements = [
+              (
+                  "MAX_TOPIC_REGENERATIONS = 1",
+                  "MAX_TOPIC_REGENERATIONS = 2",
+              ),
+              (
+                  "NOVELTY_HARD_REGENERATE_SCORE = 5.0",
+                  "NOVELTY_HARD_REGENERATE_SCORE = 4.0",
+              ),
+          ]
+
+          for old, new in replacements:
+              count = source.count(old)
+              if count != 1:
+                  raise RuntimeError(
+                      f"정책 패치 대상이 정확히 1개가 아닙니다: {old} (count={count})"
+                  )
+              source = source.replace(old, new, 1)
+
+          path.write_text(source, encoding="utf-8")
+          print("✅ Runtime policy hotfix applied")
+          PY
+
+          grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
+          python -m py_compile main.py
+
       - name: Run Shorts Generator V3.2
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
