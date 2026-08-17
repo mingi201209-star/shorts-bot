@@ -17,6 +17,10 @@ from content.candidate_explorer import (
     explore_candidates,
 )
 
+from content.candidate_gate import (
+    evaluate_candidate,
+)
+
 from content.script_generator import (
     generate_script,
 )
@@ -84,6 +88,8 @@ from quality.budget_guard import (
 #   ↓
 # Winner + Independent Runner-up
 #   ↓
+# Candidate Gate
+#   ↓
 # Script
 #   ↓
 # Visual
@@ -93,10 +99,16 @@ from quality.budget_guard import (
 # Consensus
 #
 #
+# Candidate:
+#
+# 너무 넓음 / 뻔함
+# → Script 생성 전 재탐색
+#
+#
 # Novelty:
 #
 # 매우 낮음 (< 5)
-# → Rewrite 금지
+# → 다른 Review보다 우선
 # → Explorer 재탐색
 #
 #
@@ -107,8 +119,10 @@ from quality.budget_guard import (
 # → Fact Appeal
 # → FACT_CRITICAL
 # → Runner-up
+# → Candidate Gate
 # → 새 Script
-# → 4 Judge 재심
+# → 새 Visual
+# → 4 Judge 전체 재심
 #
 # ============================================================
 
@@ -132,7 +146,7 @@ ALL_JUDGE_TYPES = JUDGE_TYPES
 MAX_REWRITES = 1
 MAX_REVIEW_ROUNDS = 1
 
-# 최초 + 재탐색 1회
+# 최초 시도 + Explorer 재탐색 1회
 MAX_TOPIC_REGENERATIONS = 1
 
 
@@ -181,6 +195,7 @@ def validate_environment():
         )
 
     except Exception:
+
         pass
 
     raise RuntimeError(
@@ -255,6 +270,7 @@ def rerun_changed_domains(
     for domain in domains:
 
         if domain not in ALL_JUDGE_TYPES:
+
             continue
 
         print("")
@@ -323,6 +339,7 @@ def has_persistent_novelty_failure(
     )
 
     if not novelty:
+
         return False
 
     print("")
@@ -346,9 +363,12 @@ def has_persistent_novelty_failure(
 
 # ============================================================
 # Novelty Hard Failure
+# ============================================================
 #
 # 매우 낮은 Novelty는
-# 표현 문제가 아니라 Candidate 선택 문제로 본다.
+# Script 표현 문제가 아니라
+# Candidate 자체의 선택 문제로 본다.
+#
 # ============================================================
 
 def has_hard_novelty_failure(
@@ -361,6 +381,7 @@ def has_hard_novelty_failure(
     )
 
     if not novelty:
+
         return False
 
     try:
@@ -392,7 +413,7 @@ def has_hard_novelty_failure(
         )
 
         print(
-            "   Rewrite를 사용하지 않고 "
+            "   다른 Review/Rewrite보다 먼저 "
             "Candidate Explorer로 반환합니다."
         )
 
@@ -440,6 +461,51 @@ def run_quality_process(
         )
 
         # ====================================================
+        # Novelty Hard Failure
+        #
+        # 중요:
+        #
+        # PASS / REWRITE / REVIEW보다 먼저 검사한다.
+        #
+        # Fact Critical 때문에 Consensus가 REVIEW가 되어도
+        # Novelty가 5 미만이라면
+        # Candidate 자체가 약하므로
+        # Extra Fact Judge 비용을 쓰지 않는다.
+        # ====================================================
+
+        if (
+            has_hard_novelty_failure(
+                consensus
+            )
+        ):
+
+            return {
+                "status":
+                    "REGENERATE_TOPIC",
+
+                "script_data":
+                    current_script,
+
+                "consensus":
+                    consensus,
+
+                "pool_results":
+                    pool_results,
+
+                "rewrite_count":
+                    rewrite_count,
+
+                "review_count":
+                    review_count,
+
+                "reason": (
+                    "Novelty가 매우 낮아 "
+                    "다른 Review/Rewrite보다 먼저 "
+                    "Candidate Explorer로 반환합니다."
+                ),
+            }
+
+        # ====================================================
         # PASS
         # ====================================================
 
@@ -470,49 +536,6 @@ def run_quality_process(
         # ====================================================
 
         if decision == "REWRITE":
-
-            # ================================================
-            # Novelty Hard Failure
-            #
-            # 예:
-            # 4.0 → Rewrite로 살리지 않는다.
-            #
-            # Candidate 자체를 다시 고른다.
-            # ================================================
-
-            if (
-                has_hard_novelty_failure(
-                    consensus
-                )
-            ):
-
-                return {
-                    "status":
-                        "REGENERATE_TOPIC",
-
-                    "script_data":
-                        current_script,
-
-                    "consensus":
-                        consensus,
-
-                    "pool_results":
-                        pool_results,
-
-                    "rewrite_count":
-                        rewrite_count,
-
-                    "review_count":
-                        review_count,
-
-                    "reason": (
-                        "Novelty가 매우 낮아 "
-                        "Script Rewrite로 해결할 문제가 "
-                        "아니라고 판단했습니다. "
-                        "Candidate Explorer가 "
-                        "새 Story Angle을 탐색합니다."
-                    ),
-                }
 
             # ------------------------------------------------
             # Rewrite Limit
@@ -878,6 +901,10 @@ def run_quality_process(
 
                 continue
 
+            # ------------------------------------------------
+            # Unknown Review Route
+            # ------------------------------------------------
+
             return {
                 "status":
                     "HOLD",
@@ -902,6 +929,10 @@ def run_quality_process(
                     f"{route_type}"
                 ),
             }
+
+        # ====================================================
+        # Unknown Consensus
+        # ====================================================
 
         return {
             "status":
@@ -1036,6 +1067,65 @@ def try_runner_up_fallback(
         )
 
     print_budget_status()
+
+    # ========================================================
+    # Runner-up Candidate Gate
+    # ========================================================
+    #
+    # Explorer가 Runner-up으로 저장해뒀다고 해서
+    # 자동 제작하지 않는다.
+    #
+    # 실제 fallback 후보로 승격되는 순간
+    # Winner와 동일한 독립 Sanity Gate를 적용한다.
+    # ========================================================
+
+    runner_gate = (
+        evaluate_candidate(
+            runner_up,
+            role="Runner-up fallback",
+        )
+    )
+
+    if (
+        runner_gate.get(
+            "status"
+        )
+        == "REGENERATE"
+    ):
+
+        print("")
+
+        print(
+            "🚫 Runner-up Candidate Gate 실패:",
+            runner_gate.get(
+                "reason",
+                "",
+            ),
+        )
+
+        return {
+            "status":
+                "REGENERATE_TOPIC",
+
+            "fallback_used":
+                True,
+
+            "fallback_from_topic":
+                failed_topic,
+
+            "fallback_to_topic":
+                runner_topic,
+
+            "script_data": {
+                "topic":
+                    runner_topic,
+            },
+
+            "reason": (
+                "Runner-up Candidate Gate 실패: "
+                f"{runner_gate.get('reason', '')}"
+            ),
+        }
 
     # ========================================================
     # New Runner-up Script
@@ -1181,7 +1271,9 @@ def try_runner_up_fallback(
 # Scene Production
 # ============================================================
 
-def generate_scenes(scenes):
+def generate_scenes(
+    scenes,
+):
 
     if not scenes:
 
@@ -1233,9 +1325,11 @@ def generate_scenes(scenes):
         for clip in scene_clips:
 
             try:
+
                 clip.close()
 
             except Exception:
+
                 pass
 
         raise
@@ -1296,13 +1390,25 @@ def main():
 
             print("=" * 64)
 
+            # =================================================
+            # Direction
+            # =================================================
+
             topic_info = (
                 choose_topic_direction()
             )
 
+            # =================================================
+            # Recent Topics
+            # =================================================
+
             recent_topics = (
                 get_recent_topic_names()
             )
+
+            # =================================================
+            # Candidate Explorer
+            # =================================================
 
             explorer_result = (
                 explore_candidates(
@@ -1461,6 +1567,85 @@ def main():
                 )
 
             # =================================================
+            # Winner Candidate Gate
+            # =================================================
+            #
+            # Explorer가 고른 Candidate를
+            # Script 생성 전에 독립 Reviewer가 검사한다.
+            #
+            # 실패하면 Runner-up 자동 승격 금지.
+            #
+            # Candidate Explorer 자체를 다시 실행한다.
+            # =================================================
+
+            winner_gate = (
+                evaluate_candidate(
+                    winner,
+                    role="Winner",
+                )
+            )
+
+            if (
+                winner_gate.get(
+                    "status"
+                )
+                == "REGENERATE"
+            ):
+
+                if (
+                    current_topic
+                    not in rejected_topics
+                ):
+
+                    rejected_topics.append(
+                        current_topic
+                    )
+
+                print("")
+                print("=" * 64)
+
+                print(
+                    "🚫 WINNER CANDIDATE GATE REJECT"
+                )
+
+                print("=" * 64)
+
+                print(
+                    "폐기 소재:",
+                    current_topic,
+                )
+
+                print(
+                    "이유:",
+                    winner_gate.get(
+                        "reason",
+                        "",
+                    ),
+                )
+
+                print_budget_status()
+
+                if (
+                    topic_attempt
+                    < total_topic_attempts
+                ):
+
+                    print("")
+
+                    print(
+                        "➡️ Candidate Explorer 재탐색"
+                    )
+
+                    continue
+
+                raise RuntimeError(
+                    "Candidate Gate를 통과하는 "
+                    "Winner를 확보하지 못했습니다. "
+                    "마지막 이유: "
+                    f"{winner_gate.get('reason', '')}"
+                )
+
+            # =================================================
             # Winner Script
             # =================================================
 
@@ -1554,7 +1739,7 @@ def main():
             )
 
             # =================================================
-            # Fact → Runner-up
+            # FACT_CRITICAL → Runner-up
             # =================================================
 
             if (
@@ -1763,6 +1948,10 @@ def main():
                     ),
                 )
 
+            # =================================================
+            # Generic HOLD
+            # =================================================
+
             raise RuntimeError(
                 "V3.2.1.2 Quality Gate HOLD: "
                 f"{quality_result.get('reason', '')}"
@@ -1822,6 +2011,10 @@ def main():
             )
         )
 
+        # ====================================================
+        # Duration
+        # ====================================================
+
         print("")
 
         print(
@@ -1840,11 +2033,19 @@ def main():
                 "⚠️ 목표 영상 길이 범위 이탈"
             )
 
+        # ====================================================
+        # Render
+        # ====================================================
+
         final_path = (
             render_final_video(
                 scene_clips
             )
         )
+
+        # ====================================================
+        # Telegram
+        # ====================================================
 
         send_result_summary(
             script_data,
@@ -1854,6 +2055,10 @@ def main():
         send_telegram_video(
             final_path
         )
+
+        # ====================================================
+        # Final Budget
+        # ====================================================
 
         print_budget_status()
 
@@ -1902,6 +2107,7 @@ def main():
             )
 
         except Exception:
+
             pass
 
         raise
@@ -1911,9 +2117,11 @@ def main():
         for clip in scene_clips:
 
             try:
+
                 clip.close()
 
             except Exception:
+
                 pass
 
 
