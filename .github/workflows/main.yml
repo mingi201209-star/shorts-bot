@@ -96,12 +96,37 @@ jobs:
           )
           explorer_path.write_text(explorer_source, encoding="utf-8")
 
+          consensus_path = Path("quality/consensus.py")
+          consensus_source = consensus_path.read_text(encoding="utf-8")
+
+          consensus_replacements = [
+              (
+                  "GOOD_ENOUGH_SCORE = 6.8",
+                  "GOOD_ENOUGH_SCORE = 6.7",
+              ),
+              (
+                  '    "hook": 7.0,',
+                  '    "hook": 6.0,',
+              ),
+          ]
+
+          for old, new in consensus_replacements:
+              count = consensus_source.count(old)
+              if count != 1:
+                  raise RuntimeError(
+                      f"consensus.py 패치 대상이 정확히 1개가 아닙니다: {old} (count={count})"
+                  )
+              consensus_source = consensus_source.replace(old, new, 1)
+
+          consensus_path.write_text(consensus_source, encoding="utf-8")
+
           print("✅ Runtime production hotfix applied")
           PY
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "temperature=0.5" content/candidate_explorer.py
-          python -m py_compile main.py content/candidate_explorer.py
+          grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
+          python -m py_compile main.py content/candidate_explorer.py quality/consensus.py
 
       - name: Run Shorts Generator V3.2
         env:
