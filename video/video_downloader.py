@@ -518,10 +518,15 @@ def _general_fallback_queries(query):
             shorter_query = " ".join(reduced_words[:2])
             if shorter_query not in variants and shorter_query != normalized:
                 variants.append(shorter_query)
-    elif len(words) > 2:
-        first_two = " ".join(words[:2])
-        if first_two != normalized:
-            variants.append(first_two)
+    elif len(words) > 2 and not _is_nature_object_query(normalized):
+        first_two_words = words[:2]
+        if any(
+            word not in GENERAL_FALLBACK_DROP_TERMS
+            for word in first_two_words
+        ):
+            first_two = " ".join(first_two_words)
+            if first_two != normalized:
+                variants.append(first_two)
 
     # 자연/생물/식물/사물 검색은 마지막 안전망으로 핵심 주제 1개만 남긴다.
     # 사람 중심 후보 필터는 이 fallback 검색에도 그대로 적용된다.
