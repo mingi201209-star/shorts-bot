@@ -124,49 +124,6 @@ jobs:
               )
           consensus_path.write_text(consensus_source, encoding="utf-8")
 
-          main_path = Path("main.py")
-          main_source = main_path.read_text(encoding="utf-8")
-          fact_fallback_marker = """                if (
-                    fallback_result
-                    is not None
-                ):
-
-                    quality_result = (
-                        fallback_result
-                    )
-"""
-          if "FACT_CRITICAL_NO_RUNNER_UP_RETRY" not in main_source:
-              if main_source.count(fact_fallback_marker) != 1:
-                  raise RuntimeError(
-                      "main.py Fact fallback 재탐색 삽입 위치를 찾지 못했습니다."
-                  )
-
-              fact_fallback_replacement = fact_fallback_marker + """                else:
-
-                    # FACT_CRITICAL_NO_RUNNER_UP_RETRY
-                    # 위험한 Winner는 이미 rejected_topics에 들어갔으므로
-                    # Runner-up이 없으면 현재 run을 HOLD로 끝내지 않고
-                    # Candidate Explorer가 새 소재를 탐색하게 한다.
-                    quality_result = {
-                        "status": "REGENERATE_TOPIC",
-                        "failure_type": "FACT_CRITICAL",
-                        "script_data": quality_result.get(
-                            "script_data",
-                            {"topic": current_topic},
-                        ),
-                        "reason": (
-                            "Fact Critical 확인 + Runner-up 없음. "
-                            "현재 소재를 폐기하고 Candidate Explorer가 새 후보를 탐색합니다."
-                        ),
-                    }
-"""
-              main_source = main_source.replace(
-                  fact_fallback_marker,
-                  fact_fallback_replacement,
-                  1,
-              )
-              main_path.write_text(main_source, encoding="utf-8")
-
           script_path = Path("content/script_generator.py")
           script_source = script_path.read_text(encoding="utf-8")
 
@@ -220,8 +177,6 @@ jobs:
                   1,
               )
 
-          # main 단계의 visual_selector와 같은 수준으로 추상 검색어를
-          # Script Generator 안에서 먼저 걸러 재시도하게 한다.
           if "meaningful_keyword_words" not in script_source:
               abstract_marker = "        if normalized in BAD_VISUAL_KEYWORDS:\n"
               if script_source.count(abstract_marker) != 1:
@@ -254,8 +209,6 @@ jobs:
                   1,
               )
 
-          # 재시도할 때 같은 오류를 반복하지 않도록 직전 실패 이유를
-          # 다음 Script prompt에 직접 전달한다.
           if "[RETRY FEEDBACK]" not in script_source:
               content_lock_marker = "[CONTENT LOCK]\n"
               if script_source.count(content_lock_marker) != 1:
@@ -305,7 +258,6 @@ jobs:
           PY
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
-          grep -n "FACT_CRITICAL_NO_RUNNER_UP_RETRY" main.py
           grep -n "MAX_SCRIPT_ATTEMPTS" config.py
           grep -n "temperature=0.5" content/candidate_explorer.py
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
