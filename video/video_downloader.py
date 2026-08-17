@@ -91,6 +91,19 @@ HUMAN_CENTRIC_SLUG_TERMS = {
     "costume", "cosplay",
 }
 
+# 일반 인프라 검색에서 핵심 피사체가 fallback/후보 선택 중 사라지는 것을 막는다.
+# canonical 단어는 fallback 검색어에 남기고, aliases는 Pexels page slug 매칭에 쓴다.
+SUBJECT_ANCHOR_GROUPS = {
+    "road": {
+        "road", "roads", "street", "streets", "highway", "highways",
+        "motorway", "motorways", "asphalt",
+    },
+    "slope": {
+        "slope", "slopes", "sloped", "incline", "inclines", "inclined",
+        "gradient", "gradients", "hill", "hills", "hilly",
+    },
+}
+
 # Pexels가 긴 검색어에서 0건을 반환할 때 의미를 최대한 유지하면서
 # 검색어를 단계적으로 단순화하기 위해 제거할 수 있는 수식/행동 단어.
 GENERAL_FALLBACK_DROP_TERMS = {
@@ -138,6 +151,17 @@ def normalize_search_query(query):
 
 def contains_any_term(query, terms):
     return bool(set(normalize_search_query(query).split()) & set(terms))
+
+
+def _subject_anchor_terms(query):
+    words = set(normalize_search_query(query).split())
+    anchors = []
+
+    for canonical, aliases in SUBJECT_ANCHOR_GROUPS.items():
+        if words & aliases:
+            anchors.append(canonical)
+
+    return anchors
 
 
 def detect_context_lock(query):
@@ -277,6 +301,23 @@ def _historical_candidate_safe(candidate):
 
     words = set(slug.split())
     return not bool(words & MODERN_SLUG_TERMS)
+
+
+def _candidate_matches_subject_anchor(candidate, query):
+    anchors = _subject_anchor_terms(query)
+    if not anchors:
+        return False
+
+    slug = _page_slug(candidate.get("page_url"))
+    if not slug:
+        return False
+
+    slug_words = set(slug.split())
+    for anchor in anchors:
+        if slug_words & SUBJECT_ANCHOR_GROUPS.get(anchor, set()):
+            return True
+
+    return False
 
 
 def _is_nature_object_query(query):
@@ -456,6 +497,34 @@ def choose_best_candidate(
                 "사람 중심 후보만 있어 원래 관련도 목록을 사용합니다."
             )
 
+    # road/slope 같은 핵심 주제가 검색어에 있다면 해당 subject가
+    # Pexels page slug에도 남아 있는 후보를 우선한다. 강제 차단은 하지 않아
+    # 적합 후보가 전혀 없을 때 영상 생성 자체가 멈추는 것을 피한다.
+    if not historical and subject_filter_query:
+        subject_anchors = _subject_anchor_terms(subject_filter_query)
+        if subject_anchors:
+            anchor_matches = [
+                item for item in ordered
+                if _candidate_matches_subject_anchor(
+                    item,
+                    subject_filter_query,
+                )
+            ]
+
+            if anchor_matches:
+                print(
+                    "🧭 Subject anchor filter: "
+                    f"{','.join(subject_anchors)} -> "
+                    f"matched {len(anchor_matches)}/{len(ordered)}"
+                )
+                ordered = anchor_matches
+            elif ordered:
+                print(
+                    "⚠️ Subject anchor soft fallback: "
+                    f"{','.join(subject_anchors)} metadata match 없음 -> "
+                    "원래 관련도 후보를 사용합니다."
+                )
+
     relevant_pool = ordered[:max(1, int(relevant_top_n))]
     if not relevant_pool:
         return None
@@ -497,6 +566,9 @@ def _general_fallback_queries(query):
     """
     긴 Pexels 검색어가 0건일 때 의미를 최대한 보존하며 2~3단계로 단순화한다.
     예: ant colony teamwork -> ant colony -> ants
+
+    road/slope처럼 정의된 subject anchor가 있으면 fallback 검색어의 앞쪽에
+    canonical anchor를 유지해 traffic/flow 같은 주변 단어만 남는 것을 막는다.
     """
     normalized = normalize_search_query(query)
     words = normalized.split()
@@ -504,11 +576,15 @@ def _general_fallback_queries(query):
         return []
 
     variants = []
+    subject_anchors = _subject_anchor_terms(normalized)
 
     reduced_words = [
         word for word in words
         if word not in GENERAL_FALLBACK_DROP_TERMS
     ]
+    if subject_anchors:
+        reduced_words = _dedupe_words(subject_anchors + reduced_words)
+
     if len(reduced_words) >= 2:
         reduced_query = " ".join(reduced_words[:4])
         if reduced_query != normalized:
@@ -519,7 +595,7 @@ def _general_fallback_queries(query):
             if shorter_query not in variants and shorter_query != normalized:
                 variants.append(shorter_query)
     elif len(words) > 2 and not _is_nature_object_query(normalized):
-        first_two_words = words[:2]
+        first_two_words = _dedupe_words(subject_anchors + words[:2])[:2]
         if any(
             word not in GENERAL_FALLBACK_DROP_TERMS
             for word in first_two_words
@@ -527,6 +603,12 @@ def _general_fallback_queries(query):
             first_two = " ".join(first_two_words)
             if first_two != normalized:
                 variants.append(first_two)
+
+    # 일반 subject anchor는 마지막 안전망으로 anchor 자체를 남긴다.
+    if subject_anchors:
+        anchor_query = " ".join(subject_anchors[:2])
+        if anchor_query not in variants and anchor_query != normalized:
+            variants.append(anchor_query)
 
     # 자연/생물/식물/사물 검색은 마지막 안전망으로 핵심 주제 1개만 남긴다.
     # 사람 중심 후보 필터는 이 fallback 검색에도 그대로 적용된다.
@@ -556,6 +638,10 @@ def fetch_pexels_video(query):
     - 사람이 검색 의도에 없을 때 사람 중심 후보를 우선 제외한다.
     - 필터 뒤에도 Pexels의 원래 관련도 순서는 보존한다.
     - 긴 검색어가 0건이면 의미를 보존한 짧은 검색어로 단계적으로 재검색한다.
+
+    일반 인프라 장면은:
+    - road/slope 같은 subject anchor가 검색/fallback 과정에서 사라지지 않게 한다.
+    - Pexels page slug에 anchor가 확인되는 후보를 soft-priority 한다.
     """
     original_query = str(query).strip()
     normalized_original = normalize_search_query(original_query)
