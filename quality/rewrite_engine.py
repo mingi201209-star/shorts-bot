@@ -25,13 +25,6 @@ SUPPORTED_DOMAINS = {
     "visual",
 }
 
-
-# ============================================================
-# Candidate Explorer가 확정한 계약
-#
-# Rewrite Engine은 이 값들을 변경할 권한이 없다.
-# ============================================================
-
 IMMUTABLE_CANDIDATE_FIELDS = (
     "topic",
     "category",
@@ -43,105 +36,55 @@ IMMUTABLE_CANDIDATE_FIELDS = (
     "candidate_selection_reason",
 )
 
+FACT_REWRITE_MAX_ATTEMPTS = 2
+
+FACT_TOKEN_STOPWORDS = {
+    "근거", "부족", "표현", "주장", "가능성", "오해",
+    "구체적인", "역사적", "관련", "일부", "대한", "대해",
+    "사람들", "방법", "실제로", "과장", "단순화",
+    "있음", "없음", "수", "있다", "없다",
+}
+
+KOREAN_SUFFIXES = (
+    "이라고", "라는", "다는", "다고", "라고",
+    "에서", "으로", "에게", "한테",
+    "은", "는", "이", "가", "을", "를",
+    "의", "에", "로", "와", "과", "도", "만",
+    "고", "며",
+)
+
 
 def extract_json(text):
-
     if not text:
+        raise ValueError("Rewrite 응답이 비어 있습니다.")
 
-        raise ValueError(
-            "Rewrite 응답이 비어 있습니다."
-        )
-
-    text = str(
-        text
-    ).strip()
-
-    text = re.sub(
-        r"```json",
-        "",
-        text,
-        flags=re.IGNORECASE,
-    )
-
-    text = re.sub(
-        r"```",
-        "",
-        text,
-    ).strip()
+    text = str(text).strip()
+    text = re.sub(r"```json", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"```", "", text).strip()
 
     try:
-
-        return json.loads(
-            text
-        )
-
+        return json.loads(text)
     except Exception:
         pass
 
     start = text.find("{")
     end = text.rfind("}")
 
-    if (
-        start != -1
-        and end != -1
-        and end > start
-    ):
+    if start != -1 and end != -1 and end > start:
+        return json.loads(text[start:end + 1])
 
-        return json.loads(
-            text[start:end + 1]
-        )
-
-    raise ValueError(
-        "Rewrite 응답에서 JSON을 찾지 못했습니다."
-    )
+    raise ValueError("Rewrite 응답에서 JSON을 찾지 못했습니다.")
 
 
-# ============================================================
-# Rewrite Domain 결정
-# ============================================================
-
-def find_rewrite_domains(
-    consensus,
-):
-
+def find_rewrite_domains(consensus):
     domains = []
+    summaries = consensus.get("domain_summaries", {})
 
-    summaries = consensus.get(
-        "domain_summaries",
-        {},
-    )
-
-    for judge_type, summary in (
-        summaries.items()
-    ):
-
-        score = float(
-            summary.get(
-                "score",
-                0.0,
-            )
-        )
-
-        confidence = float(
-            summary.get(
-                "confidence",
-                0.0,
-            )
-        )
-
-        critical = bool(
-            summary.get(
-                "critical_risk",
-                False,
-            )
-        )
-
-        disagreement = float(
-            summary.get(
-                "disagreement",
-                0.0,
-            )
-        )
+    for judge_type, summary in summaries.items():
+        score = float(summary.get("score", 0.0))
+        confidence = float(summary.get("confidence", 0.0))
+        critical = bool(summary.get("critical_risk", False))
+        disagreement = float(summary.get("disagreement", 0.0))
 
         if (
             critical
@@ -149,92 +92,160 @@ def find_rewrite_domains(
             or confidence < 0.65
             or disagreement >= 2.0
         ):
+            if judge_type in SUPPORTED_DOMAINS:
+                domains.append(judge_type)
 
-            if (
-                judge_type
-                in SUPPORTED_DOMAINS
-            ):
-
-                domains.append(
-                    judge_type
-                )
-
-    return list(
-        dict.fromkeys(
-            domains
-        )
-    )
+    return list(dict.fromkeys(domains))
 
 
-def collect_domain_issues(
-    consensus,
-    domains,
-):
-
+def collect_domain_issues(consensus, domains):
     result = {}
-
-    summaries = consensus.get(
-        "domain_summaries",
-        {},
-    )
+    summaries = consensus.get("domain_summaries", {})
 
     for domain in domains:
-
-        summary = summaries.get(
-            domain,
-            {},
-        )
-
+        summary = summaries.get(domain, {})
         result[domain] = {
-            "score":
-                summary.get(
-                    "score",
-                    0,
-                ),
-
-            "confidence":
-                summary.get(
-                    "confidence",
-                    0,
-                ),
-
-            "critical_risk":
-                summary.get(
-                    "critical_risk",
-                    False,
-                ),
-
-            "issues":
-                summary.get(
-                    "issues",
-                    [],
-                ),
+            "score": summary.get("score", 0),
+            "confidence": summary.get("confidence", 0),
+            "critical_risk": summary.get("critical_risk", False),
+            "issues": summary.get("issues", []),
         }
 
     return result
 
 
-# ============================================================
-# Rewrite Prompt
-# ============================================================
+def _normalize_fact_token(token):
+    token = str(token or "").strip().lower()
+    token = re.sub(r"[^0-9a-z가-힣]", "", token)
+
+    if len(token) <= 1:
+        return ""
+
+    # 조사/인용형/연결형을 가볍게 제거해
+    # "효과가" vs "효과는", "없었다는" vs "없었다고"를 잡는다.
+    changed = True
+    while changed:
+        changed = False
+        for suffix in KOREAN_SUFFIXES:
+            if token.endswith(suffix) and len(token) - len(suffix) >= 2:
+                token = token[:-len(suffix)]
+                changed = True
+                break
+
+    return token
+
+
+def _fact_tokens(text):
+    raw = re.findall(r"[0-9A-Za-z가-힣]+", str(text or ""))
+    result = set()
+
+    for token in raw:
+        normalized = _normalize_fact_token(token)
+        if not normalized:
+            continue
+        if normalized in FACT_TOKEN_STOPWORDS:
+            continue
+        result.add(normalized)
+
+    return result
+
+
+def _fact_issue_list(consensus):
+    fact = (
+        consensus
+        .get("domain_summaries", {})
+        .get("fact", {})
+    )
+
+    issues = fact.get("issues", [])
+    if not isinstance(issues, list):
+        return []
+
+    return [
+        str(item).strip()
+        for item in issues
+        if str(item).strip()
+    ]
+
+
+def _scene_texts(script_data):
+    scenes = script_data.get("scenes", [])
+    if not isinstance(scenes, list):
+        return []
+
+    return [
+        str(scene.get("text", "")).strip()
+        for scene in scenes
+        if isinstance(scene, dict)
+        and str(scene.get("text", "")).strip()
+    ]
+
+
+def find_persistent_fact_issues(consensus, rewritten_script):
+    """
+    Fact Judge가 구체적으로 지적한 주장/표현이 Rewrite 뒤에도
+    거의 같은 핵심어로 남아 있는지 Python 수준에서 확인한다.
+
+    완전한 사실 검증기가 아니라,
+    'Judge가 고치라고 한 문장을 그대로 남기는' 실패를 막는 guard다.
+    """
+    issues = _fact_issue_list(consensus)
+    if not issues:
+        return []
+
+    scene_tokens = [
+        _fact_tokens(text)
+        for text in _scene_texts(rewritten_script)
+    ]
+
+    persistent = []
+
+    for issue in issues:
+        issue_tokens = _fact_tokens(issue)
+
+        # 너무 추상적인 issue는 이 guard에서 강제로 판정하지 않는다.
+        if len(issue_tokens) < 2:
+            continue
+
+        matched = False
+
+        for tokens in scene_tokens:
+            overlap = issue_tokens & tokens
+
+            # 핵심어 2개 이상이 그대로 남으면 unresolved로 본다.
+            if len(overlap) >= 2:
+                matched = True
+                break
+
+            # 긴 고유 핵심어 하나가 그대로 남은 경우도 잡는다.
+            if any(
+                len(token) >= 5 and token in tokens
+                for token in issue_tokens
+            ):
+                matched = True
+                break
+
+        if matched:
+            persistent.append(issue)
+
+    return persistent
+
 
 def build_rewrite_prompt(
     script_data,
     consensus,
     domains,
+    *,
+    retry_fact_issues=None,
 ):
-
-    issues = (
-        collect_domain_issues(
-            consensus,
-            domains,
-        )
+    issues = collect_domain_issues(
+        consensus,
+        domains,
     )
 
     domain_rules = []
 
     if "hook" in domains:
-
         domain_rules.append("""
 [HOOK 수정]
 
@@ -245,92 +256,82 @@ def build_rewrite_prompt(
 """)
 
     if "novelty" in domains:
-
         domain_rules.append("""
 [NOVELTY 수정]
 
 중요:
-
-새 소재를 탐색하지 마라.
-새 Story Angle을 만들지 마라.
-
-Candidate Explorer가 결정한
-
-- topic
-- angle
-- core_question
-- micro_narrative
-
-는 변경할 수 없다.
-
+- 새 소재를 탐색하지 마라.
+- 새 Story Angle을 만들지 마라.
+- topic / angle / core_question / micro_narrative는 변경할 수 없다.
 
 허용:
-
-- 같은 Story Angle 안에서
-  예상 밖 요소를 더 일찍 공개
+- 같은 Story Angle 안에서 예상 밖 요소를 더 일찍 공개
 - Reveal 순서 개선
 - 평범한 설명 문장 축소
 - 구체적 표현 강화
-- title 개선
-- scene text 개선
+- title / scene text 개선
 
-
-현재 Candidate 자체가 너무 평범하여
-Story Angle을 바꾸지 않고는 해결할 수 없다면
-
-Rewrite가 새로운 topic을 만들어
-억지로 살리려고 하지 마라.
+Candidate 자체가 평범하다면 새 topic을 만들어 억지로 살리지 마라.
 """)
 
     if "fact" in domains:
-
         domain_rules.append("""
 [FACT 수정]
 
-- 근거 불명확한 숫자를 제거한다.
-- 과도한 단정을 완화한다.
-- 인과관계를 과장하지 않는다.
-- 불확실한 사실은 확정적으로 쓰지 않는다.
+- Judge issues를 항목별로 실제 scene text에서 해결한다.
+- '근거 부족', '일반화', '확정적 표현'이 지적된 문장은 그대로 두지 않는다.
+- 근거가 불명확한 구체적 사례/숫자/행동은 문장 전체를 삭제하거나,
+  Candidate가 이미 보장하는 더 일반적이고 검증 가능한 표현으로 교체한다.
+- 단순히 '~라고 알려져 있습니다'를 붙여서 위험한 주장을 보존하지 않는다.
+- 과도한 단정을 완화하고 인과관계를 과장하지 않는다.
+- 사실을 새로 만들어내지 않는다.
 - Candidate 소재와 Core Question은 유지한다.
 """)
 
     if "visual" in domains:
-
         domain_rules.append("""
 [VISUAL 수정]
 
 - 대사는 가급적 유지한다.
 - visual_goal / visual_type / keyword를 우선 수정한다.
-- keyword는 실제로 화면에서 보여줄 수 있는
-  2~5단어 영어 검색어를 사용한다.
+- keyword는 실제 화면에서 보여줄 수 있는 2~5단어 영어 검색어를 사용한다.
 - 단순 단어 매칭을 피한다.
 """)
+
+    retry_block = ""
+
+    if retry_fact_issues:
+        retry_block = f"""
+============================================================
+FACT REWRITE RETRY
+============================================================
+
+직전 Rewrite에도 아래 Fact Judge 지적의 핵심 표현이 남아 있었다.
+
+{json.dumps(
+    retry_fact_issues,
+    ensure_ascii=False,
+    indent=2,
+)}
+
+이번에는 해당 주장을 그대로 보존하지 마라.
+근거 부족 사례라면 삭제하고,
+일반화/단정 문제라면 의미가 실제로 바뀌도록 재작성한다.
+표면적인 어미 변경만 하지 마라.
+"""
 
     return f"""
 너는 Shorts V3의 선택적 Rewrite Engine이다.
 
 전체 콘텐츠를 새로 기획하지 마라.
-
-Candidate Explorer가 결정한
-
-"무엇을 이야기할 것인가"
-
-는 이미 확정되었다.
-
-
-너의 역할은
-
-"그 후보를 어떻게 더 잘 표현할 것인가"
-
-이다.
-
+Candidate Explorer가 결정한 '무엇을 이야기할 것인가'는 이미 확정되었다.
+너의 역할은 '그 후보를 어떻게 더 잘 표현할 것인가'이다.
 
 ============================================================
 IMMUTABLE CANDIDATE CONTRACT
 ============================================================
 
 다음 값은 절대 수정하지 마라.
-
 - topic
 - category
 - angle
@@ -340,20 +341,13 @@ IMMUTABLE CANDIDATE CONTRACT
 - visual_proof
 - candidate_selection_reason
 
-
-특히 Novelty 문제를 해결하려고
-새 topic이나 새 angle을 만들면 안 된다.
-
+특히 Novelty 문제를 해결하려고 새 topic이나 새 angle을 만들면 안 된다.
 
 ============================================================
 수정 대상
 ============================================================
 
-{json.dumps(
-    domains,
-    ensure_ascii=False
-)}
-
+{json.dumps(domains, ensure_ascii=False)}
 
 ============================================================
 Judge 문제
@@ -362,9 +356,8 @@ Judge 문제
 {json.dumps(
     issues,
     ensure_ascii=False,
-    indent=2
+    indent=2,
 )}
-
 
 ============================================================
 현재 Script
@@ -373,9 +366,8 @@ Judge 문제
 {json.dumps(
     script_data,
     ensure_ascii=False,
-    indent=2
+    indent=2,
 )}
-
 
 ============================================================
 Domain Rules
@@ -383,6 +375,7 @@ Domain Rules
 
 {chr(10).join(domain_rules)}
 
+{retry_block}
 
 ============================================================
 ABSOLUTE RULES
@@ -394,100 +387,43 @@ ABSOLUTE RULES
 - keyword는 영어.
 - 기존 JSON 구조를 유지한다.
 - Candidate metadata를 재작성하지 않는다.
+- Fact Judge가 근거 부족이라고 지적한 구체적 주장을 그대로 남기지 않는다.
 
 수정된 전체 JSON 객체만 출력한다.
 """
 
 
-# ============================================================
-# Candidate Contract 복원
-# ============================================================
-
 def restore_candidate_contract(
     original_script,
     rewritten_script,
 ):
-
-    # LLM이 Prompt를 무시하더라도
-    # Python 코드에서 원래 Candidate 값을 강제 복원한다.
-
-    for field in (
-        IMMUTABLE_CANDIDATE_FIELDS
-    ):
-
+    for field in IMMUTABLE_CANDIDATE_FIELDS:
         if field in original_script:
-
-            rewritten_script[
-                field
-            ] = copy.deepcopy(
-                original_script[
-                    field
-                ]
+            rewritten_script[field] = copy.deepcopy(
+                original_script[field]
             )
-
         else:
-
-            rewritten_script.pop(
-                field,
-                None,
-            )
+            rewritten_script.pop(field, None)
 
     return rewritten_script
 
 
-# ============================================================
-# Rewrite
-# ============================================================
-
-def rewrite_script(
+def _run_rewrite_call(
     script_data,
     consensus,
+    domains,
     *,
-    model="gpt-4o-mini",
+    model,
+    retry_fact_issues=None,
 ):
-
-    if not isinstance(
+    prompt = build_rewrite_prompt(
         script_data,
-        dict,
-    ):
-
-        raise TypeError(
-            "script_data는 dict여야 합니다."
-        )
-
-    domains = (
-        find_rewrite_domains(
-            consensus
-        )
+        consensus,
+        domains,
+        retry_fact_issues=retry_fact_issues,
     )
 
-    if not domains:
-
-        return {
-            "changed":
-                False,
-
-            "domains":
-                [],
-
-            "script_data":
-                script_data,
-        }
-
-    prompt = (
-        build_rewrite_prompt(
-            script_data,
-            consensus,
-            domains,
-        )
-    )
-
-    call_number = (
-        authorize_call(
-            model
-        )
-    )
-
+    call_number = authorize_call(model)
     print(
         "💳 Rewrite API call "
         f"authorized: #{call_number}"
@@ -499,46 +435,38 @@ def rewrite_script(
         .completions
         .create(
             model=model,
-
             messages=[
                 {
-                    "role":
-                        "system",
-
+                    "role": "system",
                     "content": (
-                        "너는 부분 수정 전용 "
-                        "Shorts Rewrite Engine이다. "
-                        "Candidate Explorer가 결정한 "
-                        "소재와 Story Angle은 "
-                        "절대로 변경하지 않는다."
+                        "너는 부분 수정 전용 Shorts Rewrite Engine이다. "
+                        "Candidate Explorer가 결정한 소재와 Story Angle은 "
+                        "절대로 변경하지 않는다. "
+                        "Fact Judge가 근거 부족이라고 지적한 주장은 "
+                        "표면적으로만 고치지 말고 실제로 제거하거나 완화한다."
                     ),
                 },
-
                 {
-                    "role":
-                        "user",
-
-                    "content":
-                        prompt,
+                    "role": "user",
+                    "content": prompt,
                 },
             ],
-
-            temperature=0.4,
+            temperature=0.3,
+            response_format={
+                "type": "json_object",
+            },
         )
     )
 
-    usage = (
-        record_usage(
-            model,
-            response,
-        )
+    usage = record_usage(
+        model,
+        response,
     )
 
     print(
         "💰 Rewrite call:"
         f" ${usage['cost_usd']:.6f}"
     )
-
     print_budget_status()
 
     content = (
@@ -549,85 +477,123 @@ def rewrite_script(
         .strip()
     )
 
-    rewritten = (
-        extract_json(
-            content
-        )
-    )
+    rewritten = extract_json(content)
 
-    if not isinstance(
-        rewritten,
-        dict,
-    ):
-
+    if not isinstance(rewritten, dict):
         raise ValueError(
             "Rewrite 결과가 dict가 아닙니다."
         )
 
-    # ========================================================
-    # Python-level Candidate Lock
-    # ========================================================
-
-    rewritten = (
-        restore_candidate_contract(
-            script_data,
-            rewritten,
-        )
+    return restore_candidate_contract(
+        script_data,
+        rewritten,
     )
 
-    return {
-        "changed":
-            True,
 
-        "domains":
+def rewrite_script(
+    script_data,
+    consensus,
+    *,
+    model="gpt-4o-mini",
+):
+    if not isinstance(script_data, dict):
+        raise TypeError(
+            "script_data는 dict여야 합니다."
+        )
+
+    domains = find_rewrite_domains(consensus)
+
+    if not domains:
+        return {
+            "changed": False,
+            "domains": [],
+            "script_data": script_data,
+        }
+
+    fact_guard_enabled = (
+        "fact" in domains
+        and bool(_fact_issue_list(consensus))
+    )
+
+    max_attempts = (
+        FACT_REWRITE_MAX_ATTEMPTS
+        if fact_guard_enabled
+        else 1
+    )
+
+    retry_fact_issues = None
+    rewritten = None
+
+    for attempt in range(1, max_attempts + 1):
+        if fact_guard_enabled:
+            print(
+                "🧪 Fact Rewrite Guard "
+                f"{attempt}/{max_attempts}"
+            )
+
+        rewritten = _run_rewrite_call(
+            script_data,
+            consensus,
             domains,
+            model=model,
+            retry_fact_issues=retry_fact_issues,
+        )
 
-        "script_data":
+        if not fact_guard_enabled:
+            break
+
+        persistent = find_persistent_fact_issues(
+            consensus,
             rewritten,
+        )
+
+        if not persistent:
+            print(
+                "✅ Fact Rewrite Guard 통과: "
+                "지적된 핵심 표현이 Rewrite 후 제거/변경됨"
+            )
+            break
+
+        print(
+            "🚫 Fact Rewrite Guard: "
+            "지적된 표현이 아직 남아 있습니다."
+        )
+        for issue in persistent:
+            print(f" - {issue}")
+
+        retry_fact_issues = persistent
+
+        if attempt >= max_attempts:
+            raise ValueError(
+                "Fact Rewrite 검증 실패: "
+                "Judge가 지적한 핵심 주장이 "
+                "최대 재시도 후에도 남아 있습니다."
+            )
+
+    return {
+        "changed": True,
+        "domains": domains,
+        "script_data": rewritten,
     }
 
 
-def print_rewrite_result(
-    result,
-):
-
+def print_rewrite_result(result):
     print("")
     print("=" * 54)
-
-    print(
-        "🔧 V3.2 REWRITE ENGINE"
-    )
-
+    print("🔧 V3.2 REWRITE ENGINE")
     print("=" * 54)
 
-    if not result.get(
-        "changed"
-    ):
-
-        print(
-            "수정 대상 없음"
-        )
-
+    if not result.get("changed"):
+        print("수정 대상 없음")
         print("=" * 54)
-
         return
 
     print(
         "수정 영역:",
         ", ".join(
-            result.get(
-                "domains",
-                [],
-            )
+            result.get("domains", [])
         ),
     )
-
-    print(
-        "🔒 Candidate Contract 유지"
-    )
-
-    print(
-        "✅ 선택적 Rewrite 완료"
-    )
-
+    print("🔒 Candidate Contract 유지")
+    print("✅ 선택적 Rewrite 완료")
     print("=" * 54)
