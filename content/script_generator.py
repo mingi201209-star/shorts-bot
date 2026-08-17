@@ -261,8 +261,23 @@ def validate_hook(scene):
                 f"설명조 오프닝 금지 표현: {banned}",
             )
 
-    if len(text) < 12:
+    visible_len = len(
+        re.sub(r"\s+", "", text)
+    )
+
+    if visible_len < 12:
         return False, "첫 장면 대사가 지나치게 짧음"
+
+    if visible_len > 42:
+        return False, "첫 장면 대사가 길어 2~3초 훅으로 부적절함"
+
+    sentence_breaks = re.findall(
+        r"[.!?…]+",
+        text,
+    )
+
+    if len(sentence_breaks) > 1:
+        return False, "첫 장면은 한 문장 훅이어야 함"
 
     return True, "하드 후킹 검사 통과"
 
@@ -530,6 +545,14 @@ Hook → Curiosity → Explanation → Reveal → Payoff의 흐름을 만든다.
 "오늘은", "알아보겠습니다", "혹시 알고 계셨나요" 같은 도입은 금지한다.
 후반부는 단순 요약이 아니라 처음 질문을 실제 답으로 보상해야 한다.
 
+[HOOK FIRST 2~3 SEC]
+첫 Scene은 반드시 한 문장으로 만든다.
+공백 제외 12~42자 안에서 끝내고 장황한 배경 설명을 넣지 마라.
+첫 구절 안에 소재의 구체적인 대상 이름을 바로 말한다.
+그 대상의 의외성, 모순, 위험, 숨은 기능 또는 날카로운 질문을 즉시 제시한다.
+"이것", "이 기술", "이 시스템"처럼 대상이 무엇인지 늦게 밝혀지는 훅은 금지한다.
+첫 Scene의 visual_goal과 keyword도 바로 그 동일한 물리적 대상을 보여줘야 한다.
+
 [FACT]
 Candidate에 없는 핵심 사실을 무리하게 추가하지 마라.
 검증 대상:
@@ -543,12 +566,17 @@ visual_goal:
 - 그 장면에서 시청자가 실제 화면으로 반드시 봐야 하는 것을 구체적으로 적는다.
 - 실제 대상/구조/행동/환경/과정/비교가 보여야 한다.
 - "관련 이미지", "과학 장면", "기술 영상" 같은 추상 표현 금지.
+- 추상 개념을 말하는 장면도 스마트폰, 주식 차트, 회의, 일반 사람 같은 비유 B-roll로 도망가지 말고 가능하면 핵심 대상 자체를 보여준다.
 
 keyword:
 - visual_goal을 Pexels에서 찾기 위한 2~7단어 영어 검색어다.
 - 대사를 영어로 번역하지 마라.
 - 실제 카메라에 잡힐 수 있는 구체적인 명사와 행동을 사용한다.
 - 같은 B-roll 유형을 연속 반복하지 마라.
+- 영상 전체에서 topic의 핵심 물리적 대상(subject anchor)이 사라지지 않게 한다.
+- 각 keyword에는 가능한 한 그 핵심 대상 또는 직접적인 구조/부품/환경 명사를 포함한다.
+- "future", "safety", "training", "data", "business", "smartphone" 같은 주변 개념만 남은 검색어를 만들지 마라.
+- 대사와 직접 관련 없는 상징적/비유적 B-roll은 금지한다.
 
 좋은 예:
 {{
