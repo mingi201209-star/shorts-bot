@@ -27,7 +27,7 @@ HOOK_NOMINAL_ENDINGS = (
     "순간",
 )
 
-SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?…])\s+")
+SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?…])\s*")
 KOREAN_RE = re.compile(r"[가-힣]")
 
 
