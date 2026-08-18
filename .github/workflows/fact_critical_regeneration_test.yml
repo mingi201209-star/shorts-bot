@@ -1,0 +1,67 @@
+name: FACT Critical Candidate Recovery Test
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  fact-critical-recovery:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Apply production hotfix chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+
+          grep -n "SCRIPT GENERATION FAILED" main.py
+          grep -n "Novelty 조기 차단" main.py
+          grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
+
+      - name: Compile
+        run: |
+          python -m py_compile \
+            ci_hotfix.py \
+            ci_novelty_budget_hotfix.py \
+            ci_fact_critical_hotfix.py \
+            main.py \
+            quality/fact_critical_regeneration_test.py
+
+      - name: Run FACT_CRITICAL regression tests
+        env:
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+        run: |
+          PYTHONPATH=. python quality/fact_critical_regeneration_test.py
+
+      - name: Check Hook flag regression
+        run: |
+          ENABLE_HOOK_EXPERIMENT=0 PYTHONPATH=. python - <<'PY'
+          from content.hook_experiment import hook_experiment_enabled
+          assert not hook_experiment_enabled()
+          print("✅ Hook OFF flag path preserved")
+          PY
+
+          ENABLE_HOOK_EXPERIMENT=1 PYTHONPATH=. python - <<'PY'
+          from content.hook_experiment import hook_experiment_enabled
+          assert hook_experiment_enabled()
+          print("✅ Hook ON flag path preserved")
+          PY
+
+          PYTHONPATH=. python quality/hook_experiment_test.py
