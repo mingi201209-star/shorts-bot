@@ -46,7 +46,7 @@ jobs:
             video/hook_visual.py \
             video/video_engine.py \
             video/subtitle_engine.py
-          python quality/hook_experiment_test.py
+          PYTHONPATH=. python quality/hook_experiment_test.py
 
       - name: Run Hook OFF regression E2E
         env:
@@ -147,7 +147,7 @@ jobs:
             video/hook_visual.py \
             video/video_engine.py \
             video/subtitle_engine.py
-          python quality/hook_experiment_test.py
+          PYTHONPATH=. python quality/hook_experiment_test.py
 
       - name: Run Hook ON E2E
         env:
