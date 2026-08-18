@@ -40,6 +40,11 @@ def test_multi_sentence_and_multi_scene():
     )
     _assert("earlier informal sentence cannot hide behind polite final sentence", not valid)
 
+    valid, _ = validate_korean_speech_text(
+        "개미는 태양으로 방향 잡는다!하지만 마지막에는 둥지를 찾아요."
+    )
+    _assert("no-space sentence boundary cannot hide informal sentence", not valid)
+
     scenes = [
         {"text": "첫 장면은 자연스럽게 설명해요."},
         {"text": "두 번째 장면은 반말로 끝난다."},
