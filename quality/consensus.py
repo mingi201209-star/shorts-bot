@@ -4,6 +4,13 @@ from statistics import mean
 PASS_SCORE = 7.5
 REWRITE_SCORE = 5.5
 DOMAIN_REWRITE_FLOOR = 6.5
+DOMAIN_REWRITE_FLOORS = {
+    "hook": 6.0,
+    "novelty": 5.0,
+    "fact": 6.5,
+    "visual": 6.5,
+    "explanation": 6.5,
+}
 MIN_CONFIDENCE = 0.65
 DISAGREEMENT_WARNING = 2.0
 DISAGREEMENT_CRITICAL = 3.5
@@ -198,11 +205,12 @@ def detect_weak_domains(summaries):
     weak = []
     for judge_type, summary in summaries.items():
         score = safe_float(summary.get("score", 0.0))
-        if score < DOMAIN_REWRITE_FLOOR:
+        minimum = DOMAIN_REWRITE_FLOORS.get(judge_type, DOMAIN_REWRITE_FLOOR)
+        if score < minimum:
             weak.append({
                 "judge_type": judge_type,
                 "score": round(score, 3),
-                "minimum": DOMAIN_REWRITE_FLOOR,
+                "minimum": minimum,
             })
     return weak
 
@@ -247,9 +255,12 @@ def build_consensus(pool_results, reliability_report=None):
         reasons.append("절대 차단 사유가 없고 Good Enough 제작 기준을 충족했습니다.")
     elif weak_domains:
         decision = "REWRITE"
-        weak_names = ", ".join(item["judge_type"] for item in weak_domains)
+        weak_descriptions = ", ".join(
+            f"{item['judge_type']} {item['score']:.1f}<{item['minimum']:.1f}"
+            for item in weak_domains
+        )
         reasons.append(
-            f"일부 전문 영역이 최소 품질 기준 {DOMAIN_REWRITE_FLOOR:.1f}점 미만입니다: {weak_names}"
+            f"일부 전문 영역이 Domain별 최소 품질 기준 미만입니다: {weak_descriptions}"
         )
     elif weighted_score >= REWRITE_SCORE:
         decision = "REWRITE"
