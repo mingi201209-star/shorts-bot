@@ -38,7 +38,8 @@ jobs:
           python ci_speech_style_hotfix.py
           python ci_hook_generation_hotfix.py
           python ci_hook_pool_guard_hotfix.py
-          grep -n "HOOK_GENERATION_COUNT\|speech_style_failure\|pool_ready" content/hook_experiment.py
+          python ci_hook_e2e_contract_hotfix.py
+          grep -n "HOOK_GENERATION_COUNT\|speech_style_failure\|cumulative_scoring_pool_count" content/hook_experiment.py
           grep -n "SCRIPT GENERATION FAILED" main.py
 
       - name: Compile and self-test
@@ -46,6 +47,9 @@ jobs:
           python -m py_compile \
             ci_hook_generation_hotfix.py \
             ci_hook_pool_guard_hotfix.py \
+            ci_hook_structure_guidance_hotfix.py \
+            ci_hook_retry_repair_hotfix.py \
+            ci_hook_e2e_contract_hotfix.py \
             main.py \
             content/hook_experiment.py \
             content/script_generator/__init__.py \
@@ -70,7 +74,7 @@ jobs:
           set -o pipefail
           PYTHONPATH=. python quality/hook_e2e_fixture.py --mode off 2>&1 | tee hook_off.log
 
-          if grep -q "HOOK FIXTURE CANDIDATES GENERATED" hook_off.log; then
+          if grep -q "HOOK RAW RESPONSE FIXTURE GENERATED" hook_off.log; then
             echo "❌ Hook candidate path occurred while experiment was OFF"
             exit 1
           fi
@@ -155,7 +159,8 @@ jobs:
           python ci_speech_style_hotfix.py
           python ci_hook_generation_hotfix.py
           python ci_hook_pool_guard_hotfix.py
-          grep -n "HOOK_GENERATION_COUNT\|speech_style_failure\|pool_ready" content/hook_experiment.py
+          python ci_hook_e2e_contract_hotfix.py
+          grep -n "HOOK_GENERATION_COUNT\|speech_style_failure\|cumulative_scoring_pool_count" content/hook_experiment.py
           grep -n "SCRIPT GENERATION FAILED" main.py
 
       - name: Compile and self-test
@@ -163,6 +168,9 @@ jobs:
           python -m py_compile \
             ci_hook_generation_hotfix.py \
             ci_hook_pool_guard_hotfix.py \
+            ci_hook_structure_guidance_hotfix.py \
+            ci_hook_retry_repair_hotfix.py \
+            ci_hook_e2e_contract_hotfix.py \
             main.py \
             content/hook_experiment.py \
             content/script_generator/__init__.py \
@@ -187,9 +195,11 @@ jobs:
           set -o pipefail
           PYTHONPATH=. python quality/hook_e2e_fixture.py --mode on 2>&1 | tee hook_on.log
 
-          grep -q "HOOK FIXTURE CANDIDATES GENERATED: 5" hook_on.log
+          grep -q "HOOK RAW RESPONSE FIXTURE GENERATED: 5" hook_on.log
+          grep -q "raw_candidate_count=5 parsed_candidate_count=5" hook_on.log
+          grep -q "cumulative_scoring_pool_count=5" hook_on.log
+          grep -q "selected=.*fallback=false" hook_on.log
           grep -q "HOOK EXPERIMENT AUDIT JSON" hook_on.log
-          grep -q '"candidate_count": 5' hook_on.log
           grep -q "HOOK VISUAL AUDIT JSON" hook_on.log
           grep -q '"mode": "hook_strict"' hook_on.log
           grep -q "Subtitle safe-area\[HOOK\]" hook_on.log
@@ -219,6 +229,9 @@ jobs:
           fixture = json.load(open("hook_on_fixture_result.json", encoding="utf-8"))
           assert fixture["mode"] == "on", fixture
           assert fixture["selected_hook"], fixture
+          assert fixture["hook_audit"]["fallback"] is False, fixture
+          assert fixture["hook_audit"]["attempts"][0]["scoring_pool_count"] >= 5, fixture
+          assert fixture["hook_audit"]["attempts"][0]["cumulative_scoring_pool_count"] >= 5, fixture
           assert fixture["hook_tts_seconds"] <= 3.0, fixture
           assert fixture["production_quality_policy_changed"] is False, fixture
           print(
