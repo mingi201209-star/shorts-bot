@@ -106,7 +106,7 @@ def test_hard_floor_reason_codes():
     _assert("fact floor reason recorded", rejected.get("fact_safety_below_floor") == 1)
 
 
-def _diag(scoring_pool, rejected):
+def _diag(scoring_pool, rejected, repair_candidates=None):
     result = hook_experiment._empty_hook_diagnostics()
     result.update({
         "raw_candidate_count": scoring_pool,
@@ -122,11 +122,12 @@ def _diag(scoring_pool, rejected):
         "scoring_pool_count": scoring_pool,
         "eligible_candidate_count": scoring_pool,
         "rejected": dict(rejected),
+        "repair_candidates": list(repair_candidates or []),
     })
     return result
 
 
-def test_bounded_attempt_two_receives_feedback():
+def test_bounded_attempt_two_receives_feedback_and_accumulates():
     original = hook_experiment._request_candidates
     calls = []
 
@@ -134,15 +135,23 @@ def test_bounded_attempt_two_receives_feedback():
         _payload([_item(1, VALID_TEXTS[0]), _item(2, VALID_TEXTS[1])])
     )
     second_candidates, _ = hook_experiment._diagnose_candidates(
-        _payload([_item(i, text) for i, text in enumerate(VALID_TEXTS[:6], 1)])
+        _payload([_item(i + 3, text) for i, text in enumerate(VALID_TEXTS[2:5])])
     )
+    repair_items = [
+        {
+            "text": "드론 균열 찾아요",
+            "visible_len": 7,
+            "visual_goal": "드론 점검 화면",
+            "keyword": "drone inspection",
+        }
+    ]
 
     def fake_request(topic_info, candidate, generation_round, rejection_feedback=None):
         del topic_info, candidate
         calls.append((generation_round, dict(rejection_feedback or {})))
         if generation_round == 1:
-            return first_candidates, _diag(2, {"too_short": 8})
-        return second_candidates, _diag(6, {})
+            return first_candidates, _diag(2, {"too_short": 8}, repair_items)
+        return second_candidates, _diag(3, {})
 
     hook_experiment._request_candidates = fake_request
     try:
@@ -151,9 +160,20 @@ def test_bounded_attempt_two_receives_feedback():
         hook_experiment._request_candidates = original
 
     _assert("Attempt 2 runs after insufficient attempt 1", len(calls) == 2)
-    _assert("Attempt 2 receives attempt-1 rejection summary", calls[1][1] == {"too_short": 8})
-    _assert("Attempt 2 can select a normal threshold-passing winner", bool(selected))
-    _assert("Successful bounded retry avoids fallback", not audit["fallback"])
+    _assert(
+        "Attempt 2 receives attempt-1 rejection counts",
+        calls[1][1].get("rejection_counts") == {"too_short": 8},
+    )
+    _assert(
+        "Attempt 2 receives bounded repair candidates",
+        calls[1][1].get("repair_candidates") == repair_items,
+    )
+    _assert(
+        "Validated candidates accumulate across bounded attempts",
+        audit["attempts"][-1]["cumulative_scoring_pool_count"] == 5,
+    )
+    _assert("Cumulative pool can select normal threshold winner", bool(selected))
+    _assert("Successful bounded repair avoids fallback", not audit["fallback"])
 
 
 def test_attempt_two_failure_preserves_legacy_fallback():
@@ -174,6 +194,29 @@ def test_attempt_two_failure_preserves_legacy_fallback():
     _assert("Hook generation remains bounded to two attempts", len(calls) == 2)
     _assert("Second failure returns no experimental Hook", selected is None)
     _assert("Existing legacy fallback signal remains enabled", audit["fallback"] is True)
+
+
+def test_legacy_three_argument_request_contract():
+    original = hook_experiment._request_candidates
+    fixture_candidates, _ = hook_experiment._diagnose_candidates(
+        _payload([_item(i, text) for i, text in enumerate(VALID_TEXTS[:5], 1)])
+    )
+    calls = []
+
+    def legacy_request(topic_info, candidate, generation_round):
+        del topic_info, candidate
+        calls.append(generation_round)
+        return fixture_candidates
+
+    hook_experiment._request_candidates = legacy_request
+    try:
+        selected, audit = hook_experiment.select_hook({}, {"topic": "fixture"})
+    finally:
+        hook_experiment._request_candidates = original
+
+    _assert("Legacy fixture contract is called once", calls == [1])
+    _assert("Legacy fixture contract still selects Hook", bool(selected))
+    _assert("Legacy fixture contract does not force fallback", not audit["fallback"])
 
 
 def test_existing_thresholds_unchanged():
@@ -199,8 +242,9 @@ def main():
     test_speech_style_reason()
     test_duplicate_reason()
     test_hard_floor_reason_codes()
-    test_bounded_attempt_two_receives_feedback()
+    test_bounded_attempt_two_receives_feedback_and_accumulates()
     test_attempt_two_failure_preserves_legacy_fallback()
+    test_legacy_three_argument_request_contract()
     test_existing_thresholds_unchanged()
     print("✅ HOOK GENERATION REGRESSION TESTS PASS")
 
