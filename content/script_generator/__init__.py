@@ -54,10 +54,120 @@ def _with_mechanism_requirement(candidate):
     return enriched
 
 
+def _apply_selected_hook(
+    script_data,
+    selected_hook,
+    audit,
+):
+    if not isinstance(
+        script_data,
+        dict,
+    ):
+        return script_data
+
+    script_data[
+        "hook_experiment_audit"
+    ] = audit
+
+    if not selected_hook:
+        return script_data
+
+    scenes = script_data.get(
+        "scenes",
+        [],
+    )
+
+    if not scenes:
+        return script_data
+
+    first_scene = scenes[0]
+
+    first_scene["text"] = (
+        selected_hook["text"]
+    )
+    first_scene["visual_goal"] = (
+        selected_hook["visual_goal"]
+    )
+    first_scene["keyword"] = (
+        selected_hook["keyword"]
+    )
+    first_scene["hook_experiment"] = {
+        "selected": True,
+        "scores": dict(
+            selected_hook.get(
+                "scores",
+                {},
+            )
+        ),
+        "total_score": (
+            selected_hook.get(
+                "total_score"
+            )
+        ),
+    }
+
+    script_data[
+        "selected_hook"
+    ] = dict(
+        selected_hook
+    )
+
+    return script_data
+
+
 def generate_script(topic_info, candidate):
-    return _LEGACY.generate_script(
+    selected_hook = None
+    audit = None
+
+    try:
+        from content.hook_experiment import (
+            hook_experiment_enabled,
+        )
+
+        hook_enabled = (
+            hook_experiment_enabled()
+        )
+
+    except Exception:
+        hook_enabled = False
+
+    if hook_enabled:
+        try:
+            from content.hook_experiment import (
+                select_hook,
+                print_hook_audit,
+            )
+
+            selected_hook, audit = (
+                select_hook(
+                    topic_info,
+                    candidate,
+                )
+            )
+
+        except Exception as exc:
+            audit = {
+                "enabled": True,
+                "fallback": True,
+                "fallback_reason": str(exc),
+            }
+
+        print_hook_audit(
+            audit
+        )
+
+    result = _LEGACY.generate_script(
         topic_info,
         _with_mechanism_requirement(candidate),
+    )
+
+    if not hook_enabled:
+        return result
+
+    return _apply_selected_hook(
+        result,
+        selected_hook,
+        audit,
     )
 
 
