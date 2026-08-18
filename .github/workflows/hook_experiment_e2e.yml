@@ -1,0 +1,245 @@
+name: Hook Experiment E2E
+
+on:
+  push:
+    branches:
+      - feature/hook-experiment-layer
+  workflow_dispatch:
+
+jobs:
+  hook-off-regression:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+          ffmpeg -version
+          fc-cache -f -v
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify ci_hotfix exact target before patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          marker = """            script_data = (
+              generate_script(
+                  topic_info,
+                  winner,
+              )
+          )
+          """
+          source = Path("main.py").read_text(encoding="utf-8")
+          count = source.count(marker)
+          print("generate_script hotfix marker count:", count)
+          if count != 1:
+              raise SystemExit(1)
+          PY
+
+      - name: Apply production hotfixes
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+
+      - name: Compile and self-test
+        run: |
+          python -m py_compile \
+            main.py \
+            content/hook_experiment.py \
+            content/script_generator/__init__.py \
+            video/hook_visual.py \
+            video/video_engine.py \
+            video/subtitle_engine.py
+          python quality/hook_experiment_test.py
+
+      - name: Run Hook OFF regression E2E
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ENABLE_HOOK_EXPERIMENT: "0"
+          V3_JUDGE_MODEL: gpt-4o-mini
+          V3_MAX_API_CALLS: "65"
+          V3_MAX_COST_USD: "0.06"
+        run: |
+          set -o pipefail
+          python main.py 2>&1 | tee hook_off.log
+
+          if grep -q "Hook API call authorized" hook_off.log; then
+            echo "❌ Hook API call occurred while experiment was OFF"
+            exit 1
+          fi
+
+          if grep -q "HOOK VISUAL AUDIT JSON" hook_off.log; then
+            echo "❌ Hook visual path occurred while experiment was OFF"
+            exit 1
+          fi
+
+          if grep -q "Subtitle safe-area\[HOOK\]" hook_off.log; then
+            echo "❌ Hook subtitle path occurred while experiment was OFF"
+            exit 1
+          fi
+
+      - name: Probe Hook OFF output
+        run: |
+          test -s final_shorts.mp4
+          ffprobe -v error -show_streams -show_format -of json final_shorts.mp4 | tee hook_off_ffprobe.json
+
+          python - <<'PY'
+          import json
+
+          data = json.load(open("hook_off_ffprobe.json", encoding="utf-8"))
+          streams = data["streams"]
+          video = next(stream for stream in streams if stream["codec_type"] == "video")
+          audio = next(stream for stream in streams if stream["codec_type"] == "audio")
+          assert video["codec_name"] == "h264", video
+          assert int(video["width"]) == 1080, video
+          assert int(video["height"]) == 1920, video
+          rate = video.get("avg_frame_rate") or video.get("r_frame_rate")
+          num, den = [int(value) for value in rate.split("/")]
+          assert abs(num / den - 30.0) < 0.01, video
+          assert audio["codec_name"] == "aac", audio
+          print("✅ Hook OFF codec/resolution/fps contract PASS")
+          PY
+
+      - name: Upload Hook OFF artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hook-off-regression
+          path: |
+            final_shorts.mp4
+            hook_off.log
+            hook_off_ffprobe.json
+
+  hook-on-e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+          ffmpeg -version
+          fc-cache -f -v
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify ci_hotfix exact target before patch
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          marker = """            script_data = (
+              generate_script(
+                  topic_info,
+                  winner,
+              )
+          )
+          """
+          source = Path("main.py").read_text(encoding="utf-8")
+          count = source.count(marker)
+          print("generate_script hotfix marker count:", count)
+          if count != 1:
+              raise SystemExit(1)
+          PY
+
+      - name: Apply production hotfixes
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+
+      - name: Compile and self-test
+        run: |
+          python -m py_compile \
+            main.py \
+            content/hook_experiment.py \
+            content/script_generator/__init__.py \
+            video/hook_visual.py \
+            video/video_engine.py \
+            video/subtitle_engine.py
+          python quality/hook_experiment_test.py
+
+      - name: Run Hook ON E2E
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ENABLE_HOOK_EXPERIMENT: "1"
+          V3_JUDGE_MODEL: gpt-4o-mini
+          V3_MAX_API_CALLS: "70"
+          V3_MAX_COST_USD: "0.07"
+        run: |
+          set -o pipefail
+          python main.py 2>&1 | tee hook_on.log
+
+          grep -q "Hook API call authorized" hook_on.log
+          grep -q "HOOK EXPERIMENT AUDIT JSON" hook_on.log
+          grep -q "HOOK VISUAL AUDIT JSON" hook_on.log
+          grep -q "Subtitle safe-area\[HOOK\]" hook_on.log
+
+      - name: Probe Hook ON output and extract first 3 seconds
+        run: |
+          test -s final_shorts.mp4
+          ffprobe -v error -show_streams -show_format -of json final_shorts.mp4 | tee hook_on_ffprobe.json
+
+          python - <<'PY'
+          import json
+
+          data = json.load(open("hook_on_ffprobe.json", encoding="utf-8"))
+          streams = data["streams"]
+          video = next(stream for stream in streams if stream["codec_type"] == "video")
+          audio = next(stream for stream in streams if stream["codec_type"] == "audio")
+          assert video["codec_name"] == "h264", video
+          assert int(video["width"]) == 1080, video
+          assert int(video["height"]) == 1920, video
+          rate = video.get("avg_frame_rate") or video.get("r_frame_rate")
+          num, den = [int(value) for value in rate.split("/")]
+          assert abs(num / den - 30.0) < 0.01, video
+          assert audio["codec_name"] == "aac", audio
+          print("✅ Hook ON codec/resolution/fps contract PASS")
+          PY
+
+          ffmpeg -y -i final_shorts.mp4 -t 3 -c copy hook_first_3s.mp4
+          ffmpeg -y -ss 0.4 -i final_shorts.mp4 -frames:v 1 hook_frame_04.png
+          ffmpeg -y -ss 1.4 -i final_shorts.mp4 -frames:v 1 hook_frame_14.png
+          ffmpeg -y -ss 2.4 -i final_shorts.mp4 -frames:v 1 hook_frame_24.png
+
+      - name: Upload Hook ON artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hook-on-e2e
+          path: |
+            final_shorts.mp4
+            hook_first_3s.mp4
+            hook_frame_04.png
+            hook_frame_14.png
+            hook_frame_24.png
+            hook_on.log
+            hook_on_ffprobe.json
