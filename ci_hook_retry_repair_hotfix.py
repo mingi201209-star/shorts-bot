@@ -66,8 +66,6 @@ rejection_feedback 안에 repair_candidates가 있으면 그 문장들은 실제
 repair candidate만 복제하지 말고 필요하면 같은 Candidate Lock 안에서 서로 다른 새 Hook도 함께 만든다.
 '''
 
-select_start = text.index("def select_hook(topic_info, candidate):")
-select_end = text.index("def print_hook_audit(", select_start)
 select_replacement = '''def select_hook(topic_info, candidate):
     audit = {
         "enabled": True,
@@ -245,8 +243,10 @@ if prompt_replacement not in text:
         )
     text = text.replace(prompt_marker, prompt_replacement, 1)
 
-current_select = text[select_start:select_end]
 if select_replacement not in text:
+    select_start = text.index("def select_hook(topic_info, candidate):")
+    select_end = text.index("def print_hook_audit(", select_start)
+    current_select = text[select_start:select_end]
     text = text.replace(current_select, select_replacement, 1)
 
 path.write_text(text, encoding="utf-8")
