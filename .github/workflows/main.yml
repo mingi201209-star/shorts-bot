@@ -51,6 +51,7 @@ jobs:
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
           python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
@@ -59,19 +60,24 @@ jobs:
           grep -n "temperature=0.5" content/candidate_explorer.py
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
           grep -n "NARRATION TONE\|존댓말 종결\|RETRY FEEDBACK\|meaningful_keyword_words" content/script_generator.py
-          grep -n "모든 scene text는 자연스러운 한국어 존댓말" quality/rewrite_engine.py
+          grep -n "validate_scenes_speech_style" content/script_generator.py
+          grep -n "validate_script_speech_style" quality/rewrite_engine.py
+          grep -n "validate_korean_speech_text" content/hook_experiment.py
           grep -n "Review 최대 횟수 초과\|SCRIPT GENERATION FAILED" main.py
 
           python -m py_compile \
             ci_hotfix.py \
             ci_novelty_budget_hotfix.py \
             ci_fact_critical_hotfix.py \
+            ci_speech_style_hotfix.py \
             main.py \
             config.py \
             content/candidate_explorer.py \
             content/script_generator.py \
+            content/hook_experiment.py \
             quality/consensus.py \
             quality/rewrite_engine.py \
+            quality/korean_speech_style.py \
             video/video_downloader.py \
             video/video_engine.py
 
