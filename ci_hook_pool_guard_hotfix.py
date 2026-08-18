@@ -154,3 +154,15 @@ for old, new in replacements:
 
 path.write_text(text, encoding="utf-8")
 print("✅ Hook measurable length guidance + pool guard + legacy request compatibility applied")
+
+repair_hotfix = Path("ci_hook_retry_repair_hotfix.py")
+if not repair_hotfix.exists():
+    raise RuntimeError("ci_hook_retry_repair_hotfix.py not found")
+exec(
+    compile(
+        repair_hotfix.read_text(encoding="utf-8"),
+        str(repair_hotfix),
+        "exec",
+    ),
+    {"__name__": "__main__"},
+)
