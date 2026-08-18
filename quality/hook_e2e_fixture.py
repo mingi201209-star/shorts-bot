@@ -42,9 +42,9 @@ WINNER = {
 HOOK_CANDIDATE_FIXTURE = [
     {
         "id": "fixture_hook_1",
-        "text": "벌집의 방은 왜 육각형일까요?",
-        "visual_goal": "육각형 벌집 셀이 화면 중앙에 크게 보이는 실제 벌집 클로즈업",
-        "keyword": "honeycomb hexagon close up",
+        "text": "벌집 방은 왜 육각형일까요?",
+        "visual_goal": "신선한 벌집의 육각형 셀이 화면 중앙에 크게 보이는 실제 클로즈업",
+        "keyword": "fresh honeycomb golden honey",
         "stop_power": 8.4,
         "curiosity_gap": 8.2,
         "clarity": 9.0,
@@ -261,7 +261,7 @@ def main():
 
     result = {
         "mode": args.mode,
-        "fixture": "honeycomb-visible-structure-v2",
+        "fixture": "honeycomb-visible-structure-v3",
         "production_quality_policy_changed": False,
         "output": output,
         "hook_tts_seconds": round(hook_tts_seconds, 3),
