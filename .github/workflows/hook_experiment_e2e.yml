@@ -31,29 +31,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Verify ci_hotfix exact target before patch
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          marker = """            script_data = (
-              generate_script(
-                  topic_info,
-                  winner,
-              )
-          )
-          """
-          source = Path("main.py").read_text(encoding="utf-8")
-          count = source.count(marker)
-          print("generate_script hotfix marker count:", count)
-          if count != 1:
-              raise SystemExit(1)
-          PY
-
       - name: Apply production hotfixes
         run: |
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
+          grep -n "SCRIPT GENERATION FAILED" main.py
 
       - name: Compile and self-test
         run: |
@@ -150,29 +132,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Verify ci_hotfix exact target before patch
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-
-          marker = """            script_data = (
-              generate_script(
-                  topic_info,
-                  winner,
-              )
-          )
-          """
-          source = Path("main.py").read_text(encoding="utf-8")
-          count = source.count(marker)
-          print("generate_script hotfix marker count:", count)
-          if count != 1:
-              raise SystemExit(1)
-          PY
-
       - name: Apply production hotfixes
         run: |
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
+          grep -n "SCRIPT GENERATION FAILED" main.py
 
       - name: Compile and self-test
         run: |
