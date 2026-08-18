@@ -35,6 +35,7 @@ jobs:
         run: |
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
+          python ci_speech_style_hotfix.py
           grep -n "SCRIPT GENERATION FAILED" main.py
 
       - name: Compile and self-test
@@ -46,8 +47,10 @@ jobs:
             video/hook_visual.py \
             video/video_engine.py \
             video/subtitle_engine.py \
+            quality/korean_speech_style.py \
             quality/hook_e2e_fixture.py
           PYTHONPATH=. python quality/hook_experiment_test.py
+          PYTHONPATH=. python quality/korean_speech_style_test.py
 
       - name: Run Hook OFF deterministic regression E2E
         env:
@@ -142,6 +145,7 @@ jobs:
         run: |
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
+          python ci_speech_style_hotfix.py
           grep -n "SCRIPT GENERATION FAILED" main.py
 
       - name: Compile and self-test
@@ -153,8 +157,10 @@ jobs:
             video/hook_visual.py \
             video/video_engine.py \
             video/subtitle_engine.py \
+            quality/korean_speech_style.py \
             quality/hook_e2e_fixture.py
           PYTHONPATH=. python quality/hook_experiment_test.py
+          PYTHONPATH=. python quality/korean_speech_style_test.py
 
       - name: Run Hook ON deterministic E2E
         env:
