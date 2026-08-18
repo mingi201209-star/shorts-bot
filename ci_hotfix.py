@@ -50,6 +50,78 @@ if count != 1:
         "candidate_explorer.py temperature 패치 대상이 정확히 1개가 아닙니다. "
         f"(count={count})"
     )
+
+specificity_marker = """============================================================
+3. SEARCH FOR DISTINCT IDEAS
+============================================================"""
+
+specificity_block = """
+============================================================
+2.5 SPECIFICITY LOCK — BROAD THEME 금지
+============================================================
+
+Candidate는 반드시 하나의 구체적인 실제 대상이나 관찰 가능한 현상에 고정되어야 한다.
+
+다음처럼 카테고리명·상위개념·교과서 단원처럼 들리는 topic은 Winner/Runner-up으로 선택하지 마라.
+
+금지 예:
+- 특이한 지리적 장소
+- 동물의 특이한 생존 전략
+- 사라진 고대의 물건 만들기 기술
+- 산업 현장에서의 예측 유지보수 기술
+- 중세 시대의 성곽 건축
+- 스마트폰의 구조
+- 자연의 소리
+- 자동차 안전 설계
+
+이런 표현은 탐색 방향일 뿐 Story Angle이 아니다.
+
+반드시 아래 형태 중 하나처럼 더 좁혀라.
+
+- 특정 대상 + 특정 이상한 구조 + 왜 그런가
+- 특정 동물 + 특정 행동 + 어떻게 가능한가
+- 특정 건축물/기술 + 특정 세부 + 숨은 목적
+- 특정 물건 + 특정 설계 특징 + 예상 밖의 이유
+- 특정 사건/관행 + 특정 결과 + 연결 메커니즘
+
+좋은 예의 형태:
+- 성문 앞 진입로가 일부러 꺾여 있던 이유
+- 사막개미가 랜드마크 없이 둥지로 돌아오는 방법
+- 로마 도로 아래 자갈층을 여러 겹 쌓은 이유
+- 비행기 창문 모서리가 둥근 이유
+
+[MANDATORY SPECIFICITY TEST]
+
+Winner를 확정하기 직전에 다음을 확인하라.
+
+1. topic만 읽어도 실제로 무엇을 보여줄지 떠오르는가?
+2. core_question이 하나의 구체적 대상/구조/행동을 직접 가리키는가?
+3. reveal을 한 문장으로 말했을 때 실제 mechanism이 들어가는가?
+4. "특정", "어떤", "여러", "다양한", "기술", "전략", "장소", "구조" 같은 추상어를 빼도 대상이 남는가?
+
+하나라도 NO라면 SELECTED하지 말고 더 구체적인 후보를 탐색하라.
+
+특히 다음 질문 패턴은 그대로 출력하지 마라.
+- 어떻게 특정 동물들은 극한 환경에서 살아남을 수 있을까?
+- 왜 이 장소가 지리적으로 평범해 보이지만 실제로는 독특한 현상을 가지고 있을까?
+- 어떻게 기계의 고장을 예측하고 예방할 수 있을까?
+- 왜 고대의 물건 만들기 기술은 현대에 잊혀졌는가?
+
+이런 질문은 반드시 실제 대상과 단일 mechanism이 드러나는 질문으로 좁혀라.
+
+"""
+
+if "2.5 SPECIFICITY LOCK" not in explorer_source:
+    if explorer_source.count(specificity_marker) != 1:
+        raise RuntimeError(
+            "candidate_explorer.py specificity 삽입 위치를 찾지 못했습니다."
+        )
+    explorer_source = explorer_source.replace(
+        specificity_marker,
+        specificity_block + specificity_marker,
+        1,
+    )
+
 explorer_path.write_text(explorer_source, encoding="utf-8")
 
 set_regex(
@@ -277,6 +349,6 @@ main_source = main_source.replace(
 main_path.write_text(main_source, encoding="utf-8")
 
 print(
-    "✅ Runtime production + polite narration + visual retry + "
+    "✅ Runtime production + candidate specificity + polite narration + visual retry + "
     "review fallback + script fallback hotfix applied"
 )
