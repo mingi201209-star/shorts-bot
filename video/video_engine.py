@@ -484,11 +484,66 @@ def create_scene(
             f"🔎 Pexels 검색: {keyword}"
         )
 
-        video_url = (
-            fetch_pexels_video(
-                keyword
+        hook_scene_enabled = (
+            idx == 0
+            and bool(
+                item.get(
+                    "hook_experiment",
+                    {},
+                ).get(
+                    "selected",
+                    False,
+                )
             )
+            and str(
+                os.environ.get(
+                    "ENABLE_HOOK_EXPERIMENT",
+                    "0",
+                )
+            ).strip().lower()
+            in {
+                "1",
+                "true",
+                "yes",
+                "on",
+            }
         )
+
+        if hook_scene_enabled:
+
+            try:
+
+                from video.hook_visual import (
+                    fetch_hook_pexels_video,
+                )
+
+                video_url = (
+                    fetch_hook_pexels_video(
+                        item
+                    )
+                )
+
+            except Exception as e:
+
+                print(
+                    "⚠️ Hook visual selector 실패, "
+                    "기존 Pexels 경로로 fallback: "
+                    f"{e}"
+                )
+
+                video_url = (
+                    fetch_pexels_video(
+                        keyword
+                    )
+                )
+
+        else:
+
+            video_url = (
+                fetch_pexels_video(
+                    keyword
+                )
+            )
 
         if not video_url:
 
@@ -553,6 +608,7 @@ def create_scene(
                 text,
                 duration,
                 video_clip=video_clip,
+                hook_mode=hook_scene_enabled,
             )
         )
 
