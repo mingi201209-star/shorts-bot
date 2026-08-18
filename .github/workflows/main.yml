@@ -51,11 +51,13 @@ jobs:
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
           python ci_fact_critical_hotfix.py
+          python ci_rewrite_exhaustion_hotfix.py
           python ci_speech_style_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
           grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
+          grep -n "REWRITE EXHAUSTION CANDIDATE REGENERATION" main.py
           grep -n "MAX_SCRIPT_ATTEMPTS" config.py
           grep -n "temperature=0.5" content/candidate_explorer.py
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
@@ -69,6 +71,7 @@ jobs:
             ci_hotfix.py \
             ci_novelty_budget_hotfix.py \
             ci_fact_critical_hotfix.py \
+            ci_rewrite_exhaustion_hotfix.py \
             ci_speech_style_hotfix.py \
             main.py \
             config.py \
