@@ -49,8 +49,10 @@ jobs:
       - name: Apply production hotfixes
         run: |
           python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
+          grep -n "Novelty 조기 차단" main.py
           grep -n "MAX_SCRIPT_ATTEMPTS" config.py
           grep -n "temperature=0.5" content/candidate_explorer.py
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
@@ -60,6 +62,7 @@ jobs:
 
           python -m py_compile \
             ci_hotfix.py \
+            ci_novelty_budget_hotfix.py \
             main.py \
             config.py \
             content/candidate_explorer.py \
@@ -76,7 +79,7 @@ jobs:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           V3_JUDGE_MODEL: gpt-4o-mini
-          V3_MAX_API_CALLS: "45"
+          V3_MAX_API_CALLS: "60"
           V3_MAX_COST_USD: "0.05"
         run: |
           echo "========================================"
