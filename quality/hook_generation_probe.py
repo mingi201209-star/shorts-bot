@@ -59,18 +59,43 @@ def main():
 
         selected, audit = hook_experiment.select_hook(topic_info, candidate)
         attempts = audit.get("attempts", [])
-        summary.append({
+        scoring_pool_counts = [
+            attempt.get("scoring_pool_count", 0)
+            for attempt in attempts
+        ]
+        eligible_counts = [
+            attempt.get("eligible_candidate_count", 0)
+            for attempt in attempts
+        ]
+        result = {
             "case": index,
             "topic": candidate["topic"],
-            "attempt_candidate_counts": [
-                attempt.get("candidate_count", 0)
+            "raw_candidate_counts": [
+                attempt.get("raw_candidate_count", 0)
+                for attempt in attempts
+            ],
+            "scoring_pool_counts": scoring_pool_counts,
+            "eligible_candidate_counts": eligible_counts,
+            "rejected": [
+                attempt.get("rejected", {})
                 for attempt in attempts
             ],
             "selected": bool(selected),
             "fallback": bool(audit.get("fallback")),
-        })
+        }
+        summary.append(result)
+
+        if max(scoring_pool_counts or [0]) < hook_experiment.HOOK_CANDIDATE_COUNT:
+            raise AssertionError(
+                f"case {index} failed to build five-candidate scoring pool: {result}"
+            )
+        if not selected or audit.get("fallback"):
+            raise AssertionError(
+                f"case {index} unexpectedly used legacy fallback: {result}"
+            )
 
     print("[HOOK PROBE SUMMARY] " + json.dumps(summary, ensure_ascii=False))
+    print("✅ REAL LLM HOOK PRODUCTION-LIKE PROBE PASS")
 
 
 if __name__ == "__main__":
