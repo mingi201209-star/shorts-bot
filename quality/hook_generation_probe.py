@@ -63,6 +63,10 @@ def main():
             attempt.get("scoring_pool_count", 0)
             for attempt in attempts
         ]
+        cumulative_pool_counts = [
+            attempt.get("cumulative_scoring_pool_count", 0)
+            for attempt in attempts
+        ]
         eligible_counts = [
             attempt.get("eligible_candidate_count", 0)
             for attempt in attempts
@@ -75,9 +79,14 @@ def main():
                 for attempt in attempts
             ],
             "scoring_pool_counts": scoring_pool_counts,
+            "cumulative_scoring_pool_counts": cumulative_pool_counts,
             "eligible_candidate_counts": eligible_counts,
             "rejected": [
                 attempt.get("rejected", {})
+                for attempt in attempts
+            ],
+            "length_histograms": [
+                attempt.get("length_histogram", {})
                 for attempt in attempts
             ],
             "selected": bool(selected),
@@ -85,9 +94,9 @@ def main():
         }
         summary.append(result)
 
-        if max(scoring_pool_counts or [0]) < hook_experiment.HOOK_CANDIDATE_COUNT:
+        if max(cumulative_pool_counts or [0]) < hook_experiment.HOOK_CANDIDATE_COUNT:
             raise AssertionError(
-                f"case {index} failed to build five-candidate scoring pool: {result}"
+                f"case {index} failed to build cumulative five-candidate scoring pool: {result}"
             )
         if not selected or audit.get("fallback"):
             raise AssertionError(
