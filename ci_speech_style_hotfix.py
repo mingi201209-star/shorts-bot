@@ -1,0 +1,121 @@
+from pathlib import Path
+
+
+# ============================================================
+# Script Generator: sentence-level deterministic validation
+# ============================================================
+script_path = Path("content/script_generator.py")
+script_source = script_path.read_text(encoding="utf-8")
+
+script_import_marker = "import openai\n\nfrom config import (\n"
+script_import_replacement = (
+    "import openai\n\n"
+    "from quality.korean_speech_style import validate_scenes_speech_style\n\n"
+    "from config import (\n"
+)
+if "from quality.korean_speech_style import validate_scenes_speech_style" not in script_source:
+    if script_source.count(script_import_marker) != 1:
+        raise RuntimeError("script_generator.py speech-style import marker mismatch")
+    script_source = script_source.replace(
+        script_import_marker,
+        script_import_replacement,
+        1,
+    )
+
+script_validation_marker = '    return True, "V3.2.1.2 Script 하드 검사 통과"\n'
+script_validation_replacement = '''    valid, reason = validate_scenes_speech_style(scenes)\n\n    if not valid:\n        return False, reason\n\n    return True, "V3.2.1.2 Script 하드 검사 통과"\n'''
+if script_validation_replacement not in script_source:
+    if script_source.count(script_validation_marker) != 1:
+        raise RuntimeError("script_generator.py speech-style validation marker mismatch")
+    script_source = script_source.replace(
+        script_validation_marker,
+        script_validation_replacement,
+        1,
+    )
+
+script_path.write_text(script_source, encoding="utf-8")
+
+
+# ============================================================
+# Hook Experiment: reject informal Hook candidates before scoring
+# ============================================================
+hook_path = Path("content/hook_experiment.py")
+hook_source = hook_path.read_text(encoding="utf-8")
+
+hook_import_marker = "import openai\n\nfrom config import OPENAI_KEY\n"
+hook_import_replacement = (
+    "import openai\n\n"
+    "from quality.korean_speech_style import validate_korean_speech_text\n\n"
+    "from config import OPENAI_KEY\n"
+)
+if "from quality.korean_speech_style import validate_korean_speech_text" not in hook_source:
+    if hook_source.count(hook_import_marker) != 1:
+        raise RuntimeError("hook_experiment.py speech-style import marker mismatch")
+    hook_source = hook_source.replace(
+        hook_import_marker,
+        hook_import_replacement,
+        1,
+    )
+
+hook_shape_marker = '''        if not _valid_hook_shape(text, keyword):\n            continue\n\n        scores, total_score = _score_hook(item)\n'''
+hook_shape_replacement = '''        if not _valid_hook_shape(text, keyword):\n            continue\n\n        speech_valid, _ = validate_korean_speech_text(\n            text,\n            allow_nominal=True,\n        )\n        if not speech_valid:\n            continue\n\n        scores, total_score = _score_hook(item)\n'''
+if hook_shape_replacement not in hook_source:
+    if hook_source.count(hook_shape_marker) != 1:
+        raise RuntimeError("hook_experiment.py speech-style candidate marker mismatch")
+    hook_source = hook_source.replace(
+        hook_shape_marker,
+        hook_shape_replacement,
+        1,
+    )
+
+hook_path.write_text(hook_source, encoding="utf-8")
+
+
+# ============================================================
+# Rewrite Engine: validate rewritten narration and retry at most once
+# ============================================================
+rewrite_path = Path("quality/rewrite_engine.py")
+rewrite_source = rewrite_path.read_text(encoding="utf-8")
+
+rewrite_import_marker = "import openai\n\nfrom config import OPENAI_KEY\n"
+rewrite_import_replacement = (
+    "import openai\n\n"
+    "from quality.korean_speech_style import validate_script_speech_style\n\n"
+    "from config import OPENAI_KEY\n"
+)
+if "from quality.korean_speech_style import validate_script_speech_style" not in rewrite_source:
+    if rewrite_source.count(rewrite_import_marker) != 1:
+        raise RuntimeError("rewrite_engine.py speech-style import marker mismatch")
+    rewrite_source = rewrite_source.replace(
+        rewrite_import_marker,
+        rewrite_import_replacement,
+        1,
+    )
+
+max_attempts_marker = "    max_attempts = FACT_REWRITE_MAX_ATTEMPTS if fact_guard_enabled else 1\n"
+max_attempts_replacement = (
+    "    max_attempts = FACT_REWRITE_MAX_ATTEMPTS if fact_guard_enabled else 2\n"
+)
+if max_attempts_replacement not in rewrite_source:
+    if rewrite_source.count(max_attempts_marker) != 1:
+        raise RuntimeError("rewrite_engine.py max_attempts marker mismatch")
+    rewrite_source = rewrite_source.replace(
+        max_attempts_marker,
+        max_attempts_replacement,
+        1,
+    )
+
+rewrite_call_marker = '''        rewritten = _run_rewrite_call(\n            script_data,\n            consensus,\n            domains,\n            model=model,\n            retry_fact_issues=retry_fact_issues,\n        )\n\n        if not fact_guard_enabled:\n            break\n'''
+rewrite_call_replacement = '''        rewritten = _run_rewrite_call(\n            script_data,\n            consensus,\n            domains,\n            model=model,\n            retry_fact_issues=retry_fact_issues,\n        )\n\n        speech_valid, speech_reason = validate_script_speech_style(rewritten)\n        if not speech_valid:\n            print(f"🚫 Rewrite speech-style 검사 실패: {speech_reason}")\n            if attempt < max_attempts:\n                print("➡️ 동일 Rewrite를 존댓말 조건으로 제한 재시도합니다.")\n                continue\n\n            print(\n                "⚠️ Rewrite speech-style 재시도 한도 초과. "\n                "비격식 Rewrite 결과를 사용하지 않고 원본 Script로 복귀합니다."\n            )\n            rewritten = copy.deepcopy(script_data)\n            break\n\n        if not fact_guard_enabled:\n            break\n'''
+if rewrite_call_replacement not in rewrite_source:
+    if rewrite_source.count(rewrite_call_marker) != 1:
+        raise RuntimeError("rewrite_engine.py speech-style retry marker mismatch")
+    rewrite_source = rewrite_source.replace(
+        rewrite_call_marker,
+        rewrite_call_replacement,
+        1,
+    )
+
+rewrite_path.write_text(rewrite_source, encoding="utf-8")
+
+print("✅ Korean speech-style hotfix applied")
