@@ -32,9 +32,11 @@ jobs:
           python ci_speech_style_hotfix.py
           python ci_hook_generation_hotfix.py
           python ci_hook_pool_guard_hotfix.py
+          python ci_hook_structure_guidance_hotfix.py
           python -m py_compile \
             ci_hook_generation_hotfix.py \
             ci_hook_pool_guard_hotfix.py \
+            ci_hook_structure_guidance_hotfix.py \
             content/hook_experiment.py \
             quality/hook_generation_probe.py
 
