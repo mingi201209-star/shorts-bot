@@ -246,12 +246,26 @@ SUBTITLE_POSITION_CANDIDATES = (
     ("bottom", 0.70),
 )
 
+HOOK_SUBTITLE_POSITION_CANDIDATES = (
+    ("top", 0.10),
+    ("upper", 0.28),
+    ("lower", 0.62),
+    ("bottom", 0.78),
+)
+
 # 기존 하단 배치를 기본으로 유지하되 실제 프레임의 시각 정보가
 # 더 복잡할 때만 위쪽 후보로 이동한다.
 SUBTITLE_POSITION_BIAS = {
     "top": 0.030,
     "middle": 0.015,
     "bottom": 0.000,
+}
+
+HOOK_SUBTITLE_POSITION_BIAS = {
+    "top": 0.010,
+    "upper": 0.005,
+    "lower": 0.000,
+    "bottom": 0.015,
 }
 
 
@@ -363,9 +377,15 @@ def _visual_region_score(frame, y_top, band_height):
 def choose_safe_subtitle_y(
     video_clip,
     subtitle_height=180,
+    hook_mode=False,
 ):
     default_y = int(
-        VIDEO_HEIGHT * 0.70
+        VIDEO_HEIGHT
+        * (
+            0.78
+            if hook_mode
+            else 0.70
+        )
     )
 
     if video_clip is None:
@@ -381,6 +401,22 @@ def choose_safe_subtitle_y(
     if duration <= 0:
         return default_y
 
+    sample_ratios = (
+        (
+            0.08,
+            0.22,
+            0.40,
+            0.60,
+            0.82,
+        )
+        if hook_mode
+        else (
+            0.20,
+            0.50,
+            0.80,
+        )
+    )
+
     sample_times = [
         max(
             0.0,
@@ -389,16 +425,24 @@ def choose_safe_subtitle_y(
                 duration * ratio,
             ),
         )
-        for ratio in (
-            0.20,
-            0.50,
-            0.80,
-        )
+        for ratio in sample_ratios
     ]
+
+    position_candidates = (
+        HOOK_SUBTITLE_POSITION_CANDIDATES
+        if hook_mode
+        else SUBTITLE_POSITION_CANDIDATES
+    )
+
+    position_bias = (
+        HOOK_SUBTITLE_POSITION_BIAS
+        if hook_mode
+        else SUBTITLE_POSITION_BIAS
+    )
 
     candidate_scores = {}
 
-    for name, ratio in SUBTITLE_POSITION_CANDIDATES:
+    for name, ratio in position_candidates:
 
         y_top = int(
             VIDEO_HEIGHT * ratio
@@ -428,7 +472,7 @@ def choose_safe_subtitle_y(
 
         candidate_scores[name] = (
             float(np.mean(scores))
-            + SUBTITLE_POSITION_BIAS.get(
+            + position_bias.get(
                 name,
                 0.0,
             )
@@ -443,7 +487,7 @@ def choose_safe_subtitle_y(
     )
 
     ratio_map = dict(
-        SUBTITLE_POSITION_CANDIDATES
+        position_candidates
     )
 
     best_y = int(
@@ -452,7 +496,12 @@ def choose_safe_subtitle_y(
     )
 
     print(
-        "🧭 Subtitle safe-area: "
+        "🧭 Subtitle safe-area"
+        + (
+            "[HOOK]: "
+            if hook_mode
+            else ": "
+        )
         + " / ".join(
             f"{name}={score:.3f}"
             for name, score
@@ -603,6 +652,7 @@ def create_subtitle_clips(
     text,
     duration,
     video_clip=None,
+    hook_mode=False,
 ):
 
     chunks = split_subtitle_text(
@@ -639,6 +689,7 @@ def create_subtitle_clips(
 
     subtitle_y = choose_safe_subtitle_y(
         video_clip,
+        hook_mode=hook_mode,
     )
 
     start = 0.0
