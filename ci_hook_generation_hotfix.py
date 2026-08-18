@@ -199,7 +199,9 @@ if import_replacement not in text:
     text = text.replace(import_marker, import_replacement, 1)
 
 if replacement_block not in text:
-    text = text[:normalize_start] + replacement_block + text[request_start:]
+    if text.count(normalize_block) != 1:
+        raise RuntimeError("hook instrumentation normalize block mismatch")
+    text = text.replace(normalize_block, replacement_block, 1)
 
 if request_return_replacement not in text:
     if text.count(request_return_marker) != 1:
