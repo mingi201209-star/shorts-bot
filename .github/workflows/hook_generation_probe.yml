@@ -1,0 +1,53 @@
+name: Hook Generation Production Probe
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  production-like-hook-probe:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Apply current production hotfix chain plus Hook observability
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python -m py_compile content/hook_experiment.py quality/hook_generation_probe.py
+
+      - name: Run real LLM Hook probe
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          V3_HOOK_MODEL: gpt-4o-mini
+          V3_MAX_API_CALLS: "8"
+          V3_MAX_COST_USD: "0.015"
+          HOOK_CANDIDATE_COUNT: "5"
+          HOOK_MAX_REGENERATIONS: "1"
+        run: |
+          set -o pipefail
+          PYTHONPATH=. python quality/hook_generation_probe.py 2>&1 | tee hook_generation_probe.log
+          grep -q "\[HOOK PROBE SUMMARY\]" hook_generation_probe.log
+
+      - name: Upload diagnostic log
+        uses: actions/upload-artifact@v4
+        with:
+          name: hook-generation-probe
+          path: hook_generation_probe.log
