@@ -30,6 +30,19 @@ fact_replacement = '''            # ============================================
             if fact_critical_recovery:
 '''
 
+regenerate_marker = '''            if (
+                status
+                == "REGENERATE_TOPIC"
+            ):
+'''
+
+regenerate_replacement = '''            if (
+                status
+                == "REGENERATE_TOPIC"
+                and not fact_critical_recovery
+            ):
+'''
+
 generic_hold_marker = '''            # =================================================
             # Generic HOLD
             # =================================================
@@ -120,13 +133,25 @@ generic_hold_replacement = '''            # ====================================
             raise RuntimeError(
 '''
 
-if fact_replacement in text and generic_hold_replacement in text:
+already_applied = (
+    fact_replacement in text
+    and regenerate_replacement in text
+    and generic_hold_replacement in text
+)
+
+if already_applied:
     print("FACT_CRITICAL candidate recovery hotfix already applied")
 else:
     if text.count(fact_marker) != 1:
         raise RuntimeError(
             "main.py FACT_CRITICAL recovery marker count mismatch: "
             f"{text.count(fact_marker)}"
+        )
+
+    if text.count(regenerate_marker) != 1:
+        raise RuntimeError(
+            "main.py Candidate Regeneration marker count mismatch: "
+            f"{text.count(regenerate_marker)}"
         )
 
     if text.count(generic_hold_marker) != 1:
@@ -138,6 +163,12 @@ else:
     text = text.replace(
         fact_marker,
         fact_replacement,
+        1,
+    )
+
+    text = text.replace(
+        regenerate_marker,
+        regenerate_replacement,
         1,
     )
 
