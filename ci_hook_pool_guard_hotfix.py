@@ -57,6 +57,71 @@ replacements = [
 ''',
     ),
     (
+        '''        candidates, diagnostics = _request_candidates(
+            topic_info,
+            candidate,
+            attempt,
+            rejection_feedback=rejection_feedback,
+        )
+        candidates.sort(key=lambda item: item["total_score"], reverse=True)
+''',
+        '''        try:
+            request_result = _request_candidates(
+                topic_info,
+                candidate,
+                attempt,
+                rejection_feedback=rejection_feedback,
+            )
+        except TypeError as exc:
+            if "rejection_feedback" not in str(exc):
+                raise
+            request_result = _request_candidates(
+                topic_info,
+                candidate,
+                attempt,
+            )
+
+        if (
+            isinstance(request_result, tuple)
+            and len(request_result) == 2
+            and isinstance(request_result[1], dict)
+        ):
+            candidates, diagnostics = request_result
+        else:
+            candidates = list(request_result or [])
+            diagnostics = _empty_hook_diagnostics()
+            count = len(candidates)
+            scoring_pool_count = sum(
+                1
+                for item in candidates
+                if item.get("criteria_pass", False)
+            )
+            eligible_candidate_count = sum(
+                1
+                for item in candidates
+                if item.get("criteria_pass", False)
+                and float(item.get("total_score", 0.0)) >= HOOK_MIN_SCORE
+            )
+            diagnostics.update({
+                "raw_candidate_count": count,
+                "parsed_candidate_count": count,
+                "normalized_candidate_count": count,
+                "length_valid_count": count,
+                "shape_valid_count": count,
+                "speech_style_valid_count": count,
+                "clarity_valid_count": scoring_pool_count,
+                "specificity_valid_count": scoring_pool_count,
+                "visual_potential_valid_count": scoring_pool_count,
+                "fact_safety_valid_count": scoring_pool_count,
+                "scoring_pool_count": scoring_pool_count,
+                "eligible_candidate_count": eligible_candidate_count,
+                "rejected": {},
+            })
+
+        candidates.sort(key=lambda item: item["total_score"], reverse=True)
+''',
+    ),
+    (
         '''        if (
             diagnostics.get("scoring_pool_count", 0) >= HOOK_CANDIDATE_COUNT
             and round_best
@@ -88,4 +153,4 @@ for old, new in replacements:
     text = text.replace(old, new, 1)
 
 path.write_text(text, encoding="utf-8")
-print("✅ Hook measurable length guidance + five-candidate scoring-pool guard applied")
+print("✅ Hook measurable length guidance + pool guard + legacy request compatibility applied")
