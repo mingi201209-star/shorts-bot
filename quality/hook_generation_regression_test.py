@@ -62,7 +62,10 @@ def test_production_like_parse_to_scoring_pool():
 
 def test_too_long_reason():
     items = [
-        _item(i, "드론이 산업 현장의 아주 작은 균열까지 먼저 찾아내고 알려줘요")
+        _item(
+            i,
+            f"드론이 산업 현장의 아주 작은 {i}번 균열까지 먼저 찾아내고 알려줘요",
+        )
         for i in range(1, 6)
     ]
     _, diagnostics = hook_experiment._diagnose_candidates(_payload(items))
@@ -71,7 +74,7 @@ def test_too_long_reason():
 
 def test_speech_style_reason():
     items = [
-        _item(i, f"드론이 균열을 먼저 찾아낸다{i}")
+        _item(i, f"드론{i}이 균열을 먼저 찾아낸다")
         for i in range(1, 4)
     ]
     _, diagnostics = hook_experiment._diagnose_candidates(_payload(items))
