@@ -49,11 +49,13 @@ jobs:
             content/hook_experiment.py \
             quality/rewrite_engine.py \
             quality/korean_speech_style.py \
-            quality/korean_speech_style_test.py
+            quality/korean_speech_style_test.py \
+            quality/korean_speech_style_rewrite_test.py
 
       - name: Run speech-style regression tests
         run: |
           PYTHONPATH=. python quality/korean_speech_style_test.py
+          PYTHONPATH=. python quality/korean_speech_style_rewrite_test.py
 
       - name: Hook OFF regression
         env:
