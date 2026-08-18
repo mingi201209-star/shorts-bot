@@ -166,3 +166,15 @@ exec(
     ),
     {"__name__": "__main__"},
 )
+
+structure_hotfix = Path("ci_hook_structure_guidance_hotfix.py")
+if not structure_hotfix.exists():
+    raise RuntimeError("ci_hook_structure_guidance_hotfix.py not found")
+exec(
+    compile(
+        structure_hotfix.read_text(encoding="utf-8"),
+        str(structure_hotfix),
+        "exec",
+    ),
+    {"__name__": "__main__"},
+)
