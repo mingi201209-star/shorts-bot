@@ -45,22 +45,20 @@ jobs:
             content/script_generator/__init__.py \
             video/hook_visual.py \
             video/video_engine.py \
-            video/subtitle_engine.py
+            video/subtitle_engine.py \
+            quality/hook_e2e_fixture.py
           PYTHONPATH=. python quality/hook_experiment_test.py
 
-      - name: Run Hook OFF regression E2E
+      - name: Run Hook OFF deterministic regression E2E
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ENABLE_HOOK_EXPERIMENT: "0"
-          V3_JUDGE_MODEL: gpt-4o-mini
-          V3_MAX_API_CALLS: "65"
-          V3_MAX_COST_USD: "0.06"
+          V3_MAX_API_CALLS: "30"
+          V3_MAX_COST_USD: "0.03"
         run: |
           set -o pipefail
-          python main.py 2>&1 | tee hook_off.log
+          PYTHONPATH=. python quality/hook_e2e_fixture.py --mode off 2>&1 | tee hook_off.log
 
           if grep -q "Hook API call authorized" hook_off.log; then
             echo "❌ Hook API call occurred while experiment was OFF"
@@ -77,9 +75,12 @@ jobs:
             exit 1
           fi
 
+          grep -q "FIXTURE E2E COMPLETE | mode=off" hook_off.log
+
       - name: Probe Hook OFF output
         run: |
           test -s final_shorts.mp4
+          test -s hook_off_fixture_result.json
           ffprobe -v error -show_streams -show_format -of json final_shorts.mp4 | tee hook_off_ffprobe.json
 
           python - <<'PY'
@@ -96,7 +97,11 @@ jobs:
           num, den = [int(value) for value in rate.split("/")]
           assert abs(num / den - 30.0) < 0.01, video
           assert audio["codec_name"] == "aac", audio
-          print("✅ Hook OFF codec/resolution/fps contract PASS")
+          fixture = json.load(open("hook_off_fixture_result.json", encoding="utf-8"))
+          assert fixture["mode"] == "off", fixture
+          assert fixture["selected_hook"] is None, fixture
+          assert fixture["production_quality_policy_changed"] is False, fixture
+          print("✅ Hook OFF deterministic production-path contract PASS")
           PY
 
       - name: Upload Hook OFF artifacts
@@ -107,6 +112,7 @@ jobs:
             final_shorts.mp4
             hook_off.log
             hook_off_ffprobe.json
+            hook_off_fixture_result.json
 
   hook-on-e2e:
     runs-on: ubuntu-latest
@@ -146,31 +152,32 @@ jobs:
             content/script_generator/__init__.py \
             video/hook_visual.py \
             video/video_engine.py \
-            video/subtitle_engine.py
+            video/subtitle_engine.py \
+            quality/hook_e2e_fixture.py
           PYTHONPATH=. python quality/hook_experiment_test.py
 
-      - name: Run Hook ON E2E
+      - name: Run Hook ON deterministic E2E
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           ENABLE_HOOK_EXPERIMENT: "1"
-          V3_JUDGE_MODEL: gpt-4o-mini
-          V3_MAX_API_CALLS: "70"
-          V3_MAX_COST_USD: "0.07"
+          V3_MAX_API_CALLS: "35"
+          V3_MAX_COST_USD: "0.04"
         run: |
           set -o pipefail
-          python main.py 2>&1 | tee hook_on.log
+          PYTHONPATH=. python quality/hook_e2e_fixture.py --mode on 2>&1 | tee hook_on.log
 
           grep -q "Hook API call authorized" hook_on.log
           grep -q "HOOK EXPERIMENT AUDIT JSON" hook_on.log
           grep -q "HOOK VISUAL AUDIT JSON" hook_on.log
+          grep -q '"mode": "hook_strict"' hook_on.log
           grep -q "Subtitle safe-area\[HOOK\]" hook_on.log
+          grep -q "FIXTURE E2E COMPLETE | mode=on" hook_on.log
 
       - name: Probe Hook ON output and extract first 3 seconds
         run: |
           test -s final_shorts.mp4
+          test -s hook_on_fixture_result.json
           ffprobe -v error -show_streams -show_format -of json final_shorts.mp4 | tee hook_on_ffprobe.json
 
           python - <<'PY'
@@ -187,10 +194,19 @@ jobs:
           num, den = [int(value) for value in rate.split("/")]
           assert abs(num / den - 30.0) < 0.01, video
           assert audio["codec_name"] == "aac", audio
-          print("✅ Hook ON codec/resolution/fps contract PASS")
+
+          fixture = json.load(open("hook_on_fixture_result.json", encoding="utf-8"))
+          assert fixture["mode"] == "on", fixture
+          assert fixture["selected_hook"], fixture
+          assert fixture["hook_tts_seconds"] <= 3.0, fixture
+          assert fixture["production_quality_policy_changed"] is False, fixture
+          print(
+              "✅ Hook ON codec/resolution/fps/TTS contract PASS | "
+              f"hook_tts={fixture['hook_tts_seconds']:.3f}s"
+          )
           PY
 
-          ffmpeg -y -i final_shorts.mp4 -t 3 -c copy hook_first_3s.mp4
+          ffmpeg -y -i final_shorts.mp4 -t 3 hook_first_3s.mp4
           ffmpeg -y -ss 0.4 -i final_shorts.mp4 -frames:v 1 hook_frame_04.png
           ffmpeg -y -ss 1.4 -i final_shorts.mp4 -frames:v 1 hook_frame_14.png
           ffmpeg -y -ss 2.4 -i final_shorts.mp4 -frames:v 1 hook_frame_24.png
@@ -207,3 +223,4 @@ jobs:
             hook_frame_24.png
             hook_on.log
             hook_on_ffprobe.json
+            hook_on_fixture_result.json
