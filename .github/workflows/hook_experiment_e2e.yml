@@ -35,13 +35,17 @@ jobs:
         run: |
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_rewrite_exhaustion_hotfix.py
           python ci_speech_style_hotfix.py
           grep -n "SCRIPT GENERATION FAILED" main.py
+          grep -n "REWRITE EXHAUSTION CANDIDATE REGENERATION" main.py
 
       - name: Compile and self-test
         run: |
           python -m py_compile \
             main.py \
+            ci_rewrite_exhaustion_hotfix.py \
             content/hook_experiment.py \
             content/script_generator/__init__.py \
             video/hook_visual.py \
@@ -145,13 +149,17 @@ jobs:
         run: |
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_rewrite_exhaustion_hotfix.py
           python ci_speech_style_hotfix.py
           grep -n "SCRIPT GENERATION FAILED" main.py
+          grep -n "REWRITE EXHAUSTION CANDIDATE REGENERATION" main.py
 
       - name: Compile and self-test
         run: |
           python -m py_compile \
             main.py \
+            ci_rewrite_exhaustion_hotfix.py \
             content/hook_experiment.py \
             content/script_generator/__init__.py \
             video/hook_visual.py \
