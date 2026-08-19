@@ -1,0 +1,58 @@
+name: Hook Generation Compatibility
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  current-main-regressions:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Apply current production hotfixes
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python -m py_compile \
+            main.py \
+            content/hook_experiment.py \
+            quality/hook_generation_regression_test.py \
+            quality/fact_critical_regeneration_test.py \
+            quality/korean_speech_style_test.py
+
+      - name: Run Hook and existing regressions
+        run: |
+          PYTHONPATH=. python quality/hook_experiment_test.py
+          PYTHONPATH=. python quality/hook_generation_regression_test.py
+          PYTHONPATH=. python quality/korean_speech_style_test.py
+          PYTHONPATH=. python quality/fact_critical_regeneration_test.py
+
+      - name: Load existing Rewrite exhaustion PR test read-only
+        run: |
+          git fetch --depth=1 origin agent/recover-rewrite-exhaustion
+          git show FETCH_HEAD:ci_rewrite_exhaustion_hotfix.py > /tmp/ci_rewrite_exhaustion_hotfix.py
+          git show FETCH_HEAD:quality/rewrite_exhaustion_regeneration_test.py > /tmp/rewrite_exhaustion_regeneration_test.py
+          python /tmp/ci_rewrite_exhaustion_hotfix.py
+          python -m py_compile main.py /tmp/rewrite_exhaustion_regeneration_test.py
+          PYTHONPATH=. python /tmp/rewrite_exhaustion_regeneration_test.py
