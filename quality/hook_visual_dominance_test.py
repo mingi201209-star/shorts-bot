@@ -64,12 +64,18 @@ def main():
         competing=1.0,
     ))
 
-    # D. If the Hook subject is a person, a person close-up can pass.
+    # D. When the Hook target is a person, that person is not a competing subject.
+    person_hook = {
+        "text": "사람은 왜 하품할까요?",
+        "keyword": "person yawning face close up",
+        "visual_goal": "하품하는 사람 얼굴 클로즈업",
+    }
+    assert requires_observable_action(person_hook) is True
     assert passes_dominance_gate(make_result(
         dominance=9.4,
-        action=10.0,
+        action=8.7,
         competing=0.5,
-        action_required=False,
+        action_required=True,
         target_is_person=True,
     ))
 
@@ -80,14 +86,6 @@ def main():
         competing=1.5,
         visible=False,
     ))
-
-    # Static Hook does not invent an action requirement.
-    person_hook = {
-        "text": "사람은 왜 하품할까요?",
-        "keyword": "person yawning face close up",
-        "visual_goal": "하품하는 사람 얼굴 클로즈업",
-    }
-    assert requires_observable_action(person_hook) is False
 
     print("✅ Hook visual subject-dominance regression PASS")
 
