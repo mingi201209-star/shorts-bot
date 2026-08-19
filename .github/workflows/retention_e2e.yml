@@ -1,0 +1,183 @@
+name: Retention Hook Frame and TTS Speed
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  retention-regression-e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Measure previous TTS rate fixture
+        env:
+          TTS_RATE: "+3%"
+        run: |
+          python - <<'PY'
+          import json
+          from moviepy.editor import AudioFileClip
+          from integrations.tts import create_voice
+
+          text = "벌집 방은 왜 육각형일까요?"
+          create_voice(text, "tts_rate_before.mp3")
+          clip = AudioFileClip("tts_rate_before.mp3")
+          try:
+              duration = float(clip.duration)
+          finally:
+              clip.close()
+          json.dump({"rate": "+3%", "duration": duration}, open("tts_before.json", "w"))
+          print(f"[RETENTION] tts_before_rate=+3% duration={duration:.3f}s")
+          PY
+
+      - name: Apply production hotfix chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_hook_e2e_contract_hotfix.py
+
+          python -m py_compile \
+            ci_retention_hotfix.py \
+            config.py \
+            video/subtitle_engine.py \
+            quality/retention_regression_test.py \
+            quality/hook_generation_regression_test.py \
+            quality/korean_speech_style_test.py \
+            quality/fact_critical_regeneration_test.py \
+            quality/hook_e2e_fixture.py
+
+          grep -n '"+13%"' config.py
+          grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
+
+      - name: Run deterministic regressions
+        run: |
+          PYTHONPATH=. python quality/retention_regression_test.py
+          PYTHONPATH=. python quality/hook_experiment_test.py
+          PYTHONPATH=. python quality/hook_generation_regression_test.py
+          PYTHONPATH=. python quality/korean_speech_style_test.py
+          PYTHONPATH=. python quality/fact_critical_regeneration_test.py
+
+      - name: Run Rewrite exhaustion regression read-only
+        run: |
+          git fetch --depth=1 origin agent/recover-rewrite-exhaustion
+          git show FETCH_HEAD:ci_rewrite_exhaustion_hotfix.py > /tmp/ci_rewrite_exhaustion_hotfix.py
+          git show FETCH_HEAD:quality/rewrite_exhaustion_regeneration_test.py > /tmp/rewrite_exhaustion_regeneration_test.py
+          python /tmp/ci_rewrite_exhaustion_hotfix.py
+          python -m py_compile main.py /tmp/rewrite_exhaustion_regeneration_test.py
+          PYTHONPATH=. python /tmp/rewrite_exhaustion_regeneration_test.py
+
+      - name: Measure accelerated TTS rate fixture
+        run: |
+          python - <<'PY'
+          import json
+          from moviepy.editor import AudioFileClip
+          from integrations.tts import create_voice
+
+          text = "벌집 방은 왜 육각형일까요?"
+          create_voice(text, "tts_rate_after.mp3")
+          clip = AudioFileClip("tts_rate_after.mp3")
+          try:
+              after = float(clip.duration)
+          finally:
+              clip.close()
+          before = json.load(open("tts_before.json"))["duration"]
+          ratio = after / before
+          json.dump({"rate": "+13%", "duration": after, "before": before, "ratio": ratio}, open("tts_after.json", "w"))
+          print(f"[RETENTION] tts_after_rate=+13% duration={after:.3f}s ratio={ratio:.4f}")
+          assert after < before, (before, after)
+          assert 0.86 <= ratio <= 0.96, (before, after, ratio)
+          PY
+
+      - name: Run Hook OFF E2E
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          ENABLE_HOOK_EXPERIMENT: "0"
+          V3_MAX_API_CALLS: "35"
+          V3_MAX_COST_USD: "0.04"
+        run: |
+          set -o pipefail
+          PYTHONPATH=. python quality/hook_e2e_fixture.py --mode off 2>&1 | tee retention_hook_off.log
+          test -s final_shorts.mp4
+          if grep -q "subtitle_start=0.000s" retention_hook_off.log; then
+            echo "Hook-only subtitle path unexpectedly ran while OFF"
+            exit 1
+          fi
+          ffmpeg -v error -i final_shorts.mp4 -f null -
+          cp final_shorts.mp4 retention_hook_off.mp4
+
+      - name: Run Hook ON E2E
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          ENABLE_HOOK_EXPERIMENT: "1"
+          V3_MAX_API_CALLS: "35"
+          V3_MAX_COST_USD: "0.04"
+        run: |
+          set -o pipefail
+          PYTHONPATH=. python quality/hook_e2e_fixture.py --mode on 2>&1 | tee retention_hook_on.log
+          test -s final_shorts.mp4
+          grep -q "subtitle_start=0.000s" retention_hook_on.log
+          grep -q "exact_tts_text=true" retention_hook_on.log
+          grep -q "Subtitle safe-area\[HOOK\]" retention_hook_on.log
+          grep -q '"mode": "hook_strict"' retention_hook_on.log
+          ffmpeg -v error -i final_shorts.mp4 -f null -
+          ffprobe -v error -show_streams -show_format -of json final_shorts.mp4 > retention_ffprobe.json
+          ffmpeg -y -ss 0.05 -i final_shorts.mp4 -frames:v 1 hook_frame_005.png
+          ffmpeg -y -ss 0.20 -i final_shorts.mp4 -frames:v 1 hook_frame_020.png
+
+          python - <<'PY'
+          import json
+          data = json.load(open("retention_ffprobe.json"))
+          video = next(x for x in data["streams"] if x["codec_type"] == "video")
+          audio = next(x for x in data["streams"] if x["codec_type"] == "audio")
+          assert video["codec_name"] == "h264", video
+          assert int(video["width"]) == 1080 and int(video["height"]) == 1920, video
+          rate = video.get("avg_frame_rate") or video.get("r_frame_rate")
+          n, d = [int(x) for x in rate.split("/")]
+          assert abs(n / d - 30.0) < 0.01, video
+          assert audio["codec_name"] == "aac", audio
+          fixture = json.load(open("hook_on_fixture_result.json"))
+          assert fixture["hook_tts_seconds"] <= 3.0, fixture
+          assert fixture["hook_audit"]["fallback"] is False, fixture
+          print(f"[RETENTION] hook_tts={fixture['hook_tts_seconds']:.3f}s")
+          print(f"[RETENTION] final_duration={float(data['format']['duration']):.3f}s")
+          PY
+
+      - name: Upload retention artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retention-e2e
+          path: |
+            final_shorts.mp4
+            retention_hook_off.mp4
+            hook_frame_005.png
+            hook_frame_020.png
+            retention_hook_off.log
+            retention_hook_on.log
+            retention_ffprobe.json
+            hook_on_fixture_result.json
+            tts_before.json
+            tts_after.json
