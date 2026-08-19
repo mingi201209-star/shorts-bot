@@ -169,8 +169,8 @@ jobs:
           from video.video_downloader import USED_VIDEO_IDS
 
           scene = {
-              "text": "벌집 방은 왜 육각형일까요?",
-              "visual_goal": "벌집의 육각형 셀이 화면 중앙에 크게 보이는 실제 클로즈업",
+              "text": "이 고양이 꼬리를 자세히 볼까요?",
+              "visual_goal": "고양이 꼬리 자체가 화면 중앙에 크게 보이는 실제 클로즈업",
               "keyword": "cat close up",
           }
           captured = {}
