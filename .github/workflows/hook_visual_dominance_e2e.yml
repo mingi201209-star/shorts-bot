@@ -1,0 +1,150 @@
+name: Hook Visual Dominance E2E
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  dominance-regression-e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+          ffmpeg -version
+          fc-cache -f -v
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Apply production hotfix chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_hook_e2e_contract_hotfix.py
+
+          grep -n '"+13%"' config.py
+          grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
+          grep -n "HOOK_SUBJECT_DOMINANCE_MIN\|HOOK_ACTION_MATCH_MIN\|HOOK_MAX_COMPETING_SUBJECT_RISK" video/hook_visual_dominance.py
+          grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES" video/hook_visual.py
+
+      - name: Compile and deterministic regressions
+        run: |
+          python -m py_compile \
+            main.py \
+            content/hook_experiment.py \
+            video/hook_visual.py \
+            video/hook_visual_dominance.py \
+            video/video_engine.py \
+            video/subtitle_engine.py \
+            quality/hook_visual_dominance_test.py \
+            quality/hook_generation_regression_test.py \
+            quality/korean_speech_style_test.py \
+            quality/fact_critical_regeneration_test.py \
+            quality/hook_e2e_fixture.py
+
+          PYTHONPATH=. python quality/hook_visual_dominance_test.py
+          PYTHONPATH=. python quality/hook_generation_regression_test.py
+          PYTHONPATH=. python quality/korean_speech_style_test.py
+          PYTHONPATH=. python quality/fact_critical_regeneration_test.py
+
+      - name: Run Hook OFF E2E
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          ENABLE_HOOK_EXPERIMENT: "0"
+          V3_MAX_API_CALLS: "40"
+          V3_MAX_COST_USD: "0.04"
+        run: |
+          set -o pipefail
+          PYTHONPATH=. python quality/hook_e2e_fixture.py --mode off 2>&1 | tee dominance_hook_off.log
+          grep -q "FIXTURE E2E COMPLETE | mode=off" dominance_hook_off.log
+          if grep -q "Hook dominance vision call authorized" dominance_hook_off.log; then
+            echo "❌ Dominance vision ran while Hook experiment was OFF"
+            exit 1
+          fi
+          test -s final_shorts.mp4
+          ffmpeg -v error -i final_shorts.mp4 -f null -
+          mv final_shorts.mp4 dominance_hook_off.mp4
+
+      - name: Run Hook ON E2E
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          ENABLE_HOOK_EXPERIMENT: "1"
+          V3_MAX_API_CALLS: "45"
+          V3_MAX_COST_USD: "0.045"
+        run: |
+          set -o pipefail
+          PYTHONPATH=. python quality/hook_e2e_fixture.py --mode on 2>&1 | tee dominance_hook_on.log
+          grep -q "FIXTURE E2E COMPLETE | mode=on" dominance_hook_on.log
+          grep -q "Hook dominance vision call authorized" dominance_hook_on.log
+          grep -q '"subject_dominance"' dominance_hook_on.log
+          grep -q '"competing_subject_risk"' dominance_hook_on.log
+          grep -q '"pass": true' dominance_hook_on.log
+          grep -q '"mode": "hook_strict"' dominance_hook_on.log
+          grep -q '"fallback": false' dominance_hook_on.log
+          grep -q "subtitle_start=0.000s" dominance_hook_on.log
+          test -s final_shorts.mp4
+          ffmpeg -v error -i final_shorts.mp4 -f null -
+
+      - name: Probe Hook ON output
+        run: |
+          ffprobe -v error -show_streams -show_format -of json final_shorts.mp4 | tee dominance_hook_on_ffprobe.json
+          python - <<'PY'
+          import json
+
+          data = json.load(open("dominance_hook_on_ffprobe.json", encoding="utf-8"))
+          video = next(stream for stream in data["streams"] if stream["codec_type"] == "video")
+          audio = next(stream for stream in data["streams"] if stream["codec_type"] == "audio")
+          assert video["codec_name"] == "h264", video
+          assert int(video["width"]) == 1080, video
+          assert int(video["height"]) == 1920, video
+          rate = video.get("avg_frame_rate") or video.get("r_frame_rate")
+          num, den = [int(value) for value in rate.split("/")]
+          assert abs(num / den - 30.0) < 0.01, video
+          assert audio["codec_name"] == "aac", audio
+          fixture = json.load(open("hook_on_fixture_result.json", encoding="utf-8"))
+          assert fixture["hook_tts_seconds"] <= 3.0, fixture
+          print(f"✅ Hook dominance E2E media contract PASS | hook_tts={fixture['hook_tts_seconds']:.3f}s")
+          PY
+
+          ffmpeg -y -ss 0.05 -i final_shorts.mp4 -frames:v 1 dominance_frame_005.png
+          ffmpeg -y -ss 0.50 -i final_shorts.mp4 -frames:v 1 dominance_frame_050.png
+          ffmpeg -y -ss 1.50 -i final_shorts.mp4 -frames:v 1 dominance_frame_150.png
+          ffmpeg -y -ss 2.50 -i final_shorts.mp4 -frames:v 1 dominance_frame_250.png
+
+      - name: Upload dominance E2E artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hook-visual-dominance-e2e
+          path: |
+            dominance_hook_off.mp4
+            final_shorts.mp4
+            dominance_hook_off.log
+            dominance_hook_on.log
+            dominance_hook_on_ffprobe.json
+            hook_on_fixture_result.json
+            dominance_frame_005.png
+            dominance_frame_050.png
+            dominance_frame_150.png
+            dominance_frame_250.png
