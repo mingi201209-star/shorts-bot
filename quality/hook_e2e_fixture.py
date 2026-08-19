@@ -111,13 +111,13 @@ HOOK_CANDIDATE_FIXTURE = [
 # Stable real Pexels source used only to remove search-ranking randomness from the
 # positive E2E. The production Hook selector, metadata gate, 1080x1920 crop,
 # frame extraction, real vision judge, dominance hard gate, and final selection
-# still run unchanged.
+# still run unchanged. Pexels labels this source Single Subject + Vertical Video.
 CONTROLLED_HOOK_VIDEO = {
-    "id": 7383905,
-    "url": "https://videos.pexels.com/video-files/7383905/7383905-uhd_2160_3840_24fps.mp4",
-    "page_url": "https://www.pexels.com/video/close-up-face-of-a-woman-looking-at-camera-7383905/",
-    "width": 2160,
-    "height": 3840,
+    "id": 6372010,
+    "url": "https://videos.pexels.com/video-files/6372010/6372010-hd_1080_1920_30fps.mp4",
+    "page_url": "https://www.pexels.com/video/woman-looking-at-camera-6372010/",
+    "width": 1080,
+    "height": 1920,
     "duration": 8.0,
     "search_position": 1,
 }
@@ -171,7 +171,7 @@ BASE_SCRIPT = {
 
 def _fixture_search_pexels_candidates(query, per_page):
     del query, per_page
-    print("🧪 HOOK VISUAL CONTROLLED SOURCE: Pexels 7383905")
+    print("🧪 HOOK VISUAL CONTROLLED SOURCE: Pexels 6372010")
     return [copy.deepcopy(CONTROLLED_HOOK_VIDEO)]
 
 
@@ -308,7 +308,7 @@ def main():
 
     result = {
         "mode": args.mode,
-        "fixture": "single-person-face-controlled-source-v4",
+        "fixture": "single-person-face-controlled-source-v5",
         "production_quality_policy_changed": False,
         "output": output,
         "hook_tts_seconds": round(hook_tts_seconds, 3),
