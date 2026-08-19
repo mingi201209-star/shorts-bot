@@ -38,7 +38,9 @@ jobs:
           python ci_speech_style_hotfix.py
           python ci_hook_generation_hotfix.py
           python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
           python ci_hook_e2e_contract_hotfix.py
+          grep -n '"+13%"' config.py
           grep -n "HOOK_GENERATION_COUNT\|speech_style_failure\|cumulative_scoring_pool_count" content/hook_experiment.py
           grep -n "SCRIPT GENERATION FAILED" main.py
 
@@ -50,7 +52,9 @@ jobs:
             ci_hook_structure_guidance_hotfix.py \
             ci_hook_retry_repair_hotfix.py \
             ci_hook_e2e_contract_hotfix.py \
+            ci_retention_hotfix.py \
             main.py \
+            config.py \
             content/hook_experiment.py \
             content/script_generator/__init__.py \
             video/hook_visual.py \
@@ -159,7 +163,9 @@ jobs:
           python ci_speech_style_hotfix.py
           python ci_hook_generation_hotfix.py
           python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
           python ci_hook_e2e_contract_hotfix.py
+          grep -n '"+13%"' config.py
           grep -n "HOOK_GENERATION_COUNT\|speech_style_failure\|cumulative_scoring_pool_count" content/hook_experiment.py
           grep -n "SCRIPT GENERATION FAILED" main.py
 
@@ -171,7 +177,9 @@ jobs:
             ci_hook_structure_guidance_hotfix.py \
             ci_hook_retry_repair_hotfix.py \
             ci_hook_e2e_contract_hotfix.py \
+            ci_retention_hotfix.py \
             main.py \
+            config.py \
             content/hook_experiment.py \
             content/script_generator/__init__.py \
             video/hook_visual.py \
