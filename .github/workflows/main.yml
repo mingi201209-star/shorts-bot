@@ -54,11 +54,14 @@ jobs:
           python ci_speech_style_hotfix.py
           python ci_hook_generation_hotfix.py
           python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
           grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
           grep -n "MAX_SCRIPT_ATTEMPTS" config.py
+          grep -n '"+13%"' config.py
+          grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
           grep -n "temperature=0.5" content/candidate_explorer.py
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
           grep -n "NARRATION TONE\|존댓말 종결\|RETRY FEEDBACK\|meaningful_keyword_words" content/script_generator.py
@@ -74,6 +77,7 @@ jobs:
             ci_speech_style_hotfix.py \
             ci_hook_generation_hotfix.py \
             ci_hook_pool_guard_hotfix.py \
+            ci_retention_hotfix.py \
             main.py \
             config.py \
             content/candidate_explorer.py \
@@ -83,7 +87,8 @@ jobs:
             quality/rewrite_engine.py \
             quality/korean_speech_style.py \
             video/video_downloader.py \
-            video/video_engine.py
+            video/video_engine.py \
+            video/subtitle_engine.py
 
       - name: Run Shorts Generator V3.2
         env:
