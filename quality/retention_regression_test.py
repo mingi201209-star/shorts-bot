@@ -1,4 +1,5 @@
 import importlib
+import importlib.util
 import math
 
 
@@ -10,6 +11,11 @@ def _assert(condition, message):
 
 
 # Production hotfix must already have been applied before importing config.
+# Retention is independent of whether the Hook subject-dominance module exists.
+# Capture availability only to prove this regression does not mutate it.
+dominance_available_before = (
+    importlib.util.find_spec("video.hook_visual_dominance") is not None
+)
 config = importlib.import_module("config")
 subtitle_engine = importlib.import_module("video.subtitle_engine")
 
@@ -55,5 +61,14 @@ try:
 finally:
     subtitle_engine.render_subtitle_image = original_render
     subtitle_engine.choose_safe_subtitle_y = original_choose
+
+
+dominance_available_after = (
+    importlib.util.find_spec("video.hook_visual_dominance") is not None
+)
+_assert(
+    dominance_available_after == dominance_available_before,
+    "Retention regression leaves Hook dominance availability unchanged",
+)
 
 print("✅ RETENTION REGRESSION TESTS PASS")

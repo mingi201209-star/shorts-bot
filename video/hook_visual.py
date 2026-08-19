@@ -5,6 +5,12 @@ from config import (
     PEXELS_RELEVANT_TOP_N,
     PEXELS_SEARCH_PER_PAGE,
 )
+from video.hook_visual_dominance import (
+    HOOK_ACTION_MATCH_MIN,
+    HOOK_MAX_COMPETING_SUBJECT_RISK,
+    HOOK_SUBJECT_DOMINANCE_MIN,
+    evaluate_hook_subject_dominance,
+)
 from video.video_downloader import (
     USED_VIDEO_IDS,
     _candidate_matches_subject_anchor,
@@ -38,6 +44,7 @@ HOOK_VISUAL_FLOORS = {
     "mobile_clarity": 8.0,
 }
 HOOK_VISUAL_MAX_OBSTRUCTION_RISK = 4.0
+HOOK_DOMINANCE_MAX_CANDIDATES = 3
 
 
 def _tokens(text):
@@ -205,12 +212,20 @@ def fetch_hook_pexels_video(scene):
         "minimum": HOOK_VISUAL_MIN_SCORE,
         "criteria_floors": dict(HOOK_VISUAL_FLOORS),
         "max_obstruction_risk": HOOK_VISUAL_MAX_OBSTRUCTION_RISK,
+        "dominance_gate": {
+            "subject_dominance_min": HOOK_SUBJECT_DOMINANCE_MIN,
+            "action_match_min_when_required": HOOK_ACTION_MATCH_MIN,
+            "max_competing_subject_risk": HOOK_MAX_COMPETING_SUBJECT_RISK,
+            "max_candidates": HOOK_DOMINANCE_MAX_CANDIDATES,
+            "frame_basis": "production 1080x1920 center crop, first 0-2.5s",
+        },
         "searches": [],
         "selected": None,
         "fallback": False,
     }
 
     strict_best = None
+    dominance_checks = 0
     for search_query in queries:
         candidates = search_pexels_candidates(
             search_query,
@@ -228,10 +243,31 @@ def fetch_hook_pexels_video(scene):
                 "candidate": candidate,
                 "scores": scores,
                 "total_score": total_score,
+                "dominance": None,
             })
 
         scored.sort(key=lambda item: item["total_score"], reverse=True)
-        passing = [item for item in scored if _passes_strict_gate(item)]
+        metadata_passing = [item for item in scored if _passes_strict_gate(item)]
+
+        for item in metadata_passing:
+            if dominance_checks >= HOOK_DOMINANCE_MAX_CANDIDATES:
+                break
+            dominance_checks += 1
+            try:
+                dominance = evaluate_hook_subject_dominance(
+                    item["candidate"],
+                    {**scene, "keyword": search_query},
+                )
+            except Exception as exc:
+                dominance = {
+                    "pass": False,
+                    "error": type(exc).__name__,
+                    "reason": str(exc)[:300],
+                }
+            item["dominance"] = dominance
+            if dominance.get("pass"):
+                strict_best = item
+                break
 
         audit["searches"].append({
             "query": search_query,
@@ -244,14 +280,19 @@ def fetch_hook_pexels_video(scene):
                     "page_url": item["candidate"].get("page_url"),
                     "scores": item["scores"],
                     "total_score": item["total_score"],
-                    "strict_pass": _passes_strict_gate(item),
+                    "metadata_strict_pass": _passes_strict_gate(item),
+                    "dominance": item.get("dominance"),
+                    "strict_pass": bool(
+                        _passes_strict_gate(item)
+                        and item.get("dominance")
+                        and item["dominance"].get("pass")
+                    ),
                 }
                 for item in scored[:5]
             ],
         })
 
-        if passing:
-            strict_best = passing[0]
+        if strict_best or dominance_checks >= HOOK_DOMINANCE_MAX_CANDIDATES:
             break
 
     if strict_best:
@@ -264,6 +305,7 @@ def fetch_hook_pexels_video(scene):
             "id": video_id,
             "page_url": candidate.get("page_url"),
             "scores": strict_best["scores"],
+            "dominance": strict_best.get("dominance"),
             "total_score": strict_best["total_score"],
             "mode": "hook_strict",
         }
@@ -272,7 +314,8 @@ def fetch_hook_pexels_video(scene):
 
     audit["fallback"] = True
     audit["fallback_reason"] = (
-        "직접 의미 일치 hard gate를 통과한 안전 후보가 없어 기존 Pexels 경로로 fallback"
+        "기존 metadata strict gate와 실제 9:16 초반 프레임 subject dominance/action gate를 "
+        "모두 통과한 후보가 없어 기존 Pexels 경로로 fallback"
     )
     print_hook_visual_audit(audit)
     return fetch_pexels_video(original_query)

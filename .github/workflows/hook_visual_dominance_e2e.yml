@@ -1,0 +1,369 @@
+name: Hook Visual Dominance E2E
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  dominance-regression-e2e:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+          ffmpeg -version
+          fc-cache -f -v
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Apply production hotfix chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_hook_e2e_contract_hotfix.py
+
+          grep -n '"+13%"' config.py
+          grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
+          grep -n "HOOK_SUBJECT_DOMINANCE_MIN\|HOOK_ACTION_MATCH_MIN\|HOOK_MAX_COMPETING_SUBJECT_RISK" video/hook_visual_dominance.py
+          grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES" video/hook_visual.py
+
+      - name: Compile and deterministic regressions
+        run: |
+          python -m py_compile \
+            main.py \
+            content/hook_experiment.py \
+            video/hook_visual.py \
+            video/hook_visual_dominance.py \
+            video/video_engine.py \
+            video/subtitle_engine.py \
+            quality/hook_visual_dominance_test.py \
+            quality/hook_generation_regression_test.py \
+            quality/korean_speech_style_test.py \
+            quality/fact_critical_regeneration_test.py \
+            quality/hook_e2e_fixture.py
+
+          PYTHONPATH=. python quality/hook_visual_dominance_test.py
+          PYTHONPATH=. python quality/hook_generation_regression_test.py
+          PYTHONPATH=. python quality/korean_speech_style_test.py
+          PYTHONPATH=. python quality/fact_critical_regeneration_test.py
+
+      - name: Qualify controlled positive source 3x with real vision judge
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          ENABLE_HOOK_EXPERIMENT: "1"
+          V3_MAX_API_CALLS: "8"
+          V3_MAX_COST_USD: "0.01"
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          import copy
+          import json
+
+          from quality.hook_e2e_fixture import CONTROLLED_HOOK_VIDEO
+          from video import hook_visual
+          from video.video_downloader import USED_VIDEO_IDS
+
+          scene = {
+              "text": "이 고양이 얼굴을 자세히 볼까요?",
+              "visual_goal": "한 마리 고양이 얼굴이 화면 중앙에 크게 보이는 실제 세로 클로즈업",
+              "keyword": "cat close up",
+          }
+          original_search = hook_visual.search_pexels_candidates
+          original_fallback = hook_visual.fetch_pexels_video
+          original_print = hook_visual.print_hook_visual_audit
+          runs = []
+
+          def controlled_search(query, per_page):
+              del query, per_page
+              return [copy.deepcopy(CONTROLLED_HOOK_VIDEO)]
+
+          def forbidden_fallback(query):
+              raise AssertionError(f"Positive qualification unexpectedly fell back: {query}")
+
+          try:
+              hook_visual.search_pexels_candidates = controlled_search
+              hook_visual.fetch_pexels_video = forbidden_fallback
+              for attempt in range(1, 4):
+                  captured = {}
+
+                  def capture(audit):
+                      captured.update(copy.deepcopy(audit))
+                      original_print(audit)
+
+                  hook_visual.print_hook_visual_audit = capture
+                  USED_VIDEO_IDS.discard(CONTROLLED_HOOK_VIDEO["id"])
+                  returned = hook_visual.fetch_hook_pexels_video(scene)
+                  selected = captured.get("selected") or {}
+                  dominance = selected.get("dominance") or {}
+                  searches = captured.get("searches", [])
+                  top_items = [item for search in searches for item in search.get("top", [])]
+                  metadata_pass = [item for item in top_items if item.get("metadata_strict_pass")]
+                  reviewed = [item for item in top_items if item.get("dominance") is not None]
+
+                  result = {
+                      "attempt": attempt,
+                      "source_id": CONTROLLED_HOOK_VIDEO["id"],
+                      "returned_expected_url": returned == CONTROLLED_HOOK_VIDEO["url"],
+                      "metadata_candidates_count": len(top_items),
+                      "metadata_strict_pass_count": len(metadata_pass),
+                      "dominance_reviewed_candidates_count": len(reviewed),
+                      "selected": selected,
+                      "fallback": captured.get("fallback"),
+                  }
+                  runs.append(result)
+                  print(json.dumps(result, ensure_ascii=False, indent=2))
+
+                  assert returned == CONTROLLED_HOOK_VIDEO["url"], result
+                  assert selected.get("id") == CONTROLLED_HOOK_VIDEO["id"], result
+                  assert selected.get("mode") == "hook_strict", result
+                  assert captured.get("fallback") is False, result
+                  assert dominance.get("pass") is True, result
+                  assert float(dominance.get("subject_dominance", 0)) >= 8.0, result
+                  assert float(dominance.get("competing_subject_risk", 10)) <= 4.0, result
+                  if dominance.get("action_required"):
+                      assert float(dominance.get("action_match", 0)) >= 7.0, result
+                  assert dominance.get("vertical_crop_subject_visible") is True, result
+                  assert 1 <= len(reviewed) <= 3, result
+
+              print("✅ CONTROLLED POSITIVE SOURCE REAL-VISION QUALIFICATION PASS 3/3")
+              print(json.dumps({"qualification_runs": runs}, ensure_ascii=False, indent=2))
+          finally:
+              hook_visual.search_pexels_candidates = original_search
+              hook_visual.fetch_pexels_video = original_fallback
+              hook_visual.print_hook_visual_audit = original_print
+              USED_VIDEO_IDS.discard(CONTROLLED_HOOK_VIDEO["id"])
+          PY
+
+      - name: Run real negative fallback regression
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          ENABLE_HOOK_EXPERIMENT: "1"
+          V3_MAX_API_CALLS: "8"
+          V3_MAX_COST_USD: "0.01"
+        run: |
+          PYTHONPATH=. python - <<'PY'
+          import copy
+          import json
+
+          from quality.hook_e2e_fixture import CONTROLLED_HOOK_VIDEO
+          from video import hook_visual
+          from video.video_downloader import USED_VIDEO_IDS
+
+          scene = {
+              "text": "이 고양이 꼬리를 자세히 볼까요?",
+              "visual_goal": "고양이 꼬리 자체가 화면 중앙에 크게 보이는 실제 클로즈업",
+              "keyword": "cat close up",
+          }
+          captured = {}
+          legacy_calls = []
+          original_search = hook_visual.search_pexels_candidates
+          original_fallback = hook_visual.fetch_pexels_video
+          original_print = hook_visual.print_hook_visual_audit
+
+          def controlled_search(query, per_page):
+              del query, per_page
+              return [copy.deepcopy(CONTROLLED_HOOK_VIDEO)]
+
+          def legacy_fallback(query):
+              legacy_calls.append(query)
+              return "fixture://legacy-fallback"
+
+          def capture(audit):
+              captured.update(copy.deepcopy(audit))
+              original_print(audit)
+
+          USED_VIDEO_IDS.discard(CONTROLLED_HOOK_VIDEO["id"])
+          hook_visual.search_pexels_candidates = controlled_search
+          hook_visual.fetch_pexels_video = legacy_fallback
+          hook_visual.print_hook_visual_audit = capture
+          try:
+              returned = hook_visual.fetch_hook_pexels_video(scene)
+          finally:
+              hook_visual.search_pexels_candidates = original_search
+              hook_visual.fetch_pexels_video = original_fallback
+              hook_visual.print_hook_visual_audit = original_print
+              USED_VIDEO_IDS.discard(CONTROLLED_HOOK_VIDEO["id"])
+
+          top_items = [
+              item
+              for search in captured.get("searches", [])
+              for item in search.get("top", [])
+          ]
+          metadata_pass = [item for item in top_items if item.get("metadata_strict_pass")]
+          reviewed = [item for item in top_items if item.get("dominance") is not None]
+
+          assert returned == "fixture://legacy-fallback", returned
+          assert captured.get("selected") is None, captured
+          assert captured.get("fallback") is True, captured
+          assert legacy_calls == [scene["keyword"]], legacy_calls
+          assert metadata_pass, captured
+          assert reviewed, captured
+          assert not any(item.get("strict_pass") for item in reviewed), reviewed
+          print("✅ NEGATIVE DOMINANCE FALLBACK PASS")
+          print(json.dumps({
+              "fallback": captured.get("fallback"),
+              "fallback_reason": captured.get("fallback_reason"),
+              "metadata_candidates_count": len(top_items),
+              "metadata_strict_pass_count": len(metadata_pass),
+              "dominance_reviewed_candidates_count": len(reviewed),
+              "rejected": [
+                  {
+                      "id": item.get("id"),
+                      "dominance": item.get("dominance"),
+                      "strict_pass": item.get("strict_pass"),
+                  }
+                  for item in reviewed
+              ],
+          }, ensure_ascii=False, indent=2))
+          PY
+
+      - name: Run Hook OFF E2E
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          ENABLE_HOOK_EXPERIMENT: "0"
+          V3_MAX_API_CALLS: "40"
+          V3_MAX_COST_USD: "0.04"
+        run: |
+          set -o pipefail
+          PYTHONPATH=. python quality/hook_e2e_fixture.py --mode off 2>&1 | tee dominance_hook_off.log
+          grep -q "FIXTURE E2E COMPLETE | mode=off" dominance_hook_off.log
+          if grep -q "Hook dominance vision call authorized" dominance_hook_off.log; then
+            echo "❌ Dominance vision ran while Hook experiment was OFF"
+            exit 1
+          fi
+          test -s final_shorts.mp4
+          ffmpeg -v error -i final_shorts.mp4 -f null -
+          mv final_shorts.mp4 dominance_hook_off.mp4
+
+      - name: Run Hook ON E2E
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          ENABLE_HOOK_EXPERIMENT: "1"
+          V3_MAX_API_CALLS: "45"
+          V3_MAX_COST_USD: "0.045"
+        run: |
+          set -o pipefail
+          PYTHONPATH=. python quality/hook_e2e_fixture.py --mode on 2>&1 | tee dominance_hook_on.log
+          grep -q "FIXTURE E2E COMPLETE | mode=on" dominance_hook_on.log
+          grep -q "Hook dominance vision call authorized" dominance_hook_on.log
+          grep -q "subtitle_start=0.000s" dominance_hook_on.log
+          test -s final_shorts.mp4
+
+      - name: Probe and preserve Hook ON output
+        run: |
+          ffmpeg -v error -i final_shorts.mp4 -f null -
+          ffprobe -v error -show_streams -show_format -of json final_shorts.mp4 | tee dominance_hook_on_ffprobe.json
+          python - <<'PY'
+          import json
+
+          data = json.load(open("dominance_hook_on_ffprobe.json", encoding="utf-8"))
+          video = next(stream for stream in data["streams"] if stream["codec_type"] == "video")
+          audio = next(stream for stream in data["streams"] if stream["codec_type"] == "audio")
+          assert video["codec_name"] == "h264", video
+          assert int(video["width"]) == 1080, video
+          assert int(video["height"]) == 1920, video
+          rate = video.get("avg_frame_rate") or video.get("r_frame_rate")
+          num, den = [int(value) for value in rate.split("/")]
+          assert abs(num / den - 30.0) < 0.01, video
+          assert audio["codec_name"] == "aac", audio
+          fixture = json.load(open("hook_on_fixture_result.json", encoding="utf-8"))
+          assert fixture["hook_tts_seconds"] <= 3.0, fixture
+          print(f"✅ Hook dominance E2E media contract PASS | hook_tts={fixture['hook_tts_seconds']:.3f}s")
+          PY
+
+          ffmpeg -y -ss 0.05 -i final_shorts.mp4 -frames:v 1 dominance_frame_005.png
+          ffmpeg -y -ss 0.50 -i final_shorts.mp4 -frames:v 1 dominance_frame_050.png
+          ffmpeg -y -ss 1.50 -i final_shorts.mp4 -frames:v 1 dominance_frame_150.png
+          ffmpeg -y -ss 2.50 -i final_shorts.mp4 -frames:v 1 dominance_frame_250.png
+
+      - name: Validate Hook ON strict dominance contract
+        run: |
+          python - <<'PY'
+          import json
+          import sys
+
+          fixture = json.load(open("hook_on_fixture_result.json", encoding="utf-8"))
+          audit = fixture.get("hook_visual_audit") or {}
+          searches = audit.get("searches", [])
+          top_items = [item for search in searches for item in search.get("top", [])]
+          metadata_pass = [item for item in top_items if item.get("metadata_strict_pass")]
+          reviewed = [item for item in top_items if item.get("dominance") is not None]
+          selected = audit.get("selected")
+
+          summary = {
+              "hook_text": (fixture.get("selected_hook") or {}).get("text"),
+              "query": audit.get("query"),
+              "effective_query": audit.get("effective_query"),
+              "metadata_candidates_count": len(top_items),
+              "metadata_strict_pass_count": len(metadata_pass),
+              "dominance_reviewed_candidates_count": len(reviewed),
+              "selected": selected,
+              "fallback": audit.get("fallback"),
+              "fallback_reason": audit.get("fallback_reason"),
+              "rejected": [
+                  {
+                      "id": item.get("id"),
+                      "metadata_strict_pass": item.get("metadata_strict_pass"),
+                      "dominance": item.get("dominance"),
+                      "strict_pass": item.get("strict_pass"),
+                  }
+                  for item in reviewed
+                  if not item.get("strict_pass")
+              ],
+          }
+          print(json.dumps(summary, ensure_ascii=False, indent=2))
+
+          if not selected:
+              print("NO_STRICT_DOMINANCE_CANDIDATE", file=sys.stderr)
+              raise SystemExit(1)
+
+          dominance = selected.get("dominance") or {}
+          assert selected.get("mode") == "hook_strict", summary
+          assert audit.get("fallback") is False, summary
+          assert dominance.get("pass") is True, summary
+          assert float(dominance.get("subject_dominance", 0)) >= 8.0, summary
+          assert float(dominance.get("competing_subject_risk", 10)) <= 4.0, summary
+          if dominance.get("action_required"):
+              assert float(dominance.get("action_match", 0)) >= 7.0, summary
+          assert dominance.get("vertical_crop_subject_visible") is True, summary
+          assert len(reviewed) <= 3, summary
+          print("✅ POSITIVE STRICT DOMINANCE E2E PASS")
+          PY
+
+      - name: Upload dominance E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hook-visual-dominance-e2e
+          path: |
+            dominance_hook_off.mp4
+            final_shorts.mp4
+            dominance_hook_off.log
+            dominance_hook_on.log
+            dominance_hook_on_ffprobe.json
+            hook_on_fixture_result.json
+            dominance_frame_005.png
+            dominance_frame_050.png
+            dominance_frame_150.png
+            dominance_frame_250.png
