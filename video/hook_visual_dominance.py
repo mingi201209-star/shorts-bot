@@ -18,15 +18,16 @@ HOOK_DOMINANCE_MODEL = os.environ.get("HOOK_DOMINANCE_MODEL", "gpt-4o-mini")
 HOOK_SUBJECT_DOMINANCE_MIN = 8.0
 HOOK_ACTION_MATCH_MIN = 7.0
 HOOK_MAX_COMPETING_SUBJECT_RISK = 4.0
-HOOK_EARLY_FRAME_TIMES = (0.05, 0.5, 1.5, 2.5)
+HOOK_EARLY_FRAME_TIMES = (0.0, 0.5, 1.5, 2.5)
 
 _OBSERVABLE_ACTION_TERMS = {
     "회전", "회전하", "돌아", "도는", "돌고", "움직", "흐르", "날아",
     "뛰", "달리", "걷", "열리", "닫히", "타오르", "떨어", "흔들",
-    "구르", "분사", "솟", "감기", "펼치", "접히", "파도치",
+    "구르", "분사", "솟", "감기", "펼치", "접히", "파도치", "하품",
     "rotating", "rotate", "spinning", "spin", "turning", "moving",
     "running", "flowing", "flying", "walking", "driving", "opening",
     "closing", "burning", "falling", "rolling", "swirling", "waving",
+    "yawning", "yawn",
 }
 
 
@@ -120,7 +121,7 @@ def _extract_vertical_frames(video_url):
         if len(generated) < 2:
             raise RuntimeError("Hook dominance frame extraction produced too few frames")
 
-        # fps=2 produces frames around 0.0, 0.5, 1.0, 1.5, 2.0, 2.5.
+        # fps=2 yields frames around 0.0, 0.5, 1.0, 1.5, 2.0, 2.5.
         wanted = (0, 1, 3, 5)
         selected = [generated[index] for index in wanted if index < len(generated)]
         encoded = []
@@ -157,7 +158,7 @@ Examples:
 - Hook about a rotating snake: snake close-up with clear movement = high dominance/action and low competing risk.
 - Hook about a rotating snake: large human holding a small snake = low dominance, high competing risk even though a snake exists.
 - Hook about a rotating snake: large static snake = high dominance but low action_match.
-- Hook about a yawning person: a human face close-up can be valid because the person is the promised subject.
+- Hook about a yawning person: a human face close-up can be valid because the person is the promised subject, but the promised yawn still needs visible action match.
 
 Return JSON only:
 {{
