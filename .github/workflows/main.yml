@@ -51,6 +51,7 @@ jobs:
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
           python ci_fact_critical_hotfix.py
+          python ci_rewrite_exhaustion_hotfix.py
           python ci_speech_style_hotfix.py
           python ci_hook_generation_hotfix.py
           python ci_hook_pool_guard_hotfix.py
@@ -59,6 +60,7 @@ jobs:
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
           grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
+          grep -n "REWRITE EXHAUSTION CANDIDATE REGENERATION" main.py
           grep -n "MAX_SCRIPT_ATTEMPTS" config.py
           grep -n '"+13%"' config.py
           grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
@@ -74,6 +76,7 @@ jobs:
             ci_hotfix.py \
             ci_novelty_budget_hotfix.py \
             ci_fact_critical_hotfix.py \
+            ci_rewrite_exhaustion_hotfix.py \
             ci_speech_style_hotfix.py \
             ci_hook_generation_hotfix.py \
             ci_hook_pool_guard_hotfix.py \
