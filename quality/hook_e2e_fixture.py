@@ -12,29 +12,30 @@ from content.hook_experiment import (
 )
 from content.script_generator import _apply_selected_hook
 from integrations.tts import create_voice
+from video import hook_visual
 from video.renderer import render_final_video
 from video.video_engine import create_scene
 
 
 TOPIC_INFO = {
-    "category": "nature",
-    "direction": "visible structure and function",
+    "category": "people",
+    "direction": "visible face close-up",
     "fixture": "hook-e2e-approved-input",
 }
 
 WINNER = {
-    "topic": "벌집의 육각형 구조",
-    "core_question": "벌집의 방은 왜 육각형 모양으로 이어져 있을까?",
-    "question": "벌집의 방은 왜 육각형 모양으로 이어져 있을까?",
+    "topic": "사람 얼굴 클로즈업",
+    "core_question": "사람 얼굴은 가까이에서 어떤 특징이 보일까?",
+    "question": "사람 얼굴은 가까이에서 어떤 특징이 보일까?",
     "micro_narrative": (
-        "벌집을 가까이 보면 반복되는 육각형 방이 보인다. "
-        "각 방이 맞닿아 이어지는 구조 자체를 중심으로 설명한다."
+        "사람 얼굴을 가까이 보면 눈, 코, 입과 표정이 한 화면에 선명하게 보인다. "
+        "카메라에 크게 잡힌 한 사람의 얼굴 자체를 중심으로 설명한다."
     ),
     "fact_check_focus": (
-        "벌집에서 반복되는 육각형 셀의 형태와 서로 맞닿는 구조만 다룬다."
+        "실제 한 사람의 얼굴이 가까이 보이는 장면에서 직접 확인 가능한 특징만 다룬다."
     ),
     "visual_proof": (
-        "실제 벌집의 육각형 셀을 화면에서 직접 식별할 수 있는 클로즈업"
+        "한 사람의 얼굴이 세로 화면 중앙을 크게 차지하는 실제 클로즈업"
     ),
     "selection_reason": "Deterministic Hook E2E fixture; production quality policy is not changed.",
 }
@@ -42,113 +43,142 @@ WINNER = {
 HOOK_CANDIDATE_FIXTURE = [
     {
         "id": "fixture_hook_1",
-        "text": "벌집 방은 왜 육각형일까요?",
-        "visual_goal": "신선한 벌집의 육각형 셀이 화면 중앙에 크게 보이는 실제 클로즈업",
-        "keyword": "fresh honeycomb golden honey",
-        "stop_power": 8.4,
+        "text": "이 사람 얼굴을 자세히 볼까요?",
+        "visual_goal": "한 사람의 얼굴이 화면 중앙에 크게 보이는 실제 세로 클로즈업",
+        "keyword": "woman face close up",
+        "stop_power": 8.6,
         "curiosity_gap": 8.2,
-        "clarity": 9.0,
-        "specificity": 9.0,
-        "visual_potential": 9.4,
-        "fact_safety": 9.6,
-        "reason": "질문과 화면에 같은 벌집 육각형 구조가 직접 등장한다.",
+        "clarity": 9.4,
+        "specificity": 9.2,
+        "visual_potential": 9.8,
+        "fact_safety": 9.8,
+        "reason": "대사와 화면이 같은 한 사람의 얼굴을 직접 가리킨다.",
     },
     {
         "id": "fixture_hook_2",
-        "text": "벌집 육각형은 어떻게 이어질까요?",
-        "visual_goal": "서로 맞닿은 육각형 벌집 셀 여러 개가 선명한 매크로 장면",
-        "keyword": "honeycomb cells macro",
-        "stop_power": 8.1,
+        "text": "사람 얼굴은 어떻게 보일까요?",
+        "visual_goal": "한 사람 얼굴의 눈과 표정이 선명한 정면 클로즈업",
+        "keyword": "woman face close up",
+        "stop_power": 8.2,
         "curiosity_gap": 8.3,
-        "clarity": 8.8,
+        "clarity": 9.1,
         "specificity": 8.8,
-        "visual_potential": 9.2,
-        "fact_safety": 9.6,
-        "reason": "맞닿은 셀 구조를 실제 화면으로 바로 검증할 수 있다.",
+        "visual_potential": 9.6,
+        "fact_safety": 9.8,
+        "reason": "한 사람 얼굴을 즉시 알아볼 수 있는 단순한 첫 화면이다.",
     },
     {
         "id": "fixture_hook_3",
-        "text": "벌집의 육각형 방을 자세히 볼까요?",
-        "visual_goal": "실제 벌집의 육각형 방 경계가 또렷한 근접 촬영",
-        "keyword": "honeycomb hexagonal cells",
-        "stop_power": 7.8,
-        "curiosity_gap": 7.6,
+        "text": "가까운 사람 얼굴을 살펴볼까요?",
+        "visual_goal": "다른 피사체 없이 한 사람 얼굴이 크게 잡힌 세로 영상",
+        "keyword": "woman face close up",
+        "stop_power": 8.0,
+        "curiosity_gap": 7.9,
         "clarity": 9.2,
-        "specificity": 9.1,
-        "visual_potential": 9.4,
+        "specificity": 9.0,
+        "visual_potential": 9.6,
         "fact_safety": 9.8,
-        "reason": "보이는 구조만 말해 사실 위험과 시각 불일치 위험이 낮다.",
+        "reason": "관찰 대상이 한 사람 얼굴로 명확하다.",
     },
     {
         "id": "fixture_hook_4",
-        "text": "벌집 방마다 왜 육각형이 보일까요?",
-        "visual_goal": "반복되는 육각형 셀 패턴이 크게 보이는 자연 벌집",
-        "keyword": "natural honeycomb hexagon",
-        "stop_power": 8.0,
-        "curiosity_gap": 8.0,
-        "clarity": 8.8,
-        "specificity": 8.9,
-        "visual_potential": 9.3,
-        "fact_safety": 9.5,
-        "reason": "육각형 반복 패턴이 대사와 화면에서 직접 일치한다.",
+        "text": "이 사람 얼굴의 특징이 보이나요?",
+        "visual_goal": "한 사람의 얼굴 특징이 모바일에서도 또렷한 정면 근접 촬영",
+        "keyword": "woman face close up",
+        "stop_power": 8.1,
+        "curiosity_gap": 8.1,
+        "clarity": 9.0,
+        "specificity": 9.1,
+        "visual_potential": 9.5,
+        "fact_safety": 9.7,
+        "reason": "화면에 실제 보이는 얼굴 특징만 묻는다.",
     },
     {
         "id": "fixture_hook_5",
-        "text": "벌집 속 육각형은 어떻게 맞닿을까요?",
-        "visual_goal": "육각형 셀 경계끼리 맞닿은 모습을 식별할 수 있는 벌집 매크로",
-        "keyword": "honeycomb pattern macro",
+        "text": "사람 얼굴을 가까이서 볼까요?",
+        "visual_goal": "한 사람 얼굴이 화면 대부분을 차지하는 자연스러운 클로즈업",
+        "keyword": "woman face close up",
         "stop_power": 8.0,
-        "curiosity_gap": 8.2,
-        "clarity": 8.7,
+        "curiosity_gap": 7.8,
+        "clarity": 9.3,
         "specificity": 9.0,
-        "visual_potential": 9.2,
-        "fact_safety": 9.6,
-        "reason": "구조적 질문과 시각 증거가 동일한 대상을 가리킨다.",
+        "visual_potential": 9.5,
+        "fact_safety": 9.8,
+        "reason": "첫 화면에서 약속한 사람 얼굴을 바로 보여줄 수 있다.",
     },
 ]
 
+# Stable real Pexels source used only to remove search-ranking randomness from the
+# positive E2E. The production Hook selector, metadata gate, 1080x1920 crop,
+# frame extraction, real vision judge, dominance hard gate, and final selection
+# still run unchanged.
+CONTROLLED_HOOK_VIDEO = {
+    "id": 7383905,
+    "url": "https://videos.pexels.com/video-files/7383905/7383905-uhd_2160_3840_24fps.mp4",
+    "page_url": "https://www.pexels.com/video/close-up-face-of-a-woman-looking-at-camera-7383905/",
+    "width": 2160,
+    "height": 3840,
+    "duration": 8.0,
+    "search_position": 1,
+}
+
+_LAST_HOOK_VISUAL_AUDIT = None
+
+
 BASE_SCRIPT = {
-    "title": "벌집을 가까이 보면 보이는 육각형",
-    "topic": "벌집의 육각형 구조",
+    "title": "사람 얼굴을 가까이 보면 보이는 특징",
+    "topic": "사람 얼굴 클로즈업",
     "scenes": [
         {
-            "text": "벌집을 가까이 보면 작은 방들이 이어져 있습니다.",
-            "keyword": "honeycomb close up",
-            "visual_goal": "육각형 벌집 셀이 화면 중앙에 크게 보이는 실제 벌집 클로즈업",
+            "text": "사람 얼굴을 가까이 보면 눈과 표정이 한 화면에 선명하게 보입니다.",
+            "keyword": "woman face close up",
+            "visual_goal": "한 사람 얼굴이 화면 중앙에 크게 보이는 실제 세로 클로즈업",
             "visual_type": "real_world_broll",
         },
         {
-            "text": "각 방의 테두리를 따라가면 반복되는 육각형 모양이 보입니다.",
-            "keyword": "honeycomb hexagon macro",
-            "visual_goal": "반복되는 육각형 셀 경계가 선명한 벌집 매크로 촬영",
+            "text": "정면에서는 눈, 코, 입의 위치와 얼굴 윤곽을 한 번에 살펴볼 수 있습니다.",
+            "keyword": "person portrait close up",
+            "visual_goal": "한 사람의 정면 얼굴 윤곽이 또렷한 인물 클로즈업",
             "visual_type": "real_world_broll",
         },
         {
-            "text": "셀들은 빈틈 없이 서로 맞닿아 한 장의 구조처럼 이어집니다.",
-            "keyword": "honeycomb cells macro",
-            "visual_goal": "서로 맞닿은 벌집 셀 여러 개가 한 화면에 보이는 장면",
+            "text": "조명이 바뀌면 같은 얼굴에서도 피부와 윤곽의 명암이 다르게 보입니다.",
+            "keyword": "portrait face natural light",
+            "visual_goal": "자연광에서 한 사람 얼굴의 명암이 선명한 근접 장면",
             "visual_type": "real_world_broll",
         },
         {
-            "text": "벌이 셀 주변을 움직이면 구조의 크기와 반복 패턴도 쉽게 비교됩니다.",
-            "keyword": "bees honeycomb close up",
-            "visual_goal": "벌과 육각형 벌집 셀이 함께 선명하게 보이는 근접 장면",
+            "text": "표정이 조금 달라지면 눈과 입 주변의 모양도 함께 달라집니다.",
+            "keyword": "facial expression close up",
+            "visual_goal": "한 사람의 표정과 눈 입 주변이 잘 보이는 근접 장면",
             "visual_type": "real_world_broll",
         },
         {
-            "text": "다른 부분을 확대해도 같은 육각형 셀이 계속 이어지는 모습을 볼 수 있습니다.",
-            "keyword": "honeycomb pattern macro",
-            "visual_goal": "벌집의 넓은 부분에서 반복되는 육각 패턴이 명확한 장면",
+            "text": "옆모습에서는 코와 턱선처럼 정면과 다른 윤곽이 더 잘 드러납니다.",
+            "keyword": "person face side profile",
+            "visual_goal": "한 사람의 옆얼굴 윤곽이 선명한 클로즈업",
             "visual_type": "real_world_broll",
         },
         {
-            "text": "그래서 벌집은 가까이 볼수록 규칙적인 셀 구조가 더 또렷하게 드러납니다.",
-            "keyword": "natural honeycomb detail",
-            "visual_goal": "자연 벌집의 육각형 셀 디테일이 또렷한 마무리 장면",
+            "text": "그래서 얼굴 클로즈업은 작은 특징도 모바일 화면에서 빠르게 확인하게 해줍니다.",
+            "keyword": "human face close up portrait",
+            "visual_goal": "한 사람 얼굴이 크게 보이는 세로 인물 클로즈업 마무리",
             "visual_type": "real_world_broll",
         },
     ],
 }
+
+
+def _fixture_search_pexels_candidates(query, per_page):
+    del query, per_page
+    print("🧪 HOOK VISUAL CONTROLLED SOURCE: Pexels 7383905")
+    return [copy.deepcopy(CONTROLLED_HOOK_VIDEO)]
+
+
+def _capture_hook_visual_audit(audit):
+    global _LAST_HOOK_VISUAL_AUDIT
+    _LAST_HOOK_VISUAL_AUDIT = copy.deepcopy(audit)
+    hook_visual._FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT(audit)
 
 
 def _fixture_request_candidates(
@@ -207,8 +237,20 @@ def _build_script(mode):
     return script, selected, audit
 
 
-def _render(script):
+def _render(script, mode):
+    global _LAST_HOOK_VISUAL_AUDIT
     clips = []
+    original_search = None
+    original_print = None
+    _LAST_HOOK_VISUAL_AUDIT = None
+
+    if mode == "on":
+        original_search = hook_visual.search_pexels_candidates
+        original_print = hook_visual.print_hook_visual_audit
+        hook_visual.search_pexels_candidates = _fixture_search_pexels_candidates
+        hook_visual._FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT = original_print
+        hook_visual.print_hook_visual_audit = _capture_hook_visual_audit
+
     try:
         for idx, scene in enumerate(script["scenes"]):
             clips.append(
@@ -225,6 +267,11 @@ def _render(script):
         )
         return output
     finally:
+        if mode == "on":
+            hook_visual.search_pexels_candidates = original_search
+            hook_visual.print_hook_visual_audit = original_print
+            if hasattr(hook_visual, "_FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT"):
+                delattr(hook_visual, "_FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT")
         for clip in clips:
             try:
                 clip.close()
@@ -250,7 +297,7 @@ def main():
     args = parser.parse_args()
 
     script, selected, audit = _build_script(args.mode)
-    output = _render(script)
+    output = _render(script, args.mode)
 
     hook_tts_seconds = _audio_duration("scene_0.mp3")
 
@@ -261,12 +308,18 @@ def main():
 
     result = {
         "mode": args.mode,
-        "fixture": "honeycomb-visible-structure-v3",
+        "fixture": "single-person-face-controlled-source-v4",
         "production_quality_policy_changed": False,
         "output": output,
         "hook_tts_seconds": round(hook_tts_seconds, 3),
         "selected_hook": selected,
         "hook_audit": audit,
+        "controlled_source": (
+            copy.deepcopy(CONTROLLED_HOOK_VIDEO)
+            if args.mode == "on"
+            else None
+        ),
+        "hook_visual_audit": copy.deepcopy(_LAST_HOOK_VISUAL_AUDIT),
     }
 
     with open(
