@@ -1,0 +1,49 @@
+name: Dispatch Throughput Production Once
+
+on:
+  push:
+    branches:
+      - agent/throughput-hook-quality-hotfix
+    paths:
+      - ".github/workflows/dispatch_throughput_production_once.yml"
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch real production workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.request
+
+          url = "https://api.github.com/repos/mingi201209-star/shorts-bot/actions/workflows/main.yml/dispatches"
+          payload = json.dumps({
+              "ref": "agent/throughput-hook-quality-hotfix",
+              "inputs": {
+                  "topic": "뉴욕에서는 건물 위의 빈 공간인 공중권(Air Rights)을 사고판다"
+              },
+          }, ensure_ascii=False).encode("utf-8")
+          request = urllib.request.Request(
+              url,
+              data=payload,
+              method="POST",
+              headers={
+                  "Authorization": f"Bearer {os.environ['GH_TOKEN']}",
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "Content-Type": "application/json; charset=utf-8",
+              },
+          )
+          with urllib.request.urlopen(request) as response:
+              print(f"dispatch_status={response.status}")
+              if response.status != 204:
+                  raise RuntimeError(f"Unexpected dispatch status: {response.status}")
+          PY
