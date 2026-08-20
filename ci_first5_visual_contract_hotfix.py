@@ -27,20 +27,32 @@ script_text = _replace_once(
 script_text = _replace_once(
     script_text,
     '''- 단순 자극보다 대사와 화면의 직접 일치를 우선한다.\n''',
-    '''- 단순 자극보다 대사와 화면의 직접 일치를 우선한다.\n- A처럼 보이지만 실제 B인 반전이면 첫 두 Scene의 visual_goal과 영어 keyword에 겉보기 A와 실제 B를 모두 남긴다.\n- 반전 소재를 B만 남는 tower/base station/antenna 같은 정체 단독 검색어로 축약하지 않는다. 특정 소재가 아니라 모든 appearance-vs-reality 반전에 동일하게 적용한다.\n''',
+    '''- 단순 자극보다 대사와 화면의 직접 일치를 우선한다.\n- A처럼 보이지만 실제 B인 반전이면 첫 두 Scene의 visual_goal과 영어 keyword에 겉보기 A와 실제 B를 모두 남긴다.\n- 반전 소재를 실제 B의 정체만 남는 검색어로 축약하지 않는다. 모든 appearance-vs-reality 반전에 동일하게 적용한다.\n''',
     "script first5 reversal prompt",
 )
 script_path.write_text(script_text, encoding="utf-8")
 
 
-# Hook generation: keep the same reversal concept in Hook visual metadata.
+# Hook generation: preserve the original Candidate reversal in visual metadata and scoring pool.
 hook_path = Path("content/hook_experiment.py")
 hook_text = hook_path.read_text(encoding="utf-8")
 hook_text = _replace_once(
     hook_text,
+    "import openai\n\n",
+    "import openai\n\nfrom quality.first5_visual_contract import validate_reversal_context\n\n",
+    "Hook visual concept contract import",
+)
+hook_text = _replace_once(
+    hook_text,
     '''- 첫 화면은 대사의 핵심 의미를 영상만 봐도 즉시 이해할 수 있어야 한다.\n''',
-    '''- 첫 화면은 대사의 핵심 의미를 영상만 봐도 즉시 이해할 수 있어야 한다.\n- 확정 Candidate가 A처럼 보이지만 실제 B인 반전이면 visual_goal과 keyword에 겉보기 A와 실제 B를 모두 보존한다. B만 남는 정체 단독 검색어로 축약하지 않는다.\n''',
+    '''- 첫 화면은 대사의 핵심 의미를 영상만 봐도 즉시 이해할 수 있어야 한다.\n- 확정 Candidate가 A처럼 보이지만 실제 B인 반전이면 visual_goal과 keyword에 겉보기 A와 실제 B를 모두 보존한다. 실제 B의 정체만 남는 검색어로 축약하지 않는다.\n''',
     "Hook reversal visual prompt",
+)
+hook_text = _replace_once(
+    hook_text,
+    '''        candidates.sort(key=lambda item: item["total_score"], reverse=True)\n''',
+    '''        concept_filtered = []\n        concept_rejected = 0\n        for item in candidates:\n            concept_ok, _ = validate_reversal_context(\n                candidate,\n                item.get("keyword", ""),\n            )\n            if concept_ok:\n                concept_filtered.append(item)\n            else:\n                concept_rejected += 1\n\n        if concept_rejected:\n            rejected = dict(diagnostics.get("rejected", {}))\n            rejected["reversal_concept_loss"] = (\n                rejected.get("reversal_concept_loss", 0)\n                + concept_rejected\n            )\n            diagnostics["rejected"] = rejected\n            diagnostics["scoring_pool_count"] = sum(\n                1 for item in concept_filtered\n                if item.get("criteria_pass", False)\n            )\n            diagnostics["eligible_candidate_count"] = sum(\n                1 for item in concept_filtered\n                if item.get("criteria_pass", False)\n                and float(item.get("total_score", 0.0)) >= HOOK_MIN_SCORE\n            )\n        candidates = concept_filtered\n\n        candidates.sort(key=lambda item: item["total_score"], reverse=True)\n''',
+    "Hook reversal scoring-pool filter",
 )
 hook_path.write_text(hook_text, encoding="utf-8")
 
