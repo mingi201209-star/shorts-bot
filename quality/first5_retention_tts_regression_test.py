@@ -68,8 +68,8 @@ def test_first_five_structure():
         _scene("이 건물에는 사람이 쓰지 않는 층이 있습니다."),
         _scene("그 이유를 지금 알려드릴게요."),
     ] + [
-        _scene(f"설비 공간의 역할을 실제 구조로 설명합니다 {idx}.")
-        for idx in range(10)
+        _scene("설비 공간의 역할을 실제 구조로 설명합니다.")
+        for _ in range(10)
     ]
     valid, reason = script_generator.validate_scenes(scenes)
     _assert(
