@@ -78,10 +78,22 @@ assert "HOOK_SUBJECT_VISIBILITY_MIN = 8.0" in dominance
 assert 'result["hook_subject_visibility"]' in dominance
 assert "MOST SPECIFIC concrete subject/detail" in dominance
 
+def original_gate(result):
+    return bool(result.get("legacy_pass", True))
+
+visibility_ns = exec_named(
+    dominance,
+    {"HOOK_SUBJECT_VISIBILITY_MIN", "passes_dominance_gate"},
+    {"_output_quality_original_passes_dominance_gate": original_gate},
+)
+visibility_gate = visibility_ns["passes_dominance_gate"]
+assert visibility_gate({"legacy_pass": True, "hook_subject_visibility": 9.0}) is True
+assert visibility_gate({"legacy_pass": True, "hook_subject_visibility": 4.0}) is False
+
 # C. Current narration-specific visual match outranks category-only metadata.
 def normalize_search_query(value):
-    value = re.sub(r"[^a-z0-9\\s-]", " ", str(value or "").lower())
-    return re.sub(r"\\s+", " ", value).strip()
+    value = re.sub(r"[^a-z0-9\s-]", " ", str(value or "").lower())
+    return re.sub(r"\s+", " ", value).strip()
 
 
 def _candidate_metadata(candidate):
@@ -117,8 +129,8 @@ density_ns = exec_named(
 )
 detect_density = density_ns["detect_information_density_issue"]
 filler = [
-    {"text": "창문 사이 압력을 조절해 바깥쪽 유리에 부담을 줄인다."},
-    {"text": "이 구조는 창문 사이 압력을 조절해 유리 부담을 줄이는 역할을 합니다."},
+    {"text": "이 작은 구멍은 창문 사이 압력을 조절하는 역할을 합니다."},
+    {"text": "이 작은 구멍은 창문 사이 압력을 조절하는 역할을 합니다."},
 ]
 dense = [
     {"text": "기내 압력은 비행 중 바깥 공기보다 높아진다."},
