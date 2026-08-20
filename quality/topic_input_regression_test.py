@@ -121,8 +121,8 @@ def main():
             "HOOK_MAX_COMPETING_SUBJECT_RISK = 4.0",
         ],
         "content/hook_experiment.py": [
-            "HOOK_MIN_SCORE = 7.2",
-            "HOOK_GENERATION_COUNT = 10",
+            'HOOK_MIN_SCORE = float(os.environ.get("HOOK_MIN_SCORE", "7.2"))',
+            'int(os.environ.get("HOOK_GENERATION_COUNT", "10"))',
         ],
         "config.py": [
             'TTS_RATE = "+13%"',
