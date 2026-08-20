@@ -29,19 +29,27 @@ def _tokens(value):
     }
 
 
+def _contains_reversal(value):
+    if isinstance(value, dict):
+        return any(_contains_reversal(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return any(_contains_reversal(item) for item in value)
+    text = str(value or "").lower()
+    return any(marker in text for marker in REVERSAL_MARKERS)
+
+
 def is_reversal_scene(scene):
-    combined = " ".join(
-        str(scene.get(key, "") or "")
-        for key in ("text", "visual_goal")
-    ).lower()
-    return any(marker in combined for marker in REVERSAL_MARKERS)
+    return _contains_reversal({
+        "text": scene.get("text", ""),
+        "visual_goal": scene.get("visual_goal", ""),
+    })
 
 
-def validate_reversal_query(scene):
-    if not is_reversal_scene(scene):
+def validate_reversal_keyword(keyword, *, reversal_required):
+    if not reversal_required:
         return True, "non_reversal"
 
-    query_tokens = _tokens(scene.get("keyword"))
+    query_tokens = _tokens(keyword)
     appearance_hits = query_tokens & APPEARANCE_QUERY_TERMS
     reveal_tokens = query_tokens - APPEARANCE_QUERY_TERMS - GENERIC_QUERY_TERMS
 
@@ -50,6 +58,20 @@ def validate_reversal_query(scene):
     if not reveal_tokens:
         return False, "reversal_reveal_side_missing"
     return True, "reversal_concept_preserved"
+
+
+def validate_reversal_query(scene):
+    return validate_reversal_keyword(
+        scene.get("keyword"),
+        reversal_required=is_reversal_scene(scene),
+    )
+
+
+def validate_reversal_context(context, keyword):
+    return validate_reversal_keyword(
+        keyword,
+        reversal_required=_contains_reversal(context),
+    )
 
 
 def visual_signature(keyword, slug):
