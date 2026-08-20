@@ -1,0 +1,21 @@
+name: Curiosity Retention Focused Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_curiosity_retention_hotfix.py"
+      - "quality/curiosity_retention_regression_test.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/curiosity_retention_regression.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run curiosity retention focused regression
+        run: python quality/curiosity_retention_regression_test.py
