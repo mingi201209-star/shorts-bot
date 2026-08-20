@@ -1,12 +1,20 @@
-import sys
+import importlib.util
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-if str(ROOT) not in sys.path:
-    sys.path.insert(0, str(ROOT))
+EXPLORER_PATH = ROOT / "content" / "candidate_explorer.py"
 
-from content.candidate_explorer import build_execution_context
+spec = importlib.util.spec_from_file_location(
+    "topic_input_candidate_explorer",
+    EXPLORER_PATH,
+)
+if spec is None or spec.loader is None:
+    raise RuntimeError("candidate_explorer.py load spec unavailable")
+
+candidate_explorer = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(candidate_explorer)
+build_execution_context = candidate_explorer.build_execution_context
 
 
 FIXED_TOPIC = "초고층 빌딩에는 왜 사람이 사용하지 않는 층이 있을까?"
