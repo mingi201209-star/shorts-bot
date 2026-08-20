@@ -2,6 +2,12 @@ name: Shorts Generator
 
 on:
   workflow_dispatch:
+    inputs:
+      topic:
+        description: "Optional fixed production topic (blank = automatic selection)"
+        required: false
+        default: ""
+        type: string
 
 jobs:
   build:
@@ -55,6 +61,7 @@ jobs:
           python ci_hook_generation_hotfix.py
           python ci_hook_pool_guard_hotfix.py
           python ci_retention_hotfix.py
+          python ci_topic_input_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
@@ -71,6 +78,8 @@ jobs:
           grep -n "validate_script_speech_style" quality/rewrite_engine.py
           grep -n "HOOK_GENERATION_COUNT\|bounded_retry_feedback\|speech_style_failure\|pool_ready" content/hook_experiment.py
           grep -n "Review 최대 횟수 초과\|SCRIPT GENERATION FAILED" main.py
+          grep -n "SHORTS_TOPIC\|지정 production 주제" main.py
+          grep -n "fixed_topic" content/candidate_explorer.py
 
           python -m py_compile \
             ci_hotfix.py \
@@ -80,6 +89,7 @@ jobs:
             ci_hook_generation_hotfix.py \
             ci_hook_pool_guard_hotfix.py \
             ci_retention_hotfix.py \
+            ci_topic_input_hotfix.py \
             main.py \
             config.py \
             content/candidate_explorer.py \
@@ -104,6 +114,7 @@ jobs:
           V3_MAX_API_CALLS: "60"
           V3_MAX_COST_USD: "0.05"
           ENABLE_HOOK_EXPERIMENT: "1"
+          SHORTS_TOPIC: ${{ inputs.topic }}
         run: |
           echo "========================================"
           echo "🚀 START SHORTS GENERATOR V3.2"
