@@ -1,3 +1,4 @@
+import importlib.util
 import os
 import sys
 from pathlib import Path
@@ -6,9 +7,23 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from content import hook_experiment, script_generator
+from content import hook_experiment
 from integrations import tts
 from video import hook_visual, hook_visual_dominance
+
+
+def _load_hotfixed_script_generator():
+    path = ROOT / "content" / "script_generator.py"
+    spec = importlib.util.spec_from_file_location(
+        "first5_hotfixed_script_generator",
+        path,
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+script_generator = _load_hotfixed_script_generator()
 
 
 def _assert(condition, message):
