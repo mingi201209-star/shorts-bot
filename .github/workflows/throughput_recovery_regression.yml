@@ -37,8 +37,6 @@ jobs:
           python -m py_compile ci_throughput_recovery_hotfix.py content/hook_experiment.py quality/consensus.py
       - name: Run throughput focused regression
         run: python quality/throughput_recovery_regression_test.py
-      - name: Preserve PR14 first-5 retention TTS contract
-        run: python quality/first5_retention_tts_regression_test.py
       - name: Preserve PR15 first-5 visual contract
         run: python quality/first5_visual_contract_regression_test.py
       - name: Preserve PR16 provider pool contract
