@@ -1,5 +1,6 @@
 from quality.first5_visual_contract import (
     progression_passes,
+    validate_reversal_context,
     validate_reversal_query,
     visual_signature,
 )
@@ -26,6 +27,24 @@ def test_reversal_concept_lock():
     }
     valid, reason = validate_reversal_query(preserved)
     _assert(valid and reason == "reversal_concept_preserved", "A+B reversal concept is preserved")
+
+    candidate_context = {
+        "micro_narrative": {
+            "hook": "평범한 건물처럼 보이지만 실제로는 기반 시설이에요.",
+            "reveal": "겉모습과 실제 기능이 다릅니다.",
+        }
+    }
+    valid, reason = validate_reversal_context(
+        candidate_context,
+        "telecom tower antenna",
+    )
+    _assert(not valid and reason == "reversal_appearance_side_missing", "Hook pool keeps original candidate reversal lock")
+
+    valid, reason = validate_reversal_context(
+        candidate_context,
+        "ordinary facade telecom infrastructure",
+    )
+    _assert(valid, "Hook pool accepts preserved candidate reversal concept")
 
     normal = {
         "text": "벌집의 육각형은 재료를 효율적으로 사용해요.",
