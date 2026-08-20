@@ -62,6 +62,7 @@ jobs:
           python ci_hook_pool_guard_hotfix.py
           python ci_retention_hotfix.py
           python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
           python ci_topic_input_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
@@ -72,12 +73,12 @@ jobs:
           grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
           grep -n "HOOK_SUBJECT_DOMINANCE_MIN\|HOOK_ACTION_MATCH_MIN\|HOOK_MAX_COMPETING_SUBJECT_RISK" video/hook_visual_dominance.py
           grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES" video/hook_visual.py
-          grep -n "fetch_early_retention_pexels_video\|early_visual_strict" video/hook_visual.py
+          grep -n "fetch_early_retention_pexels_video\|early_visual_strict\|opening_candidate_rejected" video/hook_visual.py
           grep -n "resolve_tts_prosody\|TTS_BODY_RATE\|hook_energy" integrations/tts.py
           grep -n "temperature=0.5" content/candidate_explorer.py
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
           grep -n "NARRATION TONE\|존댓말 종결\|RETRY FEEDBACK\|meaningful_keyword_words" content/script_generator.py
-          grep -n "FIRST 5 SECONDS — RETENTION\|첫 5초 금지 표현" content/script_generator.py
+          grep -n "FIRST 5 SECONDS — RETENTION\|visual concept lock" content/script_generator.py
           grep -n "validate_scenes_speech_style" content/script_generator.py
           grep -n "validate_script_speech_style" quality/rewrite_engine.py
           grep -n "HOOK_GENERATION_COUNT\|bounded_retry_feedback\|speech_style_failure\|pool_ready" content/hook_experiment.py
@@ -94,6 +95,7 @@ jobs:
             ci_hook_pool_guard_hotfix.py \
             ci_retention_hotfix.py \
             ci_first5_retention_tts_hotfix.py \
+            ci_first5_visual_contract_hotfix.py \
             ci_topic_input_hotfix.py \
             main.py \
             config.py \
@@ -104,6 +106,7 @@ jobs:
             quality/consensus.py \
             quality/rewrite_engine.py \
             quality/korean_speech_style.py \
+            quality/first5_visual_contract.py \
             video/hook_visual.py \
             video/hook_visual_dominance.py \
             video/video_downloader.py \
