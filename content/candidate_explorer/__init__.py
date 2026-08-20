@@ -67,6 +67,7 @@ def explore_candidates(
     recent_topics=None,
     recent_content=None,
     rejected_topics=None,
+    fixed_topic=None,
     model=None,
 ):
     kwargs = {
@@ -74,6 +75,8 @@ def explore_candidates(
         "recent_content": recent_content,
         "rejected_topics": rejected_topics,
     }
+    if fixed_topic is not None:
+        kwargs["fixed_topic"] = fixed_topic
     if model is not None:
         kwargs["model"] = model
 
