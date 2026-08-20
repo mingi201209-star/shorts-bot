@@ -53,6 +53,13 @@ HOOK_CRITERIA_FLOORS = {
     "fact_safety": 8.0,
 }
 
+INTRODUCTORY_HOOK_PATTERNS = (
+    r"알려\s*드(?:려요|립니다)",
+    r"알아\s*(?:봅니다|볼게요|보겠습니다)",
+    r"보여\s*드(?:려요|립니다)",
+    r"소개\s*(?:합니다|할게요|해\s*드려요)",
+)
+
 # 검색 결과만 보고는 화면에서 직접 확인하기 어려운 속성이다.
 # 이런 단어 자체를 금지하는 것이 아니라, Hook 화면 검색어가 이것에만
 # 의존하지 않도록 한다. observable consequence/action 토큰이 함께 있어야 한다.
@@ -112,12 +119,23 @@ def _keyword_words(keyword):
     }
 
 
+def _is_introductory_hook(text):
+    compact = str(text or "").strip()
+    return any(
+        re.search(pattern, compact)
+        for pattern in INTRODUCTORY_HOOK_PATTERNS
+    )
+
+
 def _valid_hook_shape(text, keyword):
     visible_len = _visible_len(text)
     if visible_len < HOOK_MIN_CHARS or visible_len > HOOK_MAX_CHARS:
         return False
 
     if len(re.findall(r"[.!?…]+", text)) > 1:
+        return False
+
+    if _is_introductory_hook(text):
         return False
 
     words = keyword.split()
@@ -213,6 +231,8 @@ Candidate Explorer와 Candidate Gate가 이미 소재를 확정했다.
 - 공백 제외 {HOOK_MIN_CHARS}~{HOOK_MAX_CHARS}자다. 16자를 넘기지 마라.
 - 첫 구절에 구체적 대상 이름을 바로 넣는다.
 - "이것", "이 기술", "이 시스템"처럼 대상을 늦게 밝히지 않는다.
+- "알려드려요", "알아봅니다", "보여드려요", "소개합니다"처럼 앞으로 설명할 내용을 예고하는 소개형 문장을 쓰지 않는다.
+- 첫 문장에서 Candidate 안의 이상현상, 반전 또는 관찰 가능한 결과를 직접 말해 즉시 "왜?"가 생기게 한다.
 - 첫 화면은 대사의 핵심 의미를 영상만 봐도 즉시 이해할 수 있어야 한다.
 - 방향, 효율, 안전성처럼 카메라로 바로 확인하기 어려운 속성만 검색하지 마라.
 - 그런 속성이 핵심이면 햇빛, 그림자, 움직임, 구조 변화 같은 관찰 가능한 결과를 첫 화면으로 선택한다.
