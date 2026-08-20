@@ -69,6 +69,7 @@ jobs:
           python ci_topic_input_hotfix.py
           python ci_aviation_candidate_context_hotfix.py
           python ci_output_quality_hotfix.py
+          python ci_curiosity_retention_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
@@ -83,10 +84,10 @@ jobs:
           grep -n "resolve_tts_prosody\|TTS_BODY_RATE\|hook_energy" integrations/tts.py
           grep -n "temperature=0.5" content/candidate_explorer.py
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
-          grep -n "NARRATION TONE\|존댓말 종결\|RETRY FEEDBACK\|meaningful_keyword_words\|INFORMATION DENSITY" content/script_generator.py
+          grep -n "NARRATION TONE\|존댓말 종결\|RETRY FEEDBACK\|meaningful_keyword_words\|INFORMATION DENSITY\|CURIOSITY RETENTION" content/script_generator.py
           grep -n "FIRST 5 SECONDS — RETENTION\|visual concept lock" content/script_generator.py
           grep -n "validate_scenes_speech_style" content/script_generator.py
-          grep -n "validate_script_speech_style\|INFORMATION DENSITY" quality/rewrite_engine.py
+          grep -n "validate_script_speech_style\|INFORMATION DENSITY\|CURIOSITY RETENTION" quality/rewrite_engine.py
           grep -n "HOOK_GENERATION_COUNT\|bounded_retry_feedback\|speech_style_failure\|pool_ready\|DECLARATIVE HOOK CONTRACT" content/hook_experiment.py
           grep -n "Review 최대 횟수 초과\|SCRIPT GENERATION FAILED" main.py
           grep -n "SHORTS_TOPIC\|지정 production 주제" main.py
@@ -106,6 +107,7 @@ jobs:
             ci_topic_input_hotfix.py \
             ci_aviation_candidate_context_hotfix.py \
             ci_output_quality_hotfix.py \
+            ci_curiosity_retention_hotfix.py \
             main.py config.py content/candidate_explorer.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py video/video_providers.py video/hook_visual.py \
