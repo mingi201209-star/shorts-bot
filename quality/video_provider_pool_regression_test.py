@@ -95,7 +95,11 @@ def test_provider_aware_dedupe():
 
 
 def test_same_gates_for_new_provider():
-    scene = {"keyword": "ordinary facade telecom infrastructure", "visual_goal": "평범한 건물 외관 속 통신 인프라", "text": "평범한 건물은 사실 기반 시설이에요."}
+    scene = {
+        "keyword": "ordinary facade telecom infrastructure",
+        "visual_goal": "평범한 건물처럼 보이지만 실제 통신 인프라",
+        "text": "평범한 건물처럼 보이지만 실제로는 기반 시설이에요.",
+    }
     bad = candidate("pixabay", 1, "radio tower antenna mast")
     scores, total = hv._score_candidate(bad, scene)
     check("G provider does not bypass first-5 strict metadata gate", not hv._passes_strict_gate({"candidate": bad, "scores": scores, "total_score": total}))
