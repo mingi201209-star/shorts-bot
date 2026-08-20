@@ -1,0 +1,30 @@
+name: Output Quality Focused Regression
+
+on:
+  push:
+    branches:
+      - agent/output-quality-polish
+    paths:
+      - "ci_output_quality_hotfix.py"
+      - "quality/output_quality_regression_test.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/output_quality_regression.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ci_output_quality_hotfix.py"
+      - "quality/output_quality_regression_test.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/output_quality_regression.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run focused regression
+        run: python quality/output_quality_regression_test.py
