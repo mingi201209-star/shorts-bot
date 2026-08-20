@@ -26,6 +26,7 @@ from content import script_generator as sg
 from content import hook_experiment as he
 from video import hook_visual_dominance as hvd
 from video import video_downloader as vd
+legacy = sg._LEGACY
 
 candidate = {
     "reveal": "작은 구멍은 창문 사이 압력을 단계적으로 조절한다",
@@ -47,7 +48,7 @@ bad_leak = result([
     "창문은 여러 겹으로 구성된다.",
     "그래서 객실 쪽 창에 부담이 집중되지 않게 압력을 조절한다.",
 ])
-ok, reason = sg.validate_curiosity_retention(bad_leak)
+ok, reason = legacy.validate_curiosity_retention(bad_leak)
 assert not ok and "answer leakage" in reason, reason
 
 good = result([
@@ -57,7 +58,7 @@ good = result([
     "고도가 올라가면 창문 안팎의 압력 차이가 커진다.",
     "그래서 객실 쪽 창에 부담이 집중되지 않게 압력을 조절한다.",
 ])
-ok, reason = sg.validate_curiosity_retention(good)
+ok, reason = legacy.validate_curiosity_retention(good)
 assert ok, reason
 
 bad_tease = result([
@@ -67,15 +68,15 @@ bad_tease = result([
     "창문은 여러 겹으로 구성된다.",
     "그래서 객실 쪽 창에 부담이 집중되지 않게 압력을 조절한다.",
 ])
-ok, reason = sg.validate_curiosity_retention(bad_tease)
+ok, reason = legacy.validate_curiosity_retention(bad_tease)
 assert not ok and "repeated tease" in reason, reason
 
-assert hasattr(sg, "detect_information_density_issue")
+assert hasattr(legacy, "detect_information_density_issue")
 filler = [
     {"text": "압력 차이는 창문 여러 겹에 나뉘어 전달됩니다."},
     {"text": "압력 차이는 창문 여러 겹에 나뉘어 전달되는 역할을 합니다."},
 ]
-assert sg.detect_information_density_issue(filler) is not None
+assert legacy.detect_information_density_issue(filler) is not None
 
 assert he._output_quality_is_declarative_hook("비행기 창문에는 작은 구멍이 있다.")
 assert not he._output_quality_is_declarative_hook("비행기 창문 구멍은 뭘까요?")
