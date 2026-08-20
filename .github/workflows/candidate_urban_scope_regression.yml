@@ -1,0 +1,22 @@
+name: Candidate Urban Scope Regression
+
+on:
+  push:
+    branches:
+      - agent/candidate-urban-scope-v4
+    paths:
+      - "ci_candidate_urban_scope_hotfix.py"
+      - "quality/candidate_urban_scope_regression_test.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/candidate_urban_scope_regression.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run focused regression
+        run: python quality/candidate_urban_scope_regression_test.py
