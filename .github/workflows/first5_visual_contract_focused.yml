@@ -1,0 +1,33 @@
+name: First5 Visual Contract Focused
+
+on:
+  push:
+    branches:
+      - agent/first5-visual-concept-progression
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Apply production hotfix chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          python ci_topic_input_hotfix.py
+      - name: Run focused regressions
+        run: |
+          python quality/first5_visual_contract_regression_test.py
+          python quality/first5_retention_tts_regression_test.py
