@@ -65,6 +65,7 @@ jobs:
           python ci_first5_visual_contract_hotfix.py
           python ci_video_provider_hotfix.py
           python ci_topic_input_hotfix.py
+          python ci_candidate_urban_scope_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
@@ -87,6 +88,7 @@ jobs:
           grep -n "Review 최대 횟수 초과\|SCRIPT GENERATION FAILED" main.py
           grep -n "SHORTS_TOPIC\|지정 production 주제" main.py
           grep -n "fixed_topic" content/candidate_explorer.py
+          grep -n "AUTOMATIC TOPIC SCOPE\|초고층 건물\|도시 인프라" content/candidate_explorer.py
 
           python -m py_compile \
             ci_hotfix.py \
@@ -100,6 +102,7 @@ jobs:
             ci_first5_visual_contract_hotfix.py \
             ci_video_provider_hotfix.py \
             ci_topic_input_hotfix.py \
+            ci_candidate_urban_scope_hotfix.py \
             main.py \
             config.py \
             content/candidate_explorer.py \
