@@ -125,7 +125,7 @@ def main():
             'int(os.environ.get("HOOK_GENERATION_COUNT", "10"))',
         ],
         "config.py": [
-            'TTS_RATE = "+13%"',
+            '"TTS_RATE",\n    "+13%",',
         ],
     }
 
