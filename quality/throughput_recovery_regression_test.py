@@ -94,7 +94,6 @@ def test_bounded_regeneration():
         selected, audit = hook.select_hook({}, {})
         check("3 bounded retry reaches cumulative five-candidate pool", selected is not None and len(calls) == 2 and audit["fallback"] is False)
 
-        calls.clear()
         hook._request_candidates = lambda topic_info, candidate, generation_round, rejection_feedback=None: (
             first[:1],
             {
@@ -178,11 +177,24 @@ def test_contract_constants():
     )
 
 
+def test_pr14_contract_preserved():
+    config_text = (ROOT / "config.py").read_text(encoding="utf-8")
+    script_text = (ROOT / "content" / "script_generator.py").read_text(encoding="utf-8")
+    subtitle_text = (ROOT / "video" / "subtitle_engine.py").read_text(encoding="utf-8")
+    tts_text = (ROOT / "integrations" / "tts.py").read_text(encoding="utf-8")
+
+    check("8 PR14 Hook/base TTS +13% preserved", '"+13%"' in config_text)
+    check("8 PR14 first-five retention structure preserved", "FIRST 5 SECONDS — RETENTION" in script_text)
+    check("8 PR14 exact Hook subtitle 0.000s preserved", "subtitle_start=0.000s" in subtitle_text)
+    check("8 PR14 TTS humanization path preserved", "resolve_tts_prosody" in tts_text and "TTS_BODY_RATE" in tts_text)
+
+
 def main():
     test_hook_length_pool()
     test_bounded_regeneration()
     test_quality_final_decision()
     test_contract_constants()
+    test_pr14_contract_preserved()
     print("✅ THROUGHPUT RECOVERY FOCUSED REGRESSION PASS")
 
 
