@@ -9,6 +9,14 @@ on:
       - "quality/aviation_candidate_context_regression_test.py"
       - ".github/workflows/main.yml"
       - ".github/workflows/aviation_candidate_context_regression.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ci_aviation_candidate_context_hotfix.py"
+      - "quality/aviation_candidate_context_regression_test.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/aviation_candidate_context_regression.yml"
 
 jobs:
   focused-regression:
