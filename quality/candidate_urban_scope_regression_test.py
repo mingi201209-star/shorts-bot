@@ -11,6 +11,7 @@ workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
 
 required_scope = (
     "[AUTOMATIC TOPIC SCOPE]",
+    "SHORTS_TOPIC이 비어 있는 자동 탐색 모드",
     "- 도시",
     "- 건축",
     "- 초고층 건물",
@@ -19,6 +20,7 @@ required_scope = (
     "- 지하 공간",
     "- 도시 설계",
     "- 건축에 숨겨진 기능",
+    "이 범위 밖의 소재는 Candidate로 만들거나 Winner/Runner-up으로 선택하지 마라.",
 )
 for item in required_scope:
     assert item in explorer, item
