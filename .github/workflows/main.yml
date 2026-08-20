@@ -60,6 +60,7 @@ jobs:
           python ci_speech_style_hotfix.py
           python ci_hook_generation_hotfix.py
           python ci_hook_pool_guard_hotfix.py
+          python ci_throughput_recovery_hotfix.py
           python ci_retention_hotfix.py
           python ci_first5_retention_tts_hotfix.py
           python ci_first5_visual_contract_hotfix.py
@@ -95,6 +96,7 @@ jobs:
             ci_speech_style_hotfix.py \
             ci_hook_generation_hotfix.py \
             ci_hook_pool_guard_hotfix.py \
+            ci_throughput_recovery_hotfix.py \
             ci_retention_hotfix.py \
             ci_first5_retention_tts_hotfix.py \
             ci_first5_visual_contract_hotfix.py \
