@@ -74,7 +74,7 @@ assert not ok and "repeated tease" in reason, reason
 assert hasattr(legacy, "detect_information_density_issue")
 filler = [
     {"text": "압력 차이는 창문 여러 겹에 나뉘어 전달됩니다."},
-    {"text": "압력 차이는 창문 여러 겹에 나뉘어 전달되는 역할을 합니다."},
+    {"text": "압력 차이는 창문 여러 겹에 나뉘어 전달됩니다."},
 ]
 assert legacy.detect_information_density_issue(filler) is not None
 
