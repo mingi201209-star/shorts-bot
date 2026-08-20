@@ -1,0 +1,45 @@
+name: Throughput Recovery Regression
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ci_throughput_recovery_hotfix.py"
+      - "quality/throughput_recovery_regression_test.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/throughput_recovery_regression.yml"
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Apply production hotfix chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_throughput_recovery_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          python ci_video_provider_hotfix.py
+          python ci_topic_input_hotfix.py
+          python -m py_compile ci_throughput_recovery_hotfix.py content/hook_experiment.py quality/consensus.py
+      - name: Run throughput focused regression
+        run: python quality/throughput_recovery_regression_test.py
+      - name: Preserve PR14 first-5 retention TTS contract
+        run: python quality/first5_retention_tts_regression_test.py
+      - name: Preserve PR15 first-5 visual contract
+        run: python quality/first5_visual_contract_regression_test.py
+      - name: Preserve PR16 provider pool contract
+        run: python quality/video_provider_pool_regression_test.py
