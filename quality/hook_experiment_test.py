@@ -65,6 +65,27 @@ def test_hook_shape_filter():
     )
 
 
+def test_introductory_hook_filter():
+    keyword = "building empty floor windows"
+    for text in (
+        "빈층의 비밀을 알려드려요",
+        "빈층의 비밀을 알아봅니다",
+        "빈층의 비밀을 보여드려요",
+    ):
+        assert_true(
+            f"Introductory hook rejected: {text}",
+            not hook_experiment._valid_hook_shape(text, keyword),
+        )
+
+    assert_true(
+        "Direct anomaly hook accepted",
+        hook_experiment._valid_hook_shape(
+            "초고층엔 사람이 없는 층이 있습니다",
+            keyword,
+        ),
+    )
+
+
 def test_hook_visual_scores():
     candidate = {
         "id": 1,
@@ -113,6 +134,7 @@ def main():
     test_flag_defaults_off()
     test_hook_score_criteria()
     test_hook_shape_filter()
+    test_introductory_hook_filter()
     test_hook_visual_scores()
     print("✅ HOOK EXPERIMENT SELF TEST PASS")
 
