@@ -1,4 +1,5 @@
 import importlib.util
+import inspect
 import sys
 from pathlib import Path
 
@@ -19,6 +20,8 @@ if spec is None or spec.loader is None:
 candidate_explorer = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(candidate_explorer)
 build_execution_context = candidate_explorer.build_execution_context
+
+import content.candidate_explorer as production_explorer
 
 
 FIXED_TOPIC = "초고층 빌딩에는 왜 사람이 사용하지 않는 층이 있을까?"
@@ -91,6 +94,50 @@ def main():
         "fixed topic runner-up protection",
     )
 
+    # Production imports the package wrapper, not the shadowed legacy file.
+    # Verify the wrapper contract that caused run 32344513244 to fail.
+    wrapper_signature = inspect.signature(
+        production_explorer.explore_candidates
+    )
+    if "fixed_topic" not in wrapper_signature.parameters:
+        raise AssertionError(
+            "production Candidate Explorer wrapper is missing fixed_topic"
+        )
+
+    captured_calls = []
+    original_legacy_explore = production_explorer._LEGACY.explore_candidates
+
+    def fake_legacy_explore(topic_info, **kwargs):
+        captured_calls.append((topic_info, dict(kwargs)))
+        return {"status": "SELECTED"}
+
+    production_explorer._LEGACY.explore_candidates = fake_legacy_explore
+    try:
+        production_explorer.explore_candidates(
+            {
+                "category": "지정 주제",
+                "topic": FIXED_TOPIC,
+            },
+            fixed_topic=FIXED_TOPIC,
+        )
+        if captured_calls[-1][1].get("fixed_topic") != FIXED_TOPIC:
+            raise AssertionError(
+                "fixed topic was not forwarded through production wrapper"
+            )
+
+        production_explorer.explore_candidates(
+            {
+                "category": "자동 탐색",
+                "topic": "자동 방향",
+            },
+        )
+        if "fixed_topic" in captured_calls[-1][1]:
+            raise AssertionError(
+                "blank topic path unexpectedly forwarded fixed_topic"
+            )
+    finally:
+        production_explorer._LEGACY.explore_candidates = original_legacy_explore
+
     require(
         explorer_source,
         "winner_topic != fixed_topic",
@@ -136,7 +183,7 @@ def main():
 
     print("✅ production topic input regression PASS")
     print("   blank topic -> automatic selection preserved")
-    print("   provided topic -> exact fixed topic context")
+    print("   provided topic -> production wrapper fixed_topic forwarding PASS")
     print("   protected Hook/dominance/TTS markers preserved")
 
 
