@@ -77,7 +77,7 @@ window = candidate(
     position=2,
 )
 
-original_search = hv.search_pexels_candidates
+original_search = hv.search_video_candidates
 original_dominance = hv.evaluate_hook_subject_dominance
 
 
@@ -98,7 +98,7 @@ def dominance(candidate_item, scene_item):
 
 try:
     # CASE A/B: metadata says window for both, but actual visual FALSE cannot beat TRUE.
-    hv.search_pexels_candidates = lambda *args, **kwargs: [wing, window]
+    hv.search_video_candidates = lambda *args, **kwargs: [wing, window]
     hv.evaluate_hook_subject_dominance = dominance
     selected_url = hv.fetch_hook_pexels_video(scene)
     trace = hv.get_last_hook_selection()
@@ -126,7 +126,7 @@ try:
     assert mismatch["selection_mode"] == "UNVERIFIED_CONTEXTUAL_FALLBACK", mismatch
 
     # CASE C/F: strict failure cannot re-enter DIRECT_VERIFIED through fallback.
-    hv.search_pexels_candidates = lambda *args, **kwargs: [wing]
+    hv.search_video_candidates = lambda *args, **kwargs: [wing]
     fallback_url = hv.fetch_hook_pexels_video(scene)
     fallback_trace = hv.get_last_hook_selection()
     assert fallback_url == wing["url"], fallback_trace
@@ -150,7 +150,7 @@ try:
     assert forged_result["contract_violation"] is True, forged_result
 
 finally:
-    hv.search_pexels_candidates = original_search
+    hv.search_video_candidates = original_search
     hv.evaluate_hook_subject_dominance = original_dominance
 
 # H: #20 declarative Hook, visibility and direct semantic-match behavior remains.
@@ -209,9 +209,9 @@ assert legacy.design_causality_preference_score([
     {"text": "또 다른 역할도 합니다."},
 ])
 assert vd.extract_query_anchors(scene["keyword"]) == ["aircraft", "window"]
-assert vd.concrete_visual_evidence(wing, scene["keyword"])["complete"] is True  # semantic only, #25 contract
+assert vd.concrete_visual_evidence(wing, scene["keyword"])["complete"] is True
 vd.register_visual_evidence(wing, visible_components=["aircraft"], source="regression_frame", definitive=True)
-assert vd.candidate_visible_component_evidence(wing, scene["keyword"])["state"] == "FALSE"  # #26 separation
+assert vd.candidate_visible_component_evidence(wing, scene["keyword"])["state"] == "FALSE"
 
 # O/P: provider isolation remains bidirectional.
 original_pexels = vd.search_pexels_candidates
