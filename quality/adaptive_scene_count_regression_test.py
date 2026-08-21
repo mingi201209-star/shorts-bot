@@ -34,10 +34,15 @@ def scene(index):
     }
 
 
-# Isolate this regression from wording heuristics in the design classifier. The
-# contract under test is routing: design context gets 8~13, normal context keeps 12~13.
-sg.design_causality_applicable = lambda context: bool(context.get("_test_design"))
-sg._SCRIPT_PARITY_ACTIVE_CONTEXT = {"_test_design": True}
+# Exercise the real production classifier and parity context rather than a
+# test-only monkeypatch, because compatibility layers may delegate to _LEGACY.
+# The contract under test is routing: design context gets 8~13, normal keeps 12~13.
+design_context = {
+    "topic": "비행기 창문 설계 구조",
+    "angle": "왜 이런 구조로 설계됐는가",
+    "core_question": "이 구조는 어떻게 압력 차이를 견디는가",
+}
+sg._SCRIPT_PARITY_ACTIVE_CONTEXT = design_context
 
 valid, reason = sg.validate_scenes([scene(i) for i in range(8)])
 assert valid, reason
@@ -48,7 +53,11 @@ assert not valid and "설계형 장면 수 부족" in reason, reason
 valid, reason = sg.validate_scenes([scene(i) for i in range(10)])
 assert valid, reason
 
-sg._SCRIPT_PARITY_ACTIVE_CONTEXT = {"_test_design": False}
+sg._SCRIPT_PARITY_ACTIVE_CONTEXT = {
+    "topic": "철새의 이동 현상",
+    "angle": "계절별 이동 관찰",
+    "core_question": "철새는 언제 이동하는가",
+}
 valid, reason = sg.validate_scenes([scene(i) for i in range(10)])
 assert not valid and "장면 수 부족" in reason, reason
 
@@ -56,7 +65,11 @@ valid, reason = sg.validate_scenes([scene(i) for i in range(12)])
 assert valid, reason
 
 # Prompt policy must explicitly forbid padding a design script to 12 scenes.
-assert "12 Scene을 채우기 위해" in sg._adaptive_scene_count_instruction({"_test_design": True})
-assert "12~13 Scene" in sg._adaptive_scene_count_instruction({"_test_design": False})
+assert "12 Scene을 채우기 위해" in sg._adaptive_scene_count_instruction(design_context)
+assert "12~13 Scene" in sg._adaptive_scene_count_instruction({
+    "topic": "철새의 이동 현상",
+    "angle": "계절별 이동 관찰",
+    "core_question": "철새는 언제 이동하는가",
+})
 
 print("PASS: adaptive design scene count preserves legacy non-design floor")
