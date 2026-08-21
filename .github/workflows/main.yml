@@ -76,6 +76,7 @@ jobs:
           python ci_concrete_visual_evidence_hotfix.py
           python ci_visible_evidence_provenance_hotfix.py
           python ci_hook_production_parity_hotfix.py
+          python ci_hook_fallback_quality_floor_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
@@ -84,42 +85,19 @@ jobs:
           grep -n '"+13%"' config.py
           grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
           grep -n "HOOK_SUBJECT_DOMINANCE_MIN\|HOOK_ACTION_MATCH_MIN\|HOOK_MAX_COMPETING_SUBJECT_RISK\|HOOK_SUBJECT_VISIBILITY_MIN" video/hook_visual_dominance.py
-          grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES\|HOOK_CONCRETE_VISUAL_EVIDENCE\|DIRECT_VERIFIED\|UNVERIFIED_CONTEXTUAL_FALLBACK" video/hook_visual.py
+          grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES\|HOOK_CONCRETE_VISUAL_EVIDENCE\|DIRECT_VERIFIED\|UNVERIFIED_CONTEXTUAL_FALLBACK\|HOOK_FALLBACK_QUALITY_FLOOR" video/hook_visual.py
           grep -n "VISUAL_TRACE\|VISUAL_CONTRACT" video/video_engine.py
           grep -n "search_video_candidates\|VIDEO_SELECTED\|VIDEO_PROVIDER\|CURRENT_NARRATION_SEMANTIC_MATCH\|VISUAL_SPECIFICITY\|QUERY_SEMANTIC_INTEGRITY\|CONCRETE_VISUAL_EVIDENCE_SAFE_REUSE\|VISIBLE_EVIDENCE_PROVENANCE_GATE" video/video_downloader.py video/hook_visual.py
-          grep -n "resolve_tts_prosody\|TTS_BODY_RATE\|hook_energy" integrations/tts.py
-          grep -n "temperature=0.5" content/candidate_explorer.py
-          grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
-          grep -n "NARRATION TONE\|존댓말 종결\|RETRY FEEDBACK\|meaningful_keyword_words\|INFORMATION DENSITY\|CURIOSITY RETENTION\|DESIGN CAUSALITY" content/script_generator.py
-          grep -n "FIRST 5 SECONDS — RETENTION\|visual concept lock" content/script_generator.py
-          grep -n "validate_scenes_speech_style" content/script_generator.py
-          grep -n "validate_script_speech_style\|INFORMATION DENSITY\|CURIOSITY RETENTION\|DESIGN CAUSALITY" quality/rewrite_engine.py
-          grep -n "HOOK_GENERATION_COUNT\|bounded_retry_feedback\|speech_style_failure\|pool_ready\|DECLARATIVE HOOK CONTRACT" content/hook_experiment.py
-          grep -n "Review 최대 횟수 초과\|SCRIPT GENERATION FAILED" main.py
-          grep -n "SHORTS_TOPIC\|지정 production 주제" main.py
-          grep -n "fixed_topic\|SHORTS_CANDIDATE_SCOPE" content/candidate_explorer.py
 
           python -m py_compile \
-            ci_hotfix.py \
-            ci_novelty_budget_hotfix.py \
-            ci_fact_critical_hotfix.py \
-            ci_speech_style_hotfix.py \
-            ci_hook_generation_hotfix.py \
-            ci_hook_pool_guard_hotfix.py \
-            ci_retention_hotfix.py \
-            ci_first5_retention_tts_hotfix.py \
-            ci_first5_visual_contract_hotfix.py \
-            ci_video_provider_hotfix.py \
-            ci_topic_input_hotfix.py \
-            ci_aviation_candidate_context_hotfix.py \
-            ci_output_quality_hotfix.py \
-            ci_curiosity_retention_hotfix.py \
-            ci_visual_specificity_hotfix.py \
-            ci_design_causality_hotfix.py \
-            ci_query_semantic_integrity_hotfix.py \
-            ci_concrete_visual_evidence_hotfix.py \
-            ci_visible_evidence_provenance_hotfix.py \
-            ci_hook_production_parity_hotfix.py \
+            ci_hotfix.py ci_novelty_budget_hotfix.py ci_fact_critical_hotfix.py ci_speech_style_hotfix.py \
+            ci_hook_generation_hotfix.py ci_hook_pool_guard_hotfix.py ci_retention_hotfix.py \
+            ci_first5_retention_tts_hotfix.py ci_first5_visual_contract_hotfix.py ci_video_provider_hotfix.py \
+            ci_topic_input_hotfix.py ci_aviation_candidate_context_hotfix.py ci_output_quality_hotfix.py \
+            ci_curiosity_retention_hotfix.py ci_visual_specificity_hotfix.py ci_design_causality_hotfix.py \
+            ci_query_semantic_integrity_hotfix.py ci_concrete_visual_evidence_hotfix.py \
+            ci_visible_evidence_provenance_hotfix.py ci_hook_production_parity_hotfix.py \
+            ci_hook_fallback_quality_floor_hotfix.py \
             main.py config.py content/candidate_explorer.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py video/video_providers.py video/hook_visual.py \
