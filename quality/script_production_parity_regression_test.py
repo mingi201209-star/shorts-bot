@@ -119,10 +119,28 @@ class FakeCompletions:
 
 def install_fake(outputs, prompts):
     fake = FakeCompletions(outputs, prompts)
-    sg.openai.chat.completions.create = fake.create
-    sg.authorize_call = lambda model: fake.calls + 1
-    sg.record_usage = lambda model, response: {"cost_usd": 0.0}
-    sg.print_budget_status = lambda: None
+    runtime = sg._script_parity_original_generate_script.__globals__
+    installed = False
+    for name, value in list(runtime.items()):
+        try:
+            completions = value.chat.completions
+        except Exception:
+            continue
+        if hasattr(completions, "create"):
+            runtime[name] = SimpleNamespace(
+                chat=SimpleNamespace(completions=SimpleNamespace(create=fake.create))
+            )
+            installed = True
+            break
+    if not installed:
+        # Legacy source uses a module-global named `openai`; install it even when
+        # a preceding hotfix removed the original import from the runtime module.
+        runtime["openai"] = SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=fake.create))
+        )
+    runtime["authorize_call"] = lambda model: fake.calls + 1
+    runtime["record_usage"] = lambda model, response: {"cost_usd": 0.0}
+    runtime["print_budget_status"] = lambda: None
     return fake
 
 
