@@ -18,11 +18,13 @@ HOTFIXES = (
     "ci_hook_production_parity_hotfix.py", "ci_hook_fallback_quality_floor_hotfix.py",
     "ci_ai_visual_fallback_hotfix.py", "ci_ai_visual_mechanism_fallback_hotfix.py",
     "ci_causal_information_progression_hotfix.py", "ci_script_production_parity_hotfix.py",
+    "ci_script_production_parity_bridge_hotfix.py",
 )
 for hotfix in HOTFIXES:
     subprocess.run([sys.executable, hotfix], cwd=ROOT, check=True)
 
 from content import script_generator as sg
+legacy = getattr(sg, "_LEGACY", sg)
 
 
 def scene(text, goal, keyword):
@@ -119,7 +121,12 @@ class FakeCompletions:
 
 def install_fake(outputs, prompts):
     fake = FakeCompletions(outputs, prompts)
-    runtime = sg._script_parity_original_generate_script.__globals__
+    runtime_fn = getattr(
+        legacy,
+        "_script_parity_original_generate_script",
+        getattr(legacy, "generate_script"),
+    )
+    runtime = runtime_fn.__globals__
     installed = False
     for name, value in list(runtime.items()):
         try:
@@ -133,8 +140,6 @@ def install_fake(outputs, prompts):
             installed = True
             break
     if not installed:
-        # Legacy source uses a module-global named `openai`; install it even when
-        # a preceding hotfix removed the original import from the runtime module.
         runtime["openai"] = SimpleNamespace(
             chat=SimpleNamespace(completions=SimpleNamespace(create=fake.create))
         )
@@ -144,8 +149,8 @@ def install_fake(outputs, prompts):
     return fake
 
 
-# A/B/E: use the real production generate_script() call. The first response contains
-# mechanism paraphrases that only pass when design context is missing; production must reject it.
+# A/B/E: exercise the exported production sg.generate_script() entrypoint across the
+# compatibility wrapper. The first response must be rejected only when context reaches legacy validation.
 design_prompts = []
 fake = install_fake([payload(repeated_mechanism_scenes()), payload(good_scenes())], design_prompts)
 result = sg.generate_script(
@@ -154,15 +159,15 @@ result = sg.generate_script(
 )
 assert fake.calls == 2, f"design production path should reject first script, calls={fake.calls}"
 assert result["scenes"][4]["text"] == good_scenes()[4]["text"]
-assert sg._SCRIPT_PARITY_ACTIVE_CONTEXT is None
+assert legacy._SCRIPT_PARITY_ACTIVE_CONTEXT is None
 
-# G: the actual production prompt for a design topic must not demand the legacy minimum.
+# G: actual production design prompt uses a max cap, not legacy minimum-fill pressure.
 assert design_prompts, "design prompt not captured"
 assert "최대 90초" in design_prompts[-1], design_prompts[-1]
 assert "75~90초가 되도록 충분한 문장 분량" not in design_prompts[-1], design_prompts[-1]
 assert "TARGET_MIN_SECONDS를 채우기 위해" in design_prompts[-1], design_prompts[-1]
 
-# C/G: non-design topics retain the legacy duration behavior and do not become design topics.
+# C/G: non-design topics retain legacy duration behavior.
 general_prompts = []
 fake_general = install_fake([payload(good_scenes())], general_prompts)
 general_result = sg.generate_script(
@@ -172,7 +177,7 @@ general_result = sg.generate_script(
 assert fake_general.calls == 1
 assert general_result["title"] == "production parity fixture"
 assert "75~90초" in general_prompts[0], general_prompts[0]
-assert not sg.design_causality_applicable(sg._script_parity_context(non_design_candidate()))
+assert not legacy.design_causality_applicable(legacy._script_parity_context(non_design_candidate()))
 
 # D: repeated result/outcome language remains rejected.
 repeated_result = [
@@ -180,7 +185,7 @@ repeated_result = [
     scene("그래서 파손 위험을 줄입니다.", "파손 위험 감소", "aircraft damage risk"),
     scene("결과적으로 더 안전한 운용이 가능합니다.", "안전한 운용", "aircraft safe operation"),
 ]
-assessment = sg.causal_information_progression_assessment(repeated_result, sg._script_parity_context(design_candidate()))
+assessment = legacy.causal_information_progression_assessment(repeated_result, legacy._script_parity_context(design_candidate()))
 assert not assessment["pass"] and (
     "result repetition" in assessment["reason"] or "result enumeration" in assessment["reason"]
 ), assessment
@@ -190,24 +195,24 @@ mechanism_repeat = [
     scene("시스템은 특정 주파수를 분석합니다.", "주파수 분석", "noise frequency analysis"),
     scene("이어서 방향과 주파수를 분석합니다.", "방향과 주파수 분석", "sound direction frequency"),
 ]
-assessment = sg.causal_information_progression_assessment(mechanism_repeat, sg._script_parity_context(design_candidate()))
+assessment = legacy.causal_information_progression_assessment(mechanism_repeat, legacy._script_parity_context(design_candidate()))
 assert not assessment["pass"] and "mechanism paraphrase" in assessment["reason"], assessment
 
-# F: a genuinely distinct component/causal step is preserved even inside a related mechanism family.
+# F: genuinely distinct component/causal steps remain valid.
 genuine_steps = [
     scene("마이크가 객실 소음을 감지합니다.", "객실 마이크", "aircraft microphone noise"),
     scene("제어기가 감지 신호를 분석합니다.", "오디오 제어기", "audio controller analysis"),
     scene("스피커가 반대 위상의 소리를 만들어 냅니다.", "객실 스피커", "cabin speaker inverse sound"),
 ]
-assessment = sg.causal_information_progression_assessment(genuine_steps, sg._script_parity_context(design_candidate()))
+assessment = legacy.causal_information_progression_assessment(genuine_steps, legacy._script_parity_context(design_candidate()))
 assert assessment["pass"], assessment
 
 # H: generic outro after payoff remains rejected by #30.
 outro = good_scenes() + [scene("이처럼 작은 설계에서 안전은 시작됩니다.", "일반 항공기", "generic airplane flight")]
-assessment = sg.causal_information_progression_assessment(outro, sg._script_parity_context(design_candidate()))
+assessment = legacy.causal_information_progression_assessment(outro, legacy._script_parity_context(design_candidate()))
 assert not assessment["pass"] and "generic outro" in assessment["reason"], assessment
 
-# I: exercise the actual bounded quality rewrite loop without any API call.
+# I: exercise the existing bounded quality rewrite loop without API calls.
 import main as production_main
 rewrite_calls = {"count": 0}
 consensus_calls = {"count": 0}
