@@ -20,6 +20,7 @@ for hotfix in (
     "ci_output_quality_hotfix.py",
     "ci_curiosity_retention_hotfix.py",
     "ci_visual_specificity_hotfix.py",
+    "ci_design_causality_hotfix.py",
 ):
     subprocess.run([sys.executable, hotfix], check=True)
 
@@ -184,7 +185,22 @@ tease = retention_result([
 ok, reason = legacy.validate_curiosity_retention(tease)
 assert not ok and "repeated tease" in reason
 
-# Production chain remains bounded and unchanged except for this appended hotfix.
+# CASE H: design causality must rank above a flat feature/benefit list.
+feature_list = [
+    {"text": "이 구멍은 압력 조절에 도움이 됩니다."},
+    {"text": "결로를 줄이는 데도 도움이 됩니다."},
+    {"text": "안전성을 높이는 역할을 합니다."},
+]
+causal_design = [
+    {"text": "높은 고도에서는 기내와 외부의 압력 차이가 커집니다."},
+    {"text": "창문 한 장이 압력을 모두 받으면 부담이 커집니다."},
+    {"text": "그래서 창문을 여러 겹으로 설계합니다."},
+    {"text": "작은 구멍이 판 사이 압력을 조절합니다."},
+    {"text": "그 결과 압력을 담당하는 구조가 유지됩니다."},
+]
+assert sg.design_causality_preference_score(causal_design) > sg.design_causality_preference_score(feature_list)
+
+# Production chain remains bounded and unchanged except for explicitly appended hotfixes.
 workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
 chain = (
     "ci_video_provider_hotfix.py",
@@ -193,10 +209,11 @@ chain = (
     "ci_output_quality_hotfix.py",
     "ci_curiosity_retention_hotfix.py",
     "ci_visual_specificity_hotfix.py",
+    "ci_design_causality_hotfix.py",
 )
 positions = [workflow.index(item) for item in chain]
 assert positions == sorted(positions)
 assert "SHORTS_TOPIC: ${{ inputs.topic }}" in workflow
 assert "SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}" in workflow
 
-print("PASS: visual specificity A/B/C/D, provider isolation E, #20 contracts F, #21 retention G")
+print("PASS: visual specificity A/B/C/D, provider isolation E, #20 contracts F, #21 retention G, design causality H")
