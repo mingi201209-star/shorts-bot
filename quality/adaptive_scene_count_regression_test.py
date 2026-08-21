@@ -20,7 +20,10 @@ for hotfix in (
 ):
     runpy.run_path(str(ROOT / hotfix), run_name="__main__")
 
-sg = importlib.import_module("content.script_generator")
+# A prerequisite hotfix may import script_generator before the later file patches
+# are written. Reload once so this in-process regression observes the same final
+# on-disk module that production imports after applying the hotfix chain.
+sg = importlib.reload(importlib.import_module("content.script_generator"))
 
 
 def scene(index):
