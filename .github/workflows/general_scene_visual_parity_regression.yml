@@ -1,0 +1,26 @@
+name: General Scene Visual Parity Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_general_scene_visual_parity_hotfix.py"
+      - "quality/general_scene_visual_parity_regression_test.py"
+      - ".github/workflows/general_scene_visual_parity_regression.yml"
+      - ".github/workflows/main.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Run general-scene visual parity regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: python quality/general_scene_visual_parity_regression_test.py
