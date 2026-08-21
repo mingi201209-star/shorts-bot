@@ -118,7 +118,7 @@ jobs:
           V3_MAX_API_CALLS: "60"
           V3_MAX_COST_USD: "0.05"
           ENABLE_HOOK_EXPERIMENT: "1"
-          AI_VISUAL_FALLBACK_ENABLED: "1"
+          AI_VISUAL_FALLBACK_ENABLED: "false"
           AI_MAX_GENERATIONS_PER_VIDEO: "1"
           AI_VISUAL_MODEL: "sora-2"
           AI_VISUAL_SECONDS: "4"
