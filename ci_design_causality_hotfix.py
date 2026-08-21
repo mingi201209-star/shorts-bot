@@ -45,9 +45,6 @@ _DESIGN_FEATURE_LIST_PATTERNS = (
     "도움이 된다", "도움이 됩니다", "좋습니다", "좋다", "효과가 있다", "효과가 있습니다",
     "역할도 한다", "역할도 합니다", "에도 도움", "에도 좋", "또한", "뿐만 아니라",
 )
-_DESIGN_INTENT_CLAIMS = (
-    "때문에 설계", "위해 설계", "위해 만들", "때문에 만들", "목적으로 설계", "발명되", "개발되",
-)
 _DESIGN_EVIDENCE_INTENT_MARKERS = (
     "설계 목적", "설계 의도", "위해 설계", "위해 만들", "때문에 설계", "발명", "개발 이유", "historical",
 )
@@ -68,6 +65,15 @@ def _design_scene_texts(scenes):
     ]
 
 
+def _design_intent_claimed(text):
+    text = str(text or "")
+    historical = any(marker in text for marker in ("발명되", "개발되", "개발됐", "기원"))
+    purpose = any(marker in text for marker in ("위해", "때문에", "목적으로")) and any(
+        marker in text for marker in ("설계", "만들", "개발", "발명")
+    )
+    return historical or purpose
+
+
 def design_causality_assessment(scenes, context=None):
     texts = _design_scene_texts(scenes)
     joined = " ".join(texts)
@@ -86,7 +92,7 @@ def design_causality_assessment(scenes, context=None):
         if isinstance(micro, dict):
             evidence_parts.extend(str(value) for value in micro.values() if str(value).strip())
     evidence = " ".join(evidence_parts)
-    intent_claim = any(marker in joined for marker in _DESIGN_INTENT_CLAIMS)
+    intent_claim = _design_intent_claimed(joined)
     intent_supported = any(marker in evidence for marker in _DESIGN_EVIDENCE_INTENT_MARKERS)
 
     if not applicable:
@@ -140,8 +146,6 @@ def validate_script(result):
 ''',
 )
 
-# The Candidate already contains the only facts this layer may use. Pass that locked
-# context into deterministic validation, then remove it from the generated payload.
 needle = "            valid, reason = validate_script(\n                result\n            )"
 replacement = "            result[\"_design_causality_context\"] = {\n                \"topic\": candidate[\"topic\"],\n                \"angle\": candidate[\"angle\"],\n                \"core_question\": candidate[\"core_question\"],\n                \"fact_check_focus\": candidate[\"fact_check_focus\"],\n                \"micro_narrative\": candidate[\"micro_narrative\"],\n            }\n            valid, reason = validate_script(\n                result\n            )\n            result.pop(\"_design_causality_context\", None)"
 if needle in text and "result[\"_design_causality_context\"]" not in text:
@@ -149,7 +153,6 @@ if needle in text and "result[\"_design_causality_context\"]" not in text:
 path.write_text(text, encoding="utf-8")
 
 
-# Extend the existing explanation judge; no separate scoring framework or threshold.
 path = Path("quality/explanation_judge.py")
 text = path.read_text(encoding="utf-8")
 if "5. DESIGN CAUSALITY" not in text:
