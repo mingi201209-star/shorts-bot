@@ -100,8 +100,37 @@ for token in (
     "SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}",
 ):
     assert token in workflow, token
-providers = Path("video/video_providers.py").read_text(encoding="utf-8")
-assert "Pexels" in providers and "Pixabay" in providers
-assert "provider failure" in providers.lower() or "except" in providers
 
-print("PASS: answer leakage, clue progression, anti-tease, payoff alignment, #20 contracts, production chain")
+# Provider failure isolation is a behavior contract, not a source-string contract:
+# one provider may fail while the other provider still contributes candidates.
+original_pexels = vd.search_pexels_candidates
+original_pixabay = vd.search_pixabay_candidates
+original_key = vd.PIXABAY_API_KEY
+try:
+    def failing_pexels(*args, **kwargs):
+        raise RuntimeError("simulated pexels failure")
+
+    def healthy_pixabay(*args, **kwargs):
+        return [{
+            "id": 77,
+            "provider": "pixabay",
+            "source_id": 77,
+            "source_url": "https://pixabay.com/videos/id-77/",
+            "download_url": "https://cdn.example.test/77.mp4",
+            "url": "https://cdn.example.test/77.mp4",
+            "search_position": 1,
+        }]
+
+    vd.search_pexels_candidates = failing_pexels
+    vd.search_pixabay_candidates = healthy_pixabay
+    vd.PIXABAY_API_KEY = "regression-key"
+    isolated_pool = vd.search_video_candidates("airplane window", per_page=3)
+    assert len(isolated_pool) == 1
+    assert isolated_pool[0].get("provider") == "pixabay"
+    assert isolated_pool[0].get("source_id") == 77
+finally:
+    vd.search_pexels_candidates = original_pexels
+    vd.search_pixabay_candidates = original_pixabay
+    vd.PIXABAY_API_KEY = original_key
+
+print("PASS: answer leakage, clue progression, anti-tease, payoff alignment, #20 contracts, provider failure isolation, production chain")
