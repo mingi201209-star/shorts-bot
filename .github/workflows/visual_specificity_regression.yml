@@ -1,0 +1,23 @@
+name: Visual Specificity Focused Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_visual_specificity_hotfix.py"
+      - "quality/visual_specificity_regression_test.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/visual_specificity_regression.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install focused regression dependencies
+        run: pip install -r requirements.txt
+      - name: Run visual specificity focused regression
+        run: python quality/visual_specificity_regression_test.py
