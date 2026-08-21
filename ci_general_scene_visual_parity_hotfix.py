@@ -38,11 +38,19 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
     compatibility = candidate_anchor_compatibility(candidate, scene_query)
     decision = visual_specificity_decision(candidate, scene_query)
     state = str(visual.get("state") or "UNKNOWN").upper()
+    specific_hits = int(decision.get("specific_hits", 0) or 0)
+    specific_total = int(decision.get("specific_total", 0) or 0)
+    mechanism_specific = specific_total > 0 and specific_hits >= max(1, (specific_total + 1) // 2)
 
     if state == "TRUE" and int(decision.get("level", 99)) <= 3:
         return 1, "VISUALLY_VERIFIED_DIRECT"
 
-    if state == "UNKNOWN" and bool(semantic.get("complete")) and bool(compatibility.get("compatible")):
+    if (
+        state == "UNKNOWN"
+        and bool(semantic.get("complete"))
+        and bool(compatibility.get("compatible"))
+        and mechanism_specific
+    ):
         return 3, "SEMANTIC_COMPLETE_UNKNOWN"
 
     if state == "UNKNOWN" and int(compatibility.get("matched", 0)) > 0:
@@ -62,11 +70,7 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
 
 
 def semantic_safe_reuse_candidate(scene_query):
-    """Reuse an already-rendered same-anchor clip without claiming it is verified.
-
-    #25 reuse limits/offsets remain authoritative. FALSE visual evidence is never
-    eligible; UNKNOWN may be reused only with full semantic anchor compatibility.
-    """
+    """Reuse an already-rendered same-anchor clip without claiming it is verified."""
     eligible = []
     for key, candidate in _SAFE_REUSE_HISTORY.items():
         if _SAFE_REUSE_COUNTS.get(key, 0) >= _SAFE_REUSE_MAX:
@@ -81,8 +85,10 @@ def semantic_safe_reuse_candidate(scene_query):
         # Actual verified reuse is handled by #26 safe_reuse_candidate first.
         if str(visual.get("state") or "UNKNOWN").upper() == "TRUE":
             continue
-        decision = visual_specificity_decision(candidate, scene_query)
-        eligible.append((int(decision.get("level", 99)), _SAFE_REUSE_COUNTS.get(key, 0), candidate))
+        tier, _ = general_scene_unknown_safe_tier(candidate, scene_query)
+        if tier > 4:
+            continue
+        eligible.append((tier, _SAFE_REUSE_COUNTS.get(key, 0), candidate))
 
     if not eligible:
         return None
