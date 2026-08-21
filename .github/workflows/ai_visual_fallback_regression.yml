@@ -1,0 +1,27 @@
+name: AI Visual Fallback Focused Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "video/ai_visual_provider.py"
+      - "ci_ai_visual_fallback_hotfix.py"
+      - "quality/ai_visual_fallback_regression_test.py"
+      - ".github/workflows/ai_visual_fallback_regression.yml"
+      - ".github/workflows/main.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+      - name: Run AI visual fallback regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: python quality/ai_visual_fallback_regression_test.py
