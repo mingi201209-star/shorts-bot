@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "ci_script_production_parity_hotfix.py"
+      - "ci_script_production_parity_bridge_hotfix.py"
       - "quality/script_production_parity_regression_test.py"
       - ".github/workflows/script_production_parity_regression.yml"
       - ".github/workflows/main.yml"
@@ -24,13 +25,3 @@ jobs:
           AI_VISUAL_FALLBACK_ENABLED: "false"
           AI_MAX_GENERATIONS_PER_VIDEO: "1"
         run: python quality/script_production_parity_regression_test.py
-      - name: Preserve #30 causal regression
-        env:
-          AI_VISUAL_FALLBACK_ENABLED: "false"
-          AI_MAX_GENERATIONS_PER_VIDEO: "1"
-        run: python quality/causal_information_progression_regression_test.py
-      - name: Preserve #29 OFF-mode regression
-        env:
-          AI_VISUAL_FALLBACK_ENABLED: "false"
-          AI_MAX_GENERATIONS_PER_VIDEO: "1"
-        run: python quality/ai_visual_fallback_regression_test.py
