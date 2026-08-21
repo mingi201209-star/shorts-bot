@@ -37,7 +37,7 @@ def design_candidate():
         "angle": "객실 소음 제어 장치의 감지·처리·대응 신호 causal chain",
         "core_question": "객실 소음 제어 장치는 어떤 단계로 반복 소음을 줄이는가",
         "micro_narrative": {
-            "hook": "항공기 객실 소음 제어 장치에는 숨은 구조가 있습니다.",
+            "hook": "항공기 객실 소음 제어 장치는 여러 단계로 작동합니다.",
             "core_question": "소음을 어떤 순서로 감지하고 줄이는가",
             "reveal": "감지된 반복 소음에 대응하는 신호를 사용한다",
             "payoff": "목표 소음 성분이 서로 간섭하면서 작게 들리게 된다",
@@ -73,7 +73,7 @@ def non_design_candidate():
 
 def good_scenes():
     return [
-        scene("항공기 소음 제어 장치에는 숨은 구조가 있습니다.", "항공기 객실의 소음 제어 장치", "aircraft cabin noise system"),
+        scene("항공기 소음 제어 장치는 여러 단계로 작동합니다.", "항공기 객실의 소음 제어 장치", "aircraft cabin noise system"),
         scene("객실 소음은 엔진과 공기 흐름에서 계속 들어옵니다.", "비행 중인 항공기 객실 내부", "aircraft cabin flight noise"),
         scene("좁은 객실에서는 소음을 줄이는 장치가 공간 제약 안에서 작동해야 합니다.", "항공기 객실 벽과 좌석 구조", "aircraft cabin interior wall"),
         scene("마이크가 객실의 반복 소음을 감지합니다.", "객실 내부 마이크 또는 소음 센서", "aircraft cabin microphone sensor"),
