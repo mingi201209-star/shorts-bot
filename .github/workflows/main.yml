@@ -82,6 +82,7 @@ jobs:
           python ci_causal_information_progression_hotfix.py
           python ci_script_production_parity_hotfix.py
           python ci_script_production_parity_bridge_hotfix.py
+          python ci_adaptive_scene_count_hotfix.py
           python ci_general_scene_visual_parity_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
@@ -89,6 +90,7 @@ jobs:
           grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
           grep -n "MAX_SCRIPT_ATTEMPTS" config.py
           grep -n '"+13%"' config.py
+          grep -n "ADAPTIVE_SCENE_COUNT_FOR_DENSE_DESIGN_V1\|ADAPTIVE_DESIGN_MIN_SCENES" content/script_generator.py
           grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
           grep -n "HOOK_SUBJECT_DOMINANCE_MIN\|HOOK_ACTION_MATCH_MIN\|HOOK_MAX_COMPETING_SUBJECT_RISK\|HOOK_SUBJECT_VISIBILITY_MIN" video/hook_visual_dominance.py
           grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES\|HOOK_CONCRETE_VISUAL_EVIDENCE\|DIRECT_VERIFIED\|UNVERIFIED_CONTEXTUAL_FALLBACK\|HOOK_FALLBACK_QUALITY_FLOOR\|AI_VISUAL_SORA_FALLBACK" video/hook_visual.py
@@ -106,7 +108,7 @@ jobs:
             ci_hook_fallback_quality_floor_hotfix.py ci_ai_visual_fallback_hotfix.py \
             ci_ai_visual_mechanism_fallback_hotfix.py ci_causal_information_progression_hotfix.py \
             ci_script_production_parity_hotfix.py ci_script_production_parity_bridge_hotfix.py \
-            ci_general_scene_visual_parity_hotfix.py \
+            ci_adaptive_scene_count_hotfix.py ci_general_scene_visual_parity_hotfix.py \
             main.py config.py content/candidate_explorer.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py video/video_providers.py video/hook_visual.py \
