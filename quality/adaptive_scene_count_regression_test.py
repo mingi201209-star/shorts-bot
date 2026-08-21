@@ -38,8 +38,6 @@ normal_context = {
     "core_question": "철새는 언제 이동하는가",
 }
 
-# Production parity may delegate to _LEGACY. The regression must prove the
-# adaptive validator is installed there, not merely on the exported module.
 runtime = getattr(sg, "_SCRIPT_PARITY_RUNTIME", None) or getattr(sg, "_LEGACY", None)
 assert runtime is not None, "production compatibility runtime missing"
 assert getattr(runtime.validate_scenes, "_adaptive_scene_count_v2", False), (
@@ -60,12 +58,19 @@ assert not valid and "장면 수 부족" in reason, reason
 valid, reason = runtime.validate_scenes([scene(i) for i in range(12)])
 assert valid, reason
 
-# Exported direct caller must route to the same production runtime contract.
 runtime._SCRIPT_PARITY_ACTIVE_CONTEXT = design_context
 valid, reason = sg.validate_scenes([scene(i) for i in range(8)])
 assert valid, reason
 
-assert "12 Scene을 채우기 위해" in sg._adaptive_scene_count_instruction(design_context)
-assert "12~13 Scene" in sg._adaptive_scene_count_instruction(normal_context)
+# The prompt helper belongs to the production compatibility runtime. Check that
+# runtime directly, then also verify the patched source contains the no-padding rule.
+assert hasattr(runtime, "_adaptive_scene_count_instruction"), (
+    "adaptive prompt helper missing on production runtime"
+)
+assert "12 Scene을 채우기 위해" in runtime._adaptive_scene_count_instruction(design_context)
+assert "12~13 Scene" in runtime._adaptive_scene_count_instruction(normal_context)
+source = (ROOT / "content" / "script_generator.py").read_text(encoding="utf-8")
+assert "{_adaptive_scene_count_instruction(candidate)}" in source
+assert "12 Scene을 채우기 위해" in source
 
 print("PASS: adaptive scene count installed on production compatibility runtime")
