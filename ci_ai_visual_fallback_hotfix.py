@@ -26,11 +26,21 @@ if '"obvious_generation_artifact"' not in text:
     )
 path.write_text(text, encoding="utf-8")
 
-# 2) Add the Sora fallback between component-relevant stock and same-domain contextual.
+# 2) Allow only already-created local AI MP4s through the normal renderer handoff.
+# Stock URLs retain the exact HTTP path. No arbitrary file URI support is added.
+path = Path("video/video_downloader.py")
+text = path.read_text(encoding="utf-8")
+if "AI_GENERATED_LOCAL_HANDOFF" not in text:
+    old = '''def download_video(\n    video_url,\n    output_path,\n    requests_module=requests,\n):\n    \"\"\"영상 URL을 로컬 MP4로 저장한다.\"\"\"\n    if not video_url:\n        raise ValueError(\"다운로드할 영상 URL이 없습니다.\")\n\n    response = requests_module.get(\n'''
+    new = '''def download_video(\n    video_url,\n    output_path,\n    requests_module=requests,\n):\n    \"\"\"영상 URL 또는 검증된 generated local MP4를 scene 파일로 저장한다.\"\"\"\n    if not video_url:\n        raise ValueError(\"다운로드할 영상 URL이 없습니다.\")\n\n    # AI_GENERATED_LOCAL_HANDOFF\n    local_path = Path(str(video_url))\n    if local_path.is_file():\n        if local_path.suffix.lower() != \".mp4\":\n            raise RuntimeError(\"generated local visual must be an MP4\")\n        target = Path(output_path)\n        target.write_bytes(local_path.read_bytes())\n        if not target.exists() or target.stat().st_size <= 0:\n            raise RuntimeError(f\"generated visual handoff failed: {output_path}\")\n        return output_path\n\n    response = requests_module.get(\n'''
+    if old not in text:
+        raise RuntimeError("download_video HTTP marker missing")
+    text = text.replace(old, new, 1)
+path.write_text(text, encoding="utf-8")
+
+# 3) Add the Sora fallback between component-relevant stock and same-domain contextual.
 path = Path("video/hook_visual.py")
 text = path.read_text(encoding="utf-8")
-
-# Imports are runtime imports so the existing stock/provider structure remains untouched.
 marker = "# HOOK_FALLBACK_QUALITY_FLOOR\n"
 helper = r'''
 # AI_VISUAL_SORA_FALLBACK
@@ -52,8 +62,6 @@ def _try_ai_generated_hook_visual(scene, scene_query, trigger_reason):
     if candidate is None:
         return None
 
-    # Generated content is never trusted by provenance alone. Reuse the existing
-    # production Hook frame verifier and register only what it actually sees.
     try:
         dominance = evaluate_hook_subject_dominance(candidate, scene)
         register_visual_evidence(
@@ -92,15 +100,6 @@ if "AI_VISUAL_SORA_FALLBACK" not in text:
     if marker not in text:
         raise RuntimeError("#28 Hook fallback marker missing")
     text = text.replace(marker, helper + "\n" + marker, 1)
-
-# Need the existing verifier symbol on the Hook module.
-if "evaluate_hook_subject_dominance," not in text:
-    text = text.replace(
-        "from video.hook_visual_dominance import (\n",
-        "from video.hook_visual_dominance import (\n",
-        1,
-    )
-# Most revisions import the callable already; fail closed if not present.
 if "evaluate_hook_subject_dominance" not in text:
     raise RuntimeError("existing Hook dominance verifier unavailable")
 
@@ -112,8 +111,6 @@ old = '''        candidate, quality, fallback_item = _choose_hook_fallback(fallb
 '''
 new = '''        candidate, quality, fallback_item = _choose_hook_fallback(fallback_scored, fallback_query)
         if candidate is not None:
-            # Stock/reuse tiers above SAME_DOMAIN_CONTEXTUAL always win without AI.
-            # Sora is attempted only when the best surviving stock fallback is tier <= 2.
             if int((quality or {}).get('tier', 0)) <= 2:
                 ai_candidate = _try_ai_generated_hook_visual(
                     scene,
@@ -142,9 +139,6 @@ new = '''        candidate, quality, fallback_item = _choose_hook_fallback(fallb
 if old not in text:
     raise RuntimeError("#28 fallback selection block missing")
 text = text.replace(old, new, 1)
-
-# Preserve AI provenance in the existing selection trace and avoid treating the local
-# generated file as a stock provider page URL.
 text = text.replace(
     "                'reuse': bool(candidate.get('_safe_reuse')),\n",
     "                'reuse': bool(candidate.get('_safe_reuse')),\n"
