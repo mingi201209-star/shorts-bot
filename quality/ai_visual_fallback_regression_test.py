@@ -8,7 +8,8 @@ HOTFIXES=(
 "ci_first5_visual_contract_hotfix.py","ci_video_provider_hotfix.py","ci_topic_input_hotfix.py","ci_aviation_candidate_context_hotfix.py",
 "ci_output_quality_hotfix.py","ci_curiosity_retention_hotfix.py","ci_visual_specificity_hotfix.py","ci_design_causality_hotfix.py",
 "ci_query_semantic_integrity_hotfix.py","ci_concrete_visual_evidence_hotfix.py","ci_visible_evidence_provenance_hotfix.py",
-"ci_hook_production_parity_hotfix.py","ci_hook_fallback_quality_floor_hotfix.py","ci_ai_visual_fallback_hotfix.py")
+"ci_hook_production_parity_hotfix.py","ci_hook_fallback_quality_floor_hotfix.py","ci_ai_visual_fallback_hotfix.py",
+"ci_ai_visual_mechanism_fallback_hotfix.py")
 for h in HOTFIXES: subprocess.run([sys.executable,h],check=True)
 
 from video import hook_visual as hv
@@ -17,6 +18,7 @@ from video import ai_visual_provider as ai
 
 q="airplane window rounded corner"
 scene={"text":"비행기 창문이 둥근 데는 이유가 있다.","keyword":q,"visual_goal":"aircraft window rounded detail"}
+mechanism_scene={"text":"압력 차이를 견디는 구조를 설명합니다.","keyword":"aircraft window pressure structure","visual_goal":"aircraft window pressure mechanism","visual_type":"educational mechanism"}
 def c(i,title): return {"id":i,"source_id":i,"provider":"pexels","url":f"https://x/{i}.mp4","title":title,"tags":title,"search_position":i,"width":1080,"height":1920,"duration":8}
 wing=c(1,"airplane wing clouds"); unknown=c(2,"aircraft cabin passenger window"); verified=c(3,"aircraft window rounded detail")
 vd.register_visual_evidence(wing,visible_components=["aircraft"],source="vision",definitive=True)
@@ -28,10 +30,11 @@ vd._SAFE_REUSE_HISTORY.clear(); vd._SAFE_REUSE_COUNTS.clear(); vd._SAFE_REUSE_HI
 cand,qual,_=hv._choose_hook_fallback([{"candidate":wing,"total_score":9}],q)
 assert qual["label"]=="VERIFIED_COMPATIBLE_REUSE"
 
-# C/G/H/I: adapter budget, eligibility, prompt safety; no real API calls.
+# C/G/H/I: adapter budget, Hook + mechanism eligibility, prompt safety; no real API calls.
 os.environ["AI_VISUAL_FALLBACK_ENABLED"]="1"
 ai.AI_VISUAL_FALLBACK_ENABLED=True; ai.AI_MAX_GENERATIONS_PER_VIDEO=1; ai.reset_generation_budget()
 assert ai.ai_visual_eligible(scene,hook=True)
+assert ai.ai_visual_eligible(mechanism_scene,hook=False)
 assert not ai.ai_visual_eligible({"text":"분위기 있는 배경","visual_goal":"ambient mood","keyword":"sky"},hook=False)
 p=ai.build_visual_prompt(scene,required_components=["aircraft","window"],hook=True)
 assert "Do not invent hidden technical structure" in p and "design intent" in p
@@ -41,7 +44,7 @@ ai._wait_for_job=lambda vid:{"id":vid,"status":"completed","seconds":"4"}
 ai._download_content=lambda vid,h:"/tmp/fake.mp4"
 r=ai.generate_ai_visual(scene,required_components=["aircraft","window"],hook=True,trigger_reason="test")
 assert r and r["provider"]=="openai_sora" and len(calls)==1
-assert ai.generate_ai_visual(scene,required_components=["aircraft","window"],hook=True,trigger_reason="budget") is None
+assert ai.generate_ai_visual(mechanism_scene,required_components=["aircraft","window"],hook=False,trigger_reason="budget") is None
 
 # D/E/F/J: generated candidate is only accepted after existing vision verifies component/dominance.
 orig_gen=ai.generate_ai_visual; orig_dom=hv.evaluate_hook_subject_dominance
@@ -56,6 +59,12 @@ try:
     assert hv._try_ai_generated_hook_visual(scene,q,"provider_exception") is None
 finally:
     ai.generate_ai_visual=orig_gen; hv.evaluate_hook_subject_dominance=orig_dom
+
+# General-scene production selector records the final stock quality for the mechanism trigger.
+vd._LAST_GENERAL_SELECTION=None
+vd.choose_best_candidate([wing],subject_filter_query=q)
+general=vd.get_last_general_selection()
+assert general and int(general["decision"]["level"])>=4
 
 # K/L provider isolation behavior remains.
 origp,origx,key=vd.search_pexels_candidates,vd.search_pixabay_candidates,vd.PIXABAY_API_KEY
@@ -72,4 +81,4 @@ finally: vd.search_pexels_candidates,vd.search_pixabay_candidates,vd.PIXABAY_API
 # #20-#28 core contracts still present behaviorally.
 assert hv._hook_fallback_quality(wing,q)["tier"] < hv._hook_fallback_quality(unknown,q)["tier"]
 assert hv.hook_render_contract({"candidate_id":"openai_sora:video_ai","url":"/tmp/fake.mp4","selection_mode":"AI_GENERATED_VERIFIED","visual_evidence":"TRUE"},render_start=0,render_duration=3,final_url="/tmp/fake.mp4")["final_url_match"]
-print("PASS: AI visual fallback A-L, #20-#28 contracts, provider isolation; no paid API calls")
+print("PASS: AI visual fallback A-L, Hook+mechanism eligibility, #20-#28 contracts, provider isolation; no paid API calls")
