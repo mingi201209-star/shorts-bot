@@ -17,5 +17,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
       - name: Run query semantic integrity focused regression
         run: python quality/query_semantic_integrity_regression_test.py
