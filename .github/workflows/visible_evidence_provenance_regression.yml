@@ -1,0 +1,23 @@
+name: Visible Evidence Provenance Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_visible_evidence_provenance_hotfix.py"
+      - "quality/visible_evidence_provenance_regression_test.py"
+      - ".github/workflows/visible_evidence_provenance_regression.yml"
+      - ".github/workflows/main.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+      - name: Run visible evidence provenance focused regression
+        run: python quality/visible_evidence_provenance_regression_test.py
