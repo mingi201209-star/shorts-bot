@@ -168,6 +168,25 @@ def choose_best_candidate(
         if selected else None
     )
 
+    # Within the same contextual tier, complete compound evidence beats partial
+    # same-domain evidence. This preserves #22 tiers while enforcing component presence.
+    if selected and evidence and evidence["concrete"] and not evidence["complete"]:
+        complete_fresh = []
+        for item in candidates or []:
+            if _candidate_is_used(item):
+                continue
+            item_evidence = concrete_visual_evidence(item, subject_filter_query)
+            if not item_evidence["complete"]:
+                continue
+            item_decision = visual_specificity_decision(item, subject_filter_query)
+            if selected_decision and item_decision["level"] <= selected_decision["level"]:
+                complete_fresh.append((item_decision["level"], int(item.get("search_position", 9999)), item))
+        if complete_fresh:
+            complete_fresh.sort(key=lambda entry: (entry[0], entry[1]))
+            selected = complete_fresh[0][2]
+            selected_decision = visual_specificity_decision(selected, subject_filter_query)
+            evidence = concrete_visual_evidence(selected, subject_filter_query)
+
     # Only rescue a previous fully-compatible concrete shot when the fresh result
     # has fallen to generic/contextual or worse. Direct/close fresh evidence wins.
     if selected_decision is None or selected_decision["level"] >= 4:
