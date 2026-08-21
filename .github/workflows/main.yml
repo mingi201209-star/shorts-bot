@@ -80,6 +80,8 @@ jobs:
           python ci_ai_visual_fallback_hotfix.py
           python ci_ai_visual_mechanism_fallback_hotfix.py
           python ci_causal_information_progression_hotfix.py
+          python ci_script_production_parity_hotfix.py
+          python ci_script_production_parity_bridge_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
@@ -102,6 +104,7 @@ jobs:
             ci_visible_evidence_provenance_hotfix.py ci_hook_production_parity_hotfix.py \
             ci_hook_fallback_quality_floor_hotfix.py ci_ai_visual_fallback_hotfix.py \
             ci_ai_visual_mechanism_fallback_hotfix.py ci_causal_information_progression_hotfix.py \
+            ci_script_production_parity_hotfix.py ci_script_production_parity_bridge_hotfix.py \
             main.py config.py content/candidate_explorer.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py video/video_providers.py video/hook_visual.py \
