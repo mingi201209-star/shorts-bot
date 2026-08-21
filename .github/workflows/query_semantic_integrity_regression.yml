@@ -1,0 +1,21 @@
+name: Query Semantic Integrity Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_query_semantic_integrity_hotfix.py"
+      - "quality/query_semantic_integrity_regression_test.py"
+      - ".github/workflows/query_semantic_integrity_regression.yml"
+      - ".github/workflows/main.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run query semantic integrity focused regression
+        run: python quality/query_semantic_integrity_regression_test.py
