@@ -70,6 +70,7 @@ jobs:
           python ci_aviation_candidate_context_hotfix.py
           python ci_output_quality_hotfix.py
           python ci_curiosity_retention_hotfix.py
+          python ci_visual_specificity_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
@@ -80,7 +81,7 @@ jobs:
           grep -n "HOOK_SUBJECT_DOMINANCE_MIN\|HOOK_ACTION_MATCH_MIN\|HOOK_MAX_COMPETING_SUBJECT_RISK\|HOOK_SUBJECT_VISIBILITY_MIN" video/hook_visual_dominance.py
           grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES" video/hook_visual.py
           grep -n "fetch_early_retention_pexels_video\|early_visual_strict\|opening_candidate_rejected" video/hook_visual.py
-          grep -n "search_video_candidates\|VIDEO_SELECTED\|VIDEO_PROVIDER\|CURRENT_NARRATION_SEMANTIC_MATCH" video/video_downloader.py video/hook_visual.py
+          grep -n "search_video_candidates\|VIDEO_SELECTED\|VIDEO_PROVIDER\|CURRENT_NARRATION_SEMANTIC_MATCH\|VISUAL_SPECIFICITY" video/video_downloader.py video/hook_visual.py
           grep -n "resolve_tts_prosody\|TTS_BODY_RATE\|hook_energy" integrations/tts.py
           grep -n "temperature=0.5" content/candidate_explorer.py
           grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
@@ -108,6 +109,7 @@ jobs:
             ci_aviation_candidate_context_hotfix.py \
             ci_output_quality_hotfix.py \
             ci_curiosity_retention_hotfix.py \
+            ci_visual_specificity_hotfix.py \
             main.py config.py content/candidate_explorer.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py video/video_providers.py video/hook_visual.py \
