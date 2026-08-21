@@ -69,8 +69,8 @@ with tempfile.TemporaryDirectory() as td:
     assert vd.download_video(str(src),str(dst),requests_module=NeverHTTP())==str(dst)
     assert dst.read_bytes()==src.read_bytes()
 
-# General-scene production selector records the final stock quality for the mechanism trigger.
-vd._LAST_GENERAL_SELECTION=None
+# General-scene trigger must be tested without the earlier verified-reuse fixture.
+vd._SAFE_REUSE_HISTORY.clear(); vd._SAFE_REUSE_COUNTS.clear(); vd._LAST_GENERAL_SELECTION=None
 vd.choose_best_candidate([wing],subject_filter_query=q)
 general=vd.get_last_general_selection()
 assert general and int(general["decision"]["level"])>=4
