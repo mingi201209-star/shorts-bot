@@ -1,0 +1,80 @@
+name: Shorts Operator Dispatch Bridge
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  dispatch:
+    if: >-
+      github.event.issue.number == 33 &&
+      github.event.comment.user.login == github.repository_owner &&
+      startsWith(github.event.comment.body, '/shorts-run')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Parse operator command
+        id: parse
+        env:
+          BODY: ${{ github.event.comment.body }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          topic=""
+          scope=""
+
+          case "$BODY" in
+            "/shorts-run")
+              ;;
+            "/shorts-run aviation")
+              scope="aviation"
+              ;;
+            "/shorts-run topic:"*)
+              topic="${BODY#'/shorts-run topic:'}"
+              topic="${topic# }"
+              if [[ -z "$topic" ]]; then
+                echo "Fixed-topic command requires a non-empty topic." >&2
+                exit 1
+              fi
+              ;;
+            *)
+              echo "Unsupported operator command: $BODY" >&2
+              exit 1
+              ;;
+          esac
+
+          {
+            echo "topic<<EOF"
+            echo "$topic"
+            echo "EOF"
+            echo "scope=$scope"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch Shorts Generator
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TOPIC: ${{ steps.parse.outputs.topic }}
+          SCOPE: ${{ steps.parse.outputs.scope }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run main.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            -f topic="$TOPIC" \
+            -f candidate_scope="$SCOPE"
+
+      - name: Record dispatch
+        env:
+          TOPIC: ${{ steps.parse.outputs.topic }}
+          SCOPE: ${{ steps.parse.outputs.scope }}
+        shell: bash
+        run: |
+          echo "Shorts production dispatch accepted."
+          echo "topic=${TOPIC:-<automatic>}"
+          echo "candidate_scope=${SCOPE:-<default>}"
