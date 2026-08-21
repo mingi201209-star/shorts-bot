@@ -1,0 +1,23 @@
+name: Hook Fallback Quality Floor Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_hook_fallback_quality_floor_hotfix.py"
+      - "quality/hook_fallback_quality_floor_regression_test.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/hook_fallback_quality_floor_regression.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+      - name: Run Hook fallback quality floor regression
+        run: python quality/hook_fallback_quality_floor_regression_test.py
