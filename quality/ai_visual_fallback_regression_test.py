@@ -24,8 +24,43 @@ wing=c(1,"airplane wing clouds"); unknown=c(2,"aircraft cabin passenger window")
 vd.register_visual_evidence(wing,visible_components=["aircraft"],source="vision",definitive=True)
 vd.register_visual_evidence(verified,visible_components=["aircraft","window"],source="vision",definitive=True)
 
-# A/B: good stock or verified reuse means no AI trigger condition.
+# Production OFF-mode contract: no create/poll/download and no AI verification vision call.
+os.environ["AI_VISUAL_FALLBACK_ENABLED"]="false"
+ai.AI_VISUAL_FALLBACK_ENABLED=False
+ai.AI_MAX_GENERATIONS_PER_VIDEO=1
+ai.reset_generation_budget()
+off_calls={"create":0,"poll":0,"download":0,"vision":0}
+orig_create,orig_wait,orig_download=ai._create_job,ai._wait_for_job,ai._download_content
+orig_dom=hv.evaluate_hook_subject_dominance
+try:
+    def no_create(*a,**k): off_calls["create"]+=1; raise AssertionError("Sora create must not run when disabled")
+    def no_poll(*a,**k): off_calls["poll"]+=1; raise AssertionError("Sora poll must not run when disabled")
+    def no_download(*a,**k): off_calls["download"]+=1; raise AssertionError("Sora download must not run when disabled")
+    def no_vision(*a,**k): off_calls["vision"]+=1; raise AssertionError("AI verification vision must not run when disabled")
+    ai._create_job,ai._wait_for_job,ai._download_content=no_create,no_poll,no_download
+    hv.evaluate_hook_subject_dominance=no_vision
+    assert ai.generate_ai_visual(scene,required_components=["aircraft","window"],hook=True,trigger_reason="off_mode") is None
+    assert hv._try_ai_generated_hook_visual(scene,q,"off_mode") is None
+    assert ai.generation_count()==0
+    assert off_calls=={"create":0,"poll":0,"download":0,"vision":0}
+finally:
+    ai._create_job,ai._wait_for_job,ai._download_content=orig_create,orig_wait,orig_download
+    hv.evaluate_hook_subject_dominance=orig_dom
+
+# OFF mode preserves the stock/reuse/component/contextual path.
 assert hv._hook_fallback_quality(verified,q)["label"]=="DIRECT_VERIFIED"
+vd._SAFE_REUSE_HISTORY.clear(); vd._SAFE_REUSE_COUNTS.clear()
+vd._SAFE_REUSE_HISTORY[vd._safe_reuse_key(verified)]=dict(verified)
+vd._SAFE_REUSE_COUNTS[vd._safe_reuse_key(verified)]=0
+cand,qual,_=hv._choose_hook_fallback([{"candidate":wing,"total_score":9}],q)
+assert cand and qual["label"]=="VERIFIED_COMPATIBLE_REUSE"
+vd._SAFE_REUSE_HISTORY.clear(); vd._SAFE_REUSE_COUNTS.clear()
+cand,qual,_=hv._choose_hook_fallback([{"candidate":unknown,"total_score":8},{"candidate":wing,"total_score":9}],q)
+assert cand and cand["source_id"]==2 and qual["label"]=="COMPONENT_RELEVANT_FALLBACK"
+cand,qual,_=hv._choose_hook_fallback([{"candidate":wing,"total_score":9}],q)
+assert cand and qual["label"] in {"SAME_DOMAIN_CONTEXTUAL","LAST_RESORT"}
+
+# A/B: good stock or verified reuse means no AI trigger condition when enabled later.
 vd._SAFE_REUSE_HISTORY.clear(); vd._SAFE_REUSE_COUNTS.clear(); vd._SAFE_REUSE_HISTORY[vd._safe_reuse_key(verified)]=dict(verified); vd._SAFE_REUSE_COUNTS[vd._safe_reuse_key(verified)]=0
 cand,qual,_=hv._choose_hook_fallback([{"candidate":wing,"total_score":9}],q)
 assert qual["label"]=="VERIFIED_COMPATIBLE_REUSE"
@@ -90,4 +125,9 @@ finally: vd.search_pexels_candidates,vd.search_pixabay_candidates,vd.PIXABAY_API
 # #20-#28 core contracts still present behaviorally.
 assert hv._hook_fallback_quality(wing,q)["tier"] < hv._hook_fallback_quality(unknown,q)["tier"]
 assert hv.hook_render_contract({"candidate_id":"openai_sora:video_ai","url":"/tmp/fake.mp4","selection_mode":"AI_GENERATED_VERIFIED","visual_evidence":"TRUE"},render_start=0,render_duration=3,final_url="/tmp/fake.mp4")["final_url_match"]
-print("PASS: AI visual fallback A-L, Hook+mechanism eligibility, local render handoff, #20-#28 contracts, provider isolation; no paid API calls")
+
+# Restore production-equivalent OFF state before exit.
+os.environ["AI_VISUAL_FALLBACK_ENABLED"]="false"
+ai.AI_VISUAL_FALLBACK_ENABLED=False
+ai.reset_generation_budget()
+print("PASS: AI visual fallback A-L + production OFF mode; Sora create/poll/download=0, AI verification vision=0 when disabled; #20-#28 contracts and provider isolation preserved; no paid API calls")
