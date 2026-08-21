@@ -241,13 +241,7 @@ assert rewrite_calls["count"] == 1, rewrite_calls
 assert quality_result["rewrite_count"] == 1, quality_result
 assert production_main.MAX_REWRITES == 1
 
-# Script-only scope and #29 OFF production contract.
-changed = subprocess.check_output(
-    ["git", "diff", "--name-only", "41cf642dd47c12380027ef549f52475d55ea3b1f...HEAD"],
-    cwd=ROOT,
-    text=True,
-).splitlines()
-assert not any(name.startswith("video/") for name in changed), changed
+# #29 OFF production contract; changed-file scope is verified through the PR API.
 main_workflow = (ROOT / ".github/workflows/main.yml").read_text(encoding="utf-8")
 assert 'AI_VISUAL_FALLBACK_ENABLED: "false"' in main_workflow
 
