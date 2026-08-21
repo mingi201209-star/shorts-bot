@@ -1,0 +1,26 @@
+name: Causal Information Progression Focused Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_causal_information_progression_hotfix.py"
+      - "quality/causal_information_progression_regression_test.py"
+      - ".github/workflows/causal_information_progression_regression.yml"
+      - ".github/workflows/main.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Run causal information progression focused regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: python quality/causal_information_progression_regression_test.py
