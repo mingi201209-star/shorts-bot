@@ -1,0 +1,23 @@
+name: Concrete Visual Evidence Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_concrete_visual_evidence_hotfix.py"
+      - "quality/concrete_visual_evidence_regression_test.py"
+      - ".github/workflows/concrete_visual_evidence_regression.yml"
+      - ".github/workflows/main.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+      - name: Run concrete visual evidence focused regression
+        run: python quality/concrete_visual_evidence_regression_test.py
