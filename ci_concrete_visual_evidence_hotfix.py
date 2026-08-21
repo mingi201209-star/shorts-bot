@@ -57,10 +57,20 @@ def visual_specificity_decision(candidate, scene_query):
     decision["detected_evidence"] = evidence["detected"]
     decision["evidence_completeness"] = evidence["completeness"]
     if evidence["concrete"] and not evidence["complete"]:
-        if evidence["detected"]:
-            decision["level"] = max(4, decision["level"])
-            decision["label"] = "generic_contextual_incomplete_evidence"
+        domain_anchor = evidence["required"][0] if len(evidence["required"]) >= 2 else None
+        same_domain = bool(domain_anchor and domain_anchor in evidence["detected"])
+        if same_domain:
+            # A same-world contextual fallback (e.g. aircraft without visible window)
+            # remains usable, but can never enter direct/close tiers.
+            decision["level"] = 4
+            decision["label"] = "same_domain_contextual_incomplete_component"
             decision["confidence"] = "low"
+        elif evidence["detected"]:
+            # Component-only evidence from another world (e.g. decorative window)
+            # is worse than same-domain context even though one token overlaps.
+            decision["level"] = 5
+            decision["label"] = "cross_domain_component_only"
+            decision["confidence"] = "very_low"
         else:
             decision["level"] = 5
             decision["label"] = "concrete_evidence_missing"
