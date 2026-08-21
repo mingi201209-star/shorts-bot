@@ -21,39 +21,24 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-noto-cjk
           ffmpeg -version
           fc-cache -f -v
-
       - name: Verify Korean fonts
         run: |
-          echo "=== Korean font check ==="
           fc-list :lang=ko family file | head -30
-          if ! fc-list :lang=ko | grep -qi "Noto Sans CJK\|Nanum"; then
-            echo "❌ Korean font not found"
-            exit 1
-          fi
-          echo "✅ Korean font detected"
-
+          if ! fc-list :lang=ko | grep -qi "Noto Sans CJK\|Nanum"; then exit 1; fi
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            echo "❌ requirements.txt not found"
-            exit 1
-          fi
-
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; else exit 1; fi
       - name: Apply production hotfixes
         run: |
           python ci_hotfix.py
@@ -72,51 +57,9 @@ jobs:
           python ci_curiosity_retention_hotfix.py
           python ci_visual_specificity_hotfix.py
           python ci_design_causality_hotfix.py
-
-          grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
-          grep -n "Novelty 조기 차단" main.py
-          grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
-          grep -n "MAX_SCRIPT_ATTEMPTS" config.py
-          grep -n '"+13%"' config.py
-          grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
-          grep -n "HOOK_SUBJECT_DOMINANCE_MIN\|HOOK_ACTION_MATCH_MIN\|HOOK_MAX_COMPETING_SUBJECT_RISK\|HOOK_SUBJECT_VISIBILITY_MIN" video/hook_visual_dominance.py
-          grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES" video/hook_visual.py
-          grep -n "fetch_early_retention_pexels_video\|early_visual_strict\|opening_candidate_rejected" video/hook_visual.py
-          grep -n "search_video_candidates\|VIDEO_SELECTED\|VIDEO_PROVIDER\|CURRENT_NARRATION_SEMANTIC_MATCH\|VISUAL_SPECIFICITY" video/video_downloader.py video/hook_visual.py
-          grep -n "resolve_tts_prosody\|TTS_BODY_RATE\|hook_energy" integrations/tts.py
-          grep -n "temperature=0.5" content/candidate_explorer.py
-          grep -n "GOOD_ENOUGH_SCORE\|\"hook\": 6.0" quality/consensus.py
-          grep -n "NARRATION TONE\|존댓말 종결\|RETRY FEEDBACK\|meaningful_keyword_words\|INFORMATION DENSITY\|CURIOSITY RETENTION\|DESIGN CAUSALITY" content/script_generator.py
-          grep -n "FIRST 5 SECONDS — RETENTION\|visual concept lock" content/script_generator.py
-          grep -n "validate_scenes_speech_style" content/script_generator.py
-          grep -n "validate_script_speech_style\|INFORMATION DENSITY\|CURIOSITY RETENTION\|DESIGN CAUSALITY" quality/rewrite_engine.py
-          grep -n "HOOK_GENERATION_COUNT\|bounded_retry_feedback\|speech_style_failure\|pool_ready\|DECLARATIVE HOOK CONTRACT" content/hook_experiment.py
-          grep -n "Review 최대 횟수 초과\|SCRIPT GENERATION FAILED" main.py
-          grep -n "SHORTS_TOPIC\|지정 production 주제" main.py
-          grep -n "fixed_topic\|SHORTS_CANDIDATE_SCOPE" content/candidate_explorer.py
-
-          python -m py_compile \
-            ci_hotfix.py \
-            ci_novelty_budget_hotfix.py \
-            ci_fact_critical_hotfix.py \
-            ci_speech_style_hotfix.py \
-            ci_hook_generation_hotfix.py \
-            ci_hook_pool_guard_hotfix.py \
-            ci_retention_hotfix.py \
-            ci_first5_retention_tts_hotfix.py \
-            ci_first5_visual_contract_hotfix.py \
-            ci_video_provider_hotfix.py \
-            ci_topic_input_hotfix.py \
-            ci_aviation_candidate_context_hotfix.py \
-            ci_output_quality_hotfix.py \
-            ci_curiosity_retention_hotfix.py \
-            ci_visual_specificity_hotfix.py \
-            ci_design_causality_hotfix.py \
-            main.py config.py content/candidate_explorer.py content/script_generator.py content/hook_experiment.py \
-            integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
-            quality/first5_visual_contract.py video/video_providers.py video/hook_visual.py \
-            video/hook_visual_dominance.py video/video_downloader.py video/video_engine.py video/subtitle_engine.py
-
+          python ci_query_semantic_integrity_hotfix.py
+          grep -n "QUERY_SEMANTIC_INTEGRITY\|QUERY_SPECIFICITY\|SEMANTIC_FALLBACK" video/video_downloader.py
+          python -m py_compile ci_query_semantic_integrity_hotfix.py video/video_downloader.py
       - name: Run Shorts Generator V3.2
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
@@ -130,11 +73,4 @@ jobs:
           ENABLE_HOOK_EXPERIMENT: "1"
           SHORTS_TOPIC: ${{ inputs.topic }}
           SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
-        run: |
-          echo "========================================"
-          echo "🚀 START SHORTS GENERATOR V3.2"
-          echo "========================================"
-          python main.py
-          echo "========================================"
-          echo "✅ SHORTS GENERATOR V3.2 FINISHED"
-          echo "========================================"
+        run: python main.py
