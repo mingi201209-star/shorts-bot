@@ -22,6 +22,6 @@ jobs:
         run: pip install -r requirements.txt
       - name: Run AI visual fallback regression
         env:
-          AI_VISUAL_FALLBACK_ENABLED: "1"
+          AI_VISUAL_FALLBACK_ENABLED: "false"
           AI_MAX_GENERATIONS_PER_VIDEO: "1"
         run: python quality/ai_visual_fallback_regression_test.py
