@@ -1,12 +1,6 @@
 from pathlib import Path
 
 
-def append_once(text, marker, block):
-    if marker in text:
-        return text
-    return text.rstrip() + "\n\n" + block.strip() + "\n"
-
-
 # Production parity fix: preserve the verified Hook candidate identity/mode through
 # the renderer and stop strict-gate failures from silently re-entering as direct.
 path = Path("video/hook_visual.py")
@@ -93,17 +87,20 @@ text = text.replace(
     "        print_hook_visual_audit(audit)\n        return candidate[\"url\"]\n\n    audit[\"fallback\"] = True\n",
     1,
 )
-text = text.replace(
-    "    print_hook_visual_audit(audit)\n    return fetch_pexels_video(original_query)\n",
+
+fallback_old = "    print_hook_visual_audit(audit)\n    return fetch_video(original_query)\n"
+fallback_new = (
     "    if fallback_best is not None:\n"
     "        candidate = fallback_best['candidate']\n"
-    "        video_id = candidate.get('id')\n"
-    "        if video_id is not None:\n"
-    "            USED_VIDEO_IDS.add(video_id)\n"
+    "        _mark_candidate_used(candidate)\n"
     "        visual = candidate_visible_component_evidence(candidate, audit.get('effective_query') or original_query)\n"
     "        audit['selected'] = {\n"
-    "            'id': video_id, 'page_url': candidate.get('page_url'),\n"
-    "            'scores': fallback_best.get('scores'), 'total_score': fallback_best.get('total_score'),\n"
+    "            'id': candidate.get('id'),\n"
+    "            'provider': candidate.get('provider', 'pexels'),\n"
+    "            'source_id': candidate.get('source_id', candidate.get('id')),\n"
+    "            'page_url': candidate.get('page_url'),\n"
+    "            'scores': fallback_best.get('scores'),\n"
+    "            'total_score': fallback_best.get('total_score'),\n"
     "            'mode': 'UNVERIFIED_CONTEXTUAL_FALLBACK',\n"
     "            'visual_evidence': visual.get('state'),\n"
     "        }\n"
@@ -113,14 +110,21 @@ text = text.replace(
     "            dominance=fallback_best.get('dominance'),\n"
     "            fallback_reason=audit.get('fallback_reason'),\n"
     "        )\n"
+    "        print(\n"
+    "            '[VIDEO_SELECTED] '\n"
+    "            f'provider={candidate.get(\"provider\", \"pexels\")} '\n"
+    "            f'source_id={candidate.get(\"source_id\", candidate.get(\"id\"))} scene=hook_fallback'\n"
+    "        )\n"
     "        print_hook_visual_audit(audit)\n"
     "        return candidate['url']\n"
-    "    video_url = fetch_pexels_video(original_query)\n"
+    "    video_url = fetch_video(original_query)\n"
     "    record_last_resort_selection(video_url, scene, audit.get('fallback_reason'))\n"
     "    print_hook_visual_audit(audit)\n"
-    "    return video_url\n",
-    1,
+    "    return video_url\n"
 )
+if fallback_old not in text:
+    raise RuntimeError("production Hook unified fallback marker not found")
+text = text.replace(fallback_old, fallback_new, 1)
 path.write_text(text, encoding="utf-8")
 
 
@@ -139,8 +143,8 @@ text = text.replace(
     1,
 )
 text = text.replace(
-    "                video_url = (\n                    fetch_pexels_video(\n                        keyword\n                    )\n                )\n",
-    "                video_url = (\n                    fetch_pexels_video(\n                        keyword\n                    )\n                )\n"
+    "                video_url = (\n                    fetch_video(\n                        keyword\n                    )\n                )\n",
+    "                video_url = (\n                    fetch_video(\n                        keyword\n                    )\n                )\n"
     "                try:\n"
     "                    record_last_resort_selection(video_url, item, f'hook selector exception: {type(e).__name__}')\n"
     "                except Exception:\n"
@@ -164,7 +168,7 @@ text = text.replace(
     "                    f'provenance={contract.get(\"provenance\", \"none\")} '\n"
     "                    f'vision_segment={contract.get(\"vision_segment\")} '\n"
     "                    f'render_segment={contract.get(\"render_segment\")} '\n"
-    "                    f'final_candidate_id={contract.get(\"candidate_id\")}\n'\n"
+    "                    f'final_candidate_id={contract.get(\"candidate_id\")}'\n"
     "                )\n"
     "                print(\n"
     "                    '[VISUAL_CONTRACT] '\n"
