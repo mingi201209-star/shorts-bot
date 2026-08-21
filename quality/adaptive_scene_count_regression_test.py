@@ -1,6 +1,14 @@
 import importlib
 import runpy
+import sys
+from pathlib import Path
 
+
+# GitHub Actions executes this file from quality/, so ensure the repository root
+# is importable before loading content.script_generator.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 # Apply the same prerequisite order used by production before importing the module.
 for hotfix in (
@@ -10,7 +18,7 @@ for hotfix in (
     "ci_script_production_parity_bridge_hotfix.py",
     "ci_adaptive_scene_count_hotfix.py",
 ):
-    runpy.run_path(hotfix, run_name="__main__")
+    runpy.run_path(str(ROOT / hotfix), run_name="__main__")
 
 sg = importlib.import_module("content.script_generator")
 
