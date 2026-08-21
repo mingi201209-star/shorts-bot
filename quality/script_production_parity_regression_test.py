@@ -34,8 +34,8 @@ def scene(text, goal, keyword):
 def design_candidate():
     return {
         "topic": "항공기 객실 소음 제어 장치의 구조와 작동 방식",
-        "angle": "왜 소음을 단순 차단하지 않고 감지와 상쇄 과정을 사용하는가",
-        "core_question": "객실 소음 제어 장치는 어떻게 반복 소음을 줄이는가",
+        "angle": "객실 소음 제어 장치의 감지·처리·대응 신호 causal chain",
+        "core_question": "객실 소음 제어 장치는 어떤 단계로 반복 소음을 줄이는가",
         "micro_narrative": {
             "hook": "항공기 객실 소음 제어 장치에는 숨은 구조가 있습니다.",
             "core_question": "소음을 어떤 순서로 감지하고 줄이는가",
@@ -75,7 +75,7 @@ def good_scenes():
     return [
         scene("항공기 소음 제어 장치에는 숨은 구조가 있습니다.", "항공기 객실의 소음 제어 장치", "aircraft cabin noise system"),
         scene("객실 소음은 엔진과 공기 흐름에서 계속 들어옵니다.", "비행 중인 항공기 객실 내부", "aircraft cabin flight noise"),
-        scene("좁은 객실에서는 소음을 무작정 막는 데 한계가 있습니다.", "항공기 객실 벽과 좌석 구조", "aircraft cabin interior wall"),
+        scene("좁은 객실에서는 소음을 줄이는 장치가 공간 제약 안에서 작동해야 합니다.", "항공기 객실 벽과 좌석 구조", "aircraft cabin interior wall"),
         scene("마이크가 객실의 반복 소음을 감지합니다.", "객실 내부 마이크 또는 소음 센서", "aircraft cabin microphone sensor"),
         scene("제어기가 감지된 신호의 특징을 계산합니다.", "오디오 제어기와 신호 처리 장치", "audio controller signal processing"),
         scene("스피커가 반대 위상의 소리를 만들어 냅니다.", "객실 스피커가 소리를 재생하는 모습", "aircraft cabin speaker audio"),
