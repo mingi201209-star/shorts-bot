@@ -1,5 +1,5 @@
 from pathlib import Path
-import os, subprocess, sys
+import os, subprocess, sys, tempfile
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 HOTFIXES=(
@@ -60,6 +60,15 @@ try:
 finally:
     ai.generate_ai_visual=orig_gen; hv.evaluate_hook_subject_dominance=orig_dom
 
+# Production parity: a verified generated local MP4 reaches the renderer handoff without HTTP.
+with tempfile.TemporaryDirectory() as td:
+    src=Path(td)/"generated.mp4"; dst=Path(td)/"scene.mp4"
+    src.write_bytes(b"fake-mp4-bytes")
+    class NeverHTTP:
+        def get(self,*a,**k): raise AssertionError("local AI handoff must not use HTTP")
+    assert vd.download_video(str(src),str(dst),requests_module=NeverHTTP())==str(dst)
+    assert dst.read_bytes()==src.read_bytes()
+
 # General-scene production selector records the final stock quality for the mechanism trigger.
 vd._LAST_GENERAL_SELECTION=None
 vd.choose_best_candidate([wing],subject_filter_query=q)
@@ -81,4 +90,4 @@ finally: vd.search_pexels_candidates,vd.search_pixabay_candidates,vd.PIXABAY_API
 # #20-#28 core contracts still present behaviorally.
 assert hv._hook_fallback_quality(wing,q)["tier"] < hv._hook_fallback_quality(unknown,q)["tier"]
 assert hv.hook_render_contract({"candidate_id":"openai_sora:video_ai","url":"/tmp/fake.mp4","selection_mode":"AI_GENERATED_VERIFIED","visual_evidence":"TRUE"},render_start=0,render_duration=3,final_url="/tmp/fake.mp4")["final_url_match"]
-print("PASS: AI visual fallback A-L, Hook+mechanism eligibility, #20-#28 contracts, provider isolation; no paid API calls")
+print("PASS: AI visual fallback A-L, Hook+mechanism eligibility, local render handoff, #20-#28 contracts, provider isolation; no paid API calls")
