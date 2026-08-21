@@ -58,8 +58,6 @@ old = '''        else:
                     keyword
                 )
             )
-
-        if not video_url:
 '''
 new = '''        else:
 
@@ -80,10 +78,7 @@ new = '''        else:
                 stock_level = int(stock_decision.get("level", 99))
                 # Component-relevant stock (levels 1-3) remains ahead of AI. Only
                 # contextual/last-resort mechanism scenes may spend the shared budget.
-                if (
-                    ai_visual_eligible(item, hook=False)
-                    and stock_level >= 4
-                ):
+                if ai_visual_eligible(item, hook=False) and stock_level >= 4:
                     required = list(stock_visual.get("required") or [])
                     ai_candidate = generate_ai_visual(
                         item,
@@ -122,8 +117,6 @@ new = '''        else:
                     "[AI_VISUAL] generation_status=isolated_failure scene_id="
                     f"{idx + 1} reason={type(ai_error).__name__} fallback=stock_contextual"
                 )
-
-        if not video_url:
 '''
 if old not in text:
     raise RuntimeError("general scene provider block not found")
