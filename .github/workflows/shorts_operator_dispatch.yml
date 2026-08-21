@@ -7,6 +7,7 @@ on:
 permissions:
   actions: write
   contents: read
+  issues: write
 
 jobs:
   dispatch:
@@ -55,6 +56,15 @@ jobs:
             echo "scope=$scope"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Snapshot existing production runs
+        id: before
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow main.yml --event workflow_dispatch --limit 30 --json databaseId --jq 'map(.databaseId) | join(",")' > /tmp/before_ids
+
       - name: Dispatch Shorts Generator
         env:
           GH_TOKEN: ${{ github.token }}
@@ -69,12 +79,50 @@ jobs:
             -f topic="$TOPIC" \
             -f candidate_scope="$SCOPE"
 
-      - name: Record dispatch
+      - name: Resolve dispatched run
+        id: run
         env:
-          TOPIC: ${{ steps.parse.outputs.topic }}
-          SCOPE: ${{ steps.parse.outputs.scope }}
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          echo "Shorts production dispatch accepted."
-          echo "topic=${TOPIC:-<automatic>}"
-          echo "candidate_scope=${SCOPE:-<default>}"
+          set -euo pipefail
+          before=",$(cat /tmp/before_ids),"
+          run_id=""
+          run_url=""
+          run_status=""
+
+          for attempt in {1..12}; do
+            while IFS=$'\t' read -r id url status; do
+              if [[ -n "$id" && "$before" != *",$id,"* ]]; then
+                run_id="$id"
+                run_url="$url"
+                run_status="$status"
+                break
+              fi
+            done < <(gh run list --repo "$GITHUB_REPOSITORY" --workflow main.yml --event workflow_dispatch --branch main --limit 10 --json databaseId,url,status --jq '.[] | [.databaseId,.url,.status] | @tsv')
+
+            [[ -n "$run_id" ]] && break
+            sleep 5
+          done
+
+          if [[ -z "$run_id" ]]; then
+            echo "Unable to resolve newly dispatched production run." >&2
+            exit 1
+          fi
+
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "run_url=$run_url" >> "$GITHUB_OUTPUT"
+          echo "run_status=$run_status" >> "$GITHUB_OUTPUT"
+
+      - name: Record dispatch on control issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TOPIC: ${{ steps.parse.outputs.topic }}
+          SCOPE: ${{ steps.parse.outputs.scope }}
+          RUN_ID: ${{ steps.run.outputs.run_id }}
+          RUN_URL: ${{ steps.run.outputs.run_url }}
+          RUN_STATUS: ${{ steps.run.outputs.run_status }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh issue comment 33 --repo "$GITHUB_REPOSITORY" --body "Production dispatch accepted. Run: ${RUN_ID} (${RUN_STATUS}). Scope: ${SCOPE:-default}. Topic: ${TOPIC:-automatic}. ${RUN_URL}"
