@@ -198,7 +198,7 @@ causal_design = [
     {"text": "작은 구멍이 판 사이 압력을 조절합니다."},
     {"text": "그 결과 압력을 담당하는 구조가 유지됩니다."},
 ]
-assert sg.design_causality_preference_score(causal_design) > sg.design_causality_preference_score(feature_list)
+assert legacy.design_causality_preference_score(causal_design) > legacy.design_causality_preference_score(feature_list)
 
 # Production chain remains bounded and unchanged except for explicitly appended hotfixes.
 workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
