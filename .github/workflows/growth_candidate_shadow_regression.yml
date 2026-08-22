@@ -1,0 +1,21 @@
+name: Growth Candidate Shadow Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/growth_candidate_ranker.py"
+      - "analytics/**"
+      - "quality/growth_candidate_shadow_regression_test.py"
+      - ".github/workflows/growth_candidate_shadow_regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run growth-aware candidate shadow regression
+        run: python -m quality.growth_candidate_shadow_regression_test
