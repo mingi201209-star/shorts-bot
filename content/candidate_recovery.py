@@ -37,6 +37,26 @@ _HARD_REJECT_REASON_MARKERS = (
     "비어 있습니다",
 )
 
+# Recovery must not override an editorial decision whose actual reason is that
+# the answer is already obvious / insufficiently novel. These markers are
+# intentionally narrow: generic weak-payoff or depth feedback remains eligible
+# for bounded grounded recovery.
+_NOVELTY_REJECT_REASON_MARKERS = (
+    "예상 가능",
+    "예측 가능",
+    "뻔",
+    "의외성이 부족",
+    "의외성 부족",
+    "새로움이 부족",
+    "새로움 부족",
+    "참신성이 부족",
+    "참신성 부족",
+    "novelty 부족",
+    "low novelty",
+    "too predictable",
+    "predictable conclusion",
+)
+
 _REQUIRED_FIELDS = (
     "topic",
     "angle",
@@ -97,6 +117,11 @@ def _reason_is_hard_reject(reason):
     return any(marker in lowered for marker in _HARD_REJECT_REASON_MARKERS)
 
 
+def _reason_is_novelty_reject(reason):
+    lowered = _text(reason).lower()
+    return any(marker in lowered for marker in _NOVELTY_REJECT_REASON_MARKERS)
+
+
 def recovery_eligibility(candidate, gate_result):
     """Return a fail-closed recovery decision for a gate-rejected Winner.
 
@@ -123,6 +148,9 @@ def recovery_eligibility(candidate, gate_result):
 
     if _reason_is_hard_reject(reason):
         return False, "hard_grounding_reject"
+
+    if _reason_is_novelty_reject(reason):
+        return False, "hard_novelty_reject"
 
     return True, "soft_editorial_reject"
 
