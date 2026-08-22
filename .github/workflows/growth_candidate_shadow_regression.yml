@@ -5,8 +5,10 @@ on:
     paths:
       - "content/growth_candidate_ranker.py"
       - "analytics/**"
-      - "quality/growth_candidate_shadow_regression_test.py"
+      - "ci_growth_candidate_shadow_hotfix.py"
+      - "quality/growth_candidate_shadow_*"
       - ".github/workflows/growth_candidate_shadow_regression.yml"
+      - ".github/workflows/main.yml"
   workflow_dispatch:
 
 jobs:
@@ -17,5 +19,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Run growth-aware candidate shadow regression
-        run: python -m quality.growth_candidate_shadow_regression_test
+      - name: Run growth-aware candidate shadow regressions
+        run: |
+          python -m quality.growth_candidate_shadow_regression_test
+          python -m quality.growth_candidate_shadow_production_regression_test
