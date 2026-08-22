@@ -4,6 +4,7 @@ on:
   pull_request:
     branches: [main]
     paths:
+      - "ci_problem_solution_narrative_hotfix.py"
       - "ci_causal_information_progression_hotfix.py"
       - "quality/causal_information_progression_regression_test.py"
       - ".github/workflows/causal_information_progression_regression.yml"
@@ -19,6 +20,13 @@ jobs:
           python-version: "3.11"
       - name: Install Python dependencies
         run: pip install -r requirements.txt
+      - name: Apply and verify evidence-gated problem-solution guidance
+        run: |
+          python ci_problem_solution_narrative_hotfix.py
+          python -m py_compile ci_problem_solution_narrative_hotfix.py content/script_generator.py
+          grep -q "PROBLEM → SOLUTION NARRATIVE — EVIDENCE GATED" content/script_generator.py
+          grep -q "절대로 극적인 문제나 사고 사례를 만들어내지 않는다" content/script_generator.py
+          grep -q "현상 → 의문 → 원인 → mechanism → 결과" content/script_generator.py
       - name: Run causal information progression focused regression
         env:
           AI_VISUAL_FALLBACK_ENABLED: "false"
