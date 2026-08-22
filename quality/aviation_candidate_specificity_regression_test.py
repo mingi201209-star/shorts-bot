@@ -19,11 +19,14 @@ subprocess.run([sys.executable, "ci_aviation_candidate_specificity_hotfix.py"], 
 gate_after = hashlib.sha256(gate_path.read_bytes()).hexdigest()
 assert gate_before == gate_after, "Candidate Gate implementation changed"
 
-# The hotfix scripts mutate the source file at runtime. Explicitly invalidate any
-# import/cache state so this regression exercises the patched production module.
+# Hotfix scripts mutate source at runtime. The package may already hold an attribute
+# pointing at the pre-hotfix module, so remove both cache locations before importing.
 importlib.invalidate_caches()
 sys.modules.pop("content.candidate_explorer", None)
-from content import candidate_explorer as ce
+import content
+if hasattr(content, "candidate_explorer"):
+    delattr(content, "candidate_explorer")
+ce = importlib.import_module("content.candidate_explorer")
 
 
 def candidate(
