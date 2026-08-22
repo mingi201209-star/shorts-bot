@@ -1,0 +1,10 @@
+{
+  "production_counterexample_run": 32555499826,
+  "unchanged_policies": {
+    "max_script_attempts": 5,
+    "v3_max_api_calls": 60,
+    "v3_max_cost_usd": 0.05,
+    "ai_visual_fallback_enabled": false
+  },
+  "expected_fix": "preserve grounded aviation specificity and use it as distinct causal units on bounded script retries"
+}
