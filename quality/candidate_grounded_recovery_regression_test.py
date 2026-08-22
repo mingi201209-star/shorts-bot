@@ -32,11 +32,41 @@ def candidate(topic="날개 끝 윙렛의 실제 역할", reveal="날개 끝 와
 def test_soft_editorial_reject_is_recoverable():
     gate = {
         "status": "REGENERATE",
-        "reason": "결론이 다소 예상 가능하고 두 번째 인과 단계가 약합니다.",
+        "reason": "두 번째 인과 단계가 약하고 payoff를 더 구체화해야 합니다.",
     }
     eligible, reason = recovery_eligibility(candidate(), gate)
     assert eligible is True
     assert reason == "soft_editorial_reject"
+
+
+def test_predictable_candidate_is_never_recoverable():
+    gate = {
+        "status": "REGENERATE",
+        "reason": "결론이 너무 예상 가능해서 시청자가 답을 이미 짐작할 수 있습니다.",
+    }
+    eligible, reason = recovery_eligibility(candidate(), gate)
+    assert eligible is False
+    assert reason == "hard_novelty_reject"
+    assert make_recovery_record(candidate(), gate, attempt=7) is None
+
+
+def test_low_novelty_candidate_cannot_revive_after_exhaustion():
+    predictable_gate = {
+        "status": "REGENERATE",
+        "reason": "의외성이 부족하고 결론이 뻔합니다.",
+    }
+    records = []
+    for attempt in range(1, 8):
+        record = make_recovery_record(
+            candidate(topic=f"예측 가능한 후보 {attempt}"),
+            predictable_gate,
+            attempt=attempt,
+        )
+        if record is not None:
+            records.append(record)
+
+    assert records == []
+    assert select_best_recovery(records) is None
 
 
 def test_hard_grounding_reject_is_never_recoverable():
@@ -62,7 +92,7 @@ def test_placeholder_is_never_recoverable():
 def test_best_grounded_candidate_is_selected_deterministically():
     gate = {
         "status": "REGENERATE",
-        "reason": "Payoff가 조금 예상 가능합니다.",
+        "reason": "Payoff의 인과 연결을 한 단계 더 구체화해야 합니다.",
     }
     weaker = candidate(
         topic="약한 후보",
@@ -93,14 +123,18 @@ def test_no_recoverable_candidate_stays_terminal():
 def main():
     test_soft_editorial_reject_is_recoverable()
     print("CASE A soft editorial recovery: PASS")
+    test_predictable_candidate_is_never_recoverable()
+    print("CASE B predictable candidate exclusion: PASS")
+    test_low_novelty_candidate_cannot_revive_after_exhaustion()
+    print("CASE C exhausted low-novelty recovery stays terminal: PASS")
     test_hard_grounding_reject_is_never_recoverable()
-    print("CASE B hard grounding exclusion: PASS")
+    print("CASE D hard grounding exclusion: PASS")
     test_placeholder_is_never_recoverable()
-    print("CASE C placeholder exclusion: PASS")
+    print("CASE E placeholder exclusion: PASS")
     test_best_grounded_candidate_is_selected_deterministically()
-    print("CASE D deterministic strongest selection: PASS")
+    print("CASE F deterministic strongest selection: PASS")
     test_no_recoverable_candidate_stays_terminal()
-    print("CASE E terminal without recoverable candidate: PASS")
+    print("CASE G terminal without recoverable candidate: PASS")
     print("CANDIDATE GROUNDED RECOVERY REGRESSION: PASS")
 
 
