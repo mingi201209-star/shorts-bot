@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 path = Path("main.py")
@@ -84,18 +85,6 @@ EXPLORER_FINAL_RECOVERY = '''                recovered = select_best_recovery(re
                 }
 '''
 
-REJECTED_TOPIC_MARKER = '''            if (
-                current_topic
-                in rejected_topics
-            ):
-'''
-REJECTED_TOPIC_REPLACEMENT = '''            if (
-                current_topic
-                in rejected_topics
-                and not recovered_from_pool
-            ):
-'''
-
 GATE_RECORD_MARKER = '''                print_budget_status()
 
                 if (
@@ -176,24 +165,105 @@ GATE_RECORD_REPLACEMENT = '''                print_budget_status()
                     )
 '''
 
+
+def replace_exact(source, marker, replacement, name):
+    if source.count(marker) != 1:
+        raise RuntimeError(
+            f"Candidate recovery {name} marker mismatch: {source.count(marker)}"
+        )
+    return source.replace(marker, replacement, 1)
+
+
+def replace_rejected_topic_guard(source):
+    # Earlier production hotfixes may prepend conditions such as
+    # `not forced_topic` to this guard. Locate the enclosing if-block by the
+    # stable `in rejected_topics` clause, then preserve every existing clause.
+    clause = re.compile(
+        r"(?m)^(?P<indent>[ \t]+)in[ \t]+rejected_topics[ \t]*$"
+    )
+    clauses = list(clause.finditer(source))
+    candidates = []
+
+    for item in clauses:
+        clause_indent = item.group("indent")
+        clause_width = len(clause_indent.expandtabs(4))
+        lines = source.splitlines(keepends=True)
+        offset = 0
+        line_index = None
+        for index, line in enumerate(lines):
+            next_offset = offset + len(line)
+            if offset <= item.start() < next_offset:
+                line_index = index
+                break
+            offset = next_offset
+        if line_index is None:
+            continue
+
+        start_index = None
+        for index in range(line_index - 1, -1, -1):
+            stripped = lines[index].lstrip(" \t")
+            indent = lines[index][:-len(stripped)] if stripped else lines[index]
+            width = len(indent.expandtabs(4))
+            if stripped.startswith("if (") and width < clause_width:
+                start_index = index
+                break
+            if stripped and width < clause_width:
+                break
+        if start_index is None:
+            continue
+
+        end_index = None
+        start_indent = lines[start_index][:-len(lines[start_index].lstrip(" \t"))]
+        for index in range(line_index + 1, min(len(lines), line_index + 12)):
+            if lines[index].startswith(start_indent + "):"):
+                end_index = index
+                break
+        if end_index is None:
+            continue
+
+        block = "".join(lines[start_index:end_index + 1])
+        if "current_topic" in block:
+            candidates.append((lines, start_index, end_index, block, start_indent))
+
+    if len(candidates) != 1:
+        raise RuntimeError(
+            "Candidate recovery rejected_topic_guard marker mismatch: "
+            f"{len(candidates)}"
+        )
+
+    lines, start_index, end_index, block, indent = candidates[0]
+    if "recovered_from_pool" in block:
+        return source
+
+    insertion = f"{indent}    and not recovered_from_pool\n"
+    lines.insert(end_index, insertion)
+    return "".join(lines)
+
+
 if "# CANDIDATE_GROUNDED_RECOVERY_V1" in text:
     print("ℹ️ Candidate grounded recovery hotfix already applied")
 else:
-    replacements = (
-        (IMPORT_MARKER, IMPORT_REPLACEMENT, "import"),
-        (INIT_MARKER, INIT_REPLACEMENT, "init"),
-        (EXPLORER_STATUS_MARKER, EXPLORER_STATUS_REPLACEMENT, "explorer_status"),
-        (EXPLORER_FINAL_RAISE, EXPLORER_FINAL_RECOVERY, "explorer_exhaustion"),
-        (REJECTED_TOPIC_MARKER, REJECTED_TOPIC_REPLACEMENT, "rejected_topic_guard"),
-        (GATE_RECORD_MARKER, GATE_RECORD_REPLACEMENT, "gate_recovery"),
+    text = replace_exact(text, IMPORT_MARKER, IMPORT_REPLACEMENT, "import")
+    text = replace_exact(text, INIT_MARKER, INIT_REPLACEMENT, "init")
+    text = replace_exact(
+        text,
+        EXPLORER_STATUS_MARKER,
+        EXPLORER_STATUS_REPLACEMENT,
+        "explorer_status",
     )
-
-    for marker, replacement, name in replacements:
-        if text.count(marker) != 1:
-            raise RuntimeError(
-                f"Candidate recovery {name} marker mismatch: {text.count(marker)}"
-            )
-        text = text.replace(marker, replacement, 1)
+    text = replace_exact(
+        text,
+        EXPLORER_FINAL_RAISE,
+        EXPLORER_FINAL_RECOVERY,
+        "explorer_exhaustion",
+    )
+    text = replace_rejected_topic_guard(text)
+    text = replace_exact(
+        text,
+        GATE_RECORD_MARKER,
+        GATE_RECORD_REPLACEMENT,
+        "gate_recovery",
+    )
 
     path.write_text(text, encoding="utf-8")
     print("✅ Bounded grounded Candidate recovery hotfix applied")
