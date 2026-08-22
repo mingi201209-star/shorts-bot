@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 # Production parity fix: preserve the verified Hook candidate identity/mode through
@@ -126,19 +127,23 @@ fallback_new = (
     "    return video_url\n"
 )
 
-fallback_markers = [
-    "    print_hook_visual_audit(audit)\n    return fetch_video(original_query)\n",
-    "    print_hook_visual_audit(audit)\n    if component_profile:\n        # Do not throw away the named component at the final fallback. A targeted\n        # component query is still preferable to a generic whole-aircraft shot.\n        return fetch_pexels_video(component_profile[\"queries\"][0])\n    return fetch_pexels_video(original_query)\n",
-]
+# Do not depend on the exact final fallback body. Multiple production hotfixes can
+# legitimately add provenance/component-aware branches here. Replace only the tail
+# of fetch_hook_pexels_video, from its final audit print through the next function.
 if fallback_new not in text:
-    matched = False
-    for fallback_old in fallback_markers:
-        if fallback_old in text:
-            text = text.replace(fallback_old, fallback_new, 1)
-            matched = True
-            break
-    if not matched:
-        raise RuntimeError("production Hook unified fallback marker not found")
+    pattern = re.compile(
+        r"    print_hook_visual_audit\(audit\)\n"
+        r"(?:(?!\ndef print_hook_visual_audit).)*?"
+        r"(?=\n\ndef print_hook_visual_audit)",
+        re.DOTALL,
+    )
+    matches = list(pattern.finditer(text))
+    if not matches:
+        raise RuntimeError("production Hook structural fallback boundary not found")
+    # The final audit-print block in fetch_hook_pexels_video is the fallback tail;
+    # strict-selection audit prints occur earlier and are followed by more code.
+    match = matches[-1]
+    text = text[:match.start()] + fallback_new + text[match.end():]
 path.write_text(text, encoding="utf-8")
 
 
