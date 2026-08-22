@@ -88,7 +88,6 @@ text = text.replace(
     1,
 )
 
-fallback_old = "    print_hook_visual_audit(audit)\n    return fetch_video(original_query)\n"
 fallback_new = (
     "    if fallback_best is not None:\n"
     "        candidate = fallback_best['candidate']\n"
@@ -117,14 +116,29 @@ fallback_new = (
     "        )\n"
     "        print_hook_visual_audit(audit)\n"
     "        return candidate['url']\n"
-    "    video_url = fetch_video(original_query)\n"
-    "    record_last_resort_selection(video_url, scene, audit.get('fallback_reason'))\n"
+    "    fallback_query = (\n"
+    "        component_profile['queries'][0]\n"
+    "        if component_profile else original_query\n"
+    "    )\n"
+    "    video_url = fetch_pexels_video(fallback_query)\n"
+    "    record_last_resort_selection(video_url, {**scene, 'keyword': fallback_query}, audit.get('fallback_reason'))\n"
     "    print_hook_visual_audit(audit)\n"
     "    return video_url\n"
 )
-if fallback_old not in text:
-    raise RuntimeError("production Hook unified fallback marker not found")
-text = text.replace(fallback_old, fallback_new, 1)
+
+fallback_markers = [
+    "    print_hook_visual_audit(audit)\n    return fetch_video(original_query)\n",
+    "    print_hook_visual_audit(audit)\n    if component_profile:\n        # Do not throw away the named component at the final fallback. A targeted\n        # component query is still preferable to a generic whole-aircraft shot.\n        return fetch_pexels_video(component_profile[\"queries\"][0])\n    return fetch_pexels_video(original_query)\n",
+]
+if fallback_new not in text:
+    matched = False
+    for fallback_old in fallback_markers:
+        if fallback_old in text:
+            text = text.replace(fallback_old, fallback_new, 1)
+            matched = True
+            break
+    if not matched:
+        raise RuntimeError("production Hook unified fallback marker not found")
 path.write_text(text, encoding="utf-8")
 
 
