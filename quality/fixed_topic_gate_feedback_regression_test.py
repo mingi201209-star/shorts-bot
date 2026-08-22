@@ -2,7 +2,6 @@ from pathlib import Path
 import hashlib
 import py_compile
 import re
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -16,17 +15,34 @@ def retry_policy(text):
     return int(match.group(1))
 
 
+def committed_text(path):
+    # This regression is also executed after the production hotfix chain has
+    # already mutated the working tree. Always reconstruct the test fixture
+    # from the checked-out commit instead of copying the mutated workspace.
+    result = subprocess.run(
+        ["git", "show", f"HEAD:{path}"],
+        cwd=ROOT,
+        check=True,
+        text=True,
+        capture_output=True,
+    )
+    return result.stdout
+
+
 with tempfile.TemporaryDirectory() as tmp:
     work = Path(tmp)
     (work / "content").mkdir()
-    shutil.copy2(ROOT / "main.py", work / "main.py")
-    shutil.copy2(
-        ROOT / "content" / "candidate_explorer.py",
-        work / "content" / "candidate_explorer.py",
+    (work / "main.py").write_text(
+        committed_text("main.py"),
+        encoding="utf-8",
     )
-    shutil.copy2(
-        ROOT / "ci_topic_input_hotfix.py",
-        work / "ci_topic_input_hotfix.py",
+    (work / "content" / "candidate_explorer.py").write_text(
+        committed_text("content/candidate_explorer.py"),
+        encoding="utf-8",
+    )
+    (work / "ci_topic_input_hotfix.py").write_text(
+        committed_text("ci_topic_input_hotfix.py"),
+        encoding="utf-8",
     )
 
     gate_path = ROOT / "content" / "candidate_gate.py"
