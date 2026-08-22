@@ -235,6 +235,16 @@ def patch_candidate_explorer():
         encoding="utf-8"
     )
 
+    if (
+        "[PREVIOUS CANDIDATE GATE FEEDBACK]" in text
+        and "fixed_topic_gate_feedback" in text
+        and "Candidate Explorer가 지정 production 주제를" in text
+    ):
+        print(
+            "✅ production topic input hotfix already applied"
+        )
+        return
+
     context_signature_marker = '''def build_execution_context(
     topic_info,
     *,
