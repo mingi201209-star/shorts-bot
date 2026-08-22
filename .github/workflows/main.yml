@@ -120,6 +120,7 @@ jobs:
             ci_script_production_parity_hotfix.py ci_script_production_parity_bridge_hotfix.py \
             ci_adaptive_scene_count_hotfix.py ci_general_scene_visual_parity_hotfix.py \
             ci_script_validation_recovery_hotfix.py \
+            quality/fixed_topic_gate_feedback_regression_test.py \
             main.py config.py content/candidate_explorer.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py quality/final_render_integrity.py \
@@ -128,6 +129,7 @@ jobs:
             video/video_engine.py video/subtitle_engine.py video/ai_visual_provider.py
 
           python quality/final_render_integrity_regression_test.py
+          python quality/fixed_topic_gate_feedback_regression_test.py
 
       - name: Run Shorts Generator V3.2
         env:
