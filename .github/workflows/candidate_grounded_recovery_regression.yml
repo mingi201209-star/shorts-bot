@@ -7,6 +7,7 @@ on:
       - "content/candidate_recovery.py"
       - "ci_candidate_grounded_recovery_hotfix.py"
       - "quality/candidate_grounded_recovery_regression_test.py"
+      - "quality/candidate_recovery_production_chain_regression_test.py"
       - ".github/workflows/candidate_grounded_recovery_regression.yml"
       - ".github/workflows/main.yml"
 
@@ -30,6 +31,9 @@ jobs:
             content/candidate_recovery.py \
             ci_candidate_grounded_recovery_hotfix.py \
             quality/candidate_grounded_recovery_regression_test.py \
+            quality/candidate_recovery_production_chain_regression_test.py \
             main.py
       - name: Run focused regression
         run: python quality/candidate_grounded_recovery_regression_test.py
+      - name: Reproduce production hotfix prefix
+        run: python quality/candidate_recovery_production_chain_regression_test.py
