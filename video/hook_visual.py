@@ -46,6 +46,49 @@ HOOK_VISUAL_FLOORS = {
 HOOK_VISUAL_MAX_OBSTRUCTION_RISK = 4.0
 HOOK_DOMINANCE_MAX_CANDIDATES = 3
 
+# Opening hooks that explicitly describe a small visible component need a tighter
+# search before generic subject-level fallbacks. Keep this deliberately narrow:
+# it only activates when the narration/visual goal names the component.
+OPENING_COMPONENT_PROFILES = {
+    "winglet": {
+        "triggers": (
+            "winglet", "wing tip", "wingtip", "wing-tip",
+            "날개 끝", "날개끝", "윙렛",
+        ),
+        "queries": (
+            "airplane winglet close up",
+            "aircraft wingtip close up",
+            "airplane wing tip upward close up",
+        ),
+        "slug_terms": {"wing", "winglet", "wingtip", "airplane", "aircraft"},
+    },
+}
+
+
+def _opening_component_profile(scene):
+    combined = " ".join((
+        str(scene.get("keyword", "")),
+        str(scene.get("visual_goal", "")),
+        str(scene.get("narration", "")),
+        str(scene.get("text", "")),
+    )).lower()
+    for name, profile in OPENING_COMPONENT_PROFILES.items():
+        if any(trigger in combined for trigger in profile["triggers"]):
+            return name, profile
+    return None, None
+
+
+def _prepend_component_queries(queries, scene):
+    profile_name, profile = _opening_component_profile(scene)
+    if not profile:
+        return queries, profile_name, profile
+
+    prioritized = []
+    for query in (*profile["queries"], *queries):
+        if query and query not in prioritized:
+            prioritized.append(query)
+    return prioritized, profile_name, profile
+
 
 def _tokens(text):
     return {
@@ -155,6 +198,21 @@ def _score_candidate(candidate, scene):
         subject_visibility = min(10.0, subject_visibility + 0.4)
         mobile_clarity = min(10.0, mobile_clarity + 0.4)
 
+    component_name, component_profile = _opening_component_profile(scene)
+    if component_profile:
+        component_hits = len(slug_tokens & component_profile["slug_terms"])
+        if component_hits:
+            # Small-part opening shots are judged on whether the named component
+            # survives the 9:16 crop, not merely whether the source is portrait.
+            semantic_match = min(10.0, semantic_match + 0.5)
+            subject_visibility = min(10.0, subject_visibility + 0.8)
+            mobile_clarity = min(10.0, mobile_clarity + 1.2)
+        else:
+            subject_visibility = max(0.0, subject_visibility - 0.8)
+        if component_name == "winglet" and {"winglet", "wingtip"} & slug_tokens:
+            semantic_match = min(10.0, semantic_match + 0.8)
+            subject_visibility = min(10.0, subject_visibility + 0.8)
+
     scores = {
         "semantic_match": round(semantic_match, 3),
         "subject_visibility": round(subject_visibility, 3),
@@ -204,10 +262,16 @@ def fetch_hook_pexels_video(scene):
             if fallback not in queries:
                 queries.append(fallback)
 
+    queries, component_profile_name, component_profile = _prepend_component_queries(
+        queries,
+        scene,
+    )
+
     audit = {
         "query": original_query,
         "effective_query": effective_query,
         "context_lock": context_lock,
+        "opening_component_profile": component_profile_name,
         "criteria": list(HOOK_VISUAL_CRITERIA),
         "minimum": HOOK_VISUAL_MIN_SCORE,
         "criteria_floors": dict(HOOK_VISUAL_FLOORS),
@@ -318,6 +382,10 @@ def fetch_hook_pexels_video(scene):
         "모두 통과한 후보가 없어 기존 Pexels 경로로 fallback"
     )
     print_hook_visual_audit(audit)
+    if component_profile:
+        # Do not throw away the named component at the final fallback. A targeted
+        # component query is still preferable to a generic whole-aircraft shot.
+        return fetch_pexels_video(component_profile["queries"][0])
     return fetch_pexels_video(original_query)
 
 
