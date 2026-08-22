@@ -7,6 +7,7 @@ import types
 
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
+sys.path.insert(0, str(ROOT))
 
 subprocess.run([sys.executable, "ci_aviation_candidate_context_hotfix.py"], check=True)
 subprocess.run([sys.executable, "ci_aviation_candidate_specificity_hotfix.py"], check=True)
@@ -14,13 +15,17 @@ subprocess.run([sys.executable, "ci_aviation_context_signature_compat_hotfix.py"
 
 source = (ROOT / "content" / "candidate_explorer.py").read_text(encoding="utf-8")
 assert "FIXED_AVIATION_SCOPE_CONTRACT_V1" in source
+
+# This regression never makes an API call; candidate_explorer only needs the
+# module to exist while its functions are loaded.
+sys.modules.setdefault("openai", types.SimpleNamespace())
 namespace = runpy.run_path(
     str(ROOT / "content" / "candidate_explorer.py"),
     run_name="fixed_aviation_scope_regression_runtime",
 )
 ce = types.SimpleNamespace(**namespace)
 
-# Production fixed-topic dispatch intentionally leaves candidate_scope blank.
+# Exact production shape: fixed topic, candidate_scope intentionally blank.
 os.environ["SHORTS_CANDIDATE_SCOPE"] = ""
 context = ce.build_execution_context(
     {"category": "항공", "topic": "윙렛"},
