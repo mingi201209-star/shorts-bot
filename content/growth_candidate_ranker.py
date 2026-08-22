@@ -5,6 +5,8 @@ Candidate Explorer's authoritative production winner.
 """
 
 from copy import deepcopy
+import json
+import os
 import re
 
 from analytics.feedback_contract import normalize_video_lineage
@@ -84,6 +86,23 @@ def _observed_subscriber_gains(history):
     return values
 
 
+def load_growth_history(path=None):
+    """Load optional normalized lineage history; missing input is safely pending."""
+    resolved = (path or os.environ.get("SHORTS_ANALYTICS_HISTORY_PATH", "")).strip()
+    if not resolved:
+        return []
+    try:
+        with open(resolved, "r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+    except (OSError, json.JSONDecodeError):
+        return []
+    if isinstance(payload, dict):
+        payload = payload.get("records", [])
+    if not isinstance(payload, list):
+        return []
+    return [item for item in payload if isinstance(item, dict)]
+
+
 def score_growth_candidate(candidate, history=None):
     """Return a deterministic 0-10 shadow score with explicit evidence state."""
     if not isinstance(candidate, dict):
@@ -91,7 +110,6 @@ def score_growth_candidate(candidate, history=None):
 
     recent = _recent_candidates(history)
     text = _candidate_text(candidate)
-    token_set = _tokens(candidate)
 
     similarities = [_similarity(candidate, prior) for prior, _ in recent]
     strongest_similarity = max(similarities, default=0.0)
