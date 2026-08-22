@@ -91,6 +91,10 @@ jobs:
           python ci_general_scene_visual_parity_hotfix.py
           python ci_script_validation_recovery_hotfix.py
 
+          # Some later production hotfixes rewrite candidate_explorer wrappers.
+          # Re-apply the compatibility patch against the FINAL production state.
+          python ci_aviation_context_signature_compat_hotfix.py
+
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
           grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
