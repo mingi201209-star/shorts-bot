@@ -1,3 +1,11 @@
+from pathlib import Path
+import sys
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from content.candidate_recovery import (
     make_recovery_record,
     recovery_eligibility,
