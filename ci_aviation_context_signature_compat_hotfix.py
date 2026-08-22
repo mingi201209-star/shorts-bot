@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from ci_fixed_topic_runtime_call_compat_hotfix import main as patch_runtime_call_compat
+
 EXPLORER_PATH = Path("content/candidate_explorer.py")
 
 
@@ -52,8 +54,6 @@ def _ensure_forwarded_keyword(text, function_name, callee, keyword):
         raise RuntimeError(f"{callee} call terminator not found")
 
     call = text[call_start:call_end]
-    # Any existing keyword assignment counts, including topic-input's normalized
-    # expression. Adding a second assignment would create a SyntaxError.
     if f"{keyword}=" in call:
         return text
 
@@ -95,6 +95,7 @@ def main():
     )
 
     EXPLORER_PATH.write_text(text, encoding="utf-8")
+    patch_runtime_call_compat()
     print("✅ Aviation fixed-topic + gate-feedback signature compatibility applied")
 
 
