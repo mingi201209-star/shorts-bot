@@ -119,15 +119,26 @@ def patch_main():
             ):
 '''
 
-    gate_feedback_marker = '''                print_budget_status()
+    gate_feedback_marker = '''                print(
+                    "이유:",
+                    winner_gate.get(
+                        "reason",
+                        "",
+                    ),
+                )
 
-                if (
-                    topic_attempt
-                    < total_topic_attempts
-                ):
+                print_budget_status()
 '''
 
-    gate_feedback_replacement = '''                if forced_topic:
+    gate_feedback_replacement = '''                print(
+                    "이유:",
+                    winner_gate.get(
+                        "reason",
+                        "",
+                    ),
+                )
+
+                if forced_topic:
                     fixed_topic_gate_feedback = str(
                         winner_gate.get(
                             "reason",
@@ -136,11 +147,6 @@ def patch_main():
                     ).strip()
 
                 print_budget_status()
-
-                if (
-                    topic_attempt
-                    < total_topic_attempts
-                ):
 '''
 
     topic_guard_marker = '''            if not current_topic:
