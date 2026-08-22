@@ -53,7 +53,13 @@ def _script_validation_recovery_guidance(last_error):
     if "paraphrase" in lowered or "causal step" in lowered or "progression" in lowered:
         guidance.extend([
             "같은 mechanism/result를 어휘만 바꿔 반복하지 마라.",
-            "새 component/condition/consequence가 Candidate 근거에 없다면 장면을 늘리지 말고 압축한다.",
+            "Candidate에 specificity/specific_observation/constraint/counterintuitive_result/tradeoff/concrete_condition이 있으면 그 검증된 값을 서로 다른 causal unit으로 직접 사용한다.",
+            "설계형 최소 장면 수를 맞출 때 같은 결과를 반복하지 말고 HOOK/OBSERVATION → QUESTION/PROBLEM → CONSTRAINT/CONDITION → DESIGN/STRUCTURE → MECHANISM STEP → CONSEQUENCE → RESULT → PAYOFF처럼 각 장면의 역할을 분리한다. 단, Candidate에 없는 사실은 만들지 않는다.",
+        ])
+    if "장면 수 부족" in reason or "scene" in lowered and "부족" in reason:
+        guidance.extend([
+            "설계형 주제의 최소 장면 수를 먼저 확보하되 filler를 추가하지 마라.",
+            "Candidate의 서로 다른 검증된 observation/constraint/condition/tradeoff/mechanism/result를 각각 한 장면의 새 정보 단위로 배치한다.",
         ])
     if "generic outro" in lowered or "filler" in lowered or "repetition" in lowered:
         guidance.append("일반론적 마무리와 길이 채우기 문장을 삭제하고 Core Question의 직접 답으로 끝낸다.")
@@ -61,5 +67,47 @@ def _script_validation_recovery_guidance(last_error):
     return "\n".join(f"- {item}" for item in guidance)
 '''
 
+# SCRIPT_VALIDATION_RECOVERY_V2_GROUNDED_SPECIFICITY
+# Candidate Explorer may carry aviation-specific grounded fields that the base
+# validator historically dropped. Preserve them for the already-bounded script
+# attempts so causal progression can use verified units instead of inventing
+# filler. This changes neither validators nor retry/API/cost limits.
+if "SCRIPT_VALIDATION_RECOVERY_V2_GROUNDED_SPECIFICITY" not in text:
+    text += r'''
+
+# SCRIPT_VALIDATION_RECOVERY_V2_GROUNDED_SPECIFICITY
+_script_recovery_original_validate_candidate = validate_candidate
+_SCRIPT_RECOVERY_SPECIFICITY_KEYS = (
+    "specific_observation",
+    "constraint",
+    "counterintuitive_result",
+    "tradeoff",
+    "concrete_condition",
+)
+
+
+def validate_candidate(candidate):
+    cleaned = _script_recovery_original_validate_candidate(candidate)
+    if not isinstance(candidate, dict):
+        return cleaned
+
+    specificity = candidate.get("specificity")
+    if isinstance(specificity, dict):
+        kept = {
+            key: str(value).strip()
+            for key, value in specificity.items()
+            if key in _SCRIPT_RECOVERY_SPECIFICITY_KEYS and str(value).strip()
+        }
+        if kept:
+            cleaned["specificity"] = kept
+
+    for key in _SCRIPT_RECOVERY_SPECIFICITY_KEYS:
+        value = str(candidate.get(key, "")).strip()
+        if value:
+            cleaned[key] = value
+
+    return cleaned
+'''
+
 path.write_text(text, encoding="utf-8")
-print("✅ Bounded script validation recovery guidance applied")
+print("✅ Bounded script validation recovery guidance + grounded specificity preservation applied")
