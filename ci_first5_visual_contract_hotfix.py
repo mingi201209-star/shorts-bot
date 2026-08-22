@@ -66,10 +66,12 @@ visual_text = _replace_once(
     '''import json\nimport re\n\nfrom quality.first5_visual_contract import (\n    progression_passes,\n    validate_reversal_query,\n    visual_signature,\n)\n\nfrom config import (\n''',
     "hook visual contract import",
 )
+# Component-profile hotfixes may insert data between the dominance constant and
+# the first helper. Anchor only on the stable constant so hotfix ordering is safe.
 visual_text = _replace_once(
     visual_text,
-    '''HOOK_DOMINANCE_MAX_CANDIDATES = 3\n\n\ndef _tokens(text):\n''',
-    '''HOOK_DOMINANCE_MAX_CANDIDATES = 3\nOPENING_FIRST_VISUAL_SIGNATURE = None\n\n\ndef _tokens(text):\n''',
+    '''HOOK_DOMINANCE_MAX_CANDIDATES = 3\n''',
+    '''HOOK_DOMINANCE_MAX_CANDIDATES = 3\nOPENING_FIRST_VISUAL_SIGNATURE = None\n''',
     "opening visual state",
 )
 visual_text = _replace_once(
