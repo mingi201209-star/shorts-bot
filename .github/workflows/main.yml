@@ -71,6 +71,7 @@ jobs:
           python ci_aviation_candidate_specificity_hotfix.py
           python ci_aviation_context_signature_compat_hotfix.py
           python ci_aviation_specificity_output_repair_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
           python ci_output_quality_hotfix.py
           python ci_curiosity_retention_hotfix.py
           python ci_visual_specificity_hotfix.py
@@ -95,6 +96,7 @@ jobs:
           grep -n "MAX_SCRIPT_ATTEMPTS" config.py
           grep -n '"+13%"' config.py
           grep -n "AVIATION_SPECIFICITY_OUTPUT_REPAIR_V1" content/candidate_explorer.py
+          grep -n "FINAL_RENDER_CONTENT_INTEGRITY_V1\|CONTENT_IDENTITY_DRIFT" main.py
           grep -n "ADAPTIVE_SCENE_COUNT_FOR_DENSE_DESIGN_V1\|ADAPTIVE_DESIGN_MIN_SCENES\|SCRIPT_VALIDATION_RECOVERY_V1" content/script_generator.py
           grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
           grep -n "HOOK_SUBJECT_DOMINANCE_MIN\|HOOK_ACTION_MATCH_MIN\|HOOK_MAX_COMPETING_SUBJECT_RISK\|HOOK_SUBJECT_VISIBILITY_MIN" video/hook_visual_dominance.py
@@ -107,7 +109,8 @@ jobs:
             ci_hook_generation_hotfix.py ci_hook_pool_guard_hotfix.py ci_retention_hotfix.py \
             ci_first5_retention_tts_hotfix.py ci_first5_visual_contract_hotfix.py ci_video_provider_hotfix.py \
             ci_topic_input_hotfix.py ci_aviation_candidate_context_hotfix.py ci_aviation_candidate_specificity_hotfix.py \
-            ci_aviation_context_signature_compat_hotfix.py ci_aviation_specificity_output_repair_hotfix.py ci_output_quality_hotfix.py \
+            ci_aviation_context_signature_compat_hotfix.py ci_aviation_specificity_output_repair_hotfix.py \
+            ci_final_render_content_integrity_hotfix.py ci_output_quality_hotfix.py \
             ci_curiosity_retention_hotfix.py ci_visual_specificity_hotfix.py ci_design_causality_hotfix.py \
             ci_query_semantic_integrity_hotfix.py ci_concrete_visual_evidence_hotfix.py \
             ci_visible_evidence_provenance_hotfix.py ci_hook_production_parity_hotfix.py \
@@ -118,9 +121,12 @@ jobs:
             ci_script_validation_recovery_hotfix.py \
             main.py config.py content/candidate_explorer.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
-            quality/first5_visual_contract.py video/video_providers.py video/hook_visual.py \
+            quality/first5_visual_contract.py quality/final_render_integrity.py \
+            quality/final_render_integrity_regression_test.py video/video_providers.py video/hook_visual.py \
             video/hook_visual_dominance.py video/video_downloader.py video/video_engine.py video/subtitle_engine.py \
             video/ai_visual_provider.py
+
+          python quality/final_render_integrity_regression_test.py
 
       - name: Run Shorts Generator V3.2
         env:
