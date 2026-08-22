@@ -96,7 +96,7 @@ jobs:
           grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
           grep -n "MAX_SCRIPT_ATTEMPTS" config.py
           grep -n '"+13%"' config.py
-          grep -n "AVIATION_SPECIFICITY_OUTPUT_REPAIR_V1\|AVIATION_SPECIFICITY_PROJECTION_V2" content/candidate_explorer.py
+          grep -n "AVIATION_SPECIFICITY_OUTPUT_REPAIR_V1\|AVIATION_SPECIFICITY_PROJECTION_V3" content/candidate_explorer.py
           grep -n "FINAL_RENDER_CONTENT_INTEGRITY_V1\|CONTENT_IDENTITY_DRIFT" main.py
           grep -n "ADAPTIVE_SCENE_COUNT_FOR_DENSE_DESIGN_V1\|ADAPTIVE_DESIGN_MIN_SCENES\|SCRIPT_VALIDATION_RECOVERY_V1" content/script_generator.py
           grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
