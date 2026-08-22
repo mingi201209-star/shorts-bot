@@ -9,6 +9,17 @@ def replace_once(text, marker, replacement, label):
     if replacement in text:
         return text
 
+    # The runtime compatibility guard intentionally wraps the already-installed
+    # fixed-topic Explorer call. Treat that wrapped form as equivalent so this
+    # installer stays idempotent when regression tests re-run it downstream.
+    if (
+        label == "main explorer call"
+        and "fixed_topic_gate_feedback runtime compatibility fallback" in text
+        and "fixed_topic_gate_feedback=(" in text
+        and "fixed_topic=(" in text
+    ):
+        return text
+
     count = text.count(marker)
     if count != 1:
         raise RuntimeError(
