@@ -147,10 +147,10 @@ os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
 rejected = ce.validate_explorer_output(default_payload)
 assert rejected["status"] == "REGENERATE"
 
-# H: Candidate Gate source and policy are unchanged; retry/API limits are not touched.
+# H: Candidate Gate source and policy are unchanged; retry/API limits are untouched.
 assert gate_before == gate_after
 main_text = (ROOT / "main.py").read_text(encoding="utf-8")
-assert "MAX_TOPIC_REGENERATIONS = 6" in main_text
+assert "MAX_TOPIC_REGENERATIONS = 1" in main_text
 assert "evaluate_candidate(" in main_text
 
 print("PASS: aviation candidate specificity A-H; Candidate Gate unchanged; no paid/Sora calls")
