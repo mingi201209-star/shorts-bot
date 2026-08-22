@@ -1,7 +1,12 @@
 import json
 import os
+import sys
 import tempfile
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from quality.final_render_integrity import (
     assert_content_identity,
@@ -86,7 +91,7 @@ def main():
             os.chdir(old_cwd)
 
     # CASE F: production source contains the post-quality guard and post-render validator.
-    source = Path("main.py").read_text(encoding="utf-8")
+    source = (ROOT / "main.py").read_text(encoding="utf-8")
     assert "FINAL_RENDER_CONTENT_INTEGRITY_V1" in source
     assert 'stage="quality_pass"' in source
     assert "begin_final_render_integrity" in source
