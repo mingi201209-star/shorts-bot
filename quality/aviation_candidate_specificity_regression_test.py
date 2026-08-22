@@ -1,9 +1,10 @@
 from pathlib import Path
 import hashlib
-import importlib
 import os
+import runpy
 import subprocess
 import sys
+import types
 
 ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
@@ -19,14 +20,13 @@ subprocess.run([sys.executable, "ci_aviation_candidate_specificity_hotfix.py"], 
 gate_after = hashlib.sha256(gate_path.read_bytes()).hexdigest()
 assert gate_before == gate_after, "Candidate Gate implementation changed"
 
-# Hotfix scripts mutate source at runtime. The package may already hold an attribute
-# pointing at the pre-hotfix module, so remove both cache locations before importing.
-importlib.invalidate_caches()
-sys.modules.pop("content.candidate_explorer", None)
-import content
-if hasattr(content, "candidate_explorer"):
-    delattr(content, "candidate_explorer")
-ce = importlib.import_module("content.candidate_explorer")
+# Execute the exact runtime-patched production source, bypassing package/pyc cache.
+patched_source = ROOT / "content" / "candidate_explorer.py"
+source_text = patched_source.read_text(encoding="utf-8")
+assert "AVIATION_CANDIDATE_SPECIFICITY_CONTRACT_V1" in source_text
+namespace = runpy.run_path(str(patched_source), run_name="candidate_explorer_regression_runtime")
+ce = types.SimpleNamespace(**namespace)
+assert hasattr(ce, "aviation_candidate_quality_check")
 
 
 def candidate(
