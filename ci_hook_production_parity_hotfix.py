@@ -127,15 +127,16 @@ fallback_new = (
     "    return video_url\n"
 )
 
-# Preserve the fallback_reason assignment, but replace everything after it until
-# the next top-level function. This avoids leaving an outer component-profile `if`
-# around fallback_new, which previously caused an IndentationError.
+# Preserve the fallback_reason assignment, but replace only the remaining fallback
+# body. The first-5 hotfix may have inserted fetch_early_retention_pexels_video()
+# before print_hook_visual_audit(); that helper is a separate production contract
+# and must survive this later parity rewrite.
 if fallback_new not in text:
     pattern = re.compile(
         r"(?P<reason>    audit\[\"fallback_reason\"\] = \(\n"
         r"(?:(?!\n    \)).)*?\n    \)\n)"
-        r"(?P<body>(?:(?!\n\ndef print_hook_visual_audit).)*?)"
-        r"(?=\n\ndef print_hook_visual_audit)",
+        r"(?P<body>(?:(?!\n\ndef (?:fetch_early_retention_pexels_video|print_hook_visual_audit)).)*?)"
+        r"(?=\n\ndef (?:fetch_early_retention_pexels_video|print_hook_visual_audit))",
         re.DOTALL,
     )
     match = pattern.search(text)
