@@ -16,6 +16,7 @@ def main():
         text,
         "AVIATION_CANDIDATE_SPECIFICITY_CONTRACT_V2",
         r'''
+# AVIATION_CANDIDATE_SPECIFICITY_CONTRACT_V1
 # AVIATION_CANDIDATE_SPECIFICITY_CONTRACT_V2
 # Candidate Gate is unchanged. This layer makes the Explorer produce candidates
 # at the level the Gate already expects, including fixed-topic retries.
@@ -59,24 +60,44 @@ def _aviation_norm(value):
 
 
 def _aviation_detail_values(candidate):
-    return [str(candidate.get(field) or "").strip() for field in _AVIATION_SPECIFICITY_FIELDS if str(candidate.get(field) or "").strip()]
+    return [
+        str(candidate.get(field) or "").strip()
+        for field in _AVIATION_SPECIFICITY_FIELDS
+        if str(candidate.get(field) or "").strip()
+    ]
 
 
 def _aviation_detail_tokens(value):
-    return {token for token in _aviation_norm(value).split() if len(token) >= 2 and token not in _AVIATION_STOP_TOKENS}
+    return {
+        token
+        for token in _aviation_norm(value).split()
+        if len(token) >= 2 and token not in _AVIATION_STOP_TOKENS
+    }
 
 
 def aviation_scope_compatible(candidate):
-    combined = " ".join([
-        str(candidate.get("topic") or ""), str(candidate.get("angle") or ""),
-        str(candidate.get("core_question") or ""), str((candidate.get("micro_narrative") or {}).get("reveal") or ""),
-    ]).lower()
+    combined = " ".join(
+        [
+            str(candidate.get("topic") or ""),
+            str(candidate.get("angle") or ""),
+            str(candidate.get("core_question") or ""),
+            str((candidate.get("micro_narrative") or {}).get("reveal") or ""),
+        ]
+    ).lower()
     return any(term in combined for term in _AVIATION_DOMAIN_TERMS)
 
 
 def _aviation_detail_is_referenced(candidate, details):
     micro = candidate.get("micro_narrative") or {}
-    combined = _aviation_norm(" ".join([str(candidate.get("topic") or ""), str(candidate.get("core_question") or ""), str(micro.get("reveal") or "")]))
+    combined = _aviation_norm(
+        " ".join(
+            [
+                str(candidate.get("topic") or ""),
+                str(candidate.get("core_question") or ""),
+                str(micro.get("reveal") or ""),
+            ]
+        )
+    )
     combined_tokens = set(combined.split())
     for detail in details:
         normalized = _aviation_norm(detail)
@@ -110,7 +131,10 @@ def aviation_candidate_quality_check(candidate):
     if not details:
         return False, "generic aviation topic: no concrete observation/constraint/result/trade-off/condition"
     core = _aviation_norm(candidate.get("core_question"))
-    if any(fragment in core for fragment in _AVIATION_GENERIC_QUESTION_FRAGMENTS) and not _aviation_detail_is_referenced(candidate, details):
+    if (
+        any(fragment in core for fragment in _AVIATION_GENERIC_QUESTION_FRAGMENTS)
+        and not _aviation_detail_is_referenced(candidate, details)
+    ):
         return False, "generic why-design question without a concrete element"
     if not _aviation_detail_is_referenced(candidate, details):
         return False, "topic/core question/reveal does not directly carry the concrete element"
@@ -123,7 +147,11 @@ _aviation_specificity_previous_validate_candidate = validate_candidate
 
 
 def validate_candidate(candidate, *, prefix, runner_up=False):
-    result = _aviation_specificity_previous_validate_candidate(candidate, prefix=prefix, runner_up=runner_up)
+    result = _aviation_specificity_previous_validate_candidate(
+        candidate,
+        prefix=prefix,
+        runner_up=runner_up,
+    )
     for field in _AVIATION_SPECIFICITY_FIELDS:
         value = candidate.get(field) if isinstance(candidate, dict) else None
         if isinstance(value, str) and value.strip():
@@ -151,16 +179,31 @@ def validate_explorer_output(data):
             promoted = dict(runner)
             promoted.pop("backup_independence", None)
             return {"status": "SELECTED", "winner": promoted, "runner_up": None}
-    return {"status": "REGENERATE", "reason": f"Aviation Explorer quality check: {winner_reason}"}
+    return {
+        "status": "REGENERATE",
+        "reason": f"Aviation Explorer quality check: {winner_reason}",
+    }
 
 
 _aviation_specificity_previous_build_context = build_execution_context
 
 
-def build_execution_context(topic_info, *, recent_topics=None, recent_content=None, rejected_topics=None, fixed_topic=None, fixed_topic_gate_feedback=""):
+def build_execution_context(
+    topic_info,
+    *,
+    recent_topics=None,
+    recent_content=None,
+    rejected_topics=None,
+    fixed_topic=None,
+    fixed_topic_gate_feedback="",
+):
     context = _aviation_specificity_previous_build_context(
-        topic_info, recent_topics=recent_topics, recent_content=recent_content, rejected_topics=rejected_topics,
-        fixed_topic=fixed_topic, fixed_topic_gate_feedback=fixed_topic_gate_feedback,
+        topic_info,
+        recent_topics=recent_topics,
+        recent_content=recent_content,
+        rejected_topics=rejected_topics,
+        fixed_topic=fixed_topic,
+        fixed_topic_gate_feedback=fixed_topic_gate_feedback,
     )
     if os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower() != "aviation":
         return context
