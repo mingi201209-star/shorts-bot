@@ -16,3 +16,7 @@ jobs:
           SHORTS_CANDIDATE_SCOPE: aviation
           AI_VISUAL_FALLBACK_ENABLED: "false"
         run: python quality/aviation_context_signature_compat_regression_test.py
+      - name: Run fixed aviation blank-scope contract regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+        run: python quality/fixed_aviation_scope_contract_regression_test.py

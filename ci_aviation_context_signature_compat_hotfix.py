@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from ci_fixed_aviation_scope_contract_hotfix import main as patch_fixed_aviation_scope
 from ci_fixed_topic_runtime_call_compat_hotfix import main as patch_runtime_call_compat
 
 EXPLORER_PATH = Path("content/candidate_explorer.py")
@@ -95,6 +96,7 @@ def main():
     )
 
     EXPLORER_PATH.write_text(text, encoding="utf-8")
+    patch_fixed_aviation_scope()
     patch_runtime_call_compat()
     print("✅ Aviation fixed-topic + gate-feedback signature compatibility applied")
 
