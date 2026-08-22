@@ -11,7 +11,6 @@ ROOT = Path(__file__).resolve().parents[1]
 os.chdir(ROOT)
 sys.path.insert(0, str(ROOT))
 
-# Candidate Gate must remain byte-for-byte unchanged by this hotfix.
 gate_path = ROOT / "content" / "candidate_gate.py"
 gate_before = hashlib.sha256(gate_path.read_bytes()).hexdigest()
 
@@ -22,10 +21,10 @@ subprocess.run([sys.executable, "ci_aviation_specificity_output_repair_hotfix.py
 gate_after = hashlib.sha256(gate_path.read_bytes()).hexdigest()
 assert gate_before == gate_after, "Candidate Gate implementation changed"
 
-# Execute the exact runtime-patched production source, bypassing package/pyc cache.
 patched_source = ROOT / "content" / "candidate_explorer.py"
 source_text = patched_source.read_text(encoding="utf-8")
 assert "AVIATION_CANDIDATE_SPECIFICITY_CONTRACT_V1" in source_text
+assert "AVIATION_CANDIDATE_SPECIFICITY_CONTRACT_V2" in source_text
 assert "AVIATION_SPECIFICITY_OUTPUT_REPAIR_V1" in source_text
 namespace = runpy.run_path(str(patched_source), run_name="candidate_explorer_regression_runtime")
 ce = types.SimpleNamespace(**namespace)
@@ -71,7 +70,6 @@ def candidate(
     return value
 
 
-# A: broad generic why-design topic is rejected by Explorer quality check.
 broad = candidate(
     topic="비행기 객실 창문 위치",
     question="비행기 창문이 왜 특정 위치일까?",
@@ -80,7 +78,6 @@ broad = candidate(
 ok, reason = ce.aviation_candidate_quality_check(broad)
 assert not ok and "concrete" in reason.lower(), (ok, reason)
 
-# B: a generic safety-only reveal is rejected even if a superficial detail field exists.
 generic_safety = candidate(
     topic="비행기 객실 조명 색상",
     question="비행기 객실 조명이 비상 상황에서 왜 특정 색으로 바뀔까?",
@@ -90,7 +87,6 @@ generic_safety = candidate(
 ok, reason = ce.aviation_candidate_quality_check(generic_safety)
 assert not ok and "generic benefit reveal" in reason, (ok, reason)
 
-# C: concrete structure + condition + counterintuitive result passes.
 specific = candidate(
     topic="강한 측풍 착륙에서 비행기 착륙장치 연결부의 움직임",
     question="강한 측풍 착륙에서 착륙장치 연결부가 왜 완전히 고정되지 않을까?",
@@ -102,7 +98,6 @@ specific = candidate(
 ok, reason = ce.aviation_candidate_quality_check(specific)
 assert ok, reason
 
-# D: a concrete trade-off candidate passes.
 tradeoff = candidate(
     topic="비행기 날개 끝 장치가 구조 중량 증가를 감수하는 trade-off",
     question="비행기 날개 끝 장치는 왜 구조 중량 증가를 감수하면서도 추가될까?",
@@ -113,18 +108,28 @@ tradeoff = candidate(
 ok, reason = ce.aviation_candidate_quality_check(tradeoff)
 assert ok, reason
 
-# E: downstream-rejected topics feed the next attempt with semantic diversity guidance.
 os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
 context = ce.build_execution_context(
     {"category": "항공", "topic": "엔진과 흡기 주변의 설계"},
     rejected_topics=["비행기 엔진의 흡기 시스템 설계"],
 )
 assert "비행기 엔진의 흡기 시스템 설계" in context
-assert "같은 semantic pattern" in context
-assert "왜 [부품]이 특정 모양/배치/위치인가?" in context
-assert "retry 횟수나 API budget을 늘리지 말고" in context
+assert "같은 명사만 바꾸거나" in context
+assert "왜 X인가? → 안전/효율/편의" in context
+assert "retry/API budget은 늘리지 않는다" in context
 
-# F: aviation scope stays inside aviation.
+fixed_context = ce.build_execution_context(
+    {"category": "항공", "topic": "윙렛"},
+    fixed_topic="비행기 날개 끝의 윙렛은 왜 위로 꺾여 있을까",
+    fixed_topic_gate_feedback="질문이 지나치게 넓고 Reveal이 일반적이다.",
+)
+assert "FIXED AVIATION TOPIC — CONCRETE MECHANISM CONTRACT" in fixed_context
+assert "날개 끝 와류" in fixed_context
+assert "압력 차" in fixed_context
+assert "유도항력" in fixed_context
+assert "효율/성능/안전에 어떤 영향?" in fixed_context
+assert "이전 Gate 피드백" in fixed_context
+
 outside = candidate(
     topic="도시 다리의 진동 구조",
     question="강풍 조건에서 다리 구조가 왜 움직일까?",
@@ -136,34 +141,25 @@ ok, _ = ce.aviation_candidate_quality_check(outside)
 assert not ok
 assert ce.aviation_scope_compatible(specific)
 
-# G: default/non-aviation Explorer keeps the pre-existing output behavior.
 os.environ["SHORTS_CANDIDATE_SCOPE"] = ""
-default_payload = {
-    "status": "SELECTED",
-    "winner": broad,
-    "runner_up": None,
-}
+default_payload = {"status": "SELECTED", "winner": broad, "runner_up": None}
 validated = ce.validate_explorer_output(default_payload)
 assert validated["status"] == "SELECTED"
 assert validated["winner"]["topic"] == broad["topic"]
 
-# Aviation mode applies the extra contract before Candidate Gate.
 os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
 rejected = ce.validate_explorer_output(default_payload)
 assert rejected["status"] == "REGENERATE"
 
-# H: Candidate Gate source and policy are unchanged; retry/API limits are untouched.
 assert gate_before == gate_after
 main_text = (ROOT / "main.py").read_text(encoding="utf-8")
 assert "MAX_TOPIC_REGENERATIONS = 1" in main_text
 assert "evaluate_candidate(" in main_text
 
-# I: aviation SELECTED output contract now requires >=1 grounded specificity field.
 assert "winner에는 아래 5개 중" in source_text
 assert "최소 1개 반드시 포함" in source_text
 assert "근거 없는 값을 만들어 필드 수를 채우는 것은 금지" in source_text
 
-# J: a field-missing but already-concrete winner gets exactly one bounded schema repair.
 repair_base = candidate(
     topic="강한 측풍 착륙에서 비행기 착륙장치 연결부의 움직임",
     question="강한 측풍 착륙에서 착륙장치 연결부가 왜 완전히 고정되지 않을까?",
@@ -172,11 +168,7 @@ repair_base = candidate(
 repair_payload = {"status": "SELECTED", "winner": repair_base, "runner_up": None}
 repaired_winner = dict(repair_base)
 repaired_winner["concrete_condition"] = "강한 측풍 착륙 조건"
-repair_response_payload = {
-    "status": "SELECTED",
-    "winner": repaired_winner,
-    "runner_up": None,
-}
+repair_response_payload = {"status": "SELECTED", "winner": repaired_winner, "runner_up": None}
 
 calls = []
 
@@ -184,26 +176,16 @@ calls = []
 def fake_create(**kwargs):
     calls.append(kwargs)
     return types.SimpleNamespace(
-        choices=[
-            types.SimpleNamespace(
-                message=types.SimpleNamespace(
-                    content=json.dumps(repair_response_payload, ensure_ascii=False)
-                )
-            )
-        ]
+        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=json.dumps(repair_response_payload, ensure_ascii=False)))]
     )
 
 
 repair_globals["authorize_call"] = lambda model: 17
 repair_globals["record_usage"] = lambda model, response: {"cost_usd": 0.0, "over_budget": False}
 repair_globals["print_budget_status"] = lambda: None
-repair_globals["openai"] = types.SimpleNamespace(
-    chat=types.SimpleNamespace(
-        completions=types.SimpleNamespace(create=fake_create)
-    )
-)
+repair_globals["openai"] = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=fake_create)))
 repaired = ce._repair_aviation_specificity_output_if_needed(repair_payload, model="mock-model")
-assert len(calls) == 1, f"expected exactly one bounded repair call, got {len(calls)}"
+assert len(calls) == 1
 assert repaired["winner"]["concrete_condition"] == "강한 측풍 착륙 조건"
 for protected in (
     "topic", "angle", "core_question", "micro_narrative",
@@ -213,41 +195,27 @@ for protected in (
 validated_repair = ce.validate_explorer_output(repaired)
 assert validated_repair["status"] == "SELECTED"
 
-# K: no safe concrete detail => repair is allowed to return REGENERATE, never invent.
+
 def fake_regenerate(**kwargs):
     calls.append(kwargs)
-    payload = {
-        "status": "REGENERATE",
-        "reason": "aviation specificity repair could not recover a grounded concrete field",
-    }
-    return types.SimpleNamespace(
-        choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=json.dumps(payload)))]
-    )
+    payload = {"status": "REGENERATE", "reason": "aviation specificity repair could not recover a grounded concrete field"}
+    return types.SimpleNamespace(choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=json.dumps(payload)))])
 
-repair_globals["openai"] = types.SimpleNamespace(
-    chat=types.SimpleNamespace(
-        completions=types.SimpleNamespace(create=fake_regenerate)
-    )
-)
+
+repair_globals["openai"] = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=fake_regenerate)))
 before_calls = len(calls)
 failed_repair = ce._repair_aviation_specificity_output_if_needed(default_payload, model="mock-model")
 assert len(calls) == before_calls + 1
 assert failed_repair["status"] == "REGENERATE"
 
-# L: non-aviation output never spends a repair call.
 os.environ["SHORTS_CANDIDATE_SCOPE"] = ""
 before_calls = len(calls)
 unchanged = ce._repair_aviation_specificity_output_if_needed(default_payload, model="mock-model")
 assert unchanged is default_payload
 assert len(calls) == before_calls
 
-# M: repair prompt explicitly forbids fabrication and only copies existing JSON facts.
 os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
-repair_globals["openai"] = types.SimpleNamespace(
-    chat=types.SimpleNamespace(
-        completions=types.SimpleNamespace(create=fake_create)
-    )
-)
+repair_globals["openai"] = types.SimpleNamespace(chat=types.SimpleNamespace(completions=types.SimpleNamespace(create=fake_create)))
 calls.clear()
 ce._repair_aviation_specificity_output_if_needed(repair_payload, model="mock-model")
 repair_prompt = calls[0]["messages"][1]["content"]
@@ -255,4 +223,4 @@ assert "새 사실" in repair_prompt and "추가하지 마라" in repair_prompt
 assert "기존 JSON에 이미 명시적으로 표현된 구체 요소만" in repair_prompt
 assert calls[0]["temperature"] == 0.0
 
-print("PASS: aviation candidate specificity A-M; bounded repair=1; Candidate Gate unchanged; no paid/Sora calls")
+print("PASS: aviation specificity V2; fixed-topic mechanism contract; bounded repair=1; Candidate Gate unchanged; no paid/Sora calls")
