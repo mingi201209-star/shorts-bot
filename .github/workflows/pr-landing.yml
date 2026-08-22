@@ -2,7 +2,7 @@ name: Protected PR Landing
 
 on:
   pull_request:
-    types: [edited]
+    types: [edited, labeled]
 
 permissions:
   contents: write
@@ -14,7 +14,10 @@ jobs:
   land:
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      contains(github.event.pull_request.body || '', format('LAND-APPROVED:{0}', github.event.pull_request.head.sha))
+      (
+        contains(github.event.pull_request.body || '', format('LAND-APPROVED:{0}', github.event.pull_request.head.sha)) ||
+        (github.event.action == 'labeled' && github.event.label.name == format('land-approved:{0}', github.event.pull_request.head.sha))
+      )
     runs-on: ubuntu-latest
     concurrency:
       group: protected-pr-landing-${{ github.event.pull_request.number }}
