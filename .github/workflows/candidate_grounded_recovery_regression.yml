@@ -1,0 +1,35 @@
+name: Candidate Grounded Recovery Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "content/candidate_recovery.py"
+      - "ci_candidate_grounded_recovery_hotfix.py"
+      - "quality/candidate_grounded_recovery_regression_test.py"
+      - ".github/workflows/candidate_grounded_recovery_regression.yml"
+      - ".github/workflows/main.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Apply production recovery hotfix
+        run: |
+          python ci_candidate_grounded_recovery_hotfix.py
+          grep -q "CANDIDATE_GROUNDED_RECOVERY_V1" main.py
+          grep -q "CANDIDATE_RECOVERY_POOL" main.py
+          grep -q "CANDIDATE GROUNDED RECOVERY" main.py
+      - name: Compile touched runtime
+        run: |
+          python -m py_compile \
+            content/candidate_recovery.py \
+            ci_candidate_grounded_recovery_hotfix.py \
+            quality/candidate_grounded_recovery_regression_test.py \
+            main.py
+      - name: Run focused regression
+        run: python quality/candidate_grounded_recovery_regression_test.py

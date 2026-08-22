@@ -72,6 +72,7 @@ jobs:
           python ci_aviation_context_signature_compat_hotfix.py
           python ci_aviation_specificity_output_repair_hotfix.py
           python ci_aviation_specificity_projection_hotfix.py
+          python ci_candidate_grounded_recovery_hotfix.py
           python ci_final_render_content_integrity_hotfix.py
           python ci_output_quality_hotfix.py
           python ci_curiosity_retention_hotfix.py
@@ -99,6 +100,7 @@ jobs:
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
           grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
+          grep -n "CANDIDATE_GROUNDED_RECOVERY_V1\|CANDIDATE_RECOVERY_POOL\|CANDIDATE GROUNDED RECOVERY" main.py
           grep -n "MAX_SCRIPT_ATTEMPTS" config.py
           grep -n '"+13%"' config.py
           grep -n "AVIATION_SPECIFICITY_OUTPUT_REPAIR_V1\|AVIATION_SPECIFICITY_PROJECTION_V3" content/candidate_explorer.py
@@ -116,7 +118,8 @@ jobs:
             ci_first5_retention_tts_hotfix.py ci_first5_visual_contract_hotfix.py ci_video_provider_hotfix.py \
             ci_topic_input_hotfix.py ci_aviation_candidate_context_hotfix.py ci_aviation_candidate_specificity_hotfix.py \
             ci_aviation_context_signature_compat_hotfix.py ci_aviation_specificity_output_repair_hotfix.py \
-            ci_aviation_specificity_projection_hotfix.py ci_final_render_content_integrity_hotfix.py ci_output_quality_hotfix.py \
+            ci_aviation_specificity_projection_hotfix.py ci_candidate_grounded_recovery_hotfix.py \
+            ci_final_render_content_integrity_hotfix.py ci_output_quality_hotfix.py \
             ci_curiosity_retention_hotfix.py ci_visual_specificity_hotfix.py ci_design_causality_hotfix.py \
             ci_query_semantic_integrity_hotfix.py ci_concrete_visual_evidence_hotfix.py \
             ci_visible_evidence_provenance_hotfix.py ci_hook_production_parity_hotfix.py \
@@ -127,7 +130,8 @@ jobs:
             ci_adaptive_scene_count_hotfix.py ci_general_scene_visual_parity_hotfix.py \
             ci_script_validation_recovery_hotfix.py \
             quality/fixed_topic_gate_feedback_regression_test.py \
-            main.py config.py content/candidate_explorer.py content/script_generator.py content/hook_experiment.py \
+            quality/candidate_grounded_recovery_regression_test.py \
+            main.py config.py content/candidate_explorer.py content/candidate_recovery.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py quality/final_render_integrity.py \
             quality/final_render_integrity_regression_test.py quality/aviation_specificity_projection_regression_test.py \
@@ -136,6 +140,7 @@ jobs:
 
           python quality/final_render_integrity_regression_test.py
           python quality/fixed_topic_gate_feedback_regression_test.py
+          python quality/candidate_grounded_recovery_regression_test.py
 
       - name: Run Shorts Generator V3.2
         env:
