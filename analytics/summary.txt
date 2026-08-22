@@ -1,0 +1,1 @@
+analytics contract implemented; pull request validation next
