@@ -1,0 +1,24 @@
+name: Candidate Novelty Parity Regression
+
+on:
+  pull_request:
+    paths:
+      - "ci_novelty_budget_hotfix.py"
+      - "quality/candidate_novelty_parity_regression_test.py"
+      - ".github/workflows/candidate_novelty_parity_regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run Candidate Gate novelty parity regression
+        run: python quality/candidate_novelty_parity_regression_test.py
