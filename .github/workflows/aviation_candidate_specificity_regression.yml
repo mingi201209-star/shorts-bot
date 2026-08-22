@@ -13,8 +13,11 @@ jobs:
           python-version: "3.11"
       - name: Install Python dependencies
         run: pip install -r requirements.txt
-      - name: Run aviation candidate specificity regression
+      - name: Run aviation candidate specificity regressions
         env:
           SHORTS_CANDIDATE_SCOPE: aviation
           AI_VISUAL_FALLBACK_ENABLED: "false"
-        run: python quality/aviation_candidate_specificity_regression_test.py
+        run: |
+          python quality/aviation_candidate_specificity_regression_test.py
+          git checkout -- content/candidate_explorer.py
+          python quality/aviation_specificity_projection_regression_test.py
