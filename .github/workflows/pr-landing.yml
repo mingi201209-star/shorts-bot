@@ -1,0 +1,44 @@
+name: Protected PR Landing
+
+on:
+  pull_request:
+    types: [edited]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  actions: read
+
+jobs:
+  land:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.body || '', format('LAND-APPROVED:{0}', github.event.pull_request.head.sha))
+    runs-on: ubuntu-latest
+    concurrency:
+      group: protected-pr-landing-${{ github.event.pull_request.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout exact approved head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 1
+
+      - name: Verify landing helper exists
+        run: |
+          test -f .github/skills/pr-landing/scripts/pr_land.py
+          python -m py_compile .github/skills/pr-landing/scripts/pr_land.py
+
+      - name: Land exact approved head through repo helper
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python .github/skills/pr-landing/scripts/pr_land.py \
+            --repo "${{ github.repository }}" \
+            --pr "${{ github.event.pull_request.number }}" \
+            --head "${{ github.event.pull_request.head.sha }}" \
+            --mode auto \
+            --method merge \
+            --confirm
