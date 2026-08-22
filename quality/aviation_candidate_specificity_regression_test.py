@@ -124,6 +124,7 @@ outside = candidate(
     topic="도시 다리의 진동 구조",
     question="강풍 조건에서 다리 구조가 왜 움직일까?",
     reveal="강풍 조건에서 구조가 제한적으로 움직이며 하중을 분산한다.",
+    angle="도시 교량의 구조 제약",
     constraint="강풍 조건",
 )
 ok, _ = ce.aviation_candidate_quality_check(outside)
