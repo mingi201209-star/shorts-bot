@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 # Production parity fix: preserve the verified Hook candidate identity/mode through
@@ -88,7 +89,6 @@ text = text.replace(
     1,
 )
 
-fallback_old = "    print_hook_visual_audit(audit)\n    return fetch_video(original_query)\n"
 fallback_new = (
     "    if fallback_best is not None:\n"
     "        candidate = fallback_best['candidate']\n"
@@ -117,14 +117,32 @@ fallback_new = (
     "        )\n"
     "        print_hook_visual_audit(audit)\n"
     "        return candidate['url']\n"
-    "    video_url = fetch_video(original_query)\n"
-    "    record_last_resort_selection(video_url, scene, audit.get('fallback_reason'))\n"
+    "    fallback_query = (\n"
+    "        component_profile['queries'][0]\n"
+    "        if component_profile else original_query\n"
+    "    )\n"
+    "    video_url = fetch_pexels_video(fallback_query)\n"
+    "    record_last_resort_selection(video_url, {**scene, 'keyword': fallback_query}, audit.get('fallback_reason'))\n"
     "    print_hook_visual_audit(audit)\n"
     "    return video_url\n"
 )
-if fallback_old not in text:
-    raise RuntimeError("production Hook unified fallback marker not found")
-text = text.replace(fallback_old, fallback_new, 1)
+
+# Preserve the fallback_reason assignment, but replace everything after it until
+# the next top-level function. This avoids leaving an outer component-profile `if`
+# around fallback_new, which previously caused an IndentationError.
+if fallback_new not in text:
+    pattern = re.compile(
+        r"(?P<reason>    audit\[\"fallback_reason\"\] = \(\n"
+        r"(?:(?!\n    \)).)*?\n    \)\n)"
+        r"(?P<body>(?:(?!\n\ndef print_hook_visual_audit).)*?)"
+        r"(?=\n\ndef print_hook_visual_audit)",
+        re.DOTALL,
+    )
+    match = pattern.search(text)
+    if not match:
+        raise RuntimeError("production Hook structural fallback boundary not found")
+    replacement = match.group("reason") + fallback_new
+    text = text[:match.start()] + replacement + text[match.end():]
 path.write_text(text, encoding="utf-8")
 
 
