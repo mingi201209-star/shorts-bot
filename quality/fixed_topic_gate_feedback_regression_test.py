@@ -24,12 +24,25 @@ with tempfile.TemporaryDirectory() as tmp:
     gate_path = ROOT / "content" / "candidate_gate.py"
     gate_before = hashlib.sha256(gate_path.read_bytes()).hexdigest()
 
-    for _ in range(2):
-        subprocess.run(
-            [sys.executable, "ci_topic_input_hotfix.py"],
-            cwd=work,
-            check=True,
-        )
+    subprocess.run(
+        [sys.executable, "ci_topic_input_hotfix.py"],
+        cwd=work,
+        check=True,
+    )
+
+    # Simulate a later production hotfix wrapping the explorer source. The topic
+    # installer must still recognize its durable markers and remain idempotent.
+    explorer_path = work / "content" / "candidate_explorer.py"
+    explorer_path.write_text(
+        explorer_path.read_text(encoding="utf-8")
+        + "\n# DOWNSTREAM_RUNTIME_WRAPPER_SIMULATION\n",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        [sys.executable, "ci_topic_input_hotfix.py"],
+        cwd=work,
+        check=True,
+    )
 
     gate_after = hashlib.sha256(gate_path.read_bytes()).hexdigest()
     assert gate_before == gate_after, "Candidate Gate implementation changed"
