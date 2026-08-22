@@ -1,0 +1,62 @@
+name: Protected PR Landing
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  actions: read
+
+jobs:
+  land:
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == github.repository_owner &&
+      startsWith(github.event.comment.body, 'LAND-APPROVED:')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: protected-pr-landing-${{ github.event.issue.number }}
+      cancel-in-progress: false
+    steps:
+      - name: Resolve and verify exact approved head
+        id: approval
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APPROVAL: ${{ github.event.comment.body }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          approved_sha="${APPROVAL#LAND-APPROVED:}"
+          approved_sha="$(printf '%s' "$approved_sha" | tr -d '[:space:]')"
+          test "${#approved_sha}" -eq 40
+          case "$approved_sha" in *[!0-9a-fA-F]*) exit 1;; esac
+          current_sha="$(gh pr view "$PR" --repo "$REPO" --json headRefOid --jq .headRefOid)"
+          test "$approved_sha" = "$current_sha"
+          echo "head=$current_sha" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact approved head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.approval.outputs.head }}
+          fetch-depth: 1
+
+      - name: Verify landing helper exists
+        run: |
+          test -f .github/skills/pr-landing/scripts/pr_land.py
+          python -m py_compile .github/skills/pr-landing/scripts/pr_land.py
+
+      - name: Land exact approved head through repo helper
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python .github/skills/pr-landing/scripts/pr_land.py \
+            --repo "${{ github.repository }}" \
+            --pr "${{ github.event.issue.number }}" \
+            --head "${{ steps.approval.outputs.head }}" \
+            --mode auto \
+            --method merge \
+            --confirm
