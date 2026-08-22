@@ -1,0 +1,21 @@
+name: Analytics Feedback Contract Regression
+
+on:
+  pull_request:
+    paths:
+      - "analytics/**"
+      - "quality/analytics_feedback_contract_regression_test.py"
+      - "quality/__init__.py"
+      - ".github/workflows/analytics_feedback_contract_regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run analytics feedback contract regression
+        run: python -m quality.analytics_feedback_contract_regression_test
