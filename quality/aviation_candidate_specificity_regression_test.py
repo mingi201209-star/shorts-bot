@@ -31,6 +31,7 @@ namespace = runpy.run_path(str(patched_source), run_name="candidate_explorer_reg
 ce = types.SimpleNamespace(**namespace)
 assert hasattr(ce, "aviation_candidate_quality_check")
 assert hasattr(ce, "_repair_aviation_specificity_output_if_needed")
+repair_globals = ce._repair_aviation_specificity_output_if_needed.__globals__
 
 
 def candidate(
@@ -193,10 +194,10 @@ def fake_create(**kwargs):
     )
 
 
-namespace["authorize_call"] = lambda model: 17
-namespace["record_usage"] = lambda model, response: {"cost_usd": 0.0, "over_budget": False}
-namespace["print_budget_status"] = lambda: None
-namespace["openai"] = types.SimpleNamespace(
+repair_globals["authorize_call"] = lambda model: 17
+repair_globals["record_usage"] = lambda model, response: {"cost_usd": 0.0, "over_budget": False}
+repair_globals["print_budget_status"] = lambda: None
+repair_globals["openai"] = types.SimpleNamespace(
     chat=types.SimpleNamespace(
         completions=types.SimpleNamespace(create=fake_create)
     )
@@ -223,7 +224,7 @@ def fake_regenerate(**kwargs):
         choices=[types.SimpleNamespace(message=types.SimpleNamespace(content=json.dumps(payload)))]
     )
 
-namespace["openai"] = types.SimpleNamespace(
+repair_globals["openai"] = types.SimpleNamespace(
     chat=types.SimpleNamespace(
         completions=types.SimpleNamespace(create=fake_regenerate)
     )
@@ -242,7 +243,7 @@ assert len(calls) == before_calls
 
 # M: repair prompt explicitly forbids fabrication and only copies existing JSON facts.
 os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
-namespace["openai"] = types.SimpleNamespace(
+repair_globals["openai"] = types.SimpleNamespace(
     chat=types.SimpleNamespace(
         completions=types.SimpleNamespace(create=fake_create)
     )
