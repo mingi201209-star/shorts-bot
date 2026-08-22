@@ -1,0 +1,18 @@
+name: Aviation Context Signature Compat Regression
+
+on:
+  pull_request:
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run fixed_topic signature compatibility regression
+        env:
+          SHORTS_CANDIDATE_SCOPE: aviation
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+        run: python quality/aviation_context_signature_compat_regression_test.py
