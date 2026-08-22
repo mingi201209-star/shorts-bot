@@ -1,0 +1,29 @@
+name: Final Render Content Integrity Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_final_render_content_integrity_hotfix.py'
+      - 'quality/final_render_integrity.py'
+      - 'quality/final_render_integrity_regression_test.py'
+      - '.github/workflows/main.yml'
+      - '.github/workflows/final_render_content_integrity_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install hotfix
+        run: |
+          python ci_final_render_content_integrity_hotfix.py
+      - name: Compile
+        run: |
+          python -m py_compile ci_final_render_content_integrity_hotfix.py quality/final_render_integrity.py quality/final_render_integrity_regression_test.py main.py
+      - name: Run regression
+        run: |
+          python quality/final_render_integrity_regression_test.py
