@@ -32,33 +32,30 @@ INIT_REPLACEMENT = '''        rejected_topics = []
         total_topic_attempts = (
 '''
 
-EXPLORER_EXHAUSTED_MARKER = '''                raise RuntimeError(
+EXPLORER_STATUS_MARKER = '''            explorer_status = (
+                explorer_result.get(
+                    "status"
+                )
+            )
+'''
+EXPLORER_STATUS_REPLACEMENT = '''            explorer_status = (
+                explorer_result.get(
+                    "status"
+                )
+            )
+
+            recovered_from_pool = False
+'''
+
+EXPLORER_FINAL_RAISE = '''                raise RuntimeError(
                     "Candidate Explorer가 "
                     "제작 가능한 Winner를 "
                     "확보하지 못했습니다. "
                     f"마지막 이유: {reason}"
                 )
-
-            # =================================================
-            # Winner / Runner-up
 '''
-EXPLORER_EXHAUSTED_REPLACEMENT = '''                recovered = select_best_recovery(recovery_candidates)
-
-                if recovered is not None:
-                    winner = recovered["candidate"]
-                    runner_up = None
-                    current_topic = str(winner.get("topic", "")).strip()
-                    print("")
-                    print("=" * 64)
-                    print("🛟 CANDIDATE GROUNDED RECOVERY")
-                    print("=" * 64)
-                    print("복구 소재:", current_topic)
-                    print("원래 Gate 이유:", recovered.get("gate_reason", ""))
-                    print("복구 근거:", recovered.get("eligibility_reason", ""))
-                    print("복구 attempt:", recovered.get("attempt"))
-                    print("➡️ bounded recovery로 Script Generator 진행")
-                    explorer_status = "RECOVERED"
-                else:
+EXPLORER_FINAL_RECOVERY = '''                recovered = select_best_recovery(recovery_candidates)
+                if recovered is None:
                     raise RuntimeError(
                         "Candidate Explorer가 "
                         "제작 가능한 Winner를 "
@@ -66,23 +63,37 @@ EXPLORER_EXHAUSTED_REPLACEMENT = '''                recovered = select_best_reco
                         f"마지막 이유: {reason}"
                     )
 
-            if explorer_status == "RECOVERED":
-                pass
-            else:
-                # =================================================
-                # Winner / Runner-up
+                winner = recovered["candidate"]
+                runner_up = None
+                current_topic = str(winner.get("topic", "")).strip()
+                recovered_from_pool = True
+                print("")
+                print("=" * 64)
+                print("🛟 CANDIDATE GROUNDED RECOVERY")
+                print("=" * 64)
+                print("복구 소재:", current_topic)
+                print("원래 Gate 이유:", recovered.get("gate_reason", ""))
+                print("복구 근거:", recovered.get("eligibility_reason", ""))
+                print("복구 attempt:", recovered.get("attempt"))
+                print("➡️ bounded recovery 후보 확보; 정상 winner 경로로 재진입")
+
+                explorer_result = {
+                    "status": "SELECTED",
+                    "winner": winner,
+                    "runner_up": None,
+                }
 '''
 
-# The winner extraction block must be indented under the recovery branch's
-# `else:` until the Gate section. Rather than broadly rewriting main.py, apply
-# a bounded indentation transform between stable markers.
-WINNER_BLOCK_START = '''            # =================================================
-            # Winner / Runner-up
-            # =================================================
+REJECTED_TOPIC_MARKER = '''            if (
+                current_topic
+                in rejected_topics
+            ):
 '''
-GATE_BLOCK_START = '''            # =================================================
-            # Winner Candidate Gate
-            # =================================================
+REJECTED_TOPIC_REPLACEMENT = '''            if (
+                current_topic
+                in rejected_topics
+                and not recovered_from_pool
+            ):
 '''
 
 GATE_RECORD_MARKER = '''                print_budget_status()
@@ -168,72 +179,21 @@ GATE_RECORD_REPLACEMENT = '''                print_budget_status()
 if "# CANDIDATE_GROUNDED_RECOVERY_V1" in text:
     print("ℹ️ Candidate grounded recovery hotfix already applied")
 else:
-    for marker, replacement, name in (
+    replacements = (
         (IMPORT_MARKER, IMPORT_REPLACEMENT, "import"),
         (INIT_MARKER, INIT_REPLACEMENT, "init"),
-    ):
+        (EXPLORER_STATUS_MARKER, EXPLORER_STATUS_REPLACEMENT, "explorer_status"),
+        (EXPLORER_FINAL_RAISE, EXPLORER_FINAL_RECOVERY, "explorer_exhaustion"),
+        (REJECTED_TOPIC_MARKER, REJECTED_TOPIC_REPLACEMENT, "rejected_topic_guard"),
+        (GATE_RECORD_MARKER, GATE_RECORD_REPLACEMENT, "gate_recovery"),
+    )
+
+    for marker, replacement, name in replacements:
         if text.count(marker) != 1:
-            raise RuntimeError(f"Candidate recovery {name} marker mismatch: {text.count(marker)}")
+            raise RuntimeError(
+                f"Candidate recovery {name} marker mismatch: {text.count(marker)}"
+            )
         text = text.replace(marker, replacement, 1)
-
-    # Handle Explorer exhaustion by recovering a previously gate-rejected
-    # selected Winner. Keep the normal winner path unchanged otherwise.
-    if text.count(EXPLORER_EXHAUSTED_MARKER) != 1:
-        raise RuntimeError(
-            "Candidate recovery explorer exhaustion marker mismatch: "
-            f"{text.count(EXPLORER_EXHAUSTED_MARKER)}"
-        )
-
-    # Simpler fail-closed insertion: replace only the final raise with a
-    # recovery branch and jump directly into the existing winner variables.
-    explorer_old = '''                raise RuntimeError(
-                    "Candidate Explorer가 "
-                    "제작 가능한 Winner를 "
-                    "확보하지 못했습니다. "
-                    f"마지막 이유: {reason}"
-                )
-'''
-    explorer_new = '''                recovered = select_best_recovery(recovery_candidates)
-                if recovered is None:
-                    raise RuntimeError(
-                        "Candidate Explorer가 "
-                        "제작 가능한 Winner를 "
-                        "확보하지 못했습니다. "
-                        f"마지막 이유: {reason}"
-                    )
-
-                winner = recovered["candidate"]
-                runner_up = None
-                current_topic = str(winner.get("topic", "")).strip()
-                print("")
-                print("=" * 64)
-                print("🛟 CANDIDATE GROUNDED RECOVERY")
-                print("=" * 64)
-                print("복구 소재:", current_topic)
-                print("원래 Gate 이유:", recovered.get("gate_reason", ""))
-                print("복구 근거:", recovered.get("eligibility_reason", ""))
-                print("복구 attempt:", recovered.get("attempt"))
-                print("➡️ bounded recovery 후보 확보; 정상 winner 경로로 재진입")
-
-                explorer_result = {
-                    "status": "SELECTED",
-                    "winner": winner,
-                    "runner_up": None,
-                }
-'''
-    if text.count(explorer_old) != 1:
-        raise RuntimeError(
-            "Candidate recovery explorer final raise mismatch: "
-            f"{text.count(explorer_old)}"
-        )
-    text = text.replace(explorer_old, explorer_new, 1)
-
-    if text.count(GATE_RECORD_MARKER) != 1:
-        raise RuntimeError(
-            "Candidate recovery gate marker mismatch: "
-            f"{text.count(GATE_RECORD_MARKER)}"
-        )
-    text = text.replace(GATE_RECORD_MARKER, GATE_RECORD_REPLACEMENT, 1)
 
     path.write_text(text, encoding="utf-8")
     print("✅ Bounded grounded Candidate recovery hotfix applied")
