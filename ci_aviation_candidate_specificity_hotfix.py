@@ -197,14 +197,29 @@ def build_execution_context(
     fixed_topic=None,
     fixed_topic_gate_feedback="",
 ):
-    context = _aviation_specificity_previous_build_context(
-        topic_info,
-        recent_topics=recent_topics,
-        recent_content=recent_content,
-        rejected_topics=rejected_topics,
-        fixed_topic=fixed_topic,
-        fixed_topic_gate_feedback=fixed_topic_gate_feedback,
-    )
+    try:
+        context = _aviation_specificity_previous_build_context(
+            topic_info,
+            recent_topics=recent_topics,
+            recent_content=recent_content,
+            rejected_topics=rejected_topics,
+            fixed_topic=fixed_topic,
+            fixed_topic_gate_feedback=fixed_topic_gate_feedback,
+        )
+    except TypeError as exc:
+        message = str(exc)
+        if not (
+            "unexpected keyword argument 'fixed_topic'" in message
+            or "unexpected keyword argument 'fixed_topic_gate_feedback'" in message
+        ):
+            raise
+        context = _aviation_specificity_previous_build_context(
+            topic_info,
+            recent_topics=recent_topics,
+            recent_content=recent_content,
+            rejected_topics=rejected_topics,
+        )
+
     if os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower() != "aviation":
         return context
 
