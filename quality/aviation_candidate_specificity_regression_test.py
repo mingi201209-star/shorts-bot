@@ -1,5 +1,6 @@
 from pathlib import Path
 import hashlib
+import importlib
 import os
 import subprocess
 import sys
@@ -18,6 +19,10 @@ subprocess.run([sys.executable, "ci_aviation_candidate_specificity_hotfix.py"], 
 gate_after = hashlib.sha256(gate_path.read_bytes()).hexdigest()
 assert gate_before == gate_after, "Candidate Gate implementation changed"
 
+# The hotfix scripts mutate the source file at runtime. Explicitly invalidate any
+# import/cache state so this regression exercises the patched production module.
+importlib.invalidate_caches()
+sys.modules.pop("content.candidate_explorer", None)
 from content import candidate_explorer as ce
 
 
