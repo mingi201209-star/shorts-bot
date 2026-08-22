@@ -1,12 +1,20 @@
 from pathlib import Path
 import hashlib
 import py_compile
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def retry_policy(text):
+    match = re.search(r"^MAX_TOPIC_REGENERATIONS\s*=\s*(\d+)\s*$", text, re.MULTILINE)
+    assert match, "MAX_TOPIC_REGENERATIONS assignment missing"
+    return int(match.group(1))
+
 
 with tempfile.TemporaryDirectory() as tmp:
     work = Path(tmp)
@@ -23,6 +31,8 @@ with tempfile.TemporaryDirectory() as tmp:
 
     gate_path = ROOT / "content" / "candidate_gate.py"
     gate_before = hashlib.sha256(gate_path.read_bytes()).hexdigest()
+    main_before = (work / "main.py").read_text(encoding="utf-8")
+    retry_before = retry_policy(main_before)
 
     subprocess.run(
         [sys.executable, "ci_topic_input_hotfix.py"],
@@ -64,8 +74,9 @@ with tempfile.TemporaryDirectory() as tmp:
     assert "Candidate Gate와 기존 품질 규칙은 그대로 적용한다." in explorer_text
     assert 'fixed_topic_gate_feedback=""' in explorer_text
 
-    # Existing retry and quality contracts stay intact.
-    assert "MAX_TOPIC_REGENERATIONS = 1" in main_text
+    # The fixed-topic installer must preserve whatever retry policy the upstream
+    # production hotfix stack selected. Do not pin this regression to a stale value.
+    assert retry_policy(main_text) == retry_before
     assert "evaluate_candidate(" in main_text
 
     py_compile.compile(str(work / "main.py"), doraise=True)
