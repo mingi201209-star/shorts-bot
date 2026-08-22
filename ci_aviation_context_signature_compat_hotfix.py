@@ -30,8 +30,6 @@ def _ensure_signature_keyword(text, function_name, keyword, default):
         signature = signature.replace(anchor, anchor + extra, 1)
         return text[:start] + signature + text[end:]
 
-    # Last-resort structural insertion before the closing signature. This keeps
-    # compatibility with thin wrappers that only expose topic_info plus '*'.
     prefix = ""
     if keyword == "fixed_topic_gate_feedback" and "fixed_topic" not in signature:
         prefix = "    fixed_topic=None,\n"
@@ -54,7 +52,9 @@ def _ensure_forwarded_keyword(text, function_name, callee, keyword):
         raise RuntimeError(f"{callee} call terminator not found")
 
     call = text[call_start:call_end]
-    if f"{keyword}={keyword}" in call:
+    # Any existing keyword assignment counts, including topic-input's normalized
+    # expression. Adding a second assignment would create a SyntaxError.
+    if f"{keyword}=" in call:
         return text
 
     insertion = f"        {keyword}={keyword},\n"
@@ -67,7 +67,7 @@ def _ensure_forwarded_keyword(text, function_name, callee, keyword):
         if anchor not in call:
             continue
         extra = insertion
-        if keyword == "fixed_topic_gate_feedback" and "fixed_topic=fixed_topic" not in call:
+        if keyword == "fixed_topic_gate_feedback" and "fixed_topic=" not in call:
             extra = "        fixed_topic=fixed_topic,\n" + insertion
         call = call.replace(anchor, anchor + extra, 1)
         return text[:call_start] + call + text[call_end:]
@@ -78,13 +78,8 @@ def _ensure_forwarded_keyword(text, function_name, callee, keyword):
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
 
-    # Aviation specificity installs a later build_execution_context wrapper. Keep
-    # the complete fixed-topic contract when that wrapper becomes the active one.
     text = _ensure_signature_keyword(
-        text,
-        "build_execution_context",
-        "fixed_topic_gate_feedback",
-        '""',
+        text, "build_execution_context", "fixed_topic_gate_feedback", '""'
     )
     text = _ensure_forwarded_keyword(
         text,
@@ -92,20 +87,11 @@ def main():
         "_aviation_specificity_previous_build_context",
         "fixed_topic_gate_feedback",
     )
-
-    # Production calls explore_candidates with both fixed_topic and Gate feedback.
-    # Guard the public Explorer signature as well so later wrappers cannot narrow it.
     text = _ensure_signature_keyword(
-        text,
-        "explore_candidates",
-        "fixed_topic_gate_feedback",
-        '""',
+        text, "explore_candidates", "fixed_topic_gate_feedback", '""'
     )
     text = _ensure_forwarded_keyword(
-        text,
-        "explore_candidates",
-        "build_execution_context",
-        "fixed_topic_gate_feedback",
+        text, "explore_candidates", "build_execution_context", "fixed_topic_gate_feedback"
     )
 
     EXPLORER_PATH.write_text(text, encoding="utf-8")
