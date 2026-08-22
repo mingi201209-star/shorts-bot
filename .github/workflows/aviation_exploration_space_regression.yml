@@ -1,0 +1,20 @@
+name: Aviation Exploration Space Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/topic_selector.py"
+      - "quality/aviation_exploration_space_regression_test.py"
+      - ".github/workflows/aviation_exploration_space_regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run aviation exploration space regression
+        run: python quality/aviation_exploration_space_regression_test.py
