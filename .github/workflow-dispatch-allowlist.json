@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "workflows": {
+    "main.yml": {
+      "ref": "main",
+      "allowed_inputs": ["topic", "candidate_scope"]
+    },
+    "adaptive_scene_count_regression.yml": {
+      "ref": "main",
+      "allowed_inputs": []
+    },
+    "script_production_parity_regression.yml": {
+      "ref": "main",
+      "allowed_inputs": []
+    },
+    "general_scene_visual_parity_regression.yml": {
+      "ref": "main",
+      "allowed_inputs": []
+    }
+  }
+}
