@@ -127,23 +127,22 @@ fallback_new = (
     "    return video_url\n"
 )
 
-# Do not depend on the exact final fallback body. Multiple production hotfixes can
-# legitimately add provenance/component-aware branches here. Replace only the tail
-# of fetch_hook_pexels_video, from its final audit print through the next function.
+# Preserve the fallback_reason assignment, but replace everything after it until
+# the next top-level function. This avoids leaving an outer component-profile `if`
+# around fallback_new, which previously caused an IndentationError.
 if fallback_new not in text:
     pattern = re.compile(
-        r"    print_hook_visual_audit\(audit\)\n"
-        r"(?:(?!\ndef print_hook_visual_audit).)*?"
+        r"(?P<reason>    audit\[\"fallback_reason\"\] = \(\n"
+        r"(?:(?!\n    \)).)*?\n    \)\n)"
+        r"(?P<body>(?:(?!\n\ndef print_hook_visual_audit).)*?)"
         r"(?=\n\ndef print_hook_visual_audit)",
         re.DOTALL,
     )
-    matches = list(pattern.finditer(text))
-    if not matches:
+    match = pattern.search(text)
+    if not match:
         raise RuntimeError("production Hook structural fallback boundary not found")
-    # The final audit-print block in fetch_hook_pexels_video is the fallback tail;
-    # strict-selection audit prints occur earlier and are followed by more code.
-    match = matches[-1]
-    text = text[:match.start()] + fallback_new + text[match.end():]
+    replacement = match.group("reason") + fallback_new
+    text = text[:match.start()] + replacement + text[match.end():]
 path.write_text(text, encoding="utf-8")
 
 
