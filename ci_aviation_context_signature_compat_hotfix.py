@@ -15,20 +15,27 @@ def _ensure_signature_keyword(text, function_name, keyword, default):
     if keyword in signature:
         return text
 
-    anchor = "    fixed_topic=None,\n"
     insertion = f"    {keyword}={default},\n"
-    if anchor in signature:
-        signature = signature.replace(anchor, anchor + insertion, 1)
-    else:
-        anchor = "    rejected_topics=None,\n"
+    for anchor in (
+        "    fixed_topic=None,\n",
+        "    rejected_topics=None,\n",
+        "    recent_content=None,\n",
+        "    recent_topics=None,\n",
+    ):
         if anchor not in signature:
-            raise RuntimeError(f"{function_name} signature anchor not found")
-        signature = signature.replace(
-            anchor,
-            anchor + "    fixed_topic=None,\n" + insertion,
-            1,
-        )
+            continue
+        extra = insertion
+        if keyword == "fixed_topic_gate_feedback" and "fixed_topic" not in signature:
+            extra = "    fixed_topic=None,\n" + insertion
+        signature = signature.replace(anchor, anchor + extra, 1)
+        return text[:start] + signature + text[end:]
 
+    # Last-resort structural insertion before the closing signature. This keeps
+    # compatibility with thin wrappers that only expose topic_info plus '*'.
+    prefix = ""
+    if keyword == "fixed_topic_gate_feedback" and "fixed_topic" not in signature:
+        prefix = "    fixed_topic=None,\n"
+    signature = signature.rstrip() + "\n" + prefix + insertion.rstrip("\n")
     return text[:start] + signature + text[end:]
 
 
@@ -50,21 +57,22 @@ def _ensure_forwarded_keyword(text, function_name, callee, keyword):
     if f"{keyword}={keyword}" in call:
         return text
 
-    anchor = "        fixed_topic=fixed_topic,\n"
     insertion = f"        {keyword}={keyword},\n"
-    if anchor in call:
-        call = call.replace(anchor, anchor + insertion, 1)
-    else:
-        anchor = "        rejected_topics=rejected_topics,\n"
+    for anchor in (
+        "        fixed_topic=fixed_topic,\n",
+        "        rejected_topics=rejected_topics,\n",
+        "        recent_content=recent_content,\n",
+        "        recent_topics=recent_topics,\n",
+    ):
         if anchor not in call:
-            raise RuntimeError(f"{callee} forwarding anchor not found")
-        call = call.replace(
-            anchor,
-            anchor + "        fixed_topic=fixed_topic,\n" + insertion,
-            1,
-        )
+            continue
+        extra = insertion
+        if keyword == "fixed_topic_gate_feedback" and "fixed_topic=fixed_topic" not in call:
+            extra = "        fixed_topic=fixed_topic,\n" + insertion
+        call = call.replace(anchor, anchor + extra, 1)
+        return text[:call_start] + call + text[call_end:]
 
-    return text[:call_start] + call + text[call_end:]
+    raise RuntimeError(f"{callee} forwarding anchor not found")
 
 
 def main():
