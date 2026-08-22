@@ -39,6 +39,8 @@ def patch_main():
                 forced_topic,
             )
 
+        fixed_topic_gate_feedback = ""
+
         final_script = None
 '''
 
@@ -80,6 +82,11 @@ def patch_main():
                         forced_topic
                         or None
                     ),
+                    fixed_topic_gate_feedback=(
+                        fixed_topic_gate_feedback
+                        if forced_topic
+                        else ""
+                    ),
                 )
 '''
 
@@ -110,6 +117,30 @@ def patch_main():
                 and current_topic
                 in rejected_topics
             ):
+'''
+
+    gate_feedback_marker = '''                print_budget_status()
+
+                if (
+                    topic_attempt
+                    < total_topic_attempts
+                ):
+'''
+
+    gate_feedback_replacement = '''                if forced_topic:
+                    fixed_topic_gate_feedback = str(
+                        winner_gate.get(
+                            "reason",
+                            "",
+                        )
+                    ).strip()
+
+                print_budget_status()
+
+                if (
+                    topic_attempt
+                    < total_topic_attempts
+                ):
 '''
 
     topic_guard_marker = '''            if not current_topic:
@@ -174,6 +205,11 @@ def patch_main():
             topic_guard_replacement,
             "main fixed topic guard",
         ),
+        (
+            gate_feedback_marker,
+            gate_feedback_replacement,
+            "main fixed topic gate feedback",
+        ),
     ):
         text = replace_once(
             text,
@@ -209,6 +245,7 @@ def patch_candidate_explorer():
     recent_content=None,
     rejected_topics=None,
     fixed_topic=None,
+    fixed_topic_gate_feedback="",
 ):
 '''
 
@@ -224,6 +261,33 @@ def patch_candidate_explorer():
     ).strip()
 
     if fixed_topic:
+
+        fixed_topic_gate_feedback = str(
+            fixed_topic_gate_feedback or ""
+        ).strip()
+
+        feedback_section = ""
+
+        if fixed_topic_gate_feedback:
+            feedback_section = f"""
+============================================================
+[PREVIOUS CANDIDATE GATE FEEDBACK]
+============================================================
+
+직전 fixed-topic Candidate가 아래 이유로 거절되었다.
+
+{fixed_topic_gate_feedback}
+
+주제 문자열은 그대로 유지하되 같은 Core Question,
+Reveal, Mechanism을 반복하지 마라.
+거절 이유를 직접 해결하도록 Story Angle을 더 좁히고,
+눈에 보이는 구체 관찰, 실제 제약, trade-off,
+counterintuitive result 중 근거 있는 요소를 질문과 Reveal에
+직접 반영하라.
+
+Candidate Gate와 기존 품질 규칙은 그대로 적용한다.
+사실을 발명하거나 약한 Candidate를 억지로 통과시키지 마라.
+"""
 
         return f"""
 [EXECUTION CONTEXT - FIXED PRODUCTION TOPIC]
@@ -258,6 +322,8 @@ Final Sanity 규칙은 그대로 적용한다.
 최근 콘텐츠는 참고하되
 지정 주제를 다른 주제로 교체하지 마라.
 
+{feedback_section}
+
 Candidate Explorer 전체 규칙을 수행한 뒤
 OUTPUT CONTRACT에 맞는
 JSON 객체 하나만 반환하라.
@@ -287,6 +353,7 @@ JSON 객체 하나만 반환하라.
     recent_content=None,
     rejected_topics=None,
     fixed_topic=None,
+    fixed_topic_gate_feedback="",
     model=MODEL,
 ):
 '''
@@ -301,6 +368,9 @@ JSON 객체 하나만 반환하라.
             recent_content=recent_content,
             rejected_topics=rejected_topics,
             fixed_topic=fixed_topic,
+            fixed_topic_gate_feedback=(
+                fixed_topic_gate_feedback
+            ),
         )
 '''
 
