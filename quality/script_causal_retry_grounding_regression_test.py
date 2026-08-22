@@ -11,7 +11,7 @@ required = [
     "tradeoff",
     "concrete_condition",
     "같은 mechanism/result를 어휘만 바꿔 반복하지 마라",
-    "설계형 최소 장면 수를 먼저 확보하되 filler를 추가하지 마라",
+    "설계형 주제의 최소 장면 수를 먼저 확보하되 filler를 추가하지 마라",
 ]
 for needle in required:
     assert needle in hotfix, needle
