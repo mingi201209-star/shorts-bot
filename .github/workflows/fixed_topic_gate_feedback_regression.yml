@@ -1,0 +1,30 @@
+name: Fixed Topic Gate Feedback Regression
+
+on:
+  pull_request:
+    paths:
+      - "ci_topic_input_hotfix.py"
+      - "main.py"
+      - "content/candidate_explorer.py"
+      - "content/candidate_gate.py"
+      - "quality/fixed_topic_gate_feedback_regression_test.py"
+      - ".github/workflows/fixed_topic_gate_feedback_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Run fixed-topic gate feedback regression
+        run: python quality/fixed_topic_gate_feedback_regression_test.py
