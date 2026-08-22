@@ -71,6 +71,7 @@ jobs:
           python ci_aviation_candidate_specificity_hotfix.py
           python ci_aviation_context_signature_compat_hotfix.py
           python ci_aviation_specificity_output_repair_hotfix.py
+          python ci_aviation_specificity_projection_hotfix.py
           python ci_final_render_content_integrity_hotfix.py
           python ci_output_quality_hotfix.py
           python ci_curiosity_retention_hotfix.py
@@ -95,7 +96,7 @@ jobs:
           grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
           grep -n "MAX_SCRIPT_ATTEMPTS" config.py
           grep -n '"+13%"' config.py
-          grep -n "AVIATION_SPECIFICITY_OUTPUT_REPAIR_V1" content/candidate_explorer.py
+          grep -n "AVIATION_SPECIFICITY_OUTPUT_REPAIR_V1\|AVIATION_SPECIFICITY_PROJECTION_V2" content/candidate_explorer.py
           grep -n "FINAL_RENDER_CONTENT_INTEGRITY_V1\|CONTENT_IDENTITY_DRIFT" main.py
           grep -n "ADAPTIVE_SCENE_COUNT_FOR_DENSE_DESIGN_V1\|ADAPTIVE_DESIGN_MIN_SCENES\|SCRIPT_VALIDATION_RECOVERY_V1" content/script_generator.py
           grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
@@ -110,7 +111,7 @@ jobs:
             ci_first5_retention_tts_hotfix.py ci_first5_visual_contract_hotfix.py ci_video_provider_hotfix.py \
             ci_topic_input_hotfix.py ci_aviation_candidate_context_hotfix.py ci_aviation_candidate_specificity_hotfix.py \
             ci_aviation_context_signature_compat_hotfix.py ci_aviation_specificity_output_repair_hotfix.py \
-            ci_final_render_content_integrity_hotfix.py ci_output_quality_hotfix.py \
+            ci_aviation_specificity_projection_hotfix.py ci_final_render_content_integrity_hotfix.py ci_output_quality_hotfix.py \
             ci_curiosity_retention_hotfix.py ci_visual_specificity_hotfix.py ci_design_causality_hotfix.py \
             ci_query_semantic_integrity_hotfix.py ci_concrete_visual_evidence_hotfix.py \
             ci_visible_evidence_provenance_hotfix.py ci_hook_production_parity_hotfix.py \
@@ -122,9 +123,9 @@ jobs:
             main.py config.py content/candidate_explorer.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py quality/final_render_integrity.py \
-            quality/final_render_integrity_regression_test.py video/video_providers.py video/hook_visual.py \
-            video/hook_visual_dominance.py video/video_downloader.py video/video_engine.py video/subtitle_engine.py \
-            video/ai_visual_provider.py
+            quality/final_render_integrity_regression_test.py quality/aviation_specificity_projection_regression_test.py \
+            video/video_providers.py video/hook_visual.py video/hook_visual_dominance.py video/video_downloader.py \
+            video/video_engine.py video/subtitle_engine.py video/ai_visual_provider.py
 
           python quality/final_render_integrity_regression_test.py
 
@@ -141,7 +142,7 @@ jobs:
           ENABLE_HOOK_EXPERIMENT: "1"
           AI_VISUAL_FALLBACK_ENABLED: "false"
           AI_MAX_GENERATIONS_PER_VIDEO: "1"
-          AI_VISUAL_MODEL: "sora-2"
+          AI_VISUAL_MODEL: sora-2
           AI_VISUAL_SECONDS: "4"
           AI_VISUAL_SIZE: "720x1280"
           SHORTS_TOPIC: ${{ inputs.topic }}
