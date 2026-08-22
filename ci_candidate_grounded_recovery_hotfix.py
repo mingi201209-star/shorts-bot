@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 
 path = Path("main.py")
@@ -84,11 +85,6 @@ EXPLORER_FINAL_RECOVERY = '''                recovered = select_best_recovery(re
                 }
 '''
 
-REJECTED_TOPIC_MARKER = '''            if (
-                current_topic
-                in rejected_topics
-            ):
-'''
 REJECTED_TOPIC_REPLACEMENT = '''            if (
                 current_topic
                 in rejected_topics
@@ -176,24 +172,76 @@ GATE_RECORD_REPLACEMENT = '''                print_budget_status()
                     )
 '''
 
+
+def replace_exact(source, marker, replacement, name):
+    if source.count(marker) != 1:
+        raise RuntimeError(
+            f"Candidate recovery {name} marker mismatch: {source.count(marker)}"
+        )
+    return source.replace(marker, replacement, 1)
+
+
+def replace_rejected_topic_guard(source):
+    # Production applies earlier hotfixes before this one. Those patches may
+    # insert extra conditions into the same multiline guard, so match its
+    # semantic shape instead of requiring byte-for-byte whitespace/content.
+    pattern = re.compile(
+        r'''(?mx)
+        ^(?P<indent>[ \t]*)if\s*\(\s*\n
+        (?P=indent)[ \t]+current_topic\s*\n
+        (?P=indent)[ \t]+in\s+rejected_topics\s*\n
+        (?P<extra>(?:(?P=indent)[ \t]+(?:and|or)\b[^\n]*\n)*)
+        (?P=indent)\):
+        '''
+    )
+    matches = list(pattern.finditer(source))
+    if len(matches) != 1:
+        raise RuntimeError(
+            "Candidate recovery rejected_topic_guard marker mismatch: "
+            f"{len(matches)}"
+        )
+
+    match = matches[0]
+    if "recovered_from_pool" in match.group(0):
+        return source
+
+    indent = match.group("indent")
+    extra = match.group("extra") or ""
+    replacement = (
+        f"{indent}if (\n"
+        f"{indent}    current_topic\n"
+        f"{indent}    in rejected_topics\n"
+        f"{extra}"
+        f"{indent}    and not recovered_from_pool\n"
+        f"{indent}):"
+    )
+    return source[:match.start()] + replacement + source[match.end():]
+
+
 if "# CANDIDATE_GROUNDED_RECOVERY_V1" in text:
     print("ℹ️ Candidate grounded recovery hotfix already applied")
 else:
-    replacements = (
-        (IMPORT_MARKER, IMPORT_REPLACEMENT, "import"),
-        (INIT_MARKER, INIT_REPLACEMENT, "init"),
-        (EXPLORER_STATUS_MARKER, EXPLORER_STATUS_REPLACEMENT, "explorer_status"),
-        (EXPLORER_FINAL_RAISE, EXPLORER_FINAL_RECOVERY, "explorer_exhaustion"),
-        (REJECTED_TOPIC_MARKER, REJECTED_TOPIC_REPLACEMENT, "rejected_topic_guard"),
-        (GATE_RECORD_MARKER, GATE_RECORD_REPLACEMENT, "gate_recovery"),
+    text = replace_exact(text, IMPORT_MARKER, IMPORT_REPLACEMENT, "import")
+    text = replace_exact(text, INIT_MARKER, INIT_REPLACEMENT, "init")
+    text = replace_exact(
+        text,
+        EXPLORER_STATUS_MARKER,
+        EXPLORER_STATUS_REPLACEMENT,
+        "explorer_status",
     )
-
-    for marker, replacement, name in replacements:
-        if text.count(marker) != 1:
-            raise RuntimeError(
-                f"Candidate recovery {name} marker mismatch: {text.count(marker)}"
-            )
-        text = text.replace(marker, replacement, 1)
+    text = replace_exact(
+        text,
+        EXPLORER_FINAL_RAISE,
+        EXPLORER_FINAL_RECOVERY,
+        "explorer_exhaustion",
+    )
+    text = replace_rejected_topic_guard(text)
+    text = replace_exact(
+        text,
+        GATE_RECORD_MARKER,
+        GATE_RECORD_REPLACEMENT,
+        "gate_recovery",
+    )
 
     path.write_text(text, encoding="utf-8")
     print("✅ Bounded grounded Candidate recovery hotfix applied")
