@@ -73,6 +73,22 @@ TOPIC_POOL = {
 }
 
 
+# candidate_scope=aviation일 때만 사용하는 넓은 탐색 공간.
+# 특정 소재/정답을 고정하지 않고 항공 내부의 서로 다른 질문 영역만 제공한다.
+AVIATION_TOPIC_POOL = [
+    "승객이 반복해서 보지만 이유를 잘 모르는 객실 구조와 작은 디테일",
+    "날개와 조종면에서 눈으로 볼 수 있지만 직관과 다르게 작동하는 구조",
+    "엔진과 흡기 주변에서 생기는 제약과 이를 해결한 의외의 설계",
+    "착륙장치와 지상 이동 과정에서 안전과 하중 문제를 해결하는 구조",
+    "고도 변화 속 압력·공조·온도 문제를 다루는 기내 시스템과 현상",
+    "비상 상황을 전제로 평소에는 잘 드러나지 않는 항공 안전장치",
+    "활주로·게이트·유도로 등 공항 운항에서 눈에 보이는 숨은 시스템",
+    "이륙·순항·착륙 중 승객이 직접 보고 느끼지만 이유를 오해하기 쉬운 현상",
+    "공간·무게·속도·소음 같은 강한 제약 때문에 생긴 항공기의 우회 설계",
+    "조종석과 객실의 배치·표시·절차 중 실제 목적이 예상 밖인 요소",
+]
+
+
 # ============================================================
 # 전체 방향 풀
 # ============================================================
@@ -189,6 +205,26 @@ def get_recent_topic_names():
 # ============================================================
 
 def choose_topic_direction():
+
+    run_scope = os.environ.get(
+        "SHORTS_CANDIDATE_SCOPE",
+        "",
+    ).strip().lower()
+
+    if run_scope == "aviation":
+        selected = {
+            "category": "항공",
+            "topic": random.choice(AVIATION_TOPIC_POOL),
+        }
+
+        print("✈️ Candidate scope: aviation")
+        print(
+            f"🎯 분야: {selected['category']}"
+        )
+        print(
+            f"🎯 방향: {selected['topic']}"
+        )
+        return selected
 
     recent_topics = get_recent_topic_names()
 
