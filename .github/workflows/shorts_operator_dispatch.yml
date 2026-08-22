@@ -14,11 +14,14 @@ jobs:
     if: >-
       github.event.issue.number == 33 &&
       github.event.comment.user.login == github.repository_owner &&
-      startsWith(github.event.comment.body, '/shorts-run')
+      (startsWith(github.event.comment.body, '/shorts-run') ||
+       startsWith(github.event.comment.body, '/workflow-run '))
     runs-on: ubuntu-latest
 
     steps:
-      - name: Parse operator command
+      - uses: actions/checkout@v4
+
+      - name: Parse and authorize operator command
         id: parse
         env:
           BODY: ${{ github.event.comment.body }}
@@ -26,63 +29,112 @@ jobs:
         run: |
           set -euo pipefail
 
-          topic=""
-          scope=""
+          python - <<'PY'
+          import json
+          import os
+          import shlex
+          from pathlib import Path
 
-          case "$BODY" in
-            "/shorts-run")
-              ;;
-            "/shorts-run aviation")
-              scope="aviation"
-              ;;
-            "/shorts-run topic:"*)
-              topic="${BODY#'/shorts-run topic:'}"
-              topic="${topic# }"
-              if [[ -z "$topic" ]]; then
-                echo "Fixed-topic command requires a non-empty topic." >&2
-                exit 1
-              fi
-              ;;
-            *)
-              echo "Unsupported operator command: $BODY" >&2
-              exit 1
-              ;;
-          esac
+          body = os.environ["BODY"].strip()
+          policy = json.loads(
+              Path(".github/workflow-dispatch-allowlist.json").read_text(encoding="utf-8")
+          )
 
-          {
-            echo "topic<<EOF"
-            echo "$topic"
-            echo "EOF"
-            echo "scope=$scope"
-          } >> "$GITHUB_OUTPUT"
+          if body == "/shorts-run":
+              workflow = "main.yml"
+              inputs = {"topic": "", "candidate_scope": ""}
+          elif body == "/shorts-run aviation":
+              workflow = "main.yml"
+              inputs = {"topic": "", "candidate_scope": "aviation"}
+          elif body.startswith("/shorts-run topic:"):
+              topic = body.split(":", 1)[1].strip()
+              if not topic:
+                  raise SystemExit("Fixed-topic command requires a non-empty topic.")
+              workflow = "main.yml"
+              inputs = {"topic": topic, "candidate_scope": ""}
+          elif body.startswith("/workflow-run "):
+              command = body[len("/workflow-run "):].strip()
+              workflow, separator, raw_inputs = command.partition(" ")
+              if not workflow:
+                  raise SystemExit("Workflow filename is required.")
+              inputs = json.loads(raw_inputs) if separator else {}
+              if not isinstance(inputs, dict):
+                  raise SystemExit("Workflow inputs must be one JSON object.")
+          else:
+              raise SystemExit(f"Unsupported operator command: {body}")
 
-      - name: Snapshot existing production runs
-        id: before
+          allowed = policy.get("workflows", {}).get(workflow)
+          if not isinstance(allowed, dict):
+              raise SystemExit(f"Workflow is not allowlisted: {workflow}")
+          if workflow == "shorts_operator_dispatch.yml":
+              raise SystemExit("The operator bridge cannot dispatch itself.")
+
+          allowed_inputs = set(allowed.get("allowed_inputs", []))
+          unknown = sorted(set(inputs) - allowed_inputs)
+          if unknown:
+              raise SystemExit(f"Unsupported inputs for {workflow}: {', '.join(unknown)}")
+
+          normalized = {}
+          for key, value in inputs.items():
+              if not isinstance(value, (str, int, float, bool)) and value is not None:
+                  raise SystemExit(f"Input {key} must be a scalar value.")
+              normalized[key] = "" if value is None else str(value)
+
+          output = Path(os.environ["GITHUB_OUTPUT"])
+          with output.open("a", encoding="utf-8") as handle:
+              handle.write(f"workflow={workflow}\n")
+              handle.write(f"ref={allowed.get('ref', 'main')}\n")
+              handle.write("inputs_json=" + json.dumps(normalized, ensure_ascii=False) + "\n")
+          PY
+
+      - name: Verify workflow and prevent duplicate execution
         env:
           GH_TOKEN: ${{ github.token }}
+          WORKFLOW: ${{ steps.parse.outputs.workflow }}
+          REF: ${{ steps.parse.outputs.ref }}
         shell: bash
         run: |
           set -euo pipefail
-          gh run list --repo "$GITHUB_REPOSITORY" --workflow main.yml --event workflow_dispatch --limit 30 --json databaseId --jq 'map(.databaseId) | join(",")' > /tmp/before_ids
+          gh workflow view "$WORKFLOW" --repo "$GITHUB_REPOSITORY" >/dev/null
 
-      - name: Dispatch Shorts Generator
+          active_count="$(
+            gh run list               --repo "$GITHUB_REPOSITORY"               --workflow "$WORKFLOW"               --event workflow_dispatch               --branch "$REF"               --limit 30               --json status               --jq '[.[] | select(.status == "queued" or .status == "in_progress" or .status == "waiting" or .status == "pending")] | length'
+          )"
+          if [[ "$active_count" != "0" ]]; then
+            echo "A workflow_dispatch run is already active for $WORKFLOW on $REF." >&2
+            exit 1
+          fi
+
+      - name: Snapshot existing workflow runs
         env:
           GH_TOKEN: ${{ github.token }}
-          TOPIC: ${{ steps.parse.outputs.topic }}
-          SCOPE: ${{ steps.parse.outputs.scope }}
+          WORKFLOW: ${{ steps.parse.outputs.workflow }}
         shell: bash
         run: |
           set -euo pipefail
-          gh workflow run main.yml \
-            --repo "$GITHUB_REPOSITORY" \
-            --ref main \
-            -f topic="$TOPIC" \
-            -f candidate_scope="$SCOPE"
+          gh run list             --repo "$GITHUB_REPOSITORY"             --workflow "$WORKFLOW"             --event workflow_dispatch             --limit 50             --json databaseId             --jq 'map(.databaseId) | join(",")' > /tmp/before_ids
+
+      - name: Dispatch allowlisted workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WORKFLOW: ${{ steps.parse.outputs.workflow }}
+          REF: ${{ steps.parse.outputs.ref }}
+          INPUTS_JSON: ${{ steps.parse.outputs.inputs_json }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(workflow run "$WORKFLOW" --repo "$GITHUB_REPOSITORY" --ref "$REF")
+          while IFS=$'\t' read -r key value; do
+            [[ -n "$key" ]] && args+=(-f "$key=$value")
+          done < <(jq -r 'to_entries[] | [.key, (.value | tostring)] | @tsv' <<<"$INPUTS_JSON")
+          gh "${args[@]}"
 
       - name: Resolve dispatched run
         id: run
         env:
           GH_TOKEN: ${{ github.token }}
+          WORKFLOW: ${{ steps.parse.outputs.workflow }}
+          REF: ${{ steps.parse.outputs.ref }}
         shell: bash
         run: |
           set -euo pipefail
@@ -90,39 +142,48 @@ jobs:
           run_id=""
           run_url=""
           run_status=""
+          run_sha=""
 
           for attempt in {1..12}; do
-            while IFS=$'\t' read -r id url status; do
+            while IFS=$'\t' read -r id url status sha; do
               if [[ -n "$id" && "$before" != *",$id,"* ]]; then
                 run_id="$id"
                 run_url="$url"
                 run_status="$status"
+                run_sha="$sha"
                 break
               fi
-            done < <(gh run list --repo "$GITHUB_REPOSITORY" --workflow main.yml --event workflow_dispatch --branch main --limit 10 --json databaseId,url,status --jq '.[] | [.databaseId,.url,.status] | @tsv')
+            done < <(
+              gh run list                 --repo "$GITHUB_REPOSITORY"                 --workflow "$WORKFLOW"                 --event workflow_dispatch                 --branch "$REF"                 --limit 20                 --json databaseId,url,status,headSha                 --jq '.[] | [.databaseId,.url,.status,.headSha] | @tsv'
+            )
 
             [[ -n "$run_id" ]] && break
             sleep 5
           done
 
           if [[ -z "$run_id" ]]; then
-            echo "Unable to resolve newly dispatched production run." >&2
+            echo "Unable to resolve newly dispatched workflow run." >&2
             exit 1
           fi
 
-          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-          echo "run_url=$run_url" >> "$GITHUB_OUTPUT"
-          echo "run_status=$run_status" >> "$GITHUB_OUTPUT"
+          {
+            echo "run_id=$run_id"
+            echo "run_url=$run_url"
+            echo "run_status=$run_status"
+            echo "run_sha=$run_sha"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Record dispatch on control issue
         env:
           GH_TOKEN: ${{ github.token }}
-          TOPIC: ${{ steps.parse.outputs.topic }}
-          SCOPE: ${{ steps.parse.outputs.scope }}
+          WORKFLOW: ${{ steps.parse.outputs.workflow }}
+          REF: ${{ steps.parse.outputs.ref }}
+          INPUTS_JSON: ${{ steps.parse.outputs.inputs_json }}
           RUN_ID: ${{ steps.run.outputs.run_id }}
           RUN_URL: ${{ steps.run.outputs.run_url }}
           RUN_STATUS: ${{ steps.run.outputs.run_status }}
+          RUN_SHA: ${{ steps.run.outputs.run_sha }}
         shell: bash
         run: |
           set -euo pipefail
-          gh issue comment 33 --repo "$GITHUB_REPOSITORY" --body "Production dispatch accepted. Run: ${RUN_ID} (${RUN_STATUS}). Scope: ${SCOPE:-default}. Topic: ${TOPIC:-automatic}. ${RUN_URL}"
+          gh issue comment 33 --repo "$GITHUB_REPOSITORY" --body "Workflow dispatch accepted. Workflow: ${WORKFLOW}. Ref: ${REF}. SHA: ${RUN_SHA}. Run: ${RUN_ID} (${RUN_STATUS}). Inputs: ${INPUTS_JSON}. ${RUN_URL}"
