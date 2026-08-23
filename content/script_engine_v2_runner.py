@@ -166,7 +166,9 @@ def _deterministic_keyword(scene: Dict[str, Any], contract: Dict[str, Any], plan
         if len(extracted) >= 2:
             break
     if len(extracted) >= 2:
-        return " ".join(extracted[:7])
+        # Preserve scene-local search variety even when every visual_goal uses
+        # the same English template and differs only by its numeric stage.
+        return " ".join((extracted[:6] + [str(index)])[:7])
 
     semantic_text = " ".join(
         str(value or "")
