@@ -36,11 +36,11 @@ def _consensus():
     }
 
 
-def test_rewrite_retries_then_accepts_polite():
-    original = _script("원래 대사는 자연스러운 존댓말이에요.")
+def test_rewrite_retries_then_accepts_formal():
+    original = _script("원래 대사는 자연스러운 격식체입니다.")
     outputs = [
-        _script("첫 Rewrite는 반말로 끝난다."),
-        _script("두 번째 Rewrite는 존댓말로 끝나요."),
+        _script("첫 Rewrite는 해요체로 끝나요."),
+        _script("두 번째 Rewrite는 격식체로 끝납니다."),
     ]
     calls = {"count": 0}
     original_call = rewrite_engine._run_rewrite_call
@@ -57,22 +57,22 @@ def test_rewrite_retries_then_accepts_polite():
     finally:
         rewrite_engine._run_rewrite_call = original_call
 
-    _assert("informal Rewrite triggers one bounded retry", calls["count"] == 2)
+    _assert("casual-polite Rewrite triggers one bounded retry", calls["count"] == 2)
     _assert(
-        "second polite Rewrite is accepted",
-        result["script_data"]["scenes"][0]["text"].endswith("끝나요."),
+        "second formal Rewrite is accepted",
+        result["script_data"]["scenes"][0]["text"].endswith("끝납니다."),
     )
 
 
 def test_rewrite_falls_back_after_retry_limit():
-    original = _script("원래 대사는 자연스러운 존댓말이에요.")
+    original = _script("원래 대사는 자연스러운 격식체입니다.")
     calls = {"count": 0}
     original_call = rewrite_engine._run_rewrite_call
 
     def fake_call(*args, **kwargs):
         del args, kwargs
         calls["count"] += 1
-        return _script("계속 반말로 끝난다.")
+        return _script("계속 해요체로 끝나요.")
 
     rewrite_engine._run_rewrite_call = fake_call
     try:
@@ -82,16 +82,16 @@ def test_rewrite_falls_back_after_retry_limit():
 
     _assert("Rewrite retry remains bounded at two attempts", calls["count"] == 2)
     _assert(
-        "informal Rewrite never replaces the original narration",
+        "non-formal Rewrite never replaces the original narration",
         result["script_data"]["scenes"][0]["text"]
         == original["scenes"][0]["text"],
     )
 
 
 def main():
-    test_rewrite_retries_then_accepts_polite()
+    test_rewrite_retries_then_accepts_formal()
     test_rewrite_falls_back_after_retry_limit()
-    print("✅ Rewrite speech-style regression suite passed")
+    print("✅ Rewrite formal speech-style regression suite passed")
 
 
 if __name__ == "__main__":

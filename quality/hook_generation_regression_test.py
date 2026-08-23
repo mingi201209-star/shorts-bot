@@ -28,16 +28,16 @@ def _item(index, text, **overrides):
 
 
 VALID_TEXTS = [
-    "드론이 균열을 먼저 찾아내요",
-    "로마 수도관은 물을 흘려보내요",
-    "남극 기지는 눈 위로 올라가요",
-    "사막여우 귀는 열을 내보내요",
-    "터치스크린은 손가락을 감지해요",
-    "비행기 창문은 압력을 견뎌요",
-    "로마 도로는 물을 옆으로 빼내요",
-    "벌집은 육각형으로 공간을 채워요",
-    "문어 피부는 색을 빠르게 바꿔요",
-    "낙타 콧속은 수분을 다시 모아요",
+    "드론이 균열을 먼저 찾습니다",
+    "수도관은 물을 흘려보냅니다",
+    "남극 기지는 위로 올라갑니다",
+    "사막여우 귀는 열을 내보냅니다",
+    "화면은 손가락을 감지합니다",
+    "비행기 창문은 압력을 견딥니다",
+    "로마 도로는 물을 빼냅니다",
+    "벌집은 공간을 육각형으로 채웁니다",
+    "문어 피부는 색을 바꿉니다",
+    "낙타 콧속은 수분을 모읍니다",
 ]
 
 
@@ -64,7 +64,7 @@ def test_too_long_reason():
     items = [
         _item(
             i,
-            f"드론이 산업 현장의 아주 작은 {i}번 균열까지 먼저 찾아내고 알려줘요",
+            f"드론이 산업 현장의 아주 작은 {i}번 균열까지 먼저 찾아내고 알려줍니다",
         )
         for i in range(1, 6)
     ]
@@ -73,13 +73,10 @@ def test_too_long_reason():
 
 
 def test_speech_style_reason():
-    items = [
-        _item(i, f"드론{i}이 균열을 먼저 찾아낸다")
-        for i in range(1, 4)
-    ]
+    items = [_item(i, f"드론{i}이 균열을 먼저 찾아내요") for i in range(1, 4)]
     _, diagnostics = hook_experiment._diagnose_candidates(_payload(items))
     _assert(
-        "Informal candidates report speech_style_failure",
+        "Casual-polite candidates report speech_style_failure",
         diagnostics["rejected"].get("speech_style_failure") == 3,
     )
 
@@ -137,14 +134,12 @@ def test_bounded_attempt_two_receives_feedback_and_accumulates():
     second_candidates, _ = hook_experiment._diagnose_candidates(
         _payload([_item(i + 3, text) for i, text in enumerate(VALID_TEXTS[2:5])])
     )
-    repair_items = [
-        {
-            "text": "드론 균열 찾아요",
-            "visible_len": 7,
-            "visual_goal": "드론 점검 화면",
-            "keyword": "drone inspection",
-        }
-    ]
+    repair_items = [{
+        "text": "드론은 균열을 확인합니다",
+        "visible_len": 11,
+        "visual_goal": "드론 점검 화면",
+        "keyword": "drone inspection",
+    }]
 
     def fake_request(topic_info, candidate, generation_round, rejection_feedback=None):
         del topic_info, candidate
@@ -160,18 +155,9 @@ def test_bounded_attempt_two_receives_feedback_and_accumulates():
         hook_experiment._request_candidates = original
 
     _assert("Attempt 2 runs after insufficient attempt 1", len(calls) == 2)
-    _assert(
-        "Attempt 2 receives attempt-1 rejection counts",
-        calls[1][1].get("rejection_counts") == {"too_short": 8},
-    )
-    _assert(
-        "Attempt 2 receives bounded repair candidates",
-        calls[1][1].get("repair_candidates") == repair_items,
-    )
-    _assert(
-        "Validated candidates accumulate across bounded attempts",
-        audit["attempts"][-1]["cumulative_scoring_pool_count"] == 5,
-    )
+    _assert("Attempt 2 receives attempt-1 rejection counts", calls[1][1].get("rejection_counts") == {"too_short": 8})
+    _assert("Attempt 2 receives bounded repair candidates", calls[1][1].get("repair_candidates") == repair_items)
+    _assert("Validated candidates accumulate across bounded attempts", audit["attempts"][-1]["cumulative_scoring_pool_count"] == 5)
     _assert("Cumulative pool can select normal threshold winner", bool(selected))
     _assert("Successful bounded repair avoids fallback", not audit["fallback"])
 
