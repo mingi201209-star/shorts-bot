@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import types
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -26,6 +27,7 @@ def candidate(topic="날개 끝 윙렛의 실제 역할", reveal="날개 끝 와
         },
         "fact_check_focus": ["winglets reduce induced drag under relevant conditions"],
         "visual_proof": ["visible upturned wingtip"],
+        "selection_reason": "구조와 메커니즘을 직접 시각화할 수 있습니다.",
     }
 
 
@@ -120,6 +122,137 @@ def test_no_recoverable_candidate_stays_terminal():
     assert select_best_recovery([None]) is None
 
 
+def _load_supply_module():
+    # This focused regression intentionally has no third-party install step.
+    # The wrapper behavior below stubs all model calls, so a minimal import-only
+    # openai module is enough to load candidate_explorer without network access.
+    if "openai" not in sys.modules:
+        fake_openai = types.ModuleType("openai")
+        fake_openai.api_key = None
+        sys.modules["openai"] = fake_openai
+
+    import content.candidate_explorer as explorer_package
+    explorer = explorer_package._LEGACY
+
+    assert hasattr(explorer, "_candidate_supply_reason_is_zero_usable"), (
+        "candidate supply recovery hotfix was not applied before regression"
+    )
+    return explorer
+
+
+def test_supply_recovery_does_not_run_for_normal_selected():
+    explorer = _load_supply_module()
+    explorer._reset_candidate_supply_recovery_for_tests()
+
+    normal = {
+        "status": "SELECTED",
+        "winner": candidate(),
+        "runner_up": None,
+    }
+    calls = {"recovery": 0}
+    original = explorer._original_explore_candidates_before_supply_recovery
+    recovery = explorer._run_candidate_supply_recovery
+
+    try:
+        explorer._original_explore_candidates_before_supply_recovery = (
+            lambda *args, **kwargs: normal
+        )
+
+        def forbidden_recovery(*args, **kwargs):
+            calls["recovery"] += 1
+            raise AssertionError("normal SELECTED must not spend supply recovery")
+
+        explorer._run_candidate_supply_recovery = forbidden_recovery
+        result = explorer.explore_candidates({"category": "항공", "topic": "객실 구조"})
+        assert result is normal
+        assert calls["recovery"] == 0
+    finally:
+        explorer._original_explore_candidates_before_supply_recovery = original
+        explorer._run_candidate_supply_recovery = recovery
+
+
+def test_zero_supply_gets_exactly_one_recovery_and_stays_validated():
+    explorer = _load_supply_module()
+    explorer._reset_candidate_supply_recovery_for_tests()
+
+    zero = {
+        "status": "REGENERATE",
+        "reason": "usable grounded Candidate가 0개",
+    }
+    recovered = explorer.validate_explorer_output({
+        "status": "SELECTED",
+        "winner": candidate(topic="비행기 창문 아래 작은 구멍의 역할"),
+        "runner_up": None,
+    })
+
+    calls = {"recovery": 0}
+    original = explorer._original_explore_candidates_before_supply_recovery
+    recovery = explorer._run_candidate_supply_recovery
+
+    try:
+        explorer._original_explore_candidates_before_supply_recovery = (
+            lambda *args, **kwargs: zero
+        )
+
+        def bounded_recovery(*args, **kwargs):
+            calls["recovery"] += 1
+            return recovered
+
+        explorer._run_candidate_supply_recovery = bounded_recovery
+        result = explorer.explore_candidates({"category": "항공", "topic": "객실 구조"})
+        assert result["status"] == "SELECTED"
+        assert result["winner"]["topic"] == "비행기 창문 아래 작은 구멍의 역할"
+        assert calls["recovery"] == 1
+    finally:
+        explorer._original_explore_candidates_before_supply_recovery = original
+        explorer._run_candidate_supply_recovery = recovery
+
+
+def test_supply_recovery_is_one_per_generation_and_fails_closed_after_spend():
+    explorer = _load_supply_module()
+    explorer._reset_candidate_supply_recovery_for_tests()
+
+    zero = {
+        "status": "REGENERATE",
+        "reason": "usable grounded Candidate가 0개",
+    }
+    calls = {"recovery": 0}
+    original = explorer._original_explore_candidates_before_supply_recovery
+    recovery = explorer._run_candidate_supply_recovery
+
+    try:
+        explorer._original_explore_candidates_before_supply_recovery = (
+            lambda *args, **kwargs: zero
+        )
+
+        def still_empty(*args, **kwargs):
+            calls["recovery"] += 1
+            return zero
+
+        explorer._run_candidate_supply_recovery = still_empty
+        first = explorer.explore_candidates({"category": "항공", "topic": "공항 시스템"})
+        second = explorer.explore_candidates({"category": "항공", "topic": "착륙장치"})
+
+        assert first["status"] == "REGENERATE"
+        assert second["status"] == "REGENERATE"
+        assert calls["recovery"] == 1
+    finally:
+        explorer._original_explore_candidates_before_supply_recovery = original
+        explorer._run_candidate_supply_recovery = recovery
+
+
+def test_supply_recovery_only_triggers_on_zero_usable_reason():
+    explorer = _load_supply_module()
+    assert explorer._candidate_supply_reason_is_zero_usable({
+        "status": "REGENERATE",
+        "reason": "usable grounded Candidate가 0개",
+    }) is True
+    assert explorer._candidate_supply_reason_is_zero_usable({
+        "status": "REGENERATE",
+        "reason": "결론이 너무 예상 가능합니다.",
+    }) is False
+
+
 def main():
     test_soft_editorial_reject_is_recoverable()
     print("CASE A soft editorial recovery: PASS")
@@ -135,6 +268,14 @@ def main():
     print("CASE F deterministic strongest selection: PASS")
     test_no_recoverable_candidate_stays_terminal()
     print("CASE G terminal without recoverable candidate: PASS")
+    test_supply_recovery_does_not_run_for_normal_selected()
+    print("CASE H normal SELECTED spends zero supply calls: PASS")
+    test_zero_supply_gets_exactly_one_recovery_and_stays_validated()
+    print("CASE I zero supply gets one validated recovery: PASS")
+    test_supply_recovery_is_one_per_generation_and_fails_closed_after_spend()
+    print("CASE J one-call bound and fail-close: PASS")
+    test_supply_recovery_only_triggers_on_zero_usable_reason()
+    print("CASE K trigger reason remains narrow: PASS")
     print("CANDIDATE GROUNDED RECOVERY REGRESSION: PASS")
 
 

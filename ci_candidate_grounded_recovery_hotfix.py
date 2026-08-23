@@ -175,9 +175,6 @@ def replace_exact(source, marker, replacement, name):
 
 
 def replace_rejected_topic_guard(source):
-    # Earlier production hotfixes may prepend conditions such as
-    # `not forced_topic` to this guard. Locate the enclosing if-block by the
-    # stable `in rejected_topics` clause, then preserve every existing clause.
     clause = re.compile(
         r"(?m)^(?P<indent>[ \t]+)in[ \t]+rejected_topics[ \t]*$"
     )
@@ -267,3 +264,5 @@ else:
 
     path.write_text(text, encoding="utf-8")
     print("✅ Bounded grounded Candidate recovery hotfix applied")
+
+import ci_candidate_supply_recovery_hotfix
