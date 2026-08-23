@@ -54,6 +54,71 @@ def _with_mechanism_requirement(candidate):
     return enriched
 
 
+def _formalize_core_question(question):
+    """Convert the Candidate question into the approved formal curiosity beat.
+
+    This is intentionally narrow and only changes the sentence ending/prefix.
+    Unknown forms are preserved for the existing validators to reject.
+    """
+    value = str(question or "").strip()
+    if not value:
+        return value
+
+    value = value.rstrip()
+    if value.startswith("그런데 ") and value.endswith("까요?"):
+        return value
+
+    stem = value.rstrip("?.! ")
+    replacements = (
+        ("했을까", "했을까요"),
+        ("였을까", "였을까요"),
+        ("있을까", "있을까요"),
+        ("없을까", "없을까요"),
+        ("될까", "될까요"),
+        ("일까", "일까요"),
+        ("할까", "할까요"),
+        ("까", "까요"),
+    )
+    for old, new in replacements:
+        if stem.endswith(old):
+            stem = stem[: -len(old)] + new
+            break
+
+    if not stem.endswith("까요"):
+        return value
+    if not stem.startswith("그런데 "):
+        stem = "그런데 " + stem
+    return stem + "?"
+
+
+def _with_locked_opening(candidate, selected_hook):
+    """Put the already-approved Hook/question into the candidate *before* legacy generation.
+
+    The production opening-lock validator lives inside the legacy runtime.  Passing
+    the approved opening only after legacy generation is too late: validation has
+    already happened by then.  This function fixes that ordering without changing
+    any validator or quality threshold.
+    """
+    enriched = _with_mechanism_requirement(candidate)
+    micro = dict(enriched.get("micro_narrative") or {})
+
+    if selected_hook and str(selected_hook.get("text", "")).strip():
+        micro["hook"] = str(selected_hook["text"]).strip()
+
+    source_question = (
+        micro.get("core_question")
+        or enriched.get("core_question")
+        or enriched.get("question")
+    )
+    formal_question = _formalize_core_question(source_question)
+    if formal_question:
+        micro["core_question"] = formal_question
+
+    if micro:
+        enriched["micro_narrative"] = micro
+    return enriched
+
+
 def _apply_selected_hook(
     script_data,
     selected_hook,
@@ -156,9 +221,16 @@ def generate_script(topic_info, candidate):
             audit
         )
 
+    # Critical ordering: selected Hook + formal curiosity question must reach the
+    # legacy runtime BEFORE it validates generated scenes.  The previous ordering
+    # only applied the Hook after _LEGACY.generate_script() had already failed.
+    generation_candidate = _with_locked_opening(
+        candidate,
+        selected_hook,
+    )
     result = _LEGACY.generate_script(
         topic_info,
-        _with_mechanism_requirement(candidate),
+        generation_candidate,
     )
 
     if not hook_enabled:
