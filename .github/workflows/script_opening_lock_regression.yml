@@ -1,0 +1,22 @@
+name: Script Opening Lock Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_script_validation_recovery_hotfix.py"
+      - "quality/script_opening_lock_regression_test.py"
+      - ".github/workflows/script_opening_lock_regression.yml"
+
+jobs:
+  opening-lock-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Run approved opening lock regression
+        run: python quality/script_opening_lock_regression_test.py
