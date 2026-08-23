@@ -131,7 +131,8 @@ def _load_supply_module():
         fake_openai.api_key = None
         sys.modules["openai"] = fake_openai
 
-    import content.candidate_explorer as explorer
+    import content.candidate_explorer as explorer_package
+    explorer = explorer_package._LEGACY
 
     assert hasattr(explorer, "_candidate_supply_reason_is_zero_usable"), (
         "candidate supply recovery hotfix was not applied before regression"
