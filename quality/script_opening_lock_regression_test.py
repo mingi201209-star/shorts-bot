@@ -101,11 +101,20 @@ assert locked["scenes"][2]["text"] == "날개 끝에서는 소용돌이가 생�
 assert locked["scenes"][3]["text"] == "그 흐름 때문에 저항이 생깁니다."
 assert locked["scenes"][4]["text"] == "직접 볼 수 있습니다."
 
+closing_locked = legacy._script_closing_lock_apply(locked, cleaned_candidate)
+assert closing_locked["scenes"][-2]["text"] == "날개 끝 공기 흐름을 줄이는 구조다"
+assert closing_locked["scenes"][-1]["text"] == "와류와 유도항력을 줄이는 데 도움이 된다"
+assert closing_locked["scenes"][-2]["visual_goal"] == "항공기 날개 끝 구조"
+assert closing_locked["scenes"][-2]["keyword"] == "airplane winglet close up"
+assert closing_locked["scenes"][-1]["visual_goal"] == "항공기 날개 끝 구조"
+assert closing_locked["scenes"][-1]["keyword"] == "airplane winglet close up"
+
 unrepairable = {
     "title": "fixture",
     "scenes": [scene("x"), scene("y"), scene("정말 놀라워요.")],
 }
 result = legacy._script_opening_lock_apply(unrepairable, cleaned_candidate)
 assert result["scenes"][2]["text"] == "정말 놀라워요."
+assert legacy._script_closing_lock_apply(unrepairable, cleaned_candidate) is unrepairable
 
-print("✅ Script opening lock production-order regression PASS")
+print("✅ Script opening + closing lock production-order regression PASS")

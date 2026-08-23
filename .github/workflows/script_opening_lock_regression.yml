@@ -1,4 +1,4 @@
-name: Script Opening Lock Regression
+name: Script Opening and Closing Lock Regression
 
 on:
   pull_request:
@@ -8,10 +8,11 @@ on:
       - "ci_script_validation_recovery_hotfix.py"
       - "quality/script_opening_lock_regression_test.py"
       - "quality/script_wrapper_opening_order_regression_test.py"
+      - "quality/script_closing_lock_regression_test.py"
       - ".github/workflows/script_opening_lock_regression.yml"
 
 jobs:
-  opening-lock-regression:
+  opening-closing-lock-regression:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,3 +25,5 @@ jobs:
         run: python quality/script_opening_lock_regression_test.py
       - name: Run wrapper pre-validation opening-order regression
         run: python quality/script_wrapper_opening_order_regression_test.py
+      - name: Run approved closing lock regression
+        run: python quality/script_closing_lock_regression_test.py

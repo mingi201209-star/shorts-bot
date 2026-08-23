@@ -63,6 +63,11 @@ def _script_validation_recovery_guidance(last_error):
         ])
     if "generic outro" in lowered or "filler" in lowered or "repetition" in lowered:
         guidance.append("일반론적 마무리와 길이 채우기 문장을 삭제하고 Core Question의 직접 답으로 끝낸다.")
+    if "narrative reveal contract" in lowered or "opening question" in lowered:
+        guidance.extend([
+            "마지막 두 Scene은 Candidate의 locked reveal → locked payoff 순서로 질문을 명시적으로 회수한다.",
+            "결말을 새로운 일반론이나 분위기 문장으로 바꾸지 말고, 처음 질문의 직접 답을 끝부분에 남긴다.",
+        ])
 
     return "\n".join(f"- {item}" for item in guidance)
 '''
@@ -109,20 +114,20 @@ def validate_candidate(candidate):
     return cleaned
 '''
 
-# SCRIPT_OPENING_LOCK_V1
-# The Hook selector/Candidate contract has already approved the opening intent.
-# Do not spend Script API retries asking another model pass to rewrite those two
-# beats. Preserve generated visual metadata, but deterministically restore the
-# approved narration before every existing validator runs.
+# SCRIPT_OPENING_LOCK_V1 + SCRIPT_CLOSING_LOCK_V1
+# Candidate/Hook selection already approved the first two and final two narrative
+# beats. Preserve generated visual metadata, but deterministically restore those
+# narration beats before every existing validator runs.
 if "SCRIPT_OPENING_LOCK_V1" not in text:
-    # Anchor on the validation call, not on the whole extract_json -> validation
-    # block. Earlier production hotfixes may legitimately insert normalization
-    # between those two statements, which made the old exact-block marker brittle.
     validation_anchor = '''            valid, reason = validate_script(
                 generated
             )
 '''
     locked_validation = '''            generated = _script_opening_lock_apply(
+                generated,
+                candidate,
+            )
+            generated = _script_closing_lock_apply(
                 generated,
                 candidate,
             )
@@ -133,7 +138,7 @@ if "SCRIPT_OPENING_LOCK_V1" not in text:
 '''
     if text.count(validation_anchor) != 1:
         raise RuntimeError(
-            f"script opening lock validation marker mismatch: {text.count(validation_anchor)}"
+            f"script opening/closing lock validation marker mismatch: {text.count(validation_anchor)}"
         )
     text = text.replace(validation_anchor, locked_validation, 1)
 
@@ -156,9 +161,15 @@ Scene 2 narration text is already approved and will be restored deterministicall
 {micro['core_question']}
 Generate useful visual_goal/keyword fields for those scenes, but spend your writing effort on Scene 3 onward.
 Do not duplicate Scene 1/2 wording later in the script.
+
+[LOCKED CLOSING — DO NOT REWRITE]
+The final two narration beats are already approved and will be restored deterministically to:
+REVEAL: {micro['reveal']}
+PAYOFF: {micro['payoff']}
+Generate useful visual_goal/keyword fields for those final scenes. Build the middle scenes so they lead causally into this reveal/payoff without duplicating it early.
 '''
     if text.count(prompt_marker) != 1:
-        raise RuntimeError("script opening lock prompt marker mismatch")
+        raise RuntimeError("script opening/closing lock prompt marker mismatch")
     text = text.replace(prompt_marker, prompt_replacement, 1)
 
     text += r'''
@@ -205,23 +216,41 @@ def _script_opening_lock_apply(payload, candidate):
     locked_hook = str(micro.get("hook", "")).strip()
     locked_question = str(micro.get("core_question", "")).strip()
 
-    # Keep visual_goal/keyword produced by the LLM, but never let it replace the
-    # approved narration. Structural validators still decide whether the result
-    # is acceptable after the lock is applied.
     if len(scenes) >= 1 and isinstance(scenes[0], dict) and locked_hook:
         scenes[0]["text"] = locked_hook
     if len(scenes) >= 2 and isinstance(scenes[1], dict) and locked_question:
         scenes[1]["text"] = locked_question
 
-    # Safe style-only cleanup for body scenes. This is deliberately narrow: any
-    # wording not in the whitelist remains untouched and can still fail the
-    # existing speech-style gate/retry path.
     for scene in scenes[2:]:
         if isinstance(scene, dict):
             scene["text"] = _script_safe_formal_ending_repair(scene.get("text", ""))
 
     return payload
+
+
+# SCRIPT_CLOSING_LOCK_V1
+def _script_closing_lock_apply(payload, candidate):
+    if not isinstance(payload, dict) or not isinstance(candidate, dict):
+        return payload
+
+    scenes = payload.get("scenes")
+    if not isinstance(scenes, list) or len(scenes) < 4:
+        return payload
+
+    micro = candidate.get("micro_narrative")
+    if not isinstance(micro, dict):
+        return payload
+
+    locked_reveal = str(micro.get("reveal", "")).strip()
+    locked_payoff = str(micro.get("payoff", "")).strip()
+
+    if isinstance(scenes[-2], dict) and locked_reveal:
+        scenes[-2]["text"] = _script_safe_formal_ending_repair(locked_reveal)
+    if isinstance(scenes[-1], dict) and locked_payoff:
+        scenes[-1]["text"] = _script_safe_formal_ending_repair(locked_payoff)
+
+    return payload
 '''
 
 path.write_text(text, encoding="utf-8")
-print("✅ Bounded script validation recovery + approved opening lock applied")
+print("✅ Bounded script validation recovery + approved opening/closing lock applied")
