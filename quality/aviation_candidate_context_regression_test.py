@@ -13,11 +13,25 @@ required = (
     "[THIS RUN ONLY - AVIATION CANDIDATE SUPPLY CONTEXT]",
     "최소 10개의 서로 다른 grounded seed",
     "[SEPARATION OF RESPONSIBILITIES]",
+    "[SUPPLY SHORTAGE IS NOT A TERMINAL RESULT]",
     "[DO NOT SELF-WITHHOLD]",
     "[BOUNDED RETRY DISCIPLINE]",
     "Gate 기준을 낮추지 마라",
 )
 for item in required:
+    assert item in explorer, item
+
+# Production Run 32646061801 exhausted attempts after Explorer began returning
+# REGENERATE only because it could not supply enough distinct candidates.
+# A single viable grounded candidate must still reach the independent Gate.
+for item in (
+    "위 최소 10개는 탐색 목표이지 SELECTED를 반환하기 위한 최소 통과 숫자가 아니다",
+    "grounded하고 구체적이며 필수 필드가 완성된 Candidate가 1개라도 남아 있다면 후보 수가 목표보다 적다는 이유만으로 REGENERATE를 반환하지 마라",
+    "runner_up은 null이어도 된다",
+    "REGENERATE는 usable grounded Candidate가 0개인 경우",
+    "후보 공급 부족",
+    "이 규칙은 Candidate Gate를 우회하지 않는다",
+):
     assert item in explorer, item
 
 # Generation must not self-withhold candidates for downstream editorial reasons.
@@ -61,4 +75,4 @@ assert positions == sorted(positions)
 assert "SHORTS_TOPIC: ${{ inputs.topic }}" in workflow
 assert "SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}" in workflow
 
-print("PASS: aviation candidate supply separated from editorial Gate self-filtering")
+print("PASS: aviation candidate supply shortage no longer becomes terminal by count alone")
