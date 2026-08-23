@@ -8,6 +8,9 @@ from content.retention_structure import build_retention_plan
 
 MAX_SCRIPT_API_CALLS = 3
 MAX_LOCAL_REPAIR_CALLS = 2
+CAUSAL_CLUE_TOKENS = (
+    "때문", "원인", "압력", "힘", "공기", "구조", "작동", "차이", "분산", "조절", "균형",
+)
 
 
 @dataclass(frozen=True)
@@ -177,9 +180,7 @@ def deterministic_scene_repair(text: str, role: str) -> str:
     for pattern, replacement in _ENDING_REPAIRS:
         value = re.sub(pattern, replacement, value)
     if role == "causal_clue" and value and not any(
-        token in value for token in (
-            "원인", "압력", "공기", "구조", "차이", "힘", "흐름", "소용돌이"
-        )
+        token in value for token in CAUSAL_CLUE_TOKENS
     ):
         value = "원인의 첫 단서는 " + value
     return value
