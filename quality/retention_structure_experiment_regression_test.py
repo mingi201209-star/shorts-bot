@@ -14,7 +14,7 @@ def candidate_simple():
         "core_question": "왜 창문 아래쪽에 작은 구멍이 있을까?",
         "micro_narrative": {
             "hook": "비행기 창문에는 작은 구멍이 있습니다.",
-            "core_question": "왜 일부러 뚫어둘까요?",
+            "core_question": "그런데 왜 일부러 뚫어둘까요?",
             "reveal": "구멍이 창문 층 사이의 압력을 조절합니다.",
             "payoff": "그래서 바깥쪽 창이 압력을 주로 버티게 됩니다.",
         },
@@ -51,15 +51,15 @@ def good_scenes():
             "retention_role": "phenomenon",
         },
         {
-            "text": "이 구멍이 없으면 창문이 압력을 버티기 더 어려워집니다.",
-            "visual_goal": "객실 창문과 압력 차이를 보여주는 단면",
-            "keyword": "airplane window pressure layers",
-            "retention_role": "consequence",
+            "text": "그런데 왜 일부러 작은 구멍을 뚫어둘까요?",
+            "visual_goal": "창문 작은 구멍을 가리키는 근접 화면",
+            "keyword": "airplane window hole closeup",
+            "retention_role": "question",
         },
         {
-            "text": "원인은 창문 층 사이의 압력을 조절해야 하기 때문입니다.",
+            "text": "첫 단서는 창문 여러 층 사이의 압력 차이입니다.",
             "visual_goal": "여러 겹 창문 사이 공기층 단면",
-            "keyword": "aircraft window layer cross section",
+            "keyword": "aircraft window layer pressure",
             "retention_role": "causal_clue",
         },
         {
@@ -81,10 +81,16 @@ def test_first5_contract():
     ok, reason = validate_first5_progression(good_scenes())
     assert ok, reason
 
-    bad = good_scenes()
-    bad[2] = dict(bad[2])
-    bad[2]["retention_role"] = "consequence"
-    ok, _ = validate_first5_progression(bad)
+    bad_role = good_scenes()
+    bad_role[1] = dict(bad_role[1])
+    bad_role[1]["retention_role"] = "consequence"
+    ok, _ = validate_first5_progression(bad_role)
+    assert not ok
+
+    bad_question = good_scenes()
+    bad_question[1] = dict(bad_question[1])
+    bad_question[1]["text"] = "왜 일부러 작은 구멍을 뚫어두나요?"
+    ok, _ = validate_first5_progression(bad_question)
     assert not ok
 
 
@@ -103,6 +109,8 @@ def test_annotation_is_observational():
     annotated = annotate_script(original, plan)
     assert original.get("runtime_bucket") is None
     assert annotated["runtime_bucket"] == "24-30s"
+    assert annotated["retention_structure"]["version"] == 2
+    assert annotated["retention_structure"]["first5_contract"][1]["role"] == "question"
     assert annotated["retention_structure"]["first5_contract"][2]["role"] == "causal_clue"
 
 
@@ -110,7 +118,7 @@ def main():
     test_runtime_router()
     print("CASE A runtime routing: PASS")
     test_first5_contract()
-    print("CASE B first5 mini narrative: PASS")
+    print("CASE B observation-question-causal first5: PASS")
     test_density_rejects_repetition()
     print("CASE C density redundancy gate: PASS")
     test_annotation_is_observational()
