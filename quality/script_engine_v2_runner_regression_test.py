@@ -80,11 +80,10 @@ def production_shape_writer(item):
     return {"result": {"title": "윙렛의 이유", "scenes": scenes}}
 
 
-def latest_production_shape_writer(item):
-    """Distill Run 32641375844: Korean keywords survive all local model repairs."""
-    plan = build_narrative_plan(item)
+def latest_production_shape_writer(writer_payload):
+    """Distill Run 32641375844 after candidate-opening normalization."""
     scenes = []
-    for contract in plan["contracts"]:
+    for contract in writer_payload["scene_contracts"]:
         index = contract["index"]
         scenes.append({
             "narration": MIDDLE_TEXTS[(index - 1) % len(MIDDLE_TEXTS)],
@@ -159,7 +158,7 @@ def main():
     def latest_call(payload, *, mode):
         latest_calls.append(mode)
         if mode == "writer":
-            return latest_production_shape_writer(latest_item)
+            return latest_production_shape_writer(payload)
         # Even if the local model repeats the Korean keyword, deterministic
         # contract normalization must recover without weakening validation.
         return {
