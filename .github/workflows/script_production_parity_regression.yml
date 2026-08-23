@@ -6,7 +6,9 @@ on:
     paths:
       - "ci_script_production_parity_hotfix.py"
       - "ci_script_production_parity_bridge_hotfix.py"
+      - "ci_script_validation_recovery_hotfix.py"
       - "quality/script_production_parity_regression_test.py"
+      - "quality/script_opening_lock_regression_test.py"
       - ".github/workflows/script_production_parity_regression.yml"
       - ".github/workflows/main.yml"
 
@@ -25,3 +27,5 @@ jobs:
           AI_VISUAL_FALLBACK_ENABLED: "false"
           AI_MAX_GENERATIONS_PER_VIDEO: "1"
         run: python quality/script_production_parity_regression_test.py
+      - name: Run approved opening lock regression
+        run: python quality/script_opening_lock_regression_test.py
