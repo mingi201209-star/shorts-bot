@@ -1,0 +1,30 @@
+name: YouTube Upload Lineage Regression
+
+on:
+  pull_request:
+    paths:
+      - "analytics/youtube_upload.py"
+      - "analytics/publish_and_persist.py"
+      - "quality/youtube_upload_lineage_regression_test.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/youtube_upload_lineage_regression.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install requests
+      - name: Validate disabled-by-default upload and lineage persistence
+        run: |
+          python -m quality.youtube_upload_lineage_regression_test
+          ENABLE_YOUTUBE_UPLOAD=0 python -m analytics.publish_and_persist
+          python -m py_compile analytics/youtube_upload.py analytics/publish_and_persist.py
+      - name: Verify production workflow safety defaults
+        run: |
+          grep -n 'default: false' .github/workflows/main.yml
+          grep -n 'default: "private"' .github/workflows/main.yml
+          grep -n 'ENABLE_YOUTUBE_UPLOAD' .github/workflows/main.yml
