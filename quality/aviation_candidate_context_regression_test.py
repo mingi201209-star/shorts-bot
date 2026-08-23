@@ -10,12 +10,30 @@ workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
 
 required = (
     "SHORTS_CANDIDATE_SCOPE",
-    "[THIS RUN ONLY - AVIATION EXPLORATION CONTEXT]",
-    "서로 실질적으로 다른 후보를 최소 10개",
-    "Pexels/Pixabay",
-    "기존 novelty/중복 회피 기준은 그대로 적용한다",
+    "[THIS RUN ONLY - AVIATION CANDIDATE SUPPLY CONTEXT]",
+    "최소 10개의 서로 다른 grounded seed",
+    "[SEPARATION OF RESPONSIBILITIES]",
+    "[DO NOT SELF-WITHHOLD]",
+    "[BOUNDED RETRY DISCIPLINE]",
+    "Gate 기준을 낮추지 마라",
 )
 for item in required:
+    assert item in explorer, item
+
+# Generation must not self-withhold candidates for downstream editorial reasons.
+for item in (
+    "predictable payoff, weak payoff, novelty 부족 같은 편집적 판단 때문에 후보를 생성 단계에서 숨기거나 0개로 만들지 마라",
+    "실제 탈락 여부는 기존 Gate가 결정한다",
+    "후보가 Gate에서 약할 것 같다는 이유로 전체 Candidate pool을 비우고 재시도하지 마라",
+):
+    assert item in explorer, item
+
+# Hard structural / grounding exclusions remain explicit.
+for item in (
+    "placeholder / 빈 필드 / 추상적인 시스템명만 있는 항목",
+    "같은 질문·reveal·mechanism의 사실상 중복",
+    "실제 존재나 인과관계가 의심스러워 이야기를 발명해야 하는 항목",
+):
     assert item in explorer, item
 
 # Fixed topic mode returns before the optional automatic run scope is read.
@@ -43,4 +61,4 @@ assert positions == sorted(positions)
 assert "SHORTS_TOPIC: ${{ inputs.topic }}" in workflow
 assert "SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}" in workflow
 
-print("PASS: aviation run scope, >=10 exploration instruction, fixed topic preservation, hotfix chain")
+print("PASS: aviation candidate supply separated from editorial Gate self-filtering")
