@@ -84,7 +84,7 @@ def good_scenes():
         scene("비행 상태가 달라지면 들어오는 소음 특성도 달라집니다.", "비행 중 객실과 엔진 환경 변화", "aircraft cabin engine flight"),
         scene("제어기는 그 변화에 맞춰 출력을 조절합니다.", "오디오 제어기의 출력 조절", "audio controller output adjustment"),
         scene("스피커 출력도 계산된 변화에 맞춰 이어집니다.", "객실 스피커 출력 장면", "cabin speaker playback system"),
-        scene("마이크가 반복 소음을 감지하고 제어기가 계산한 대응 신호를 스피커가 재생하면서 목표 소음 성분이 줄어듭니다.", "소음 제어 단계가 이어지는 항공기 객실", "aircraft noise control sequence"),
+        scene("그래서 마이크가 반복 소음을 감지하고 제어기가 계산한 대응 신호를 스피커가 재생하면서 목표 소음 성분이 줄어듭니다.", "소음 제어 단계가 이어지는 항공기 객실", "aircraft noise control sequence"),
     ]
 
 
