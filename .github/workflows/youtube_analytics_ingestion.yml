@@ -28,7 +28,7 @@ jobs:
       - name: Validate read-only ingestion contract
         run: |
           python -m quality.youtube_analytics_ingestion_regression_test
-          python -m quality.feedback_contract_regression_test
+          python -m quality.analytics_feedback_contract_regression_test
           python -m quality.growth_candidate_shadow_regression_test
           python -m quality.winner_replication_regression_test
           python -m py_compile analytics/youtube_ingestion.py analytics/collect_youtube_performance.py
