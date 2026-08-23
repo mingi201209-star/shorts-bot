@@ -50,7 +50,8 @@ def _default_call(payload: Dict[str, Any], *, mode: str) -> Dict[str, Any]:
     authorize_call(MODEL)
     if mode == "writer":
         instruction = (
-            "Return JSON only. Write exactly target_scene_count Shorts scenes. "
+            "Return JSON only with top-level keys title and scenes. "
+            "Write exactly target_scene_count Shorts scenes. "
             "Each scene must contain text, visual_goal, and an English 2-7 word keyword. "
             "Keep locked_text exact. Use formal Korean narration (~습니다/~합니다; questions only ~까요?). "
             "Use easy language. Do not reveal the final answer before reveal/payoff."
@@ -72,6 +73,38 @@ def _default_call(payload: Dict[str, Any], *, mode: str) -> Dict[str, Any]:
     )
     record_usage(MODEL, response)
     return _extract_json(response.choices[0].message.content)
+
+
+def _normalize_writer_envelope(response: Dict[str, Any]) -> Dict[str, Any]:
+    """Accept harmless JSON envelope variants without another model call."""
+    if not isinstance(response, dict):
+        raise ValueError("Script Engine V2 writer response must be an object")
+    if isinstance(response.get("scenes"), list):
+        return response
+
+    for key in ("script", "result", "output"):
+        nested = response.get(key)
+        if isinstance(nested, dict) and isinstance(nested.get("scenes"), list):
+            normalized = deepcopy(nested)
+            if "title" not in normalized and isinstance(response.get("title"), str):
+                normalized["title"] = response["title"]
+            print(f"🧩 V2 writer envelope normalized without API: {key}")
+            return normalized
+
+    scenes = response.get("scenes")
+    if isinstance(scenes, dict):
+        def scene_sort_key(item):
+            raw = str(item[0])
+            match = re.search(r"(\d+)", raw)
+            return int(match.group(1)) if match else 10**6
+        ordered = [value for _, value in sorted(scenes.items(), key=scene_sort_key) if isinstance(value, dict)]
+        if ordered:
+            normalized = deepcopy(response)
+            normalized["scenes"] = ordered
+            print("🧩 V2 writer scene-map normalized without API")
+            return normalized
+
+    raise ValueError("script.scenes must be a list")
 
 
 def _apply_local_repairs(script: Dict[str, Any], response: Dict[str, Any], allowed_indexes: set[int]) -> Dict[str, Any]:
@@ -107,7 +140,8 @@ def _question_hook_to_observation(text: Any) -> str:
     intentionally supports a small, deterministic set of endings; anything
     outside that set is left unchanged so build_narrative_plan can fail closed.
     """
-    value = str(text or "").strip()
+    original = str(text or "").strip()
+    value = original
     if not value:
         return value
     if "?" not in value and not value.startswith(("왜 ", "그런데 왜 ")):
@@ -116,6 +150,10 @@ def _question_hook_to_observation(text: Any) -> str:
     value = re.sub(r"^그런데\s+", "", value)
     value = re.sub(r"^왜\s+", "", value)
     value = value.rstrip().rstrip("?").strip()
+    # Fixed-topic Candidate hooks often preserve the why-marker mid-sentence:
+    # "윙렛은 왜 위로 꺾여 있을까?". Remove that single question marker only
+    # after we have established that this is a question-form hook.
+    value = re.sub(r"\s+왜\s+", " ", value, count=1)
 
     replacements = (
         (r"있을까요$", "있습니다"),
@@ -131,7 +169,7 @@ def _question_hook_to_observation(text: Any) -> str:
         converted, count = re.subn(pattern, replacement, value)
         if count:
             return converted.rstrip(".") + "."
-    return str(text or "").strip()
+    return original
 
 
 def _normalize_candidate_opening(candidate: Dict[str, Any], approved_hook: str) -> tuple[Dict[str, Any], str]:
@@ -171,6 +209,7 @@ def generate_script_v2(
     if call_count > MAX_SCRIPT_API_CALLS:
         raise RuntimeError("Script Engine V2 call budget exceeded")
 
+    generated = _normalize_writer_envelope(generated)
     script = apply_locked_scenes(generated, plan)
     validation = validate_script_v2(script, plan)
     if validation["valid"]:
