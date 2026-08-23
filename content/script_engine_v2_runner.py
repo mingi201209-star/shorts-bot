@@ -53,6 +53,7 @@ def _default_call(payload: Dict[str, Any], *, mode: str) -> Dict[str, Any]:
             "Return JSON only with top-level keys title and scenes. "
             "Write exactly target_scene_count Shorts scenes. "
             "Each scene must contain text, visual_goal, and an English 2-7 word keyword. "
+            "For EVERY scene, keyword must use ASCII English words only. "
             "Keep locked_text exact. Use formal Korean narration (~습니다/~합니다; questions only ~까요?). "
             "Use easy language. Do not reveal the final answer before reveal/payoff."
         )
@@ -60,7 +61,8 @@ def _default_call(payload: Dict[str, Any], *, mode: str) -> Dict[str, Any]:
         instruction = (
             "Return JSON only as {\"repairs\":[...]}. Repair ONLY the listed target scenes. "
             "Each repair must include scene_index and only fields that need changing. "
-            "Use formal Korean and preserve all factual scope."
+            "For locked scenes, NEVER change text; visual_goal and keyword may be repaired. "
+            "Every keyword must be 2-7 ASCII English words. Use formal Korean and preserve factual scope."
         )
     response = openai.chat.completions.create(
         model=MODEL,
@@ -75,47 +77,106 @@ def _default_call(payload: Dict[str, Any], *, mode: str) -> Dict[str, Any]:
     return _extract_json(response.choices[0].message.content)
 
 
+def _normalize_scene_fields(scene: Dict[str, Any]) -> Dict[str, Any]:
+    """Map harmless writer field aliases without spending another model call."""
+    result = deepcopy(scene)
+
+    if not str(result.get("text", "")).strip():
+        for key in ("narration", "narration_text", "voiceover", "script", "line", "sentence"):
+            value = result.get(key)
+            if isinstance(value, str) and value.strip():
+                result["text"] = value.strip()
+                break
+
+    if len(str(result.get("visual_goal", "")).strip()) < 8:
+        for key in ("visual", "visual_description", "scene_description", "visual_prompt", "shot"):
+            value = result.get(key)
+            if isinstance(value, str) and value.strip():
+                result["visual_goal"] = value.strip()
+                break
+
+    keyword = result.get("keyword")
+    if isinstance(keyword, list):
+        keyword = " ".join(str(item).strip() for item in keyword if str(item).strip())
+        result["keyword"] = keyword
+    if not str(result.get("keyword", "")).strip():
+        for key in ("keywords", "search_keyword", "search_query", "query"):
+            value = result.get(key)
+            if isinstance(value, list):
+                value = " ".join(str(item).strip() for item in value if str(item).strip())
+            if isinstance(value, str) and value.strip():
+                result["keyword"] = value.strip()
+                break
+
+    return result
+
+
 def _normalize_writer_envelope(response: Dict[str, Any]) -> Dict[str, Any]:
-    """Accept harmless JSON envelope variants without another model call."""
+    """Accept harmless JSON envelope/field variants without another model call."""
     if not isinstance(response, dict):
         raise ValueError("Script Engine V2 writer response must be an object")
-    if isinstance(response.get("scenes"), list):
-        return response
 
-    for key in ("script", "result", "output"):
-        nested = response.get(key)
-        if isinstance(nested, dict) and isinstance(nested.get("scenes"), list):
-            normalized = deepcopy(nested)
-            if "title" not in normalized and isinstance(response.get("title"), str):
-                normalized["title"] = response["title"]
-            print(f"🧩 V2 writer envelope normalized without API: {key}")
-            return normalized
+    normalized = response
+    if not isinstance(response.get("scenes"), list):
+        found = None
+        for key in ("script", "result", "output"):
+            nested = response.get(key)
+            if isinstance(nested, dict) and isinstance(nested.get("scenes"), list):
+                found = deepcopy(nested)
+                if "title" not in found and isinstance(response.get("title"), str):
+                    found["title"] = response["title"]
+                print(f"🧩 V2 writer envelope normalized without API: {key}")
+                break
+        if found is None:
+            scenes = response.get("scenes")
+            if isinstance(scenes, dict):
+                def scene_sort_key(item):
+                    raw = str(item[0])
+                    match = re.search(r"(\d+)", raw)
+                    return int(match.group(1)) if match else 10**6
+                ordered = [value for _, value in sorted(scenes.items(), key=scene_sort_key) if isinstance(value, dict)]
+                if ordered:
+                    found = deepcopy(response)
+                    found["scenes"] = ordered
+                    print("🧩 V2 writer scene-map normalized without API")
+        if found is None:
+            raise ValueError("script.scenes must be a list")
+        normalized = found
 
-    scenes = response.get("scenes")
-    if isinstance(scenes, dict):
-        def scene_sort_key(item):
-            raw = str(item[0])
-            match = re.search(r"(\d+)", raw)
-            return int(match.group(1)) if match else 10**6
-        ordered = [value for _, value in sorted(scenes.items(), key=scene_sort_key) if isinstance(value, dict)]
-        if ordered:
-            normalized = deepcopy(response)
-            normalized["scenes"] = ordered
-            print("🧩 V2 writer scene-map normalized without API")
-            return normalized
-
-    raise ValueError("script.scenes must be a list")
+    result = deepcopy(normalized)
+    result["scenes"] = [
+        _normalize_scene_fields(scene) if isinstance(scene, dict) else scene
+        for scene in result.get("scenes", [])
+    ]
+    return result
 
 
-def _apply_local_repairs(script: Dict[str, Any], response: Dict[str, Any], allowed_indexes: set[int]) -> Dict[str, Any]:
+def _normalize_repair_item(item: Dict[str, Any]) -> Dict[str, Any]:
+    """Apply the same harmless field alias normalization to local repairs."""
+    result = _normalize_scene_fields(item)
+    if "scene_index" not in result:
+        for key in ("index", "scene", "scene_number"):
+            if key in result:
+                result["scene_index"] = result[key]
+                break
+    return result
+
+
+def _apply_local_repairs(
+    script: Dict[str, Any],
+    response: Dict[str, Any],
+    allowed_indexes: set[int],
+    locked_text_indexes: set[int],
+) -> Dict[str, Any]:
     result = deepcopy(script)
     scenes = result.get("scenes") or []
     repairs = response.get("repairs") or []
     if not isinstance(repairs, list):
         raise ValueError("local repair response repairs must be a list")
-    for item in repairs:
-        if not isinstance(item, dict):
+    for raw_item in repairs:
+        if not isinstance(raw_item, dict):
             continue
+        item = _normalize_repair_item(raw_item)
         try:
             scene_index = int(item.get("scene_index"))
         except Exception:
@@ -126,6 +187,8 @@ def _apply_local_repairs(script: Dict[str, Any], response: Dict[str, Any], allow
         if index < 0 or index >= len(scenes) or not isinstance(scenes[index], dict):
             continue
         for field in ("text", "visual_goal", "keyword"):
+            if field == "text" and scene_index in locked_text_indexes:
+                continue
             value = item.get(field)
             if isinstance(value, str) and value.strip():
                 scenes[index][field] = value.strip()
@@ -134,12 +197,7 @@ def _apply_local_repairs(script: Dict[str, Any], response: Dict[str, Any], allow
 
 
 def _question_hook_to_observation(text: Any) -> str:
-    """Convert only simple Korean why-questions into a fact-neutral observation.
-
-    This is a zero-API boundary repair for Candidate micro_narrative hooks. It
-    intentionally supports a small, deterministic set of endings; anything
-    outside that set is left unchanged so build_narrative_plan can fail closed.
-    """
+    """Convert a simple Korean why-question into a fact-neutral observation."""
     original = str(text or "").strip()
     value = original
     if not value:
@@ -150,9 +208,6 @@ def _question_hook_to_observation(text: Any) -> str:
     value = re.sub(r"^그런데\s+", "", value)
     value = re.sub(r"^왜\s+", "", value)
     value = value.rstrip().rstrip("?").strip()
-    # Fixed-topic Candidate hooks often preserve the why-marker mid-sentence:
-    # "윙렛은 왜 위로 꺾여 있을까?". Remove that single question marker only
-    # after we have established that this is a question-form hook.
     value = re.sub(r"\s+왜\s+", " ", value, count=1)
 
     replacements = (
@@ -226,13 +281,18 @@ def generate_script_v2(
         indexes = validation["failed_scene_indexes"]
         payload = local_repair_payload(script, plan, indexes, validation["reasons"])
         allowed = {int(item["scene_index"]) for item in payload["targets"]}
+        locked_text_indexes = {
+            int(item["scene_index"])
+            for item in payload["targets"]
+            if item.get("text_locked")
+        }
         if not allowed:
             break
         response = caller(payload, mode="local_repair")
         call_count += 1
         if call_count > MAX_SCRIPT_API_CALLS:
             raise RuntimeError("Script Engine V2 call budget exceeded")
-        script = _apply_local_repairs(script, response, allowed)
+        script = _apply_local_repairs(script, response, allowed, locked_text_indexes)
         script = apply_locked_scenes(script, plan)
         script = repair_failed_scenes(script, plan, list(allowed))
         validation = validate_script_v2(script, plan)
