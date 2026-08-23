@@ -2,15 +2,21 @@ from pathlib import Path
 import runpy
 
 
+# Apply the narrow deterministic repair before speech validation is injected.
+# This prevents a single safe 하다-style ending from forcing a full Script retry.
+runpy.run_path("ci_script_local_formal_repair_hotfix.py", run_name="__main__")
+
+
 # ============================================================
 # Script Generator: sentence-level deterministic validation
 # ============================================================
 script_path = Path("content/script_generator.py")
 script_source = script_path.read_text(encoding="utf-8")
 
-script_import_marker = "import openai\n\nfrom config import (\n"
+# Local formal repair may already have inserted validate_korean_speech_text
+# between openai and config. Anchor on config instead of the fragile full block.
+script_import_marker = "from config import (\n"
 script_import_replacement = (
-    "import openai\n\n"
     "from quality.korean_speech_style import validate_scenes_speech_style\n\n"
     "from config import (\n"
 )
