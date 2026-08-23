@@ -7,15 +7,15 @@ specific factual follow-up topic.
 
 from collections import defaultdict
 from copy import deepcopy
-import math
 import re
 
 from analytics.feedback_contract import normalize_video_lineage
 
 WINNER_REPLICATION_VERSION = 1
 MIN_PROMOTION_SAMPLE = 3
+STRONG_RELATIVE_SCORE = 0.55
+WEAK_RELATIVE_SCORE = 0.45
 STATES = frozenset({"exploration", "challenger", "winner", "series_candidate", "retired"})
-_TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]{2,}")
 
 
 def _clean(value):
@@ -167,8 +167,8 @@ def _group_summary(rows):
     summaries = {}
     for key, group in grouped.items():
         mature = [row for row in group if row["window"] and row["performance_score"] is not None]
-        strong = [row for row in mature if row["performance_score"] >= 0.60]
-        weak = [row for row in mature if row["performance_score"] <= 0.40]
+        strong = [row for row in mature if row["performance_score"] >= STRONG_RELATIVE_SCORE]
+        weak = [row for row in mature if row["performance_score"] <= WEAK_RELATIVE_SCORE]
         subscriber_known = [
             row for row in mature
             if isinstance((row["snapshot"] or {}).get("subscriber_gain"), (int, float))
@@ -218,7 +218,7 @@ def classify_history(history):
             state = "exploration"
         elif group["state"] in ("winner", "series_candidate", "retired"):
             state = group["state"]
-        elif row["performance_score"] >= 0.60:
+        elif row["performance_score"] >= STRONG_RELATIVE_SCORE:
             state = "challenger"
         else:
             state = "exploration"
@@ -232,6 +232,7 @@ def classify_history(history):
     return {
         "version": WINNER_REPLICATION_VERSION,
         "minimum_promotion_sample": MIN_PROMOTION_SAMPLE,
+        "relative_score_bands": {"strong_min": STRONG_RELATIVE_SCORE, "weak_max": WEAK_RELATIVE_SCORE},
         "records": records,
         "patterns": summaries,
     }
