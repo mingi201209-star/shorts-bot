@@ -40,6 +40,33 @@ def _micro(candidate: Dict[str, Any]) -> Dict[str, Any]:
     return value
 
 
+def _normalize_locked_narration(text: Any, role: str) -> str:
+    """Keep locked meaning while enforcing the production speech contract."""
+    value = _text(text)
+    if not value:
+        return value
+
+    if role == "question":
+        value = value.rstrip().rstrip(".?!")
+        replacements = (
+            (r"있을까$", "있을까요"),
+            (r"할까$", "할까요"),
+            (r"될까$", "될까요"),
+            (r"일까$", "일까요"),
+            (r"일까요$", "일까요"),
+            (r"있을까요$", "있을까요"),
+            (r"할까요$", "할까요"),
+            (r"될까요$", "될까요"),
+        )
+        for pattern, replacement in replacements:
+            converted, count = re.subn(pattern, replacement, value)
+            if count:
+                return converted + "?"
+        return value + "?"
+
+    return deterministic_scene_repair(value, role)
+
+
 def _concept_window(concepts: tuple[str, ...], start: int, width: int = 2) -> tuple[str, ...]:
     if not concepts:
         return ()
@@ -72,10 +99,12 @@ def build_narrative_plan(candidate: Dict[str, Any], approved_hook: str = "") -> 
     if "?" in hook or hook.endswith(("까요", "나요", "어요", "예요")):
         raise ValueError("scene 1 hook must be an observable statement, not a question")
 
+    hook = _normalize_locked_narration(hook, "phenomenon")
     if not question.startswith("그런데"):
         question = "그런데 " + question
-    if "?" not in question:
-        question = question.rstrip(".") + "?"
+    question = _normalize_locked_narration(question, "question")
+    reveal = _normalize_locked_narration(reveal, "reveal")
+    payoff = _normalize_locked_narration(payoff, "payoff")
 
     focus = [_text(x) for x in candidate.get("fact_check_focus", []) if _text(x)]
     visual = [_text(x) for x in candidate.get("visual_proof", []) if _text(x)]
@@ -135,7 +164,9 @@ def apply_locked_scenes(script: Dict[str, Any], plan: Dict[str, Any]) -> Dict[st
         if index < 3:
             scene["retention_role"] = contract["role"]
         if contract.get("locked"):
-            scene["text"] = contract["locked_text"]
+            scene["text"] = _normalize_locked_narration(
+                contract["locked_text"], contract.get("role", "")
+            )
 
     result["scenes"] = scenes
     result["script_engine"] = "v2"
@@ -167,6 +198,9 @@ _ENDING_REPAIRS = (
     (r"감소시킨다(?=[.!?…]*$)", "감소시킵니다"),
     (r"줄인다(?=[.!?…]*$)", "줄입니다"),
     (r"감소한다(?=[.!?…]*$)", "감소합니다"),
+    (r"향상된다(?=[.!?…]*$)", "향상됩니다"),
+    (r"발생한다(?=[.!?…]*$)", "발생합니다"),
+    (r"만든다(?=[.!?…]*$)", "만듭니다"),
     (r"한다(?=[.!?…]*$)", "합니다"),
     (r"된다(?=[.!?…]*$)", "됩니다"),
     (r"이다(?=[.!?…]*$)", "입니다"),
@@ -191,7 +225,7 @@ def repair_failed_scenes(
     plan: Dict[str, Any],
     failed_scene_indexes: list[int],
 ) -> Dict[str, Any]:
-    """Repair only failed unlocked scenes; never regenerate Candidate or whole Script."""
+    """Repair only failed narration; locked text remains immutable."""
     result = deepcopy(script)
     scenes = result.get("scenes") or []
     contracts = plan.get("contracts") or []
@@ -199,14 +233,19 @@ def repair_failed_scenes(
 
     for scene_index in failed_scene_indexes:
         contract = by_index.get(int(scene_index))
-        if not contract or contract.get("locked"):
+        if not contract:
             continue
         index = int(scene_index) - 1
         if index < 0 or index >= len(scenes) or not isinstance(scenes[index], dict):
             continue
-        scenes[index]["text"] = deterministic_scene_repair(
-            scenes[index].get("text", ""), contract.get("role", "")
-        )
+        if contract.get("locked"):
+            scenes[index]["text"] = _normalize_locked_narration(
+                contract.get("locked_text", ""), contract.get("role", "")
+            )
+        else:
+            scenes[index]["text"] = deterministic_scene_repair(
+                scenes[index].get("text", ""), contract.get("role", "")
+            )
         scenes[index]["role"] = contract.get("role", "")
 
     result["scenes"] = scenes
@@ -219,6 +258,7 @@ def local_repair_payload(
     failed_scene_indexes: list[int],
     reasons: list[str],
 ) -> Dict[str, Any]:
+    """Allow metadata repair on locked scenes while keeping locked narration immutable."""
     contracts = {int(item["index"]): item for item in plan.get("contracts") or []}
     scenes = script.get("scenes") or []
     targets = []
@@ -227,7 +267,6 @@ def local_repair_payload(
         index = int(scene_index) - 1
         if (
             contract
-            and not contract.get("locked")
             and 0 <= index < len(scenes)
             and isinstance(scenes[index], dict)
         ):
@@ -236,6 +275,10 @@ def local_repair_payload(
                 "role": contract.get("role"),
                 "required_concepts": contract.get("required_concepts") or [],
                 "current_text": _text(scenes[index].get("text")),
+                "text_locked": bool(contract.get("locked")),
+                "locked_text": _text(contract.get("locked_text")) if contract.get("locked") else "",
+                "current_visual_goal": _text(scenes[index].get("visual_goal")),
+                "current_keyword": _text(scenes[index].get("keyword")),
             })
     return {
         "targets": targets,
@@ -245,6 +288,8 @@ def local_repair_payload(
             "formal_korean": True,
             "easy_language": True,
             "do_not_rewrite_other_scenes": True,
+            "locked_scene_text_is_immutable": True,
+            "metadata_on_locked_scenes_may_be_repaired": True,
             "max_local_repair_calls": MAX_LOCAL_REPAIR_CALLS,
         },
     }
