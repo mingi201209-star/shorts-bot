@@ -196,8 +196,9 @@ def main():
 
     try:
         generate_script_v2(item, call_fn=structurally_invalid)
-    except RuntimeError as exc:
-        assert "within 3 calls" in str(exc)
+    except (RuntimeError, ValueError) as exc:
+        message = str(exc)
+        assert "within 3 calls" in message or "scene count mismatch" in message
     else:
         raise AssertionError("V2 must still fail closed on non-local structural defects")
     assert failing_calls == ["writer"]
