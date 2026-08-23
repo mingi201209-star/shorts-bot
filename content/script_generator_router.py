@@ -100,12 +100,17 @@ def _normalize_locked_candidate_narration(candidate):
     normalized_micro = dict(micro)
     changed = []
 
-    question_source = str(normalized_micro.get("core_question") or result.get("core_question") or "").strip()
-    question = _formal_question(question_source)
-    if question and question != question_source:
-        normalized_micro["core_question"] = question
-        result["core_question"] = question
-        changed.append("question")
+    top_question_source = str(result.get("core_question", "")).strip()
+    top_question = _formal_question(top_question_source)
+    if top_question and top_question != top_question_source:
+        result["core_question"] = top_question
+        changed.append("core_question")
+
+    micro_question_source = str(normalized_micro.get("core_question", "")).strip()
+    micro_question = _formal_question(micro_question_source)
+    if micro_question and micro_question != micro_question_source:
+        normalized_micro["core_question"] = micro_question
+        changed.append("scene2_question")
 
     for key in ("reveal", "payoff"):
         source = str(normalized_micro.get(key, "")).strip()
