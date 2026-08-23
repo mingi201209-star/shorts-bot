@@ -25,26 +25,38 @@ def candidate():
 def main():
     item = candidate()
     plan = build_narrative_plan(item)
+    contracts = plan["contracts"]
+    count = plan["target_scene_count"]
+
     assert plan["api_call_budget"] == 3 == MAX_SCRIPT_API_CALLS
-    assert [c["role"] for c in plan["contracts"]] == [
-        "phenomenon", "question", "causal_clue", "mechanism_1",
-        "mechanism_2", "consequence", "reveal", "payoff",
+    assert 7 <= count <= 13
+    assert len(contracts) == count
+    assert [c["role"] for c in contracts[:3]] == [
+        "phenomenon", "question", "causal_clue"
     ]
-    assert plan["contracts"][0]["locked_text"].endswith("있습니다.")
-    assert "?" in plan["contracts"][1]["locked_text"]
-    assert plan["contracts"][6]["locked"] is True
-    assert plan["contracts"][7]["locked"] is True
+    assert contracts[-2]["role"] == "reveal"
+    assert contracts[-1]["role"] == "payoff"
+    assert contracts[0]["locked_text"].endswith("있습니다.")
+    assert contracts[1]["locked_text"].startswith("그런데")
+    assert contracts[-2]["locked"] is True
+    assert contracts[-1]["locked"] is True
 
     payload = writer_payload(item, plan)
     assert payload["rules"]["do_not_change_locked_text"] is True
     assert payload["rules"]["max_total_api_calls"] == 3
+    assert payload["target_scene_count"] == count
 
-    generated = {"scenes": [{"text": f"writer scene {i}"} for i in range(1, 9)]}
+    generated = {
+        "scenes": [
+            {"text": f"writer scene {i}"}
+            for i in range(1, count + 1)
+        ]
+    }
     locked = apply_locked_scenes(generated, plan)
     assert locked["scenes"][0]["text"] == item["micro_narrative"]["hook"]
-    assert locked["scenes"][1]["text"] == item["core_question"]
-    assert locked["scenes"][6]["text"] == item["micro_narrative"]["reveal"]
-    assert locked["scenes"][7]["text"] == item["micro_narrative"]["payoff"]
+    assert locked["scenes"][1]["text"].startswith("그런데")
+    assert locked["scenes"][-2]["text"] == item["micro_narrative"]["reveal"]
+    assert locked["scenes"][-1]["text"] == item["micro_narrative"]["payoff"]
     assert locked["scenes"][2]["text"] == "writer scene 3"
 
     bad = candidate()
@@ -56,7 +68,7 @@ def main():
     else:
         raise AssertionError("question Hook must be rejected before writer call")
 
-    print("PASS: Script Engine V2 deterministic narrative plan")
+    print("PASS: Script Engine V2 adaptive deterministic narrative plan")
 
 
 if __name__ == "__main__":
