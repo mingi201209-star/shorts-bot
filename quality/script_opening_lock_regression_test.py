@@ -14,6 +14,7 @@ subprocess.run(
 )
 
 from content import script_generator as sg
+legacy = getattr(sg, "_LEGACY", sg)
 
 
 def candidate():
@@ -47,7 +48,8 @@ payload = {
     ],
 }
 
-locked = sg._script_opening_lock_apply(payload, sg.validate_candidate(candidate()))
+cleaned_candidate = legacy.validate_candidate(candidate())
+locked = legacy._script_opening_lock_apply(payload, cleaned_candidate)
 
 # 1/2: LLM cannot replace the approved opening narration.
 assert locked["scenes"][0]["text"] == "비행기 날개 끝이 위로 꺾여 있습니다."
@@ -65,7 +67,7 @@ assert locked["scenes"][4]["text"] == "직접 볼 수 있습니다."
 # 4: non-whitelisted wording remains untouched so existing validators still
 # fail closed instead of silently changing facts/meaning.
 unrepairable = {"title": "fixture", "scenes": [scene("x"), scene("y"), scene("정말 놀라워요.")]}
-result = sg._script_opening_lock_apply(unrepairable, sg.validate_candidate(candidate()))
+result = legacy._script_opening_lock_apply(unrepairable, cleaned_candidate)
 assert result["scenes"][2]["text"] == "정말 놀라워요."
 
 print("✅ Script opening lock regression PASS")
