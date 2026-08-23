@@ -8,6 +8,7 @@ on:
       - "content/script_engine_v2_validation.py"
       - "content/script_generator_router.py"
       - "quality/script_engine_v2_*"
+      - "quality/script_generator_router_regression_test.py"
       - ".github/workflows/script_engine_v2_regression.yml"
   workflow_dispatch:
 
@@ -31,9 +32,11 @@ jobs:
             content/script_engine_v2.py \
             content/script_engine_v2_runner.py \
             content/script_engine_v2_validation.py \
+            content/script_generator_router.py \
             quality/script_engine_v2_regression_test.py \
             quality/script_engine_v2_failure_fixtures_test.py \
-            quality/script_engine_v2_runner_regression_test.py
+            quality/script_engine_v2_runner_regression_test.py \
+            quality/script_generator_router_regression_test.py
 
       - name: Deterministic narrative plan regression
         run: python -m quality.script_engine_v2_regression_test
@@ -43,6 +46,9 @@ jobs:
 
       - name: Bounded writer orchestration
         run: python -m quality.script_engine_v2_runner_regression_test
+
+      - name: Legacy-safe router regression
+        run: python -m quality.script_generator_router_regression_test
 
       - name: Enforce Script API ceiling
         run: |
