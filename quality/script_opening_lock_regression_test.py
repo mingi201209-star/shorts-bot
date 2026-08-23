@@ -41,7 +41,7 @@ payload = {
     "scenes": [
         scene("LLM이 첫 문장을 질문으로 바꿨나요?"),
         scene("왜 필요한지 지금 알려드려요."),
-        scene("날개 끝에서는 공기가 돌아가는데요."),
+        scene("날개 끝에서는 소용돌이가 생기는데요."),
         scene("그 흐름 때문에 저항이 생기죠."),
         scene("직접 보세요."),
     ],
@@ -58,7 +58,7 @@ assert locked["scenes"][0]["visual_goal"] == "항공기 날개 끝 구조"
 assert locked["scenes"][0]["keyword"] == "airplane winglet close up"
 
 # 3: whitelisted style-only repairs happen without another LLM call.
-assert locked["scenes"][2]["text"] == "날개 끝에서는 공기가 돌아갑니다."
+assert locked["scenes"][2]["text"] == "날개 끝에서는 소용돌이가 생깁니다."
 assert locked["scenes"][3]["text"] == "그 흐름 때문에 저항이 생깁니다."
 assert locked["scenes"][4]["text"] == "직접 볼 수 있습니다."
 
