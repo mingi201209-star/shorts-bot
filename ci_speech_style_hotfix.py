@@ -60,6 +60,7 @@ hook_path.write_text(hook_source, encoding="utf-8")
 # Downstream Hook generation hotfix: keep generation and validation contracts
 # aligned. ci_hook_generation_hotfix.py runs AFTER this file in production, so
 # patch its prompt source now to prevent it from reintroducing 해요체 examples.
+# Preserve legacy marker sentences that later hotfixes search for exactly.
 # ============================================================
 hook_generation_hotfix_path = Path("ci_hook_generation_hotfix.py")
 if hook_generation_hotfix_path.exists():
@@ -71,10 +72,10 @@ if hook_generation_hotfix_path.exists():
         "- 해요체인 ~요/~해요/~돼요/~이에요/~예요/~죠/~세요는 사용하지 않는다. 자연스러운 질문형 ~까요?만 예외로 허용한다.\n"
         "- 반말/해라체 종결인 ~다, ~한다, ~했다, ~이다도 사용하지 않는다.\n",
     )
-    generation_source = generation_source.replace(
-        "길이 탈락이면 13~15자 목표를 우선하고, speech_style_failure면 반드시 존댓말 종결을 사용한다.\n",
-        "길이 탈락이면 13~15자 목표를 우선하고, speech_style_failure면 반드시 ~습니다/~입니다 계열 격식체로 고친다. 해요체로 고치지 않는다.\n",
-    )
+    legacy_feedback = "길이 탈락이면 13~15자 목표를 우선하고, speech_style_failure면 반드시 존댓말 종결을 사용한다.\n"
+    formal_feedback = legacy_feedback + "- 추가 문체 계약: speech_style_failure를 고칠 때 해요체를 쓰지 말고 반드시 ~습니다/~입니다/~합니다/~있습니다 계열 격식체로 고친다. 질문은 ~까요?만 허용한다.\n"
+    if formal_feedback not in generation_source:
+        generation_source = generation_source.replace(legacy_feedback, formal_feedback)
     generation_source = generation_source.replace(
         '"text": "한국어 존댓말 Hook 한 문장",',
         '"text": "한국어 격식체 Hook 한 문장",',
