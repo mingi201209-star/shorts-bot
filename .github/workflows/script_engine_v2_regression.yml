@@ -7,6 +7,7 @@ on:
       - "content/script_engine_v2_runner.py"
       - "content/script_engine_v2_validation.py"
       - "content/script_generator_router.py"
+      - "ci_script_v2_visual_goal_hotfix.py"
       - "quality/script_engine_v2_*"
       - "quality/script_generator_router_regression_test.py"
       - ".github/workflows/script_engine_v2_regression.yml"
@@ -26,9 +27,13 @@ jobs:
       - name: Install minimal dependencies
         run: python -m pip install openai
 
+      - name: Apply V2 production hotfixes
+        run: python ci_script_v2_visual_goal_hotfix.py
+
       - name: Compile V2 modules
         run: |
           python -m py_compile \
+            ci_script_v2_visual_goal_hotfix.py \
             content/script_engine_v2.py \
             content/script_engine_v2_runner.py \
             content/script_engine_v2_validation.py \
