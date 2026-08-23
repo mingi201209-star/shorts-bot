@@ -111,6 +111,130 @@ def _normalize_scene_fields(scene: Dict[str, Any]) -> Dict[str, Any]:
     return result
 
 
+def _ascii_keyword_words(value: Any) -> list[str]:
+    words = re.findall(r"[A-Za-z][A-Za-z0-9-]*", str(value or ""))
+    result = []
+    seen = set()
+    for word in words:
+        lowered = word.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        result.append(lowered)
+    return result
+
+
+def _keyword_contract_ok(value: Any) -> bool:
+    words = str(value or "").strip().split()
+    return 2 <= len(words) <= 7 and bool(re.search(r"[A-Za-z]", str(value or "")))
+
+
+_FORMAL_ENDING_REPAIRS = (
+    (r"줄어든다(?=[.!?…]*$)", "줄어듭니다"),
+    (r"늘어난다(?=[.!?…]*$)", "늘어납니다"),
+    (r"약해진다(?=[.!?…]*$)", "약해집니다"),
+    (r"강해진다(?=[.!?…]*$)", "강해집니다"),
+    (r"달라진다(?=[.!?…]*$)", "달라집니다"),
+    (r"좋아진다(?=[.!?…]*$)", "좋아집니다"),
+)
+
+
+def _formalize_common_ending(text: Any) -> str:
+    value = str(text or "").strip()
+    for pattern, replacement in _FORMAL_ENDING_REPAIRS:
+        value = re.sub(pattern, replacement, value)
+    return value
+
+
+def _deterministic_keyword(scene: Dict[str, Any], contract: Dict[str, Any], plan: Dict[str, Any], index: int) -> str:
+    """Project failed keyword metadata into a bounded English search phrase."""
+    current = str(scene.get("keyword", "")).strip()
+    if _keyword_contract_ok(current):
+        return current
+
+    sources = [
+        scene.get("visual_goal", ""),
+        " ".join(str(item) for item in contract.get("required_concepts") or []),
+    ]
+    extracted = []
+    for source in sources:
+        for word in _ascii_keyword_words(source):
+            if word not in extracted:
+                extracted.append(word)
+            if len(extracted) >= 6:
+                break
+        if len(extracted) >= 2:
+            break
+    if len(extracted) >= 2:
+        return " ".join(extracted[:7])
+
+    semantic_text = " ".join(
+        str(value or "")
+        for value in (
+            current,
+            scene.get("visual_goal", ""),
+            " ".join(str(item) for item in contract.get("required_concepts") or []),
+            plan.get("topic", ""),
+            plan.get("angle", ""),
+        )
+    )
+    hints = []
+    for korean, english in (
+        ("윙렛", "winglet"),
+        ("날개", "aircraft wing"),
+        ("소용돌이", "wingtip vortex"),
+        ("공기", "airflow"),
+        ("압력", "pressure"),
+        ("유도항력", "induced drag"),
+        ("항력", "drag"),
+        ("연료", "fuel efficiency"),
+    ):
+        if korean in semantic_text:
+            for word in english.split():
+                if word not in hints:
+                    hints.append(word)
+        if len(hints) >= 4:
+            break
+
+    if not hints:
+        hints = ["aircraft", "wing", "mechanism"]
+    while len(hints) < 2:
+        hints.append("detail")
+    return " ".join((hints[:5] + ["stage", str(index)])[:7])
+
+
+def _normalize_script_contracts_without_api(script: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
+    """Repair deterministic contract-only defects before spending local repair calls."""
+    result = deepcopy(script)
+    scenes = result.get("scenes") or []
+    contracts = plan.get("contracts") or []
+    if len(scenes) != len(contracts):
+        return result
+
+    changed_keywords = 0
+    changed_endings = 0
+    for index, (scene, contract) in enumerate(zip(scenes, contracts), start=1):
+        if not isinstance(scene, dict) or not isinstance(contract, dict):
+            continue
+        before_keyword = str(scene.get("keyword", "")).strip()
+        scene["keyword"] = _deterministic_keyword(scene, contract, plan, index)
+        if scene["keyword"] != before_keyword:
+            changed_keywords += 1
+        if not contract.get("locked"):
+            before_text = str(scene.get("text", "")).strip()
+            scene["text"] = _formalize_common_ending(before_text)
+            if scene["text"] != before_text:
+                changed_endings += 1
+
+    if changed_keywords or changed_endings:
+        print(
+            "🧩 V2 deterministic contract normalization without API: "
+            f"keywords={changed_keywords} endings={changed_endings}"
+        )
+    result["scenes"] = scenes
+    return result
+
+
 def _normalize_writer_envelope(response: Dict[str, Any]) -> Dict[str, Any]:
     """Accept harmless JSON envelope/field variants without another model call."""
     if not isinstance(response, dict):
@@ -205,6 +329,14 @@ def _question_hook_to_observation(text: Any) -> str:
     if "?" not in value and not value.startswith(("왜 ", "그런데 왜 ")):
         return value
 
+    reason_tail = re.search(r",?\s*그\s*이유는\s*무엇(?:일까|일까요)\??$", value)
+    if reason_tail:
+        value = value[:reason_tail.start()].rstrip(" ,")
+        value = re.sub(r"있지만$", "있습니다", value)
+        value = re.sub(r"보이지만$", "보입니다", value)
+        if value and value != original:
+            return value.rstrip(".") + "."
+
     value = re.sub(r"^그런데\s+", "", value)
     value = re.sub(r"^왜\s+", "", value)
     value = value.rstrip().rstrip("?").strip()
@@ -266,12 +398,14 @@ def generate_script_v2(
 
     generated = _normalize_writer_envelope(generated)
     script = apply_locked_scenes(generated, plan)
+    script = _normalize_script_contracts_without_api(script, plan)
     validation = validate_script_v2(script, plan)
     if validation["valid"]:
         script["script_engine_v2_calls"] = call_count
         return script
 
     script = repair_failed_scenes(script, plan, validation["failed_scene_indexes"])
+    script = _normalize_script_contracts_without_api(script, plan)
     validation = validate_script_v2(script, plan)
     if validation["valid"]:
         script["script_engine_v2_calls"] = call_count
@@ -295,6 +429,7 @@ def generate_script_v2(
         script = _apply_local_repairs(script, response, allowed, locked_text_indexes)
         script = apply_locked_scenes(script, plan)
         script = repair_failed_scenes(script, plan, list(allowed))
+        script = _normalize_script_contracts_without_api(script, plan)
         validation = validate_script_v2(script, plan)
         if validation["valid"]:
             script["script_engine_v2_calls"] = call_count
