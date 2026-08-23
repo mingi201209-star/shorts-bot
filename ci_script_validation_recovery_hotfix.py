@@ -115,18 +115,14 @@ def validate_candidate(candidate):
 # beats. Preserve generated visual metadata, but deterministically restore the
 # approved narration before every existing validator runs.
 if "SCRIPT_OPENING_LOCK_V1" not in text:
-    extraction = '''            generated = extract_json(
-                content
-            )
-
-            valid, reason = validate_script(
+    # Anchor on the validation call, not on the whole extract_json -> validation
+    # block. Earlier production hotfixes may legitimately insert normalization
+    # between those two statements, which made the old exact-block marker brittle.
+    validation_anchor = '''            valid, reason = validate_script(
                 generated
             )
 '''
-    locked_extraction = '''            generated = extract_json(
-                content
-            )
-            generated = _script_opening_lock_apply(
+    locked_validation = '''            generated = _script_opening_lock_apply(
                 generated,
                 candidate,
             )
@@ -135,9 +131,11 @@ if "SCRIPT_OPENING_LOCK_V1" not in text:
                 generated
             )
 '''
-    if text.count(extraction) != 1:
-        raise RuntimeError("script opening lock extraction marker mismatch")
-    text = text.replace(extraction, locked_extraction, 1)
+    if text.count(validation_anchor) != 1:
+        raise RuntimeError(
+            f"script opening lock validation marker mismatch: {text.count(validation_anchor)}"
+        )
+    text = text.replace(validation_anchor, locked_validation, 1)
 
     prompt_marker = '''[MICRO NARRATIVE]
 HOOK: {micro['hook']}
