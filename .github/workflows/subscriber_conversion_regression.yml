@@ -1,0 +1,27 @@
+name: Subscriber Conversion Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/subscriber_conversion.py"
+      - "ci_subscriber_conversion_hotfix.py"
+      - "quality/subscriber_conversion_regression_test.py"
+      - ".github/workflows/subscriber_conversion_regression.yml"
+      - ".github/workflows/main.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate subscriber conversion planner and production attachment
+        run: |
+          python -m quality.subscriber_conversion_regression_test
+          python ci_retention_structure_experiment_hotfix.py
+          python ci_subscriber_conversion_hotfix.py
+          grep -n "SUBSCRIBER_CONVERSION_LAYER_V1\|Subscriber conversion" content/script_generator.py
+          python -m py_compile content/subscriber_conversion.py ci_subscriber_conversion_hotfix.py content/script_generator.py
