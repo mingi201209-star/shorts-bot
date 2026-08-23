@@ -152,6 +152,9 @@ def main():
         "윙렛은 날개 끝에서 발생하는 압력 차로 인한 강한 소용돌이를 약화시키기 위해 "
         "위로 꺾여 있으며, 이로 인해 유도항력이 줄어든다."
     )
+    latest_item["micro_narrative"]["payoff"] = (
+        "결과적으로, 이 설계는 유도항력을 줄여 비행기의 연료 효율성을 높인다."
+    )
     latest_item["visual_proof"] = ["윙렛", "날개 끝 공기 흐름"]
     latest_calls = []
 
@@ -159,8 +162,6 @@ def main():
         latest_calls.append(mode)
         if mode == "writer":
             return latest_production_shape_writer(payload)
-        # Even if the local model repeats the Korean keyword, deterministic
-        # contract normalization must recover without weakening validation.
         return {
             "repairs": [
                 {"scene_index": target["scene_index"], "keyword": "윙렛 공기 흐름"}
@@ -173,6 +174,7 @@ def main():
     assert latest_script["scenes"][0]["text"] == "비행기 날개 끝의 윙렛이 위로 꺾여 있는 모습은 흔히 볼 수 있습니다."
     assert "무엇입니다" not in latest_script["scenes"][0]["text"]
     assert latest_script["scenes"][-2]["text"].endswith("유도항력이 줄어듭니다.")
+    assert latest_script["scenes"][-1]["text"].endswith("연료 효율성을 높입니다.")
     assert all(any(ch.isascii() and ch.isalpha() for ch in scene["keyword"]) for scene in latest_script["scenes"])
     assert len({scene["keyword"] for scene in latest_script["scenes"]}) >= max(6, len(latest_script["scenes"]) // 2)
 
