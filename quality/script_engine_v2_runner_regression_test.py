@@ -1,3 +1,8 @@
+import subprocess
+import sys
+
+subprocess.run([sys.executable, "ci_script_v2_visual_goal_hotfix.py"], check=True)
+
 from content.script_engine_v2 import build_narrative_plan
 from content.script_engine_v2_runner import generate_script_v2
 
@@ -57,7 +62,10 @@ def writer_script(item, *, missing_visual=False):
             "keyword": f"airplane wing airflow stage {index}",
         })
     if missing_visual:
+        # Run 32646866316: more than one scene survived writer/local-repair
+        # with a missing or too-short visual_goal.
         scenes[3]["visual_goal"] = ""
+        scenes[6]["visual_goal"] = "shot"
     return {"title": "윙렛의 이유", "scenes": scenes}
 
 
@@ -101,25 +109,23 @@ def main():
         calls.append(mode)
         if mode == "writer":
             return writer_script(item, missing_visual=True)
-        assert mode == "local_repair"
-        targets = payload["targets"]
-        assert [entry["scene_index"] for entry in targets] == [4]
-        return {
-            "repairs": [{
-                "scene_index": 4,
-                "visual_goal": "show wingtip vortex shrinking behind the wing",
-            }]
-        }
+        raise AssertionError("missing/short visual_goal must not spend a local-repair API call")
 
     script = generate_script_v2(item, call_fn=fake_call)
-    assert calls == ["writer", "local_repair"]
-    assert script["script_engine_v2_calls"] == 2
+    assert calls == ["writer"]
+    assert script["script_engine_v2_calls"] == 1
     assert script["scenes"][0]["text"] == item["micro_narrative"]["hook"]
     assert script["scenes"][1]["text"].startswith("그런데")
     assert script["scenes"][1]["text"].endswith("있을까요?")
     assert script["scenes"][-2]["text"].endswith("줄입니다.")
     assert script["scenes"][-1]["text"].endswith("됩니다.")
     assert script["scenes"][2]["text"] == "날개 끝에서도 압력 차이가 유지됩니다."
+    assert len(script["scenes"][3]["visual_goal"]) >= 8
+    assert len(script["scenes"][6]["visual_goal"]) >= 8
+    assert "airplane wing airflow stage 4" in script["scenes"][3]["visual_goal"]
+    assert "airplane wing airflow stage 7" in script["scenes"][6]["visual_goal"]
+    # Valid writer metadata must remain byte-for-byte unchanged.
+    assert script["scenes"][2]["visual_goal"] == "show aviation mechanism stage 3 clearly"
 
     production_calls = []
 
@@ -180,21 +186,23 @@ def main():
 
     failing_calls = []
 
-    def never_fix(payload, *, mode):
+    def structurally_invalid(payload, *, mode):
         failing_calls.append(mode)
         if mode == "writer":
-            return writer_script(item, missing_visual=True)
+            broken = writer_script(item)
+            broken["scenes"] = broken["scenes"][:-1]
+            return broken
         return {"repairs": []}
 
     try:
-        generate_script_v2(item, call_fn=never_fix)
+        generate_script_v2(item, call_fn=structurally_invalid)
     except RuntimeError as exc:
         assert "within 3 calls" in str(exc)
     else:
-        raise AssertionError("V2 must fail closed after bounded local repairs")
-    assert failing_calls == ["writer", "local_repair", "local_repair"]
+        raise AssertionError("V2 must still fail closed on non-local structural defects")
+    assert failing_calls == ["writer"]
 
-    print("PASS: Script Engine V2 bounded writer orchestration + production failure fixture")
+    print("PASS: Script Engine V2 bounded writer orchestration + Run 32646866316 visual_goal fixture")
 
 
 if __name__ == "__main__":
