@@ -7,7 +7,7 @@ It is intentionally provider-free and does not weaken existing Hook/FACT/visual 
 from copy import deepcopy
 import re
 
-RETENTION_STRUCTURE_VERSION = 1
+RETENTION_STRUCTURE_VERSION = 2
 
 RUNTIME_BUCKETS = {
     "24-30s": {"min_seconds": 24, "max_seconds": 30, "min_scenes": 7, "max_scenes": 9},
@@ -24,9 +24,6 @@ _MECHANISM_SIGNALS = (
 )
 _CAUSAL_CLUE_SIGNALS = (
     "때문", "원인", "압력", "힘", "공기", "구조", "작동", "차이", "분산", "조절", "균형",
-)
-_CONSEQUENCE_SIGNALS = (
-    "위험", "문제", "없으면", "그래서", "필요", "중요", "버티", "막", "줄", "안전", "더",
 )
 _TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]{2,}")
 
@@ -63,12 +60,9 @@ def classify_runtime_bucket(candidate):
     evidence_items = len(visual_proof) if isinstance(visual_proof, list) else 1
     fact_items = len(facts) if isinstance(facts, list) else 1
 
-    # History/design-evolution genuinely needs more causal beats; do not squeeze it.
     if long_hits >= 2 or (long_hits >= 1 and fact_items >= 3):
         return "45-55s"
 
-    # A single evidence/fact mechanism is still a simple answer even if its text
-    # naturally contains several causal words such as pressure/cause/result.
     if (
         fact_items <= 1
         and evidence_items <= 1
@@ -78,7 +72,6 @@ def classify_runtime_bucket(candidate):
     ):
         return "24-30s"
 
-    # Cause + mechanism with multiple evidence/fact beats fits the middle bucket.
     if mechanism_hits >= 2 or evidence_items >= 2 or fact_items >= 2:
         return "32-42s"
 
@@ -96,7 +89,7 @@ def build_retention_plan(candidate):
         **spec,
         "first5_contract": [
             {"role": "phenomenon", "window": "0.0-1.5s"},
-            {"role": "consequence", "window": "1.5-3.0s"},
+            {"role": "question", "window": "1.5-3.0s"},
             {"role": "causal_clue", "window": "3.0-5.0s"},
         ],
         "visual_update_target_seconds": [2.5, 4.0],
@@ -113,7 +106,7 @@ def runtime_instruction(plan):
 
 
 def first5_prompt_contract():
-    return """[FIRST 5 SEC MINI NARRATIVE — REQUIRED]\n첫 3 Scene은 같은 말을 반복하지 않고 정보를 전진시킨다.\n- Scene 1 retention_role=phenomenon: 0.0~1.5초. 이상한 현상/결론을 대상 이름과 함께 직접 제시한다.\n- Scene 2 retention_role=consequence: 1.5~3.0초. 그 현상이 왜 중요/위험/의외인지 결과나 제약을 제시한다.\n- Scene 3 retention_role=causal_clue: 3.0~5.0초. 정답 전체를 미루지 말고 원인의 첫 단서를 공개한다.\nScene 1~3은 서로 다른 visual_goal/keyword로 시각 정보도 전진시킨다.\n"""
+    return """[FIRST 5 SEC MINI NARRATIVE — REQUIRED]\n첫 3 Scene은 같은 말을 반복하지 않고 정보를 전진시킨다.\n- Scene 1 retention_role=phenomenon: 0.0~1.5초. 화면에서 바로 확인 가능한 이상한 현상/상태를 대상 이름과 함께 격식체로 단정한다. 질문으로 시작하지 않는다.\n- Scene 2 retention_role=question: 1.5~3.0초. 반드시 '그런데'로 시작해 Scene 1의 관찰을 왜 그런지 묻는다. 자연스러운 질문형은 ~까요?만 사용한다. ~나요?/~어요?/~예요?는 금지한다.\n- Scene 3 retention_role=causal_clue: 3.0~5.0초. 최종 정답을 공개하지 말고 원인의 첫 단서 또는 물리적 제약을 한 단계만 공개한다.\nScene 1~3은 서로 다른 visual_goal/keyword로 시각 정보도 전진시킨다.\n"""
 
 
 def density_prompt_contract():
@@ -134,7 +127,7 @@ def _text_similarity(left, right):
 def validate_first5_progression(scenes):
     if not isinstance(scenes, list) or len(scenes) < 3:
         return False, "first5 requires at least 3 scenes"
-    expected = ("phenomenon", "consequence", "causal_clue")
+    expected = ("phenomenon", "question", "causal_clue")
     for index, role in enumerate(expected):
         scene = scenes[index]
         if str(scene.get("retention_role", "")).strip() != role:
@@ -144,16 +137,22 @@ def validate_first5_progression(scenes):
         if not str(scene.get("visual_goal", "")).strip():
             return False, f"scene {index + 1} visual_goal missing"
 
-    second = str(scenes[1].get("text", ""))
-    third = str(scenes[2].get("text", ""))
-    if not any(signal in second for signal in _CONSEQUENCE_SIGNALS):
-        return False, "scene 2 lacks an explicit consequence/constraint cue"
+    first = str(scenes[0].get("text", "")).strip()
+    second = str(scenes[1].get("text", "")).strip()
+    third = str(scenes[2].get("text", "")).strip()
+
+    if first.endswith("?"):
+        return False, "scene 1 must state the observable phenomenon before asking"
+    if not second.startswith("그런데") or not second.endswith("?"):
+        return False, "scene 2 must use 그런데 + opening question"
+    if not second.endswith("까요?"):
+        return False, "scene 2 question must use formal ~까요? ending"
     if not any(signal in third for signal in _CAUSAL_CLUE_SIGNALS):
         return False, "scene 3 lacks an explicit causal clue"
 
-    if _text_similarity(scenes[0].get("text"), scenes[1].get("text")) >= 0.72:
+    if _text_similarity(first, second) >= 0.72:
         return False, "scene 1 and 2 repeat the same information"
-    if _text_similarity(scenes[1].get("text"), scenes[2].get("text")) >= 0.72:
+    if _text_similarity(second, third) >= 0.72:
         return False, "scene 2 and 3 repeat the same information"
     return True, "first5 progression pass"
 
@@ -167,7 +166,6 @@ def validate_density(scenes):
             return False, f"adjacent scenes {index}/{index + 1} are redundant"
     for index, scene in enumerate(scenes):
         text = str(scene.get("text", ""))
-        # Three or more semicolon/comma-separated causal clauses usually overload one visual beat.
         clause_count = len(re.findall(r"[,;]|그리고|또한|동시에", text)) + 1
         if clause_count > 4:
             return False, f"scene {index + 1} carries too many concepts"
