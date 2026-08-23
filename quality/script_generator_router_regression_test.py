@@ -23,7 +23,7 @@ def main():
     old_v2 = sys.modules.get("content.script_engine_v2_runner")
     try:
         legacy_module = types.ModuleType("content.script_generator")
-        legacy_module.generate_script = lambda topic_info, candidate: {"engine": "legacy"}
+        legacy_module.generate_script = lambda topic_info, item: {"engine": "legacy"}
         v2_module = types.ModuleType("content.script_engine_v2_runner")
         v2_module.generate_script_v2 = lambda item: {
             "engine": "v2",
@@ -38,9 +38,6 @@ def main():
         sys.modules["content.script_engine_v2_runner"] = v2_module
 
         os.environ.pop("SCRIPT_ENGINE_MODE", None)
-        assert router.generate_script({"topic": "direction"}, candidate())["engine"] == "legacy"
-
-        os.environ["SCRIPT_ENGINE_MODE"] = "v2"
         result = router.generate_script({"topic": "aviation", "category": "항공"}, candidate())
         assert result["engine"] == "v2"
         assert result["topic"] == candidate()["topic"]
@@ -52,6 +49,9 @@ def main():
         assert result["visual_proof"] == ["winglet"]
         assert result["candidate_selection_reason"] == "aviation continuity"
         assert result["scenes"][0]["visual_type"] == "real_world_broll"
+
+        os.environ["SCRIPT_ENGINE_MODE"] = "legacy"
+        assert router.generate_script({"topic": "direction"}, candidate())["engine"] == "legacy"
 
         os.environ["SCRIPT_ENGINE_MODE"] = "unknown"
         try:
@@ -74,7 +74,7 @@ def main():
         else:
             os.environ["SCRIPT_ENGINE_MODE"] = original
 
-    print("PASS: Script Generator router legacy boundary and V2 normalization")
+    print("PASS: Script Generator router V2 default and legacy rollback")
 
 
 if __name__ == "__main__":
