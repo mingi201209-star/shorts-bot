@@ -47,6 +47,7 @@ def _build_candidate_supply_recovery_context(
     recent_topics=None,
     recent_content=None,
     rejected_topics=None,
+    fixed_topic_gate_feedback="",
     original_reason="",
 ):
     base = build_execution_context(
@@ -54,6 +55,7 @@ def _build_candidate_supply_recovery_context(
         recent_topics=recent_topics,
         recent_content=recent_content,
         rejected_topics=rejected_topics,
+        fixed_topic_gate_feedback=fixed_topic_gate_feedback,
     )
 
     return base + f"""
@@ -94,6 +96,8 @@ def _run_candidate_supply_recovery(
     recent_topics=None,
     recent_content=None,
     rejected_topics=None,
+    fixed_topic=None,
+    fixed_topic_gate_feedback="",
     model=MODEL,
     original_reason="",
 ):
@@ -102,6 +106,7 @@ def _run_candidate_supply_recovery(
         recent_topics=recent_topics,
         recent_content=recent_content,
         rejected_topics=rejected_topics,
+        fixed_topic_gate_feedback=fixed_topic_gate_feedback,
         original_reason=original_reason,
     )
 
@@ -142,6 +147,8 @@ def explore_candidates(
     recent_topics=None,
     recent_content=None,
     rejected_topics=None,
+    fixed_topic=None,
+    fixed_topic_gate_feedback="",
     model=MODEL,
 ):
     global _candidate_supply_recovery_used
@@ -151,6 +158,8 @@ def explore_candidates(
         recent_topics=recent_topics,
         recent_content=recent_content,
         rejected_topics=rejected_topics,
+        fixed_topic=fixed_topic,
+        fixed_topic_gate_feedback=fixed_topic_gate_feedback,
         model=model,
     )
 
@@ -172,6 +181,8 @@ def explore_candidates(
         recent_topics=recent_topics,
         recent_content=recent_content,
         rejected_topics=rejected_topics,
+        fixed_topic=fixed_topic,
+        fixed_topic_gate_feedback=fixed_topic_gate_feedback,
         model=model,
         original_reason=result.get("reason", ""),
     )

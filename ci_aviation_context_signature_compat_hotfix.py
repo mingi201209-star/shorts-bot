@@ -109,7 +109,6 @@ def _apply_final_script_scene_recovery_if_ready():
 
 
 def _patch_script_engine_router():
-    """Switch final production main.py to the stable V2/legacy router boundary."""
     text = MAIN_PATH.read_text(encoding="utf-8")
     legacy_import = '''from content.script_generator import (\n    generate_script,\n)\n'''
     router_import = '''from content.script_generator_router import (\n    generate_script,\n)\n'''
@@ -138,9 +137,18 @@ def main():
     text = _ensure_signature_keyword(
         text, "explore_candidates", "fixed_topic_gate_feedback", '""'
     )
-    text = _ensure_forwarded_keyword(
-        text, "explore_candidates", "build_execution_context", "fixed_topic_gate_feedback"
-    )
+
+    if "# CANDIDATE_SUPPLY_RECOVERY_V1" in text:
+        # The supply wrapper is appended only after the original Explorer has
+        # already received this compatibility patch earlier in production.
+        # It forwards fixed_topic + fixed_topic_gate_feedback itself, so trying
+        # to find build_execution_context inside the wrapper would be a false
+        # marker failure during the final compatibility re-apply.
+        print("✅ Candidate supply wrapper preserves aviation context; direct re-forward skipped")
+    else:
+        text = _ensure_forwarded_keyword(
+            text, "explore_candidates", "build_execution_context", "fixed_topic_gate_feedback"
+        )
 
     EXPLORER_PATH.write_text(text, encoding="utf-8")
     patch_fixed_aviation_scope()
