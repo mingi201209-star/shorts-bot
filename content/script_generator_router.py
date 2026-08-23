@@ -54,6 +54,72 @@ def _observable_hook_from_candidate(candidate):
     return result
 
 
+def _formal_question(text):
+    """Normalize only narrow, semantics-preserving Korean question endings."""
+    value = str(text or "").strip()
+    if not value:
+        return value
+    repairs = (
+        (r"을까\?$", "을까요?"),
+        (r"ㄹ까\?$", "ㄹ까요?"),
+        (r"일까\?$", "일까요?"),
+        (r"할까\?$", "할까요?"),
+        (r"될까\?$", "될까요?"),
+        (r"있을까\?$", "있을까요?"),
+        (r"없을까\?$", "없을까요?"),
+    )
+    for pattern, replacement in repairs:
+        converted, count = re.subn(pattern, replacement, value)
+        if count:
+            return converted
+    return value
+
+
+def _formal_locked_statement(text):
+    """Normalize known safe declarative endings without changing factual scope."""
+    value = str(text or "").strip()
+    repairs = (
+        (r"높아진다(?=[.!?…]*$)", "높아집니다"),
+        (r"낮아진다(?=[.!?…]*$)", "낮아집니다"),
+        (r"줄어든다(?=[.!?…]*$)", "줄어듭니다"),
+        (r"늘어난다(?=[.!?…]*$)", "늘어납니다"),
+        (r"개선된다(?=[.!?…]*$)", "개선됩니다"),
+    )
+    for pattern, replacement in repairs:
+        value = re.sub(pattern, replacement, value)
+    return value
+
+
+def _normalize_locked_candidate_narration(candidate):
+    """Normalize locked Candidate narration before V2 builds immutable contracts."""
+    result = deepcopy(candidate)
+    micro = result.get("micro_narrative")
+    if not isinstance(micro, dict):
+        return result
+
+    normalized_micro = dict(micro)
+    changed = []
+
+    question_source = str(normalized_micro.get("core_question") or result.get("core_question") or "").strip()
+    question = _formal_question(question_source)
+    if question and question != question_source:
+        normalized_micro["core_question"] = question
+        result["core_question"] = question
+        changed.append("question")
+
+    for key in ("reveal", "payoff"):
+        source = str(normalized_micro.get(key, "")).strip()
+        normalized = _formal_locked_statement(source)
+        if normalized != source:
+            normalized_micro[key] = normalized
+            changed.append(key)
+
+    if changed:
+        result["micro_narrative"] = normalized_micro
+        print("🧩 Router locked narration normalized without API: " + ",".join(changed))
+    return result
+
+
 def _normalize_v2_result(result, topic_info, candidate):
     if not isinstance(result, dict):
         raise TypeError("Script Engine V2 result must be a dict")
@@ -103,6 +169,7 @@ def generate_script(topic_info, candidate):
     if mode in ("", "v2"):
         from content.script_engine_v2_runner import generate_script_v2
         normalized_candidate = _observable_hook_from_candidate(candidate)
+        normalized_candidate = _normalize_locked_candidate_narration(normalized_candidate)
         return _normalize_v2_result(
             generate_script_v2(normalized_candidate),
             topic_info,
