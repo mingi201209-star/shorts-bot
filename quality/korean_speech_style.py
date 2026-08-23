@@ -1,7 +1,7 @@
 import re
 
 
-# Production narration uses formal polite Korean (하십시오체).  Casual polite
+# Production narration uses formal polite Korean (하십시오체). Casual polite
 # 해요체 is deliberately excluded so a script cannot mix "~습니다" and "~요".
 FORMAL_ENDINGS = (
     "니다",
@@ -67,13 +67,15 @@ def validate_korean_speech_text(text, *, allow_nominal=False):
         if not terminal:
             continue
 
-        # Explicitly reject 해요체 before checking allowed formal endings.
-        if CASUAL_POLITE_RE.search(terminal):
-            return False, f"해요체 종결 감지: {sentence}"
-
-        # Natural formal questions such as "왜 꺾여 있을까요?" are allowed.
+        # Natural formal curiosity questions such as "왜 꺾여 있을까요?" are
+        # an explicit part of the narration contract. Check this before the
+        # generic trailing-요 detector so ~까요 is not mistaken for 해요체.
         if terminal.endswith("까요"):
             continue
+
+        # All other casual-polite 해요체 endings remain prohibited.
+        if CASUAL_POLITE_RE.search(terminal):
+            return False, f"해요체 종결 감지: {sentence}"
 
         if terminal.endswith(FORMAL_ENDINGS):
             continue
