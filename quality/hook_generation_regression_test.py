@@ -81,6 +81,23 @@ def test_speech_style_reason():
     )
 
 
+def test_question_hook_reserved_for_scene_two():
+    question = "드론은 왜 균열을 먼저 찾을까요?"
+    candidates, diagnostics = hook_experiment._diagnose_candidates(
+        _payload([
+            _item(1, question, stop_power=9.8),
+            _item(2, VALID_TEXTS[0]),
+        ])
+    )
+    texts = [item["text"] for item in candidates]
+    _assert("Question-shaped Hook is excluded upstream", question not in texts)
+    _assert(
+        "Question-shaped Hook exposes dedicated rejection reason",
+        diagnostics["rejected"].get("question_hook_not_allowed") == 1,
+    )
+    _assert("Declarative Hook remains eligible beside rejected question", VALID_TEXTS[0] in texts)
+
+
 def test_duplicate_reason():
     repeated = VALID_TEXTS[0]
     items = [_item(1, repeated), _item(2, repeated)]
@@ -226,6 +243,7 @@ def main():
     test_production_like_parse_to_scoring_pool()
     test_too_long_reason()
     test_speech_style_reason()
+    test_question_hook_reserved_for_scene_two()
     test_duplicate_reason()
     test_hard_floor_reason_codes()
     test_bounded_attempt_two_receives_feedback_and_accumulates()
