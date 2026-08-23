@@ -14,15 +14,41 @@ def replace_once(source, old, new, label):
     return source.replace(old, new, 1)
 
 
+def replace_retention_plan_once(source):
+    """Install subscriber planning after the active retention plan.
+
+    Retention V2 is the current production contract. Keep the V1 marker as a
+    compatibility fallback so this hotfix remains safe when replayed against an
+    older production fixture, without weakening or rewriting the retention
+    contract itself.
+    """
+    subscriber_marker = "    # SUBSCRIBER_CONVERSION_LAYER_V1\n"
+    if subscriber_marker in source:
+        return source
+
+    for version in ("V2", "V1"):
+        marker = f'''    # RETENTION_STRUCTURE_EXPERIMENT_{version}\n    retention_plan = build_retention_plan(candidate)\n\n    category = str(\n'''
+        replacement = f'''    # RETENTION_STRUCTURE_EXPERIMENT_{version}\n    retention_plan = build_retention_plan(candidate)\n\n    # SUBSCRIBER_CONVERSION_LAYER_V1\n    subscriber_plan = build_subscriber_conversion_plan(candidate)\n\n    category = str(\n'''
+        count = source.count(marker)
+        if count == 1:
+            return source.replace(marker, replacement, 1)
+        if count > 1:
+            raise RuntimeError(
+                f"subscriber plan marker count mismatch for {version}: {count}"
+            )
+
+    raise RuntimeError(
+        "subscriber plan marker count mismatch: no supported retention marker"
+    )
+
+
 # This patch runs after retention-structure planning and before script-production
 # parity wrapping, so the authoritative production generator captures it.
 config_marker = "from config import (\n"
 subscriber_import = '''from content.subscriber_conversion import (\n    apply_subscriber_conversion,\n    build_subscriber_conversion_plan,\n    subscriber_conversion_prompt_contract,\n)\n\nfrom config import (\n'''
 text = replace_once(text, config_marker, subscriber_import, "subscriber imports")
 
-plan_marker = '''    # RETENTION_STRUCTURE_EXPERIMENT_V1\n    retention_plan = build_retention_plan(candidate)\n\n    category = str(\n'''
-plan_replacement = '''    # RETENTION_STRUCTURE_EXPERIMENT_V1\n    retention_plan = build_retention_plan(candidate)\n\n    # SUBSCRIBER_CONVERSION_LAYER_V1\n    subscriber_plan = build_subscriber_conversion_plan(candidate)\n\n    category = str(\n'''
-text = replace_once(text, plan_marker, plan_replacement, "subscriber plan")
+text = replace_retention_plan_once(text)
 
 prompt_marker = '''{density_prompt_contract()}\n[STORY]\n'''
 prompt_replacement = '''{density_prompt_contract()}\n{subscriber_conversion_prompt_contract(subscriber_plan)}\n[STORY]\n'''
