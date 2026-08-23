@@ -57,6 +57,36 @@ hook_path.write_text(hook_source, encoding="utf-8")
 
 
 # ============================================================
+# Downstream Hook generation hotfix: keep generation and validation contracts
+# aligned. ci_hook_generation_hotfix.py runs AFTER this file in production, so
+# patch its prompt source now to prevent it from reintroducing 해요체 examples.
+# ============================================================
+hook_generation_hotfix_path = Path("ci_hook_generation_hotfix.py")
+if hook_generation_hotfix_path.exists():
+    generation_source = hook_generation_hotfix_path.read_text(encoding="utf-8")
+    generation_source = generation_source.replace(
+        "- 모든 spoken Hook은 자연스러운 한국어 존댓말로 끝낸다. 예: ~요, ~죠, ~니다, ~니까, ~세요.\n"
+        "- 반말/해라체 종결인 ~다, ~한다, ~했다, ~이다를 사용하지 않는다.\n",
+        "- 모든 spoken Hook은 격식체 존댓말로 끝낸다. 평서문은 ~습니다/~입니다/~합니다/~됩니다/~있습니다 계열을 사용한다.\n"
+        "- 해요체인 ~요/~해요/~돼요/~이에요/~예요/~죠/~세요는 사용하지 않는다. 자연스러운 질문형 ~까요?만 예외로 허용한다.\n"
+        "- 반말/해라체 종결인 ~다, ~한다, ~했다, ~이다도 사용하지 않는다.\n",
+    )
+    generation_source = generation_source.replace(
+        "길이 탈락이면 13~15자 목표를 우선하고, speech_style_failure면 반드시 존댓말 종결을 사용한다.\n",
+        "길이 탈락이면 13~15자 목표를 우선하고, speech_style_failure면 반드시 ~습니다/~입니다 계열 격식체로 고친다. 해요체로 고치지 않는다.\n",
+    )
+    generation_source = generation_source.replace(
+        '"text": "한국어 존댓말 Hook 한 문장",',
+        '"text": "한국어 격식체 Hook 한 문장",',
+    )
+    generation_source = generation_source.replace(
+        '"자연스러운 한국어 존댓말, 화면으로 직접 증명 가능한 첫 장면을 "',
+        '"~습니다/~입니다 계열의 격식체 한국어, 화면으로 직접 증명 가능한 첫 장면을 "',
+    )
+    hook_generation_hotfix_path.write_text(generation_source, encoding="utf-8")
+
+
+# ============================================================
 # Rewrite Engine: validate rewritten narration and retry at most once
 # ============================================================
 rewrite_path = Path("quality/rewrite_engine.py")
