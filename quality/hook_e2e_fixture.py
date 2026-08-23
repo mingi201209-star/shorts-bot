@@ -82,7 +82,7 @@ HOOK_CANDIDATE_FIXTURE = [
     },
     {
         "id": "fixture_hook_4",
-        "text": "이 고양이 얼굴이 잘 보이나요?",
+        "text": "이 고양이 얼굴이 잘 보입니다",
         "visual_goal": "한 마리 고양이 얼굴 특징이 모바일에서도 또렷한 정면 근접 촬영",
         "keyword": "cat close up",
         "stop_power": 8.1,
@@ -91,7 +91,7 @@ HOOK_CANDIDATE_FIXTURE = [
         "specificity": 9.1,
         "visual_potential": 9.5,
         "fact_safety": 9.7,
-        "reason": "화면에 실제 보이는 고양이 얼굴 특징만 묻습니다.",
+        "reason": "화면에 실제 보이는 고양이 얼굴 특징만 말합니다.",
     },
     {
         "id": "fixture_hook_5",
