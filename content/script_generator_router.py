@@ -1,4 +1,8 @@
-"""Stable Script Generator router with a legacy-compatible V2 boundary."""
+"""Stable Script Generator router with a legacy-compatible V2 boundary.
+
+V2 is the production default after its dedicated regressions pass. Set
+SCRIPT_ENGINE_MODE=legacy for an immediate rollback without changing code.
+"""
 import os
 
 
@@ -47,13 +51,13 @@ def _normalize_v2_result(result, topic_info, candidate):
 
 
 def generate_script(topic_info, candidate):
-    mode = os.environ.get("SCRIPT_ENGINE_MODE", "legacy").strip().lower()
-    if mode == "v2":
+    mode = os.environ.get("SCRIPT_ENGINE_MODE", "v2").strip().lower()
+    if mode in ("", "v2"):
         from content.script_engine_v2_runner import generate_script_v2
         return _normalize_v2_result(generate_script_v2(candidate), topic_info, candidate)
 
-    if mode not in ("", "legacy", "v1"):
-        raise ValueError(f"Unsupported SCRIPT_ENGINE_MODE: {mode}")
+    if mode in ("legacy", "v1"):
+        from content.script_generator import generate_script as legacy_generate_script
+        return legacy_generate_script(topic_info, candidate)
 
-    from content.script_generator import generate_script as legacy_generate_script
-    return legacy_generate_script(topic_info, candidate)
+    raise ValueError(f"Unsupported SCRIPT_ENGINE_MODE: {mode}")
