@@ -29,14 +29,27 @@ def main():
 
         def fake_v2(item):
             seen_candidates.append(item)
+            scenes = [{
+                "text": item["micro_narrative"]["hook"],
+                "visual_goal": "show winglet",
+                "keyword": "airplane winglet closeup",
+            }]
+            if item.get("micro_narrative", {}).get("core_question"):
+                scenes.append({
+                    "text": item["micro_narrative"]["core_question"],
+                    "visual_goal": "show winglet question",
+                    "keyword": "winglet closeup question",
+                })
+            if item.get("micro_narrative", {}).get("payoff"):
+                scenes.append({
+                    "text": item["micro_narrative"]["payoff"],
+                    "visual_goal": "show winglet result",
+                    "keyword": "winglet efficiency result",
+                })
             return {
                 "engine": "v2",
                 "title": "윙렛의 이유",
-                "scenes": [{
-                    "text": item["micro_narrative"]["hook"],
-                    "visual_goal": "show winglet",
-                    "keyword": "airplane winglet closeup",
-                }],
+                "scenes": scenes,
             }
 
         v2_module.generate_script_v2 = fake_v2
@@ -71,6 +84,36 @@ def main():
         assert question_result["micro_narrative"]["hook"] == "비행기 날개 끝이 위로 꺾여 있습니다."
         assert question_item["micro_narrative"]["hook"] == original_question
 
+        # Production Run 32643474443 shape: Scene 1 is fixed, but the locked
+        # Scene 2 question and payoff arrive in plain-form Korean. They must be
+        # normalized before V2 freezes the narration contracts.
+        locked_item = candidate()
+        locked_item["topic"] = "비행기 날개 끝이 위로 꺾여 있는 이유"
+        locked_item["core_question"] = "왜 비행기 날개 끝을 위로 꺾어 놓았을까?"
+        locked_item["micro_narrative"] = {
+            "hook": "왜 비행기 날개 끝이 위로 꺾여 있을까요?",
+            "core_question": "그런데 왜 비행기 날개 끝을 위로 꺾어 놓았을까?",
+            "reveal": "윙렛은 날개 끝 소용돌이를 약하게 만들어 유도항력을 줄입니다.",
+            "payoff": "결과적으로 비행기의 연료 효율이 개선되고 안정성이 높아진다.",
+        }
+        original_locked = {
+            "core_question": locked_item["core_question"],
+            "micro_narrative": dict(locked_item["micro_narrative"]),
+        }
+        locked_result = router.generate_script(
+            {"topic": "aviation", "category": "항공"},
+            locked_item,
+        )
+        normalized = seen_candidates[-1]
+        assert normalized["micro_narrative"]["hook"] == "비행기 날개 끝이 위로 꺾여 있습니다."
+        assert normalized["core_question"] == "왜 비행기 날개 끝을 위로 꺾어 놓았을까요?"
+        assert normalized["micro_narrative"]["core_question"] == "그런데 왜 비행기 날개 끝을 위로 꺾어 놓았을까요?"
+        assert normalized["micro_narrative"]["payoff"] == "결과적으로 비행기의 연료 효율이 개선되고 안정성이 높아집니다."
+        assert locked_result["scenes"][1]["text"].endswith("놓았을까요?")
+        assert locked_result["scenes"][-1]["text"].endswith("높아집니다.")
+        assert locked_item["core_question"] == original_locked["core_question"]
+        assert locked_item["micro_narrative"] == original_locked["micro_narrative"]
+
         os.environ["SCRIPT_ENGINE_MODE"] = "legacy"
         assert router.generate_script({"topic": "direction"}, candidate())["engine"] == "legacy"
 
@@ -95,7 +138,7 @@ def main():
         else:
             os.environ["SCRIPT_ENGINE_MODE"] = original
 
-    print("PASS: Script Generator router V2 default + question-hook normalization + legacy rollback")
+    print("PASS: Script Generator router V2 default + production locked narration normalization + legacy rollback")
 
 
 if __name__ == "__main__":
