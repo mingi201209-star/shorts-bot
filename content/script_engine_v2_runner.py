@@ -100,6 +100,60 @@ def _apply_local_repairs(script: Dict[str, Any], response: Dict[str, Any], allow
     return result
 
 
+def _question_hook_to_observation(text: Any) -> str:
+    """Convert only simple Korean why-questions into a fact-neutral observation.
+
+    This is a zero-API boundary repair for Candidate micro_narrative hooks. It
+    intentionally supports a small, deterministic set of endings; anything
+    outside that set is left unchanged so build_narrative_plan can fail closed.
+    """
+    value = str(text or "").strip()
+    if not value:
+        return value
+    if "?" not in value and not value.startswith(("왜 ", "그런데 왜 ")):
+        return value
+
+    value = re.sub(r"^그런데\s+", "", value)
+    value = re.sub(r"^왜\s+", "", value)
+    value = value.rstrip().rstrip("?").strip()
+
+    replacements = (
+        (r"있을까요$", "있습니다"),
+        (r"있을까$", "있습니다"),
+        (r"일까요$", "입니다"),
+        (r"일까$", "입니다"),
+        (r"될까요$", "됩니다"),
+        (r"될까$", "됩니다"),
+        (r"할까요$", "합니다"),
+        (r"할까$", "합니다"),
+    )
+    for pattern, replacement in replacements:
+        converted, count = re.subn(pattern, replacement, value)
+        if count:
+            return converted.rstrip(".") + "."
+    return str(text or "").strip()
+
+
+def _normalize_candidate_opening(candidate: Dict[str, Any], approved_hook: str) -> tuple[Dict[str, Any], str]:
+    """Normalize a Candidate-supplied question Hook without mutating caller data."""
+    result = deepcopy(candidate)
+    micro = result.get("micro_narrative")
+    if not isinstance(micro, dict):
+        return result, approved_hook
+
+    if approved_hook:
+        normalized = _question_hook_to_observation(approved_hook)
+        return result, normalized
+
+    original = micro.get("hook")
+    normalized = _question_hook_to_observation(original)
+    if normalized != str(original or "").strip():
+        micro["hook"] = normalized
+        result["micro_narrative"] = micro
+        print(f"🧩 V2 opening normalized without API: {normalized}")
+    return result, approved_hook
+
+
 def generate_script_v2(
     candidate: Dict[str, Any],
     approved_hook: str = "",
@@ -108,6 +162,7 @@ def generate_script_v2(
 ) -> Dict[str, Any]:
     """Generate one Script with a hard V2-local call ceiling of three."""
     caller = call_fn or _default_call
+    candidate, approved_hook = _normalize_candidate_opening(candidate, approved_hook)
     plan = build_narrative_plan(candidate, approved_hook=approved_hook)
     call_count = 0
 
