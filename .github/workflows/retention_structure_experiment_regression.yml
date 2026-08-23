@@ -1,0 +1,26 @@
+name: Retention Structure Experiment Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/retention_structure.py"
+      - "ci_retention_structure_experiment_hotfix.py"
+      - "quality/retention_structure_experiment_regression_test.py"
+      - ".github/workflows/retention_structure_experiment_regression.yml"
+      - ".github/workflows/main.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate retention planner and source attachment
+        run: |
+          python -m quality.retention_structure_experiment_regression_test
+          python ci_retention_structure_experiment_hotfix.py
+          grep -n "RETENTION_STRUCTURE_EXPERIMENT_V1\|FIRST 5 SEC MINI NARRATIVE\|runtime_bucket" content/script_generator.py
+          python -m py_compile content/retention_structure.py ci_retention_structure_experiment_hotfix.py content/script_generator.py
