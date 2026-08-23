@@ -1,0 +1,27 @@
+name: Winner Replication Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/winner_replication.py"
+      - "content/growth_candidate_ranker.py"
+      - "quality/winner_replication_regression_test.py"
+      - "quality/growth_candidate_shadow_regression_test.py"
+      - "quality/growth_candidate_shadow_production_regression_test.py"
+      - ".github/workflows/winner_replication_regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate bounded winner learning
+        run: |
+          python -m quality.winner_replication_regression_test
+          python -m quality.growth_candidate_shadow_regression_test
+          python -m quality.growth_candidate_shadow_production_regression_test
+          python -m py_compile content/winner_replication.py content/growth_candidate_ranker.py

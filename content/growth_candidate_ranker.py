@@ -10,6 +10,7 @@ import os
 import re
 
 from analytics.feedback_contract import normalize_video_lineage
+from content.winner_replication import build_winner_learning
 
 GROWTH_SHADOW_VERSION = 1
 AXES = (
@@ -206,5 +207,6 @@ def annotate_explorer_output(explorer_output, history=None):
         candidate = explorer_output.get(key)
         if isinstance(candidate, dict) and candidate:
             shadow["candidates"][key] = score_growth_candidate(candidate, history=history)
+    shadow["winner_learning"] = build_winner_learning(history)
     annotated["growth_shadow"] = shadow
     return annotated
