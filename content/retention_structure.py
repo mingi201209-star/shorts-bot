@@ -67,11 +67,21 @@ def classify_runtime_bucket(candidate):
     if long_hits >= 2 or (long_hits >= 1 and fact_items >= 3):
         return "45-55s"
 
-    # Cause + mechanism or several distinct evidence beats fits the middle bucket.
-    if mechanism_hits >= 2 or evidence_items >= 3 or fact_items >= 3:
+    # A single evidence/fact mechanism is still a simple answer even if its text
+    # naturally contains several causal words such as pressure/cause/result.
+    if (
+        fact_items <= 1
+        and evidence_items <= 1
+        and isinstance(micro, dict)
+        and micro.get("reveal")
+        and micro.get("payoff")
+    ):
+        return "24-30s"
+
+    # Cause + mechanism with multiple evidence/fact beats fits the middle bucket.
+    if mechanism_hits >= 2 or evidence_items >= 2 or fact_items >= 2:
         return "32-42s"
 
-    # One self-contained why/how question should not be padded toward ~50 seconds.
     if isinstance(micro, dict) and micro.get("reveal") and micro.get("payoff"):
         return "24-30s"
     return "32-42s"
