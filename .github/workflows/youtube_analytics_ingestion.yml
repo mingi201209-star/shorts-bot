@@ -1,0 +1,61 @@
+name: YouTube Analytics Ingestion
+
+on:
+  pull_request:
+    paths:
+      - "analytics/youtube_ingestion.py"
+      - "analytics/collect_youtube_performance.py"
+      - "quality/youtube_analytics_ingestion_regression_test.py"
+      - "analytics/feedback_contract.py"
+      - "content/winner_replication.py"
+      - "content/growth_candidate_ranker.py"
+      - ".github/workflows/youtube_analytics_ingestion.yml"
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+jobs:
+  regression:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install minimal dependency
+        run: pip install requests
+      - name: Validate read-only ingestion contract
+        run: |
+          python -m quality.youtube_analytics_ingestion_regression_test
+          python -m quality.analytics_feedback_contract_regression_test
+          python -m quality.growth_candidate_shadow_regression_test
+          python -m quality.winner_replication_regression_test
+          python -m py_compile analytics/youtube_ingestion.py analytics/collect_youtube_performance.py
+
+  collect:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SHORTS_ANALYTICS_HISTORY_PATH: analytics/performance_history.json
+      YOUTUBE_ANALYTICS_CLIENT_ID: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_ID }}
+      YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET }}
+      YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install minimal dependency
+        run: pip install requests
+      - name: Collect mature snapshots safely
+        run: python -m analytics.collect_youtube_performance
+      - name: Upload updated history when present
+        if: ${{ hashFiles('analytics/performance_history.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: analytics-history-${{ github.run_id }}
+          path: analytics/performance_history.json
+          retention-days: 30
