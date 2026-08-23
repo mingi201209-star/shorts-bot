@@ -5,6 +5,7 @@ on:
     paths:
       - "analytics/youtube_ingestion.py"
       - "analytics/collect_youtube_performance.py"
+      - "analytics/restore_history_artifact.py"
       - "quality/youtube_analytics_ingestion_regression_test.py"
       - "analytics/feedback_contract.py"
       - "content/winner_replication.py"
@@ -31,14 +32,16 @@ jobs:
           python -m quality.analytics_feedback_contract_regression_test
           python -m quality.growth_candidate_shadow_regression_test
           python -m quality.winner_replication_regression_test
-          python -m py_compile analytics/youtube_ingestion.py analytics/collect_youtube_performance.py
+          python -m py_compile analytics/youtube_ingestion.py analytics/collect_youtube_performance.py analytics/restore_history_artifact.py
 
   collect:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
+      actions: read
       contents: read
     env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       SHORTS_ANALYTICS_HISTORY_PATH: analytics/performance_history.json
       YOUTUBE_ANALYTICS_CLIENT_ID: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_ID }}
       YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET }}
@@ -50,6 +53,8 @@ jobs:
           python-version: "3.11"
       - name: Install minimal dependency
         run: pip install requests
+      - name: Restore latest persisted history
+        run: python -m analytics.restore_history_artifact
       - name: Collect mature snapshots safely
         run: python -m analytics.collect_youtube_performance
       - name: Upload updated history when present
@@ -58,4 +63,4 @@ jobs:
         with:
           name: analytics-history-${{ github.run_id }}
           path: analytics/performance_history.json
-          retention-days: 30
+          retention-days: 90
