@@ -51,6 +51,15 @@ def main():
 그중 가능한 한 여러 개를 실제 Candidate record로 유지하여 기존 Gate가 비교하게 하라.
 모든 후보가 완벽할 필요는 없다. Gate가 경쟁시킬 수 있을 정도로 구체적이고 사실 기반이면 된다.
 
+[SUPPLY SHORTAGE IS NOT A TERMINAL RESULT]
+위 최소 10개는 탐색 목표이지 SELECTED를 반환하기 위한 최소 통과 숫자가 아니다.
+grounded하고 구체적이며 필수 필드가 완성된 Candidate가 1개라도 남아 있다면 후보 수가 목표보다 적다는 이유만으로 REGENERATE를 반환하지 마라.
+그 경우 남아 있는 Candidate 중 기존 Hard Gate, scoring, shortlist, final sanity 기준을 통과한 가장 강한 하나를 Winner로 SELECTED하라.
+독립적인 두 번째 후보가 없으면 runner_up은 null이어도 된다.
+REGENERATE는 usable grounded Candidate가 0개인 경우, 또는 남은 모든 후보가 구조·사실성 Hard Gate를 통과하지 못한 경우에만 사용하라.
+"후보 공급 부족", "후보 숫자 부족", "충분한 후보를 탐색하지 못함" 자체는 Candidate가 1개 이상 살아 있는 상황의 REGENERATE 이유가 될 수 없다.
+이 규칙은 Candidate Gate를 우회하지 않는다. SELECTED된 Winner는 기존 독립 Candidate Gate에서 똑같이 심사받고 약하면 그대로 탈락해야 한다.
+
 각 Candidate는 다음을 갖춰야 한다:
 1. 승객이 좌석/창문/객실/탑승/이륙/비행/착륙 과정에서 직접 보고·듣고·느낄 수 있는 단일 관찰 대상 또는 행동
 2. 그 대상을 직접 묻는 구체적인 core_question
