@@ -43,7 +43,7 @@ WINNER = {
 HOOK_CANDIDATE_FIXTURE = [
     {
         "id": "fixture_hook_1",
-        "text": "이 고양이 얼굴을 자세히 볼까요?",
+        "text": "고양이 얼굴이 크게 보입니다",
         "visual_goal": "한 마리 고양이 얼굴이 화면 중앙에 크게 보이는 실제 세로 클로즈업",
         "keyword": "cat close up",
         "stop_power": 8.6,
@@ -56,7 +56,7 @@ HOOK_CANDIDATE_FIXTURE = [
     },
     {
         "id": "fixture_hook_2",
-        "text": "고양이 얼굴은 어떻게 보일까요?",
+        "text": "고양이 눈과 수염이 보입니다",
         "visual_goal": "한 마리 고양이 얼굴의 눈과 수염이 선명한 정면 클로즈업",
         "keyword": "cat close up",
         "stop_power": 8.2,
@@ -69,8 +69,8 @@ HOOK_CANDIDATE_FIXTURE = [
     },
     {
         "id": "fixture_hook_3",
-        "text": "가까운 고양이 얼굴을 볼까요?",
-        "visual_goal": "다른 피사체 없이 한 마리 고양이 얼굴이 크게 잡힌 세로 영상",
+        "text": "고양이 귀가 곧게 서 있습니다",
+        "visual_goal": "다른 피사체 없이 한 마리 고양이 얼굴과 귀가 크게 잡힌 세로 영상",
         "keyword": "cat close up",
         "stop_power": 8.0,
         "curiosity_gap": 7.9,
@@ -78,11 +78,11 @@ HOOK_CANDIDATE_FIXTURE = [
         "specificity": 9.0,
         "visual_potential": 9.6,
         "fact_safety": 9.8,
-        "reason": "관찰 대상이 한 마리 고양이 얼굴로 명확합니다.",
+        "reason": "관찰 대상이 한 마리 고양이 얼굴과 귀로 명확합니다.",
     },
     {
         "id": "fixture_hook_4",
-        "text": "이 고양이 얼굴이 잘 보입니다",
+        "text": "고양이 코가 가까이 보입니다",
         "visual_goal": "한 마리 고양이 얼굴 특징이 모바일에서도 또렷한 정면 근접 촬영",
         "keyword": "cat close up",
         "stop_power": 8.1,
@@ -95,7 +95,7 @@ HOOK_CANDIDATE_FIXTURE = [
     },
     {
         "id": "fixture_hook_5",
-        "text": "고양이 얼굴을 가까이서 볼까요?",
+        "text": "고양이 얼굴 윤곽이 보입니다",
         "visual_goal": "한 마리 고양이 얼굴이 화면 대부분을 차지하는 자연스러운 클로즈업",
         "keyword": "cat close up",
         "stop_power": 8.0,
@@ -308,7 +308,7 @@ def main():
 
     result = {
         "mode": args.mode,
-        "fixture": "single-cat-face-controlled-source-v6",
+        "fixture": "single-cat-face-controlled-source-v7-declarative-hook",
         "production_quality_policy_changed": False,
         "output": output,
         "hook_tts_seconds": round(hook_tts_seconds, 3),
