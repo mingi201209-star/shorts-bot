@@ -1,12 +1,11 @@
 import re
 
 
-POLITE_ENDINGS = (
-    "요",
-    "죠",
+# Production narration uses formal polite Korean (하십시오체).  Casual polite
+# 해요체 is deliberately excluded so a script cannot mix "~습니다" and "~요".
+FORMAL_ENDINGS = (
     "니다",
     "니까",
-    "세요",
     "십시오",
 )
 
@@ -29,10 +28,13 @@ HOOK_NOMINAL_ENDINGS = (
 
 SENTENCE_SPLIT_RE = re.compile(r"(?<=[.!?…])\s*")
 KOREAN_RE = re.compile(r"[가-힣]")
+CASUAL_POLITE_RE = re.compile(
+    r"(?:해요|돼요|되어요|이에요|예요|거예요|것이에요|나요|군요|네요|죠|세요|요)$"
+)
 
 
 def _clean_sentence(text):
-    return str(text or "").strip().strip('"\'“”‘’()[]{}<>').strip()
+    return str(text or "").strip().strip('\"\'“”‘’()[]{}<>').strip()
 
 
 def _terminal(text):
@@ -65,15 +67,23 @@ def validate_korean_speech_text(text, *, allow_nominal=False):
         if not terminal:
             continue
 
-        if terminal.endswith(POLITE_ENDINGS):
+        # Explicitly reject 해요체 before checking allowed formal endings.
+        if CASUAL_POLITE_RE.search(terminal):
+            return False, f"해요체 종결 감지: {sentence}"
+
+        # Natural formal questions such as "왜 꺾여 있을까요?" are allowed.
+        if terminal.endswith("까요"):
+            continue
+
+        if terminal.endswith(FORMAL_ENDINGS):
             continue
 
         if allow_nominal and _is_nominal_hook(sentence):
             continue
 
-        return False, f"비격식/비존댓말 종결 감지: {sentence}"
+        return False, f"격식체(하십시오체) 이외 종결 감지: {sentence}"
 
-    return True, "자연스러운 한국어 존댓말 종결"
+    return True, "격식체 한국어 narration 종결"
 
 
 def validate_scenes_speech_style(scenes):
@@ -91,7 +101,7 @@ def validate_scenes_speech_style(scenes):
         if not valid:
             return False, f"{index}번 Scene speech-style 실패: {reason}"
 
-    return True, "전체 narration 존댓말 검사 통과"
+    return True, "전체 narration 격식체 검사 통과"
 
 
 def validate_script_speech_style(script_data):
