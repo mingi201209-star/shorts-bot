@@ -41,6 +41,7 @@ jobs:
             quality/script_engine_v2_regression_test.py \
             quality/script_engine_v2_failure_fixtures_test.py \
             quality/script_engine_v2_runner_regression_test.py \
+            quality/script_engine_v2_text_alias_regression_test.py \
             quality/script_generator_router_regression_test.py
 
       - name: Deterministic narrative plan regression
@@ -51,6 +52,9 @@ jobs:
 
       - name: Bounded writer orchestration
         run: python -m quality.script_engine_v2_runner_regression_test
+
+      - name: Writer text alias normalization
+        run: python -m quality.script_engine_v2_text_alias_regression_test
 
       - name: Legacy-safe router regression
         run: python -m quality.script_generator_router_regression_test
