@@ -21,7 +21,7 @@ import_replacement = '''import re\n\nimport openai\n\nfrom content.retention_str
 text = replace_once(text, import_marker, import_replacement, "retention imports")
 
 candidate_marker = '''    candidate = validate_candidate(\n        candidate\n    )\n\n    category = str(\n'''
-candidate_replacement = '''    candidate = validate_candidate(\n        candidate\n    )\n\n    # RETENTION_STRUCTURE_EXPERIMENT_V1\n    retention_plan = build_retention_plan(candidate)\n\n    category = str(\n'''
+candidate_replacement = '''    candidate = validate_candidate(\n        candidate\n    )\n\n    # RETENTION_STRUCTURE_EXPERIMENT_V2\n    retention_plan = build_retention_plan(candidate)\n\n    category = str(\n'''
 text = replace_once(text, candidate_marker, candidate_replacement, "retention plan")
 
 runtime_marker = '''새 소재를 탐색하지 말고 확정 Winner를 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초,\n{MIN_SCENES}~{MAX_SCENES} Scene의 Shorts로 발전시켜라.\n'''
@@ -36,9 +36,8 @@ length_marker = '''[LENGTH]\n전체 TTS가 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECO
 length_replacement = '''[LENGTH]\n전체 TTS는 retention runtime contract의 초 범위를 따른다.\n짧은 bucket을 기존 길이로 패딩하지 말고, 긴 bucket도 필요한 causal beat를 억지로 삭제하지 마라.\n너무 짧은 문장을 Scene 수만 맞추려고 잘게 쪼개지 마라.\n'''
 text = replace_once(text, length_marker, length_replacement, "retention length prompt")
 
-# Modify only the final OUTPUT schema occurrence, not the good/bad visual examples.
 output_marker = '''    {{\n      "text": "한국어 Scene 대사",\n      "visual_goal": "이 Scene에서 실제로 보여야 하는 구체적인 화면",\n      "keyword": "specific english visual search"\n    }}\n'''
-output_replacement = '''    {{\n      "text": "한국어 Scene 대사",\n      "visual_goal": "이 Scene에서 실제로 보여야 하는 구체적인 화면",\n      "keyword": "specific english visual search",\n      "retention_role": "첫 3 Scene만 phenomenon | consequence | causal_clue, 이후 빈 문자열"\n    }}\n'''
+output_replacement = '''    {{\n      "text": "한국어 Scene 대사",\n      "visual_goal": "이 Scene에서 실제로 보여야 하는 구체적인 화면",\n      "keyword": "specific english visual search",\n      "retention_role": "첫 3 Scene만 phenomenon | question | causal_clue, 이후 빈 문자열"\n    }}\n'''
 if output_replacement not in text:
     if text.count(output_marker) != 1:
         raise RuntimeError(f"retention output schema marker count mismatch: {text.count(output_marker)}")
