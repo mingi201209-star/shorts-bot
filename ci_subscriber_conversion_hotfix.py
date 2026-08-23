@@ -36,5 +36,25 @@ print_marker = '''            print("⏱️ Retention runtime bucket:", result["
 print_replacement = '''            print("⏱️ Retention runtime bucket:", result["runtime_bucket"])\n            print("🔔 Subscriber conversion:", result.get("subscriber_conversion_mode"), "added=", result.get("cta_added"))\n            print("➡️ 다음 단계: 독립 Judge Committee")\n'''
 text = replace_once(text, print_marker, print_replacement, "subscriber observability")
 
+# SCRIPT_PARITY_LEGACY_MARKER_BRIDGE_V1
+# Retention structure intentionally replaces the old duration prompt before the
+# script-production-parity hotfix runs. The parity hotfix still installs semantic
+# validator/runtime wrappers but historically used those old prompt strings as
+# installation sentinels. Keep inert copies so that installer remains compatible
+# with the evolved retention prompt without reverting the actual runtime contract.
+if "SCRIPT_PARITY_LEGACY_MARKER_BRIDGE_V1" not in text:
+    text += r'''
+
+# SCRIPT_PARITY_LEGACY_MARKER_BRIDGE_V1
+_SCRIPT_PARITY_LEGACY_INSTALL_SENTINELS = r"""
+새 소재를 탐색하지 말고 확정 Winner를 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초,
+{MIN_SCENES}~{MAX_SCENES} Scene의 Shorts로 발전시켜라.
+
+[LENGTH]
+전체 TTS가 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초가 되도록 충분한 문장 분량을 만든다.
+너무 짧은 문장을 억지로 Scene 수만 맞추려고 잘게 쪼개지 마라.
+"""
+'''
+
 PATH.write_text(text, encoding="utf-8")
 print("✅ subscriber conversion layer hotfix applied")
