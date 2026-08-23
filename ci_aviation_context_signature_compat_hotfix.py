@@ -4,6 +4,7 @@ from ci_fixed_aviation_scope_contract_hotfix import main as patch_fixed_aviation
 from ci_fixed_topic_runtime_call_compat_hotfix import main as patch_runtime_call_compat
 
 EXPLORER_PATH = Path("content/candidate_explorer.py")
+MAIN_PATH = Path("main.py")
 
 
 def _ensure_signature_keyword(text, function_name, keyword, default):
@@ -76,6 +77,25 @@ def _ensure_forwarded_keyword(text, function_name, callee, keyword):
     raise RuntimeError(f"{callee} forwarding anchor not found")
 
 
+def _patch_automatic_gate_feedback():
+    text = MAIN_PATH.read_text(encoding="utf-8")
+    marker = '''                if forced_topic:\n                    fixed_topic_gate_feedback = str(\n                        winner_gate.get(\n                            "reason",\n                            "",\n                        )\n                    ).strip()\n\n                print_budget_status()\n'''
+    replacement = '''                gate_reject_reason = str(\n                    winner_gate.get(\n                        "reason",\n                        "",\n                    )\n                ).strip()\n\n                if forced_topic:\n                    fixed_topic_gate_feedback = gate_reject_reason\n                elif (\n                    os.environ.get(\n                        "SHORTS_CANDIDATE_SCOPE",\n                        "",\n                    ).strip().lower() == "aviation"\n                    and gate_reject_reason\n                ):\n                    automatic_feedback = (\n                        "[AUTOMATIC AVIATION GATE FEEDBACK] "\n                        f"rejected_topic={current_topic} | "\n                        f"reason={gate_reject_reason}"\n                    )\n                    if automatic_feedback not in rejected_topics:\n                        rejected_topics.append(automatic_feedback)\n                    print(\n                        "🔁 AUTOMATIC AVIATION GATE FEEDBACK:",\n                        gate_reject_reason,\n                    )\n\n                print_budget_status()\n'''
+
+    if "[AUTOMATIC AVIATION GATE FEEDBACK]" in text:
+        print("✅ automatic aviation Gate feedback already propagated")
+        return
+
+    count = text.count(marker)
+    if count != 1:
+        raise RuntimeError(
+            f"automatic aviation Gate feedback marker count mismatch: {count}"
+        )
+
+    MAIN_PATH.write_text(text.replace(marker, replacement, 1), encoding="utf-8")
+    print("✅ automatic aviation Gate feedback propagation applied")
+
+
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
 
@@ -98,7 +118,8 @@ def main():
     EXPLORER_PATH.write_text(text, encoding="utf-8")
     patch_fixed_aviation_scope()
     patch_runtime_call_compat()
-    print("✅ Aviation fixed-topic + gate-feedback signature compatibility applied")
+    _patch_automatic_gate_feedback()
+    print("✅ Aviation fixed-topic + automatic gate-feedback compatibility applied")
 
 
 if __name__ == "__main__":
