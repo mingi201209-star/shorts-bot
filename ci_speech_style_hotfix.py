@@ -2,6 +2,11 @@ from pathlib import Path
 import runpy
 
 
+# Apply the narrow deterministic repair before speech validation is injected.
+# This prevents a single safe 하다-style ending from forcing a full Script retry.
+runpy.run_path("ci_script_local_formal_repair_hotfix.py", run_name="__main__")
+
+
 # ============================================================
 # Script Generator: sentence-level deterministic validation
 # ============================================================
