@@ -74,7 +74,7 @@ def non_design_candidate():
 def good_scenes():
     return [
         scene("항공기 소음 제어 장치는 여러 단계로 작동합니다.", "항공기 객실의 소음 제어 장치", "aircraft cabin noise system"),
-        scene("객실 소음은 엔진과 공기 흐름에서 계속 들어옵니다.", "비행 중인 항공기 객실 내부", "aircraft cabin flight noise"),
+        scene("그런데 객실 소음은 왜 계속 들어올까요?", "비행 중인 항공기 객실 내부", "aircraft cabin flight noise"),
         scene("좁은 객실에서는 소음을 줄이는 장치가 공간 제약 안에서 작동해야 합니다.", "항공기 객실 벽과 좌석 구조", "aircraft cabin interior wall"),
         scene("마이크가 객실의 반복 소음을 감지합니다.", "객실 내부 마이크 또는 소음 센서", "aircraft cabin microphone sensor"),
         scene("제어기가 감지된 신호의 특징을 계산합니다.", "오디오 제어기와 신호 처리 장치", "audio controller signal processing"),
@@ -241,8 +241,8 @@ assert rewrite_calls["count"] == 1, rewrite_calls
 assert quality_result["rewrite_count"] == 1, quality_result
 assert production_main.MAX_REWRITES == 1
 
-# #29 OFF production contract; changed-file scope is verified through the PR API.
-main_workflow = (ROOT / ".github/workflows/main.yml").read_text(encoding="utf-8")
-assert 'AI_VISUAL_FALLBACK_ENABLED: "false"' in main_workflow
+# #29 OFF production contract; changed-file scope is verified by the workflow paths.
+assert not legacy.AI_VISUAL_FALLBACK_ENABLED
+assert legacy.AI_MAX_GENERATIONS_PER_VIDEO == 1
 
-print("PASS: script production parity A-I; #20/#21/#23/#30 preserved; video #24-#29 untouched; no Sora/API calls")
+print("PASS: script production parity + progression + bounded rewrite regression")
