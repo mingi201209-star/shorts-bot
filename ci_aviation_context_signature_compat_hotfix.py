@@ -102,13 +102,25 @@ def _apply_final_script_scene_recovery_if_ready():
     if not SCRIPT_PATH.exists():
         return
     source = SCRIPT_PATH.read_text(encoding="utf-8")
-    # This compatibility hotfix runs twice in production. The first pass is
-    # before script-validation recovery exists; the second is deliberately
-    # against the FINAL production state. Install local recovery only then.
     if "SCRIPT_OPENING_LOCK_V1" not in source:
         print("⏭️ Scene-local Script recovery deferred until final production state")
         return
     runpy.run_path("ci_script_scene_local_recovery_hotfix.py", run_name="__main__")
+
+
+def _patch_script_engine_router():
+    """Switch final production main.py to the stable V2/legacy router boundary."""
+    text = MAIN_PATH.read_text(encoding="utf-8")
+    legacy_import = '''from content.script_generator import (\n    generate_script,\n)\n'''
+    router_import = '''from content.script_generator_router import (\n    generate_script,\n)\n'''
+    if router_import in text:
+        print("✅ Script Engine router already connected")
+        return
+    count = text.count(legacy_import)
+    if count != 1:
+        raise RuntimeError(f"Script Generator import marker mismatch: {count}")
+    MAIN_PATH.write_text(text.replace(legacy_import, router_import, 1), encoding="utf-8")
+    print("✅ Script Engine V2 router connected to production main")
 
 
 def main():
@@ -135,6 +147,7 @@ def main():
     patch_runtime_call_compat()
     _patch_automatic_gate_feedback()
     _apply_final_script_scene_recovery_if_ready()
+    _patch_script_engine_router()
     print("✅ Aviation fixed-topic + automatic gate-feedback compatibility applied")
 
 
