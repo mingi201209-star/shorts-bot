@@ -69,12 +69,14 @@ def build_subscriber_conversion_plan(candidate):
     text = _candidate_text(candidate)
     score = _series_continuity_score(candidate)
     identity = infer_series_identity(candidate)
+    proof = candidate.get("visual_proof") or []
+    strong_visual_continuity = isinstance(proof, list) and len(proof) >= 2
 
     if any(signal in text for signal in _AVIATION_SIGNALS) and score >= 2:
         mode = "soft_series_cta"
         cta_text = "비행기 숨은 이유가 더 궁금하시면 구독해 두세요."
         reason = "aviation series continuity is strong"
-    elif score >= 4:
+    elif score >= 4 and strong_visual_continuity:
         mode = "soft_series_cta"
         cta_text = "숨은 이유가 더 궁금하시면 구독해 두세요."
         reason = "recurring series value is explicit"
