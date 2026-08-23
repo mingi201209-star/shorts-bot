@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import types
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -122,6 +123,14 @@ def test_no_recoverable_candidate_stays_terminal():
 
 
 def _load_supply_module():
+    # This focused regression intentionally has no third-party install step.
+    # The wrapper behavior below stubs all model calls, so a minimal import-only
+    # openai module is enough to load candidate_explorer without network access.
+    if "openai" not in sys.modules:
+        fake_openai = types.ModuleType("openai")
+        fake_openai.api_key = None
+        sys.modules["openai"] = fake_openai
+
     import content.candidate_explorer as explorer
 
     assert hasattr(explorer, "_candidate_supply_reason_is_zero_usable"), (
