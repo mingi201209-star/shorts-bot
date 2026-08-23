@@ -1,0 +1,11 @@
+{
+  "id": 32641375844,
+  "html_url": "https://github.com/mingi201209-star/shorts-bot/actions/runs/32641375844",
+  "head_sha": "6f93d33add1fe6590bed9cf527607cf531479df1",
+  "status": "in_progress",
+  "conclusion": null,
+  "created_at": "2026-08-23T13:07:06Z",
+  "updated_at": "2026-08-23T13:07:12Z",
+  "event": "workflow_dispatch",
+  "run_number": 258
+}
