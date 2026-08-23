@@ -242,7 +242,8 @@ assert quality_result["rewrite_count"] == 1, quality_result
 assert production_main.MAX_REWRITES == 1
 
 # #29 OFF production contract; changed-file scope is verified by the workflow paths.
-assert not legacy.AI_VISUAL_FALLBACK_ENABLED
-assert legacy.AI_MAX_GENERATIONS_PER_VIDEO == 1
+from video import ai_visual_provider
+assert not ai_visual_provider.AI_VISUAL_FALLBACK_ENABLED
+assert ai_visual_provider.AI_MAX_GENERATIONS_PER_VIDEO == 1
 
 print("PASS: script production parity + progression + bounded rewrite regression")
