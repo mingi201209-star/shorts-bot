@@ -1,9 +1,5 @@
 """Regression fixtures distilled from repeated production Script failures."""
-from content.script_engine_v2 import (
-    build_narrative_plan,
-    local_repair_payload,
-    repair_failed_scenes,
-)
+from content.script_engine_v2 import build_narrative_plan, local_repair_payload, repair_failed_scenes
 
 CANDIDATE = {
     "topic": "비행기 날개 끝이 위로 꺾인 이유",
@@ -22,18 +18,10 @@ CANDIDATE = {
 
 def script_with(plan, scene3, scene4):
     count = plan["target_scene_count"]
-    texts = [
-        CANDIDATE["micro_narrative"]["hook"],
-        "그런데 왜 비행기 날개 끝은 위로 꺾여 있을까요?",
-        scene3,
-        scene4,
-    ]
+    texts = [CANDIDATE["micro_narrative"]["hook"], "그런데 왜 비행기 날개 끝은 위로 꺾여 있을까요?", scene3, scene4]
     while len(texts) < count - 2:
         texts.append("공기 흐름과 힘의 변화가 다음 단계로 이어집니다.")
-    texts.extend([
-        CANDIDATE["micro_narrative"]["reveal"],
-        CANDIDATE["micro_narrative"]["payoff"],
-    ])
+    texts.extend([CANDIDATE["micro_narrative"]["reveal"], CANDIDATE["micro_narrative"]["payoff"]])
     return {"scenes": [{"text": text} for text in texts]}
 
 
@@ -41,21 +29,18 @@ def main():
     plan = build_narrative_plan(CANDIDATE)
     reveal_index = plan["target_scene_count"] - 1
 
-    broken = script_with(
-        plan,
-        "날개 끝에서 서로 다른 공기가 만나게 된다.",
-        "이 구조가 소용돌이를 줄여준다.",
-    )
+    broken = script_with(plan, "날개 끝에서 서로 다른 공기가 만나게 된다.", "이 구조가 소용돌이를 줄여준다.")
     repaired = repair_failed_scenes(broken, plan, [3, 4])
-    assert repaired["scenes"][2]["text"].startswith("원인의 첫 단서는 ")
     assert repaired["scenes"][2]["text"].endswith("됩니다.")
+    assert "공기" in repaired["scenes"][2]["text"]
     assert repaired["scenes"][3]["text"].endswith("줄여줍니다.")
 
-    tampered = script_with(
-        plan,
-        "압력 차이가 생깁니다.",
-        "소용돌이가 감소시킨다.",
-    )
+    missing_clue = script_with(plan, "두 부분이 서로 만나게 된다.", "이 구조가 소용돌이를 줄여준다.")
+    repaired_clue = repair_failed_scenes(missing_clue, plan, [3])
+    assert repaired_clue["scenes"][2]["text"].startswith("원인의 첫 단서는 ")
+    assert repaired_clue["scenes"][2]["text"].endswith("됩니다.")
+
+    tampered = script_with(plan, "압력 차이가 생깁니다.", "소용돌이가 감소시킨다.")
     tampered["scenes"][0]["text"] = "왜 꺾였을까요?"
     tampered["scenes"][reveal_index - 1]["text"] = "정답을 바꾼다."
     repaired2 = repair_failed_scenes(tampered, plan, [1, 4, reveal_index])
@@ -63,12 +48,7 @@ def main():
     assert repaired2["scenes"][3]["text"].endswith("감소시킵니다.")
     assert repaired2["scenes"][reveal_index - 1]["text"] == CANDIDATE["micro_narrative"]["reveal"]
 
-    payload = local_repair_payload(
-        repaired2,
-        plan,
-        [1, 3, 4, reveal_index],
-        ["scene 3 lacks causal clue", "scene 4 speech style"],
-    )
+    payload = local_repair_payload(repaired2, plan, [1, 3, 4, reveal_index], ["scene 3 lacks causal clue", "scene 4 speech style"])
     assert [item["scene_index"] for item in payload["targets"]] == [3, 4]
     assert payload["rules"]["max_local_repair_calls"] == 2
     assert payload["rules"]["do_not_rewrite_other_scenes"] is True
