@@ -80,6 +80,20 @@ def production_shape_writer(item):
     return {"result": {"title": "윙렛의 이유", "scenes": scenes}}
 
 
+def latest_production_shape_writer(item):
+    """Distill Run 32641375844: Korean keywords survive all local model repairs."""
+    plan = build_narrative_plan(item)
+    scenes = []
+    for contract in plan["contracts"]:
+        index = contract["index"]
+        scenes.append({
+            "narration": MIDDLE_TEXTS[(index - 1) % len(MIDDLE_TEXTS)],
+            "visual_description": f"show winglet airflow mechanism stage {index}",
+            "search_query": "윙렛 공기 흐름",
+        })
+    return {"result": {"title": "윙렛의 이유", "scenes": scenes}}
+
+
 def main():
     item = candidate()
     calls = []
@@ -129,6 +143,39 @@ def main():
     assert production_script["scenes"][-2]["text"].endswith("줄입니다.")
     assert production_script["scenes"][-1]["text"].endswith("됩니다.")
     assert all(any(ch.isascii() and ch.isalpha() for ch in scene["keyword"]) for scene in production_script["scenes"])
+
+    latest_item = candidate()
+    latest_item["topic"] = "비행기 날개 끝의 윙렛은 왜 위로 꺾여 있을까"
+    latest_item["micro_narrative"]["hook"] = (
+        "비행기 날개 끝의 윙렛이 위로 꺾여 있는 모습은 흔히 볼 수 있지만, 그 이유는 무엇일까?"
+    )
+    latest_item["micro_narrative"]["reveal"] = (
+        "윙렛은 날개 끝에서 발생하는 압력 차로 인한 강한 소용돌이를 약화시키기 위해 "
+        "위로 꺾여 있으며, 이로 인해 유도항력이 줄어든다."
+    )
+    latest_item["visual_proof"] = ["윙렛", "날개 끝 공기 흐름"]
+    latest_calls = []
+
+    def latest_call(payload, *, mode):
+        latest_calls.append(mode)
+        if mode == "writer":
+            return latest_production_shape_writer(latest_item)
+        # Even if the local model repeats the Korean keyword, deterministic
+        # contract normalization must recover without weakening validation.
+        return {
+            "repairs": [
+                {"scene_index": target["scene_index"], "keyword": "윙렛 공기 흐름"}
+                for target in payload["targets"]
+            ]
+        }
+
+    latest_script = generate_script_v2(latest_item, call_fn=latest_call)
+    assert latest_script["script_engine_v2_calls"] <= 3
+    assert latest_script["scenes"][0]["text"] == "비행기 날개 끝의 윙렛이 위로 꺾여 있는 모습은 흔히 볼 수 있습니다."
+    assert "무엇입니다" not in latest_script["scenes"][0]["text"]
+    assert latest_script["scenes"][-2]["text"].endswith("유도항력이 줄어듭니다.")
+    assert all(any(ch.isascii() and ch.isalpha() for ch in scene["keyword"]) for scene in latest_script["scenes"])
+    assert len({scene["keyword"] for scene in latest_script["scenes"]}) >= max(6, len(latest_script["scenes"]) // 2)
 
     failing_calls = []
 
