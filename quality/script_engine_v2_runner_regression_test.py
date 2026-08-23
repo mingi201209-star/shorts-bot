@@ -19,7 +19,7 @@ def candidate():
 
 
 MIDDLE_TEXTS = (
-    "날개 위아래의 압력 차이가 끝부분까지 이어진다.",
+    "날개 끝에서도 압력 차이가 유지된다.",
     "높은 압력의 공기가 날개 끝 바깥쪽으로 움직입니다.",
     "끝을 돌아 나온 공기가 뒤쪽에서 회전하기 시작합니다.",
     "이 회전 흐름은 날개가 받는 힘의 방향을 바꿉니다.",
@@ -86,8 +86,7 @@ def main():
     assert script["scenes"][1]["text"].startswith("그런데")
     assert script["scenes"][-2]["text"] == item["micro_narrative"]["reveal"]
     assert script["scenes"][-1]["text"] == item["micro_narrative"]["payoff"]
-    assert script["scenes"][2]["text"].startswith("원인의 첫 단서는 ")
-    assert script["scenes"][2]["text"].endswith("됩니다.")
+    assert script["scenes"][2]["text"] == "날개 끝에서도 압력 차이가 유지됩니다."
 
     failing_calls = []
 
