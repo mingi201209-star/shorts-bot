@@ -49,7 +49,15 @@ def main():
     assert repaired2["scenes"][reveal_index - 1]["text"] == CANDIDATE["micro_narrative"]["reveal"]
 
     payload = local_repair_payload(repaired2, plan, [1, 3, 4, reveal_index], ["scene 3 lacks causal clue", "scene 4 speech style"])
-    assert [item["scene_index"] for item in payload["targets"]] == [3, 4]
+    targets = payload["targets"]
+    assert [item["scene_index"] for item in targets] == [1, 3, 4, reveal_index]
+    assert targets[0]["text_locked"] is True
+    assert targets[0]["locked_text"] == CANDIDATE["micro_narrative"]["hook"]
+    assert targets[1]["text_locked"] is False
+    assert targets[-1]["text_locked"] is True
+    assert targets[-1]["locked_text"] == CANDIDATE["micro_narrative"]["reveal"]
+    assert payload["rules"]["locked_scene_text_is_immutable"] is True
+    assert payload["rules"]["metadata_on_locked_scenes_may_be_repaired"] is True
     assert payload["rules"]["max_local_repair_calls"] == 2
     assert payload["rules"]["do_not_rewrite_other_scenes"] is True
     print("PASS: Script Engine V2 production failure fixtures")
