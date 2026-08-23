@@ -109,5 +109,121 @@ def validate_candidate(candidate):
     return cleaned
 '''
 
+# SCRIPT_OPENING_LOCK_V1
+# The Hook selector/Candidate contract has already approved the opening intent.
+# Do not spend Script API retries asking another model pass to rewrite those two
+# beats. Preserve generated visual metadata, but deterministically restore the
+# approved narration before every existing validator runs.
+if "SCRIPT_OPENING_LOCK_V1" not in text:
+    extraction = '''            generated = extract_json(
+                content
+            )
+
+            valid, reason = validate_script(
+                generated
+            )
+'''
+    locked_extraction = '''            generated = extract_json(
+                content
+            )
+            generated = _script_opening_lock_apply(
+                generated,
+                candidate,
+            )
+
+            valid, reason = validate_script(
+                generated
+            )
+'''
+    if text.count(extraction) != 1:
+        raise RuntimeError("script opening lock extraction marker mismatch")
+    text = text.replace(extraction, locked_extraction, 1)
+
+    prompt_marker = '''[MICRO NARRATIVE]
+HOOK: {micro['hook']}
+QUESTION: {micro['core_question']}
+REVEAL: {micro['reveal']}
+PAYOFF: {micro['payoff']}
+'''
+    prompt_replacement = '''[MICRO NARRATIVE]
+HOOK: {micro['hook']}
+QUESTION: {micro['core_question']}
+REVEAL: {micro['reveal']}
+PAYOFF: {micro['payoff']}
+
+[LOCKED OPENING — DO NOT REWRITE]
+Scene 1 narration text is already approved and will be restored deterministically to:
+{micro['hook']}
+Scene 2 narration text is already approved and will be restored deterministically to:
+{micro['core_question']}
+Generate useful visual_goal/keyword fields for those scenes, but spend your writing effort on Scene 3 onward.
+Do not duplicate Scene 1/2 wording later in the script.
+'''
+    if text.count(prompt_marker) != 1:
+        raise RuntimeError("script opening lock prompt marker mismatch")
+    text = text.replace(prompt_marker, prompt_replacement, 1)
+
+    text += r'''
+
+# SCRIPT_OPENING_LOCK_V1
+_SAFE_FORMAL_ENDING_REPAIRS = (
+    (re.compile(r"있는데요([.!?…]*)$"), r"있습니다\1"),
+    (re.compile(r"없는데요([.!?…]*)$"), r"없습니다\1"),
+    (re.compile(r"되는데요([.!?…]*)$"), r"됩니다\1"),
+    (re.compile(r"생기는데요([.!?…]*)$"), r"생깁니다\1"),
+    (re.compile(r"하는데요([.!?…]*)$"), r"합니다\1"),
+    (re.compile(r"인데요([.!?…]*)$"), r"입니다\1"),
+    (re.compile(r"있죠([.!?…]*)$"), r"있습니다\1"),
+    (re.compile(r"없죠([.!?…]*)$"), r"없습니다\1"),
+    (re.compile(r"되죠([.!?…]*)$"), r"됩니다\1"),
+    (re.compile(r"생기죠([.!?…]*)$"), r"생깁니다\1"),
+    (re.compile(r"보이죠([.!?…]*)$"), r"보입니다\1"),
+    (re.compile(r"때문이죠([.!?…]*)$"), r"때문입니다\1"),
+    (re.compile(r"보세요([.!?…]*)$"), r"볼 수 있습니다\1"),
+)
+
+
+def _script_safe_formal_ending_repair(text):
+    value = str(text or "").strip()
+    for pattern, replacement in _SAFE_FORMAL_ENDING_REPAIRS:
+        repaired = pattern.sub(replacement, value)
+        if repaired != value:
+            return repaired
+    return value
+
+
+def _script_opening_lock_apply(payload, candidate):
+    if not isinstance(payload, dict) or not isinstance(candidate, dict):
+        return payload
+
+    scenes = payload.get("scenes")
+    if not isinstance(scenes, list):
+        return payload
+
+    micro = candidate.get("micro_narrative")
+    if not isinstance(micro, dict):
+        micro = {}
+
+    locked_hook = str(micro.get("hook", "")).strip()
+    locked_question = str(micro.get("core_question", "")).strip()
+
+    # Keep visual_goal/keyword produced by the LLM, but never let it replace the
+    # approved narration. Structural validators still decide whether the result
+    # is acceptable after the lock is applied.
+    if len(scenes) >= 1 and isinstance(scenes[0], dict) and locked_hook:
+        scenes[0]["text"] = locked_hook
+    if len(scenes) >= 2 and isinstance(scenes[1], dict) and locked_question:
+        scenes[1]["text"] = locked_question
+
+    # Safe style-only cleanup for body scenes. This is deliberately narrow: any
+    # wording not in the whitelist remains untouched and can still fail the
+    # existing speech-style gate/retry path.
+    for scene in scenes[2:]:
+        if isinstance(scene, dict):
+            scene["text"] = _script_safe_formal_ending_repair(scene.get("text", ""))
+
+    return payload
+'''
+
 path.write_text(text, encoding="utf-8")
-print("✅ Bounded script validation recovery guidance + grounded specificity preservation applied")
+print("✅ Bounded script validation recovery + approved opening lock applied")
