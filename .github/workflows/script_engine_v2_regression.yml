@@ -1,0 +1,54 @@
+name: Script Engine V2 Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/script_engine_v2.py"
+      - "content/script_engine_v2_runner.py"
+      - "content/script_engine_v2_validation.py"
+      - "content/script_generator_router.py"
+      - "quality/script_engine_v2_*"
+      - ".github/workflows/script_engine_v2_regression.yml"
+  workflow_dispatch:
+
+jobs:
+  v2-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install minimal dependencies
+        run: python -m pip install openai
+
+      - name: Compile V2 modules
+        run: |
+          python -m py_compile \
+            content/script_engine_v2.py \
+            content/script_engine_v2_runner.py \
+            content/script_engine_v2_validation.py \
+            quality/script_engine_v2_regression_test.py \
+            quality/script_engine_v2_failure_fixtures_test.py \
+            quality/script_engine_v2_runner_regression_test.py
+
+      - name: Deterministic narrative plan regression
+        run: python -m quality.script_engine_v2_regression_test
+
+      - name: Production failure fixtures
+        run: python -m quality.script_engine_v2_failure_fixtures_test
+
+      - name: Bounded writer orchestration
+        run: python -m quality.script_engine_v2_runner_regression_test
+
+      - name: Enforce Script API ceiling
+        run: |
+          python - <<'PY'
+          from content.script_engine_v2 import MAX_SCRIPT_API_CALLS, MAX_LOCAL_REPAIR_CALLS
+          assert MAX_SCRIPT_API_CALLS == 3
+          assert MAX_LOCAL_REPAIR_CALLS == 2
+          print("PASS: writer 1 + local repair <= 2")
+          PY
