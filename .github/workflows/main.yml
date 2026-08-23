@@ -109,6 +109,7 @@ jobs:
           python ci_adaptive_scene_count_hotfix.py
           python ci_general_scene_visual_parity_hotfix.py
           python ci_script_validation_recovery_hotfix.py
+          python ci_script_v2_visual_goal_hotfix.py
 
           # Some later production hotfixes rewrite candidate_explorer wrappers.
           # Re-apply the compatibility patch against the FINAL production state.
@@ -148,7 +149,7 @@ jobs:
             ci_subscriber_conversion_hotfix.py content/subscriber_conversion.py \
             ci_script_production_parity_hotfix.py ci_script_production_parity_bridge_hotfix.py \
             ci_adaptive_scene_count_hotfix.py ci_general_scene_visual_parity_hotfix.py \
-            ci_script_validation_recovery_hotfix.py content/retention_structure.py \
+            ci_script_validation_recovery_hotfix.py ci_script_v2_visual_goal_hotfix.py content/retention_structure.py \
             quality/retention_structure_experiment_regression_test.py \
             quality/subscriber_conversion_regression_test.py \
             quality/fixed_topic_gate_feedback_regression_test.py \

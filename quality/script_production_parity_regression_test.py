@@ -74,7 +74,7 @@ def non_design_candidate():
 def good_scenes():
     return [
         scene("항공기 소음 제어 장치는 여러 단계로 작동합니다.", "항공기 객실의 소음 제어 장치", "aircraft cabin noise system"),
-        scene("객실 소음은 엔진과 공기 흐름에서 계속 들어옵니다.", "비행 중인 항공기 객실 내부", "aircraft cabin flight noise"),
+        scene("그런데 객실 소음은 왜 계속 들어올까요?", "비행 중인 항공기 객실 내부", "aircraft cabin flight noise"),
         scene("좁은 객실에서는 소음을 줄이는 장치가 공간 제약 안에서 작동해야 합니다.", "항공기 객실 벽과 좌석 구조", "aircraft cabin interior wall"),
         scene("마이크가 객실의 반복 소음을 감지합니다.", "객실 내부 마이크 또는 소음 센서", "aircraft cabin microphone sensor"),
         scene("제어기가 감지된 신호의 특징을 계산합니다.", "오디오 제어기와 신호 처리 장치", "audio controller signal processing"),
@@ -84,7 +84,7 @@ def good_scenes():
         scene("비행 상태가 달라지면 들어오는 소음 특성도 달라집니다.", "비행 중 객실과 엔진 환경 변화", "aircraft cabin engine flight"),
         scene("제어기는 그 변화에 맞춰 출력을 조절합니다.", "오디오 제어기의 출력 조절", "audio controller output adjustment"),
         scene("스피커 출력도 계산된 변화에 맞춰 이어집니다.", "객실 스피커 출력 장면", "cabin speaker playback system"),
-        scene("그 결과 목표로 삼은 소음 성분이 더 작게 들립니다.", "소음이 줄어든 항공기 객실", "aircraft cabin reduced noise"),
+        scene("그래서 마이크가 반복 소음을 감지하고 제어기가 계산한 대응 신호를 스피커가 재생하면서 목표 소음 성분이 줄어듭니다.", "소음 제어 단계가 이어지는 항공기 객실", "aircraft noise control sequence"),
     ]
 
 
@@ -241,8 +241,9 @@ assert rewrite_calls["count"] == 1, rewrite_calls
 assert quality_result["rewrite_count"] == 1, quality_result
 assert production_main.MAX_REWRITES == 1
 
-# #29 OFF production contract; changed-file scope is verified through the PR API.
-main_workflow = (ROOT / ".github/workflows/main.yml").read_text(encoding="utf-8")
-assert 'AI_VISUAL_FALLBACK_ENABLED: "false"' in main_workflow
+# #29 OFF production contract; changed-file scope is verified by the workflow paths.
+from video import ai_visual_provider
+assert not ai_visual_provider.AI_VISUAL_FALLBACK_ENABLED
+assert ai_visual_provider.AI_MAX_GENERATIONS_PER_VIDEO == 1
 
-print("PASS: script production parity A-I; #20/#21/#23/#30 preserved; video #24-#29 untouched; no Sora/API calls")
+print("PASS: script production parity + progression + bounded rewrite regression")
