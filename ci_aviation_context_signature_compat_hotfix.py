@@ -1,10 +1,12 @@
 from pathlib import Path
+import runpy
 
 from ci_fixed_aviation_scope_contract_hotfix import main as patch_fixed_aviation_scope
 from ci_fixed_topic_runtime_call_compat_hotfix import main as patch_runtime_call_compat
 
 EXPLORER_PATH = Path("content/candidate_explorer.py")
 MAIN_PATH = Path("main.py")
+SCRIPT_PATH = Path("content/script_generator.py")
 
 
 def _ensure_signature_keyword(text, function_name, keyword, default):
@@ -96,6 +98,19 @@ def _patch_automatic_gate_feedback():
     print("✅ automatic aviation Gate feedback propagation applied")
 
 
+def _apply_final_script_scene_recovery_if_ready():
+    if not SCRIPT_PATH.exists():
+        return
+    source = SCRIPT_PATH.read_text(encoding="utf-8")
+    # This compatibility hotfix runs twice in production. The first pass is
+    # before script-validation recovery exists; the second is deliberately
+    # against the FINAL production state. Install local recovery only then.
+    if "SCRIPT_OPENING_LOCK_V1" not in source:
+        print("⏭️ Scene-local Script recovery deferred until final production state")
+        return
+    runpy.run_path("ci_script_scene_local_recovery_hotfix.py", run_name="__main__")
+
+
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
 
@@ -119,6 +134,7 @@ def main():
     patch_fixed_aviation_scope()
     patch_runtime_call_compat()
     _patch_automatic_gate_feedback()
+    _apply_final_script_scene_recovery_if_ready()
     print("✅ Aviation fixed-topic + automatic gate-feedback compatibility applied")
 
 
