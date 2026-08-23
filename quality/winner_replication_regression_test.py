@@ -1,4 +1,5 @@
 from analytics.feedback_contract import make_video_lineage
+from content.growth_candidate_ranker import annotate_explorer_output
 from content.winner_replication import (
     MIN_PROMOTION_SAMPLE,
     build_replication_specs,
@@ -140,13 +141,17 @@ def test_repeated_weak_pattern_can_retire_without_missing_as_zero():
     assert summary["weak_observations"] >= 3
 
 
-def test_promoted_pattern_emits_exactly_three_isolated_specs():
+def promoted_history():
     winners = [
         lineage("rep-1", views=9000, engaged=8000, subscriber=2),
         lineage("rep-2", views=8500, engaged=7600, subscriber=2),
         lineage("rep-3", views=8200, engaged=7300, subscriber=1),
     ]
-    history = winners + [comparator("r-base-1", 100), comparator("r-base-2", 200), comparator("r-base-3", 300)]
+    return winners + [comparator("r-base-1", 100), comparator("r-base-2", 200), comparator("r-base-3", 300)], winners
+
+
+def test_promoted_pattern_emits_exactly_three_isolated_specs():
+    history, winners = promoted_history()
     _, summary = pattern_state(history, winners[0])
     specs = build_replication_specs(summary)
     assert len(specs) == 3
@@ -167,6 +172,21 @@ def test_promoted_pattern_emits_exactly_three_isolated_specs():
     assert len(learning["promoted_patterns"][0]["challenger_specs"]) == 3
 
 
+def test_growth_shadow_attaches_learning_without_changing_winner():
+    history, _ = promoted_history()
+    winner = candidate()
+    runner = candidate(topic="비행기 좌석 위 작은 표시", question="비행기 좌석 위 표시는 왜 있나요?")
+    output = {"winner": winner, "runner_up": runner, "winner_reason": "authoritative existing ranker"}
+    annotated = annotate_explorer_output(output, history=history)
+    assert annotated["winner"] == winner
+    assert annotated["runner_up"] == runner
+    assert annotated["winner_reason"] == "authoritative existing ranker"
+    learning = annotated["growth_shadow"]["winner_learning"]
+    assert learning["mode"] == "bounded_shadow_learning"
+    assert learning["production_authoritative"] is True
+    assert len(learning["promoted_patterns"]) == 1
+
+
 def main():
     test_pending_72h_blocks_24h_fallback()
     print("CASE A pending 72h blocks fallback: PASS")
@@ -182,6 +202,8 @@ def main():
     print("CASE F repeated weak retired: PASS")
     test_promoted_pattern_emits_exactly_three_isolated_specs()
     print("CASE G three challenger specs: PASS")
+    test_growth_shadow_attaches_learning_without_changing_winner()
+    print("CASE H growth shadow attachment: PASS")
     print("WINNER REPLICATION REGRESSION: PASS")
 
 
