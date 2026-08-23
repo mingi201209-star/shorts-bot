@@ -5,6 +5,7 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 EXPLORER = ROOT / "content" / "candidate_explorer.py"
+MAIN = ROOT / "main.py"
 
 
 def run(script):
@@ -57,14 +58,34 @@ def main():
     assert "fixed_topic=fixed_topic" in explorer_segment
     assert "fixed_topic_gate_feedback" in explorer_segment
 
-    # Exact production counterexample from run 32561698004 must compile after the
-    # full Explorer hotfix stack, without changing Candidate Gate thresholds.
-    compile(text, str(EXPLORER), "exec")
+    # Automatic aviation rejection feedback is persisted through rejected_topics,
+    # while the exact rejected topic remains separately present for repeat blocking.
+    main_text = MAIN.read_text(encoding="utf-8")
+    assert "[AUTOMATIC AVIATION GATE FEEDBACK]" in main_text
+    assert "gate_reject_reason" in main_text
+    assert "automatic_feedback not in rejected_topics" in main_text
+    assert "rejected_topics.append(automatic_feedback)" in main_text
+    assert 'SHORTS_CANDIDATE_SCOPE' in main_text
+    assert '== "aviation"' in main_text
+    assert "if forced_topic:" in main_text
+    assert "fixed_topic_gate_feedback = gate_reject_reason" in main_text
 
-    print("PASS: aviation fixed-topic signature compatibility")
+    # The aviation specificity context already serializes rejected_topics into
+    # DOWNSTREAM REJECTION FEEDBACK, so automatic Gate reason records reach the
+    # next Explorer attempt without changing Candidate Gate thresholds.
+    assert "[DOWNSTREAM REJECTION FEEDBACK]" in text
+    assert "rejected_feedback" in text
+    assert "같은 명사만 바꾸거나" in text
+
+    # Exact production counterexample must compile after the full Explorer stack.
+    compile(text, str(EXPLORER), "exec")
+    compile(main_text, str(MAIN), "exec")
+
+    print("PASS: aviation Gate-feedback compatibility")
     print("- fixed_topic + gate feedback accepted by final wrappers")
-    print("- both values forwarded through execution context")
-    print("- Candidate Gate/specificity thresholds untouched")
+    print("- automatic aviation Gate rejection reason retained for next attempt")
+    print("- exact rejected topic repeat protection remains separate")
+    print("- Candidate Gate/recovery thresholds untouched")
 
 
 if __name__ == "__main__":
