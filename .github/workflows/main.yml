@@ -13,6 +13,20 @@ on:
         required: false
         default: ""
         type: string
+      youtube_upload:
+        description: "Explicitly upload the rendered Short to YouTube"
+        required: false
+        default: false
+        type: boolean
+      youtube_privacy:
+        description: "YouTube privacy when upload is explicitly enabled"
+        required: false
+        default: "private"
+        type: choice
+        options:
+          - private
+          - unlisted
+          - public
 
 jobs:
   build:
@@ -179,3 +193,24 @@ jobs:
           echo "========================================"
           echo "✅ SHORTS GENERATOR V3.2 FINISHED"
           echo "========================================"
+
+      - name: Publish to YouTube and persist lineage
+        env:
+          ENABLE_YOUTUBE_UPLOAD: ${{ inputs.youtube_upload && '1' || '0' }}
+          SHORTS_YOUTUBE_PRIVACY: ${{ inputs.youtube_privacy }}
+          SHORTS_YOUTUBE_TITLE: ${{ inputs.topic || 'Shorts' }}
+          SHORTS_TOPIC: ${{ inputs.topic }}
+          SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
+          SHORTS_ANALYTICS_HISTORY_PATH: analytics/performance_history.json
+          YOUTUBE_ANALYTICS_CLIENT_ID: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_ID }}
+          YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET }}
+          YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN }}
+        run: python -m analytics.publish_and_persist
+
+      - name: Preserve analytics history
+        if: ${{ hashFiles('analytics/performance_history.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: analytics-history-${{ github.run_id }}
+          path: analytics/performance_history.json
+          retention-days: 90
