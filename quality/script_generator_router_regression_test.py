@@ -25,15 +25,21 @@ def main():
         legacy_module = types.ModuleType("content.script_generator")
         legacy_module.generate_script = lambda topic_info, item: {"engine": "legacy"}
         v2_module = types.ModuleType("content.script_engine_v2_runner")
-        v2_module.generate_script_v2 = lambda item: {
-            "engine": "v2",
-            "title": "윙렛의 이유",
-            "scenes": [{
-                "text": "비행기 날개 끝이 위로 꺾여 있습니다.",
-                "visual_goal": "show winglet",
-                "keyword": "airplane winglet closeup",
-            }],
-        }
+        seen_candidates = []
+
+        def fake_v2(item):
+            seen_candidates.append(item)
+            return {
+                "engine": "v2",
+                "title": "윙렛의 이유",
+                "scenes": [{
+                    "text": item["micro_narrative"]["hook"],
+                    "visual_goal": "show winglet",
+                    "keyword": "airplane winglet closeup",
+                }],
+            }
+
+        v2_module.generate_script_v2 = fake_v2
         sys.modules["content.script_generator"] = legacy_module
         sys.modules["content.script_engine_v2_runner"] = v2_module
 
@@ -49,6 +55,21 @@ def main():
         assert result["visual_proof"] == ["winglet"]
         assert result["candidate_selection_reason"] == "aviation continuity"
         assert result["scenes"][0]["visual_type"] == "real_world_broll"
+
+        # Production Run 32642764834 shape: Candidate supplies a why-question
+        # as Scene 1 even though V2 requires an observable statement.
+        question_item = candidate()
+        question_item["topic"] = "비행기 날개 끝이 위로 꺾여 있는 이유"
+        question_item["micro_narrative"]["hook"] = "왜 비행기 날개 끝이 위로 꺾여 있을까요?"
+        original_question = question_item["micro_narrative"]["hook"]
+        question_result = router.generate_script(
+            {"topic": "aviation", "category": "항공"},
+            question_item,
+        )
+        assert seen_candidates[-1]["micro_narrative"]["hook"] == "비행기 날개 끝이 위로 꺾여 있습니다."
+        assert question_result["scenes"][0]["text"] == "비행기 날개 끝이 위로 꺾여 있습니다."
+        assert question_result["micro_narrative"]["hook"] == "비행기 날개 끝이 위로 꺾여 있습니다."
+        assert question_item["micro_narrative"]["hook"] == original_question
 
         os.environ["SCRIPT_ENGINE_MODE"] = "legacy"
         assert router.generate_script({"topic": "direction"}, candidate())["engine"] == "legacy"
@@ -74,7 +95,7 @@ def main():
         else:
             os.environ["SCRIPT_ENGINE_MODE"] = original
 
-    print("PASS: Script Generator router V2 default and legacy rollback")
+    print("PASS: Script Generator router V2 default + question-hook normalization + legacy rollback")
 
 
 if __name__ == "__main__":
