@@ -110,6 +110,7 @@ jobs:
           python ci_general_scene_visual_parity_hotfix.py
           python ci_script_validation_recovery_hotfix.py
           python ci_script_v2_visual_goal_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
 
           # Some later production hotfixes rewrite candidate_explorer wrappers.
           # Re-apply the compatibility patch against the FINAL production state.
@@ -149,7 +150,7 @@ jobs:
             ci_subscriber_conversion_hotfix.py content/subscriber_conversion.py \
             ci_script_production_parity_hotfix.py ci_script_production_parity_bridge_hotfix.py \
             ci_adaptive_scene_count_hotfix.py ci_general_scene_visual_parity_hotfix.py \
-            ci_script_validation_recovery_hotfix.py ci_script_v2_visual_goal_hotfix.py content/retention_structure.py \
+            ci_script_validation_recovery_hotfix.py ci_script_v2_visual_goal_hotfix.py ci_final_visual_semantic_qa_hotfix.py content/retention_structure.py \
             quality/retention_structure_experiment_regression_test.py \
             quality/subscriber_conversion_regression_test.py \
             quality/fixed_topic_gate_feedback_regression_test.py \
@@ -157,11 +158,13 @@ jobs:
             main.py config.py content/candidate_explorer.py content/candidate_recovery.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py quality/final_render_integrity.py \
-            quality/final_render_integrity_regression_test.py quality/aviation_specificity_projection_regression_test.py \
+            quality/final_render_integrity_regression_test.py quality/final_visual_semantic_qa.py \
+            quality/final_visual_semantic_qa_regression_test.py quality/aviation_specificity_projection_regression_test.py \
             video/video_providers.py video/hook_visual.py video/hook_visual_dominance.py video/video_downloader.py \
             video/video_engine.py video/subtitle_engine.py video/ai_visual_provider.py
 
           python quality/final_render_integrity_regression_test.py
+          python quality/final_visual_semantic_qa_regression_test.py
           python quality/fixed_topic_gate_feedback_regression_test.py
           python quality/candidate_grounded_recovery_regression_test.py
           python -m quality.growth_candidate_shadow_regression_test
