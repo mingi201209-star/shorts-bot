@@ -68,6 +68,16 @@ def main():
         "비행기 날개 위 작은 판은 착륙할 때 올라옵니다."
     )
 
+    what_question = candidate()
+    what_question["topic"] = "비행기 문이 비행 중 바깥쪽으로 바로 열리지 않는 이유"
+    what_question["micro_narrative"]["hook"] = (
+        "비행기 문이 비행 중 바깥쪽으로 바로 열리지 않는 이유는 무엇일까?"
+    )
+    repaired_what = build_narrative_plan(what_question)
+    assert repaired_what["contracts"][0]["locked_text"] == (
+        "비행기 문이 비행 중 바깥쪽으로 바로 열리지 않습니다."
+    )
+
     unsupported = candidate()
     unsupported["micro_narrative"]["hook"] = "왜 날개가 움직이나요?"
     try:
