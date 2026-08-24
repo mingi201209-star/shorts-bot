@@ -21,6 +21,7 @@ from content.script_engine_v2 import (
     local_repair_payload,
     repair_failed_scenes,
     writer_payload,
+    _question_hook_to_observation as _plan_question_hook_to_observation,
 )
 from content.script_engine_v2_validation import validate_script_v2
 
@@ -322,7 +323,7 @@ def _apply_local_repairs(
     return result
 
 
-def _question_hook_to_observation(text: Any) -> str:
+def _question_hook_to_observation(text: Any, topic: Any = "") -> str:
     """Convert a simple Korean why-question into a fact-neutral observation."""
     original = str(text or "").strip()
     value = original
@@ -330,6 +331,11 @@ def _question_hook_to_observation(text: Any) -> str:
         return value
     if "?" not in value and not value.startswith(("왜 ", "그런데 왜 ")):
         return value
+
+    if re.search(r"이유는\s*무엇(?:일까|일까요)\??$", value):
+        normalized = _plan_question_hook_to_observation(value, topic)
+        if normalized:
+            return normalized
 
     reason_tail = re.search(r",?\s*그\s*이유는\s*무엇(?:일까|일까요)\??$", value)
     if reason_tail:
@@ -369,11 +375,11 @@ def _normalize_candidate_opening(candidate: Dict[str, Any], approved_hook: str) 
         return result, approved_hook
 
     if approved_hook:
-        normalized = _question_hook_to_observation(approved_hook)
+        normalized = _question_hook_to_observation(approved_hook, result.get("topic"))
         return result, normalized
 
     original = micro.get("hook")
-    normalized = _question_hook_to_observation(original)
+    normalized = _question_hook_to_observation(original, result.get("topic"))
     if normalized != str(original or "").strip():
         micro["hook"] = normalized
         result["micro_narrative"] = micro
