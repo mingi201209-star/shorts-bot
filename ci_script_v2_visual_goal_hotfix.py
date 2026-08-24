@@ -100,6 +100,53 @@ def _deterministic_keyword(scene, contract, plan, index):
     print("✅ fixed wing/winglet scenes retain aircraft+wing search anchors")
 
 
+def _apply_aviation_window_query_domain_lock():
+    text = SCRIPT_V2_RUNNER_PATH.read_text(encoding="utf-8")
+    marker = "# AVIATION_WINDOW_QUERY_DOMAIN_LOCK_V1"
+    if marker in text:
+        print("✅ aviation window query domain lock already applied")
+        return
+    block = r'''
+
+# AVIATION_WINDOW_QUERY_DOMAIN_LOCK_V1
+# Fixed airplane-window topics must never emit abstract standalone searches such
+# as pressure/safety/structure. Keep aircraft+window on every scene so the
+# existing semantic candidate gate rejects bus/medical/office cross-domain stock.
+_script_v2_window_previous_deterministic_keyword = _deterministic_keyword
+
+
+def _deterministic_keyword(scene, contract, plan, index):
+    value = _script_v2_window_previous_deterministic_keyword(scene, contract, plan, index)
+    fixed_topic = os.environ.get("SHORTS_TOPIC", "").strip()
+    topic_text = " ".join((fixed_topic, str(plan.get("topic", "")))).lower()
+    window_topic = any(term in topic_text for term in ("창문", "window", "windows", "pane", "panes"))
+    aviation_topic = any(term in topic_text for term in ("비행기", "항공", "aircraft", "airplane", "aviation"))
+    if not (window_topic and aviation_topic):
+        return value
+
+    words = _ascii_keyword_words(value)
+    if (
+        any(word in {"aircraft", "airplane", "plane", "aviation"} for word in words)
+        and any(word in {"window", "windows", "pane", "panes"} for word in words)
+    ):
+        return value
+    filtered = [
+        word for word in words
+        if word not in {"aircraft", "airplane", "plane", "aviation", "window", "windows", "pane", "panes", "stage"}
+    ]
+    locked = ["aircraft", "window"] + filtered[:3] + ["stage", str(index)]
+    locked = locked[:7]
+    if len(locked) < 2:
+        locked = ["aircraft", "window"]
+    result = " ".join(locked)
+    if result != value:
+        print(f"🪟 AVIATION WINDOW QUERY LOCK scene={index}: {result}")
+    return result
+'''
+    SCRIPT_V2_RUNNER_PATH.write_text(text.rstrip() + block + "\n", encoding="utf-8")
+    print("✅ fixed airplane-window scenes retain aircraft+window search anchors")
+
+
 def _apply_fixed_topic_novelty_lock():
     # The fixed-topic soft-Judge mode already prevents Hook/Novelty/Visual from
     # blocking pinned-topic production. Keep this legacy optimization disabled
@@ -113,6 +160,7 @@ def main():
     _apply_fixed_topic_soft_judges()
     _apply_script_v2_formal_ending_repair()
     _apply_aviation_wing_query_domain_lock()
+    _apply_aviation_window_query_domain_lock()
     _apply_fixed_topic_novelty_lock()
 
 
