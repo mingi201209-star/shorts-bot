@@ -29,8 +29,6 @@ jobs:
           python ci_query_semantic_integrity_hotfix.py
           python ci_concrete_visual_evidence_hotfix.py
           python ci_visible_evidence_provenance_hotfix.py
-          python ci_ai_visual_fallback_hotfix.py
-          python ci_ai_visual_mechanism_fallback_hotfix.py
           python ci_general_scene_visual_parity_hotfix.py
           python ci_final_visual_semantic_qa_hotfix.py
       - name: Run final visual semantic QA regression
