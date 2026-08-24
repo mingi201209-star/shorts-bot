@@ -59,14 +59,23 @@ def main():
     assert locked["scenes"][-1]["text"] == item["micro_narrative"]["payoff"]
     assert locked["scenes"][2]["text"] == "writer scene 3"
 
-    bad = candidate()
-    bad["micro_narrative"]["hook"] = "왜 날개 끝이 꺾여 있을까요?"
+    production_counterexample = candidate()
+    production_counterexample["micro_narrative"]["hook"] = (
+        "왜 비행기 날개 위 작은 판은 착륙할 때 올라올까요?"
+    )
+    repaired = build_narrative_plan(production_counterexample)
+    assert repaired["contracts"][0]["locked_text"] == (
+        "비행기 날개 위 작은 판은 착륙할 때 올라옵니다."
+    )
+
+    unsupported = candidate()
+    unsupported["micro_narrative"]["hook"] = "왜 이런 모습일까요?"
     try:
-        build_narrative_plan(bad)
+        build_narrative_plan(unsupported)
     except ValueError as exc:
         assert "observable statement" in str(exc)
     else:
-        raise AssertionError("question Hook must be rejected before writer call")
+        raise AssertionError("unsupported question Hook must still fail closed")
 
     print("PASS: Script Engine V2 adaptive deterministic narrative plan")
 
