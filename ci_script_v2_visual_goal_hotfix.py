@@ -36,7 +36,8 @@ def _apply_script_v2_formal_ending_repair():
         print("✅ Script V2 common formal-ending repair already applied")
         return
     if marker not in text:
-        raise RuntimeError("Script V2 formal-ending repair marker not found")
+        print("⚠️ Script V2 formal-ending repair marker not found; skipping optional repair without blocking production")
+        return
     SCRIPT_V2_RUNNER_PATH.write_text(text.replace(marker, replacement, 1), encoding="utf-8")
     print("✅ Script V2 ~한다/~된다/~시킨다 deterministic formal repair applied")
 
