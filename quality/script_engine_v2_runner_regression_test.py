@@ -103,6 +103,19 @@ def latest_production_shape_writer(writer_payload):
 
 def main():
     item = candidate()
+
+    door_item = candidate()
+    door_item["topic"] = "비행기 문이 비행 중 바깥쪽으로 바로 열리지 않는 이유"
+    door_item["micro_narrative"]["hook"] = (
+        "비행기 문이 비행 중 바깥쪽으로 바로 열리지 않는 이유는 무엇일까요?"
+    )
+    door_writer = lambda payload, *, mode: writer_script(door_item)
+    door_script = generate_script_v2(door_item, call_fn=door_writer)
+    assert door_script["scenes"][0]["text"] == (
+        "비행기 문이 비행 중 바깥쪽으로 바로 열리지 않습니다."
+    )
+    assert "무엇입니다" not in door_script["scenes"][0]["text"]
+
     calls = []
 
     def fake_call(payload, *, mode):

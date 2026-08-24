@@ -109,12 +109,12 @@ def _topic_to_observation(topic: Any) -> str:
 def _question_hook_to_observation(text: Any, topic: Any = "") -> str:
     """Convert only known Korean question endings; unsupported forms still fail closed."""
     value = re.sub(r"^(?:그런데\s+)?왜\s+", "", _text(text)).rstrip().rstrip(".?!")
+    if re.search(r"무엇일(?:까|까요)$", value):
+        return _topic_to_observation(topic)
     for pattern, replacement in _QUESTION_HOOK_REPAIRS:
         converted, count = re.subn(pattern, replacement, value)
         if count:
             return converted + "."
-    if re.search(r"무엇일(?:까|까요)$", value):
-        return _topic_to_observation(topic)
     return ""
 
 
