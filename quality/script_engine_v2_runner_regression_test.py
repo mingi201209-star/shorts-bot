@@ -3,8 +3,8 @@ import sys
 
 subprocess.run([sys.executable, "ci_script_v2_visual_goal_hotfix.py"], check=True)
 
-from content.script_engine_v2 import build_narrative_plan
-from content.script_engine_v2_runner import generate_script_v2
+from content.script_engine_v2 import build_narrative_plan, writer_payload
+from content.script_engine_v2_runner import generate_script_v2, _writer_response_format
 
 
 def candidate():
@@ -103,6 +103,13 @@ def latest_production_shape_writer(writer_payload):
 
 def main():
     item = candidate()
+
+    plan = build_narrative_plan(item)
+    writer_format = _writer_response_format(writer_payload(item, plan), mode="writer")
+    scene_schema = writer_format["json_schema"]["schema"]["properties"]["scenes"]
+    assert scene_schema["minItems"] == plan["target_scene_count"]
+    assert scene_schema["maxItems"] == plan["target_scene_count"]
+    assert _writer_response_format({}, mode="local_repair") == {"type": "json_object"}
 
     door_item = candidate()
     door_item["topic"] = "비행기 문이 비행 중 바깥쪽으로 바로 열리지 않는 이유"
