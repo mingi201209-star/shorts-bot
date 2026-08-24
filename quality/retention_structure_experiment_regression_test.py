@@ -72,9 +72,9 @@ def good_scenes():
 
 
 def test_runtime_router():
-    assert classify_runtime_bucket(candidate_simple()) == "24-30s"
-    assert classify_runtime_bucket(candidate_medium()) == "32-42s"
-    assert classify_runtime_bucket(candidate_long()) == "45-55s"
+    assert classify_runtime_bucket(candidate_simple()) == "50-60s"
+    assert classify_runtime_bucket(candidate_medium()) == "50-60s"
+    assert classify_runtime_bucket(candidate_long()) == "55-60s"
 
 
 def test_first5_contract():
@@ -108,8 +108,8 @@ def test_annotation_is_observational():
     plan = build_retention_plan(candidate_simple())
     annotated = annotate_script(original, plan)
     assert original.get("runtime_bucket") is None
-    assert annotated["runtime_bucket"] == "24-30s"
-    assert annotated["retention_structure"]["version"] == 2
+    assert annotated["runtime_bucket"] == "50-60s"
+    assert annotated["retention_structure"]["version"] == 3
     assert annotated["retention_structure"]["first5_contract"][1]["role"] == "question"
     assert annotated["retention_structure"]["first5_contract"][2]["role"] == "causal_clue"
 
