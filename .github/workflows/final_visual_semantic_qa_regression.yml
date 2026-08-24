@@ -7,6 +7,8 @@ on:
       - "ci_final_visual_semantic_qa_hotfix.py"
       - "quality/final_visual_semantic_qa.py"
       - "quality/final_visual_semantic_qa_regression_test.py"
+      - "quality/still_image_motion_fallback_regression_test.py"
+      - "video/still_image_fallback.py"
       - ".github/workflows/final_visual_semantic_qa_regression.yml"
       - ".github/workflows/main.yml"
 
@@ -36,5 +38,6 @@ jobs:
           AI_VISUAL_FALLBACK_ENABLED: "false"
           AI_MAX_GENERATIONS_PER_VIDEO: "1"
         run: |
-          python -m py_compile ci_final_visual_semantic_qa_hotfix.py quality/final_visual_semantic_qa.py quality/final_visual_semantic_qa_regression_test.py video/video_downloader.py video/video_engine.py main.py
+          python -m py_compile ci_final_visual_semantic_qa_hotfix.py quality/final_visual_semantic_qa.py quality/final_visual_semantic_qa_regression_test.py quality/still_image_motion_fallback_regression_test.py video/still_image_fallback.py video/video_downloader.py video/video_engine.py main.py
           python quality/final_visual_semantic_qa_regression_test.py
+          python quality/still_image_motion_fallback_regression_test.py
