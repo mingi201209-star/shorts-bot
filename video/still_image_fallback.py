@@ -8,7 +8,7 @@ import requests
 
 from config import OPENAI_KEY
 
-STILL_IMAGE_FALLBACK_ENABLED = os.environ.get("STILL_IMAGE_FALLBACK_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
+STILL_IMAGE_FALLBACK_ENABLED = os.environ.get("STILL_IMAGE_FALLBACK_ENABLED", "1").strip().lower() in {"1", "true", "yes", "on"}
 STILL_IMAGE_MODEL = os.environ.get("STILL_IMAGE_MODEL", "gpt-image-1.5")
 STILL_IMAGE_QUALITY = os.environ.get("STILL_IMAGE_QUALITY", "low")
 STILL_IMAGE_SIZE = os.environ.get("STILL_IMAGE_SIZE", "1024x1536")
@@ -108,6 +108,44 @@ def _motion_clip(image_path, output_path, duration):
         raise RuntimeError("still-image motion output missing")
 
 
+def _verify_motion_clip(scene, output_path):
+    # Reuse the already-bounded visual verifier used for generated Sora Hook
+    # visuals. This adds no new verifier implementation and fails closed if the
+    # generated still does not visibly contain the required query anchors.
+    from video.hook_visual_dominance import evaluate_hook_subject_dominance
+    from video.video_downloader import _anchor_aliases, extract_query_anchors
+
+    candidate = {
+        "id": f"still-verify-{_scene_id(scene)}",
+        "source_id": f"still-verify-{_scene_id(scene)}",
+        "provider": "openai_image",
+        "source_type": "ai_generated_still_motion",
+        "url": str(output_path),
+        "page_url": None,
+        "duration": 4.0,
+        "width": 1080,
+        "height": 1920,
+        "search_position": 0,
+    }
+    result = evaluate_hook_subject_dominance(candidate, scene)
+    if result.get("obvious_generation_artifact", False):
+        return False, result
+    if result.get("factual_visual_contradiction", False):
+        return False, result
+    if float(result.get("subject_visibility", 0) or 0) < 6.0:
+        return False, result
+
+    visible_words = set()
+    for component in result.get("visible_components", []) or []:
+        visible_words.update(str(component or "").strip().lower().replace("-", " ").split())
+    anchors = extract_query_anchors(str(scene.get("keyword", "") or ""))
+    for anchor in anchors:
+        aliases = set(_anchor_aliases(anchor)) | {anchor}
+        if not (visible_words & aliases):
+            return False, result
+    return True, result
+
+
 def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reason="semantic_scarcity"):
     global _GENERATION_COUNT
     if not STILL_IMAGE_FALLBACK_ENABLED:
@@ -128,17 +166,29 @@ def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reas
         image_path = temp_dir / f"still_fallback_{digest}.png"
         image_path.write_bytes(image_bytes)
         _motion_clip(image_path, output_path, duration)
+        verified, evidence = _verify_motion_clip(scene, output_path)
+        if not verified:
+            print(
+                f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=rejected_by_vision "
+                f"count={_GENERATION_COUNT}"
+            )
+            try:
+                Path(output_path).unlink()
+            except FileNotFoundError:
+                pass
+            return None
         print(
-            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=completed "
+            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=verified "
             f"count={_GENERATION_COUNT} model={STILL_IMAGE_MODEL} quality={STILL_IMAGE_QUALITY}"
         )
         return {
             "path": str(output_path),
             "provider": "openai_image",
             "source_id": f"still-{digest}",
-            "mode": "GENERATED_STILL_MOTION",
-            "tier": 3,
-            "visual_state": "GENERATED",
+            "mode": "GENERATED_STILL_MOTION_VERIFIED",
+            "tier": 2,
+            "visual_state": "TRUE",
+            "visible_components": list(evidence.get("visible_components", []) or []),
         }
     except Exception as exc:
         print(
