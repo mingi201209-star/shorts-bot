@@ -25,7 +25,7 @@ candidate_replacement = '''    candidate = validate_candidate(\n        candidat
 text = replace_once(text, candidate_marker, candidate_replacement, "retention plan")
 
 runtime_marker = '''새 소재를 탐색하지 말고 확정 Winner를 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초,\n{MIN_SCENES}~{MAX_SCENES} Scene의 Shorts로 발전시켜라.\n'''
-runtime_replacement = '''새 소재를 탐색하지 말고 확정 Winner를 아래 retention runtime contract에 맞춰 발전시켜라.\n{runtime_instruction(retention_plan)}\n{MIN_SCENES}~{MAX_SCENES} Scene의 Shorts로 발전시켜라.\n'''
+runtime_replacement = '''새 소재를 탐색하지 말고 확정 Winner를 아래 retention runtime contract에 맞춰 발전시켜라.\n{runtime_instruction(retention_plan)}\nScene 수 역시 위 retention runtime contract를 따른다.\n'''
 text = replace_once(text, runtime_marker, runtime_replacement, "runtime prompt")
 
 story_marker = '''[STORY]\nHook → Curiosity → Explanation → Reveal → Payoff의 흐름을 만든다.\n'''
