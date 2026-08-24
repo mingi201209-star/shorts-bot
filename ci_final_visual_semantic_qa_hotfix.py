@@ -160,6 +160,29 @@ if "STILL_IMAGE_MOTION_FALLBACK_V1" not in text:
         no_video_replacement,
         "still fallback no-video block",
     )
+
+# The still-image fallback replaces the whole no-video-to-download interval.
+# Reinstall Scene lineage after that replacement so it cannot delete the call.
+if "FINAL_VISUAL_SCENE_RECORD_V1" not in text:
+    record_needle = '''        # ====================================================
+        # 4. 영상 다운로드
+        # ====================================================
+'''
+    record_block = '''        # FINAL_VISUAL_SCENE_RECORD_V1
+        record_final_visual_scene(
+            idx,
+            keyword,
+            get_last_final_visual_selection(),
+            hook_verified=hook_scene_enabled,
+        )
+
+''' + record_needle
+    if text.count(record_needle) != 1:
+        raise RuntimeError("final visual QA post-fallback record anchor not unique")
+    text = text.replace(record_needle, record_block, 1)
+
+if text.count("FINAL_VISUAL_SCENE_RECORD_V1") != 1:
+    raise RuntimeError("final visual QA Scene record was not installed exactly once")
 engine.write_text(text, encoding="utf-8")
 
 
