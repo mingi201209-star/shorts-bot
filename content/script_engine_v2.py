@@ -111,7 +111,7 @@ def build_narrative_plan(candidate: Dict[str, Any], approved_hook: str = "") -> 
     concepts = tuple((focus + visual)[:6])
 
     retention = build_retention_plan(candidate)
-    scene_count = max(7, min(13, int(retention["min_scenes"])))
+    scene_count = max(7, min(int(retention["max_scenes"]), int(retention["min_scenes"])))
 
     contracts = [
         SceneContract(1, "phenomenon", True, hook, forbidden=("question", "answer")),
