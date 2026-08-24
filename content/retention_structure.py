@@ -7,12 +7,15 @@ It is intentionally provider-free and does not weaken existing Hook/FACT/visual 
 from copy import deepcopy
 import re
 
-RETENTION_STRUCTURE_VERSION = 2
+RETENTION_STRUCTURE_VERSION = 3
 
+# Knowledge Shorts now target roughly one minute. Shorter buckets remain for
+# genuinely thin candidates, but mechanism-rich topics should have enough room
+# for cause -> mechanism -> effect -> real-world meaning without filler.
 RUNTIME_BUCKETS = {
-    "24-30s": {"min_seconds": 24, "max_seconds": 30, "min_scenes": 7, "max_scenes": 9},
-    "32-42s": {"min_seconds": 32, "max_seconds": 42, "min_scenes": 9, "max_scenes": 11},
-    "45-55s": {"min_seconds": 45, "max_seconds": 55, "min_scenes": 12, "max_scenes": 13},
+    "38-48s": {"min_seconds": 38, "max_seconds": 48, "min_scenes": 10, "max_scenes": 12},
+    "50-60s": {"min_seconds": 50, "max_seconds": 60, "min_scenes": 12, "max_scenes": 14},
+    "55-60s": {"min_seconds": 55, "max_seconds": 60, "min_scenes": 13, "max_scenes": 15},
 }
 
 _LONG_SIGNALS = (
@@ -60,9 +63,14 @@ def classify_runtime_bucket(candidate):
     evidence_items = len(visual_proof) if isinstance(visual_proof, list) else 1
     fact_items = len(facts) if isinstance(facts, list) else 1
 
+    # Rich history/redesign or multi-fact mechanism topics get the full minute.
     if long_hits >= 2 or (long_hits >= 1 and fact_items >= 3):
-        return "45-55s"
+        return "55-60s"
+    if mechanism_hits >= 2 or evidence_items >= 2 or fact_items >= 2:
+        return "50-60s"
 
+    # Thin candidates are not padded to one minute; they still get substantially
+    # more room than the old 24-30 second bucket.
     if (
         fact_items <= 1
         and evidence_items <= 1
@@ -70,14 +78,11 @@ def classify_runtime_bucket(candidate):
         and micro.get("reveal")
         and micro.get("payoff")
     ):
-        return "24-30s"
-
-    if mechanism_hits >= 2 or evidence_items >= 2 or fact_items >= 2:
-        return "32-42s"
+        return "38-48s"
 
     if isinstance(micro, dict) and micro.get("reveal") and micro.get("payoff"):
-        return "24-30s"
-    return "32-42s"
+        return "38-48s"
+    return "50-60s"
 
 
 def build_retention_plan(candidate):
@@ -101,7 +106,8 @@ def runtime_instruction(plan):
         f"Retention 실험 bucket={plan['runtime_bucket']}: 전체 TTS를 "
         f"{plan['min_seconds']}~{plan['max_seconds']}초, "
         f"{plan['min_scenes']}~{plan['max_scenes']} Scene으로 만든다. "
-        "Scene 수를 채우기 위한 반복/filler는 금지하고 각 Scene은 새로운 causal 또는 visual beat를 가져야 한다."
+        "길이는 반복으로 채우지 않는다. 현상, 원인, 작동 원리, 실제 효과, 현실적 의미 또는 추가 흥미 사실처럼 "
+        "각 Scene마다 새로운 정보 단계를 추가하고, 근거가 없는 사실은 만들지 않는다."
     )
 
 
@@ -110,7 +116,7 @@ def first5_prompt_contract():
 
 
 def density_prompt_contract():
-    return """[RETENTION DENSITY — REQUIRED]\n- 답이 이미 완결된 뒤 같은 뜻을 다시 요약하지 않는다.\n- 동일 mechanism/result를 표현만 바꿔 반복하지 않는다.\n- 답에 필요하지 않고 화면으로 증명하기도 어려운 문장은 제거한다.\n- 한 Scene에는 핵심 개념 1개를 우선한다.\n- 가능한 경우 2.5~4초마다 새로운 시각 정보가 나타나도록 Scene/visual_goal을 설계한다.\n"""
+    return """[RETENTION DENSITY — REQUIRED]\n- 답이 이미 완결된 뒤 같은 뜻을 다시 요약하지 않는다.\n- 동일 mechanism/result를 표현만 바꿔 반복하지 않는다.\n- 답에 필요하지 않고 화면으로 증명하기도 어려운 문장은 제거한다.\n- 한 Scene에는 핵심 개념 1개를 우선한다.\n- 50~60초형에서는 현상→원인/제약→작동 원리→결과→현실적 의미→추가 흥미 사실→회수 순으로 가능한 만큼 새로운 정보를 전진시킨다.\n- 근거가 없는 역사, 사고, 수치, 효과를 길이 확보용으로 지어내지 않는다.\n- 가능한 경우 2.5~4초마다 새로운 시각 정보가 나타나도록 Scene/visual_goal을 설계한다.\n"""
 
 
 def _normalized_tokens(text):
