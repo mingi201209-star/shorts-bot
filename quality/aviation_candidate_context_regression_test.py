@@ -55,8 +55,10 @@ assert explorer.index("if fixed_topic:") < explorer.index("SHORTS_CANDIDATE_SCOP
 assert "winner.topic은 반드시 아래 문자열과" in explorer
 assert "result[\"runner_up\"] = None" in explorer
 
-# Production chain remains intact; aviation context is appended after topic-input support.
+# Production chain remains intact. Topic-input support intentionally runs first so
+# its stable main.py markers cannot be invalidated by later production hotfixes.
 chain = (
+    "ci_topic_input_hotfix.py",
     "ci_hotfix.py",
     "ci_novelty_budget_hotfix.py",
     "ci_fact_critical_hotfix.py",
@@ -67,7 +69,6 @@ chain = (
     "ci_first5_retention_tts_hotfix.py",
     "ci_first5_visual_contract_hotfix.py",
     "ci_video_provider_hotfix.py",
-    "ci_topic_input_hotfix.py",
     "ci_aviation_candidate_context_hotfix.py",
 )
 positions = [workflow.index(name) for name in chain]
