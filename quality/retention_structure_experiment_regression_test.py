@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from content.retention_structure import (
     annotate_script,
     build_retention_plan,
@@ -114,6 +116,16 @@ def test_annotation_is_observational():
     assert annotated["retention_structure"]["first5_contract"][2]["role"] == "causal_clue"
 
 
+def test_hotfix_uses_single_scene_count_contract():
+    source = Path("ci_retention_structure_experiment_hotfix.py").read_text(encoding="utf-8")
+    marker = "runtime_replacement = '''"
+    assert marker in source
+    replacement = source.split(marker, 1)[1].split("'''", 1)[0]
+    assert "runtime_instruction(retention_plan)" in replacement
+    assert "{MIN_SCENES}~{MAX_SCENES}" not in replacement
+    assert "Scene 수 역시 위 retention runtime contract를 따른다." in replacement
+
+
 def main():
     test_runtime_router()
     print("CASE A runtime routing: PASS")
@@ -123,6 +135,8 @@ def main():
     print("CASE C density redundancy gate: PASS")
     test_annotation_is_observational()
     print("CASE D retention metadata: PASS")
+    test_hotfix_uses_single_scene_count_contract()
+    print("CASE E single scene-count contract: PASS")
     print("RETENTION STRUCTURE EXPERIMENT REGRESSION: PASS")
 
 
