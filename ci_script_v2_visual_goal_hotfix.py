@@ -53,6 +53,45 @@ def _apply_script_v2_formal_ending_repair():
     print("✅ Script V2 ~않다/~설계다 common endings repaired deterministically")
 
 
+def _apply_aviation_wing_query_domain_lock():
+    text = SCRIPT_V2_RUNNER_PATH.read_text(encoding="utf-8")
+    marker = "# AVIATION_WING_QUERY_DOMAIN_LOCK_V1"
+    if marker in text:
+        print("✅ aviation wing query domain lock already applied")
+        return
+    block = r'''
+
+# AVIATION_WING_QUERY_DOMAIN_LOCK_V1
+# For a fixed wing/winglet topic, every general-scene search phrase keeps the
+# aircraft+wing domain anchors. This prevents abstract mechanism words such as
+# efficiency/pressure/reduction from drifting into charts, keyboards, fire, etc.
+_script_v2_previous_deterministic_keyword = _deterministic_keyword
+
+
+def _deterministic_keyword(scene, contract, plan, index):
+    value = _script_v2_previous_deterministic_keyword(scene, contract, plan, index)
+    fixed_topic = os.environ.get("SHORTS_TOPIC", "").strip()
+    topic_text = " ".join((fixed_topic, str(plan.get("topic", "")))).lower()
+    wing_topic = any(term in topic_text for term in ("날개", "윙렛", "winglet", "wing tip", "wingtip"))
+    aviation_topic = any(term in topic_text for term in ("비행기", "항공", "aircraft", "airplane", "aviation"))
+    if not (wing_topic and aviation_topic):
+        return value
+
+    words = _ascii_keyword_words(value)
+    filtered = [word for word in words if word not in {"aircraft", "airplane", "plane", "aviation", "wing", "wings"}]
+    locked = ["aircraft", "wing"] + filtered
+    locked = locked[:7]
+    if len(locked) < 2:
+        locked = ["aircraft", "wing"]
+    result = " ".join(locked)
+    if result != value:
+        print(f"🛩️ AVIATION WING QUERY LOCK scene={index}: {result}")
+    return result
+'''
+    SCRIPT_V2_RUNNER_PATH.write_text(text.rstrip() + block + "\n", encoding="utf-8")
+    print("✅ fixed wing/winglet scenes retain aircraft+wing search anchors")
+
+
 def _apply_fixed_topic_novelty_lock():
     # The fixed-topic soft-Judge mode already prevents Hook/Novelty/Visual from
     # blocking pinned-topic production. Keep this legacy optimization disabled
@@ -65,6 +104,7 @@ def main():
     runpy.run_path(str(LEGACY_PATH), run_name="__main__")
     _apply_fixed_topic_soft_judges()
     _apply_script_v2_formal_ending_repair()
+    _apply_aviation_wing_query_domain_lock()
     _apply_fixed_topic_novelty_lock()
 
 
