@@ -1,0 +1,20 @@
+name: One Minute Retention Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/retention_structure.py"
+      - "quality/one_minute_retention_regression_test.py"
+      - ".github/workflows/one_minute_retention_regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run one-minute retention regression
+        run: python quality/one_minute_retention_regression_test.py
