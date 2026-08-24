@@ -28,6 +28,7 @@ jobs:
 
       - name: Apply production hotfix chain
         run: |
+          python ci_topic_input_hotfix.py
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
           python ci_fact_critical_hotfix.py
@@ -35,7 +36,6 @@ jobs:
           python ci_hook_generation_hotfix.py
           python ci_hook_pool_guard_hotfix.py
           python ci_retention_hotfix.py
-          python ci_topic_input_hotfix.py
 
       - name: Compile topic input path
         run: |
