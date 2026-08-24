@@ -70,22 +70,19 @@ if "FINAL_VISUAL_SCENE_RECORD_V1" not in text:
     if import_needle not in text:
         raise RuntimeError("final visual QA video_engine import anchor not found")
     text = text.replace(import_needle, import_replacement, 1)
-    selection_needle = '''        if not video_url:
-
-            raise RuntimeError(
-                "Pexels에서 영상을 "
-                f"찾지 못했습니다: {keyword}"
-            )
+    selection_needle = '''        # ====================================================
+        # 4. 영상 다운로드
+        # ====================================================
 '''
-    selection_replacement = selection_needle + '''
-        # FINAL_VISUAL_SCENE_RECORD_V1
+    selection_replacement = '''        # FINAL_VISUAL_SCENE_RECORD_V1
         record_final_visual_scene(
             idx,
             keyword,
             get_last_final_visual_selection(),
             hook_verified=hook_scene_enabled,
         )
-'''
+
+''' + selection_needle
     if selection_needle not in text:
         raise RuntimeError("final visual QA selection anchor not found")
     text = text.replace(selection_needle, selection_replacement, 1)
