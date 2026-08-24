@@ -69,7 +69,7 @@ def main():
     )
 
     unsupported = candidate()
-    unsupported["micro_narrative"]["hook"] = "왜 이런 모습일까요?"
+    unsupported["micro_narrative"]["hook"] = "왜 날개가 움직이나요?"
     try:
         build_narrative_plan(unsupported)
     except ValueError as exc:
