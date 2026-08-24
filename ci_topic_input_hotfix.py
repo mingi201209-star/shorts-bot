@@ -191,6 +191,99 @@ def patch_main():
             print("")
 '''
 
+    quality_regen_marker = '''            # =================================================
+            # Candidate Regeneration
+            # =================================================
+
+            if (
+                status
+                == "REGENERATE_TOPIC"
+            ):
+'''
+
+    quality_regen_replacement = '''            # =================================================
+            # Fixed-topic Novelty Lock
+            # =================================================
+            # A pinned production topic cannot be replaced by Candidate
+            # regeneration. REGENERATE_TOPIC is emitted by the quality layer for
+            # a hard Novelty miss before ordinary PASS/REWRITE handling. In fixed
+            # topic mode, repeatedly rediscovering the same topic cannot improve
+            # topic novelty and only burns the global API budget. Preserve the
+            # global novelty threshold for automatic discovery, but treat a
+            # Novelty-only regeneration request as an editorial lock for this
+            # explicitly pinned topic. FACT_CRITICAL and every other HOLD/failure
+            # path remain fail-close.
+
+            if (
+                forced_topic
+                and status == "REGENERATE_TOPIC"
+                and "Novelty" in str(
+                    quality_result.get(
+                        "reason",
+                        "",
+                    )
+                )
+                and quality_result.get(
+                    "failure_type"
+                ) != "FACT_CRITICAL"
+            ):
+
+                fixed_topic_script = (
+                    quality_result.get(
+                        "script_data"
+                    )
+                )
+
+                if not isinstance(
+                    fixed_topic_script,
+                    dict,
+                ):
+                    raise RuntimeError(
+                        "지정 주제 Novelty lock에 사용할 "
+                        "검증 대본이 없습니다."
+                    )
+
+                fixed_script_topic = str(
+                    fixed_topic_script.get(
+                        "topic",
+                        current_topic,
+                    )
+                ).strip()
+
+                if fixed_script_topic != forced_topic:
+                    raise RuntimeError(
+                        "지정 주제 Novelty lock의 대본 topic이 "
+                        "production 주제와 다릅니다."
+                    )
+
+                print("")
+                print("=" * 64)
+                print(
+                    "🔒 FIXED TOPIC NOVELTY LOCK"
+                )
+                print("=" * 64)
+                print(
+                    "지정 주제는 교체하지 않고 현재 검증 대본으로 "
+                    "production을 계속합니다."
+                )
+                print(
+                    "Novelty 점수는 기록하지만 자동 탐색 모드의 "
+                    "기준은 변경하지 않습니다."
+                )
+
+                final_script = fixed_topic_script
+                break
+
+            # =================================================
+            # Candidate Regeneration
+            # =================================================
+
+            if (
+                status
+                == "REGENERATE_TOPIC"
+            ):
+'''
+
     for marker, replacement, label in (
         (
             environment_marker,
@@ -226,6 +319,11 @@ def patch_main():
             gate_feedback_marker,
             gate_feedback_replacement,
             "main fixed topic gate feedback",
+        ),
+        (
+            quality_regen_marker,
+            quality_regen_replacement,
+            "main fixed topic novelty lock",
         ),
     ):
         text = replace_once(
