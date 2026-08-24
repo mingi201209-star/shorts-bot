@@ -55,6 +55,17 @@ def get_last_final_visual_selection():
     return dict(_LAST_FINAL_VISUAL_SELECTION or {})
 ''',
 )
+text = append_once(
+    text,
+    "FINAL_VISUAL_GENERATED_LINEAGE_SETTER_V1",
+    r'''
+# FINAL_VISUAL_GENERATED_LINEAGE_SETTER_V1
+def set_last_final_visual_selection(selection):
+    global _LAST_FINAL_VISUAL_SELECTION
+    _LAST_FINAL_VISUAL_SELECTION = dict(selection or {})
+    return dict(_LAST_FINAL_VISUAL_SELECTION)
+''',
+)
 downloader.write_text(text, encoding="utf-8")
 
 
@@ -86,6 +97,34 @@ if "FINAL_VISUAL_SCENE_RECORD_V1" not in text:
     if selection_needle not in text:
         raise RuntimeError("final visual QA selection anchor not found")
     text = text.replace(selection_needle, selection_replacement, 1)
+
+if "STILL_IMAGE_MOTION_FALLBACK_V1" not in text:
+    import_anchor = "from video.video_downloader import get_last_final_visual_selection\n"
+    import_block = (
+        "from video.video_downloader import get_last_final_visual_selection, set_last_final_visual_selection\n"
+        "from video.still_image_fallback import generate_still_motion_fallback\n"
+    )
+    if import_anchor not in text:
+        raise RuntimeError("still fallback final visual import anchor not found")
+    text = text.replace(import_anchor, import_block, 1)
+
+    no_video_needle = '''        if not video_url:\n\n            raise RuntimeError(\n                "Pexels에서 영상을 "\n                f"찾지 못했습니다: {keyword}"\n            )\n'''
+    no_video_replacement = '''        # STILL_IMAGE_MOTION_FALLBACK_V1\n        using_still_motion_fallback = False\n        if not video_url:\n            still_result = generate_still_motion_fallback(\n                item,\n                output_path=vertical_video_path,\n                duration=duration,\n                trigger_reason="no_semantically_safe_stock",\n            )\n            if still_result:\n                using_still_motion_fallback = True\n                set_last_final_visual_selection({\n                    "accepted": True,\n                    "mode": still_result.get("mode", "GENERATED_STILL_MOTION"),\n                    "tier": int(still_result.get("tier", 3)),\n                    "visual_state": still_result.get("visual_state", "GENERATED"),\n                    "anchor_matched": 1,\n                    "anchor_total": 1,\n                    "provider": still_result.get("provider", "openai_image"),\n                    "source_id": still_result.get("source_id", "generated-still"),\n                    "metadata": "generated still image animated with slow zoom/pan and fade",\n                })\n                print(f"🖼️ STILL IMAGE MOTION FALLBACK scene={idx + 1}: {vertical_video_path}")\n            else:\n                raise RuntimeError(\n                    "Pexels에서 영상을 찾지 못했고 정지 이미지 fallback도 실패했습니다: "\n                    f"{keyword}"\n                )\n'''
+    if no_video_needle not in text:
+        raise RuntimeError("still fallback no-video anchor not found")
+    text = text.replace(no_video_needle, no_video_replacement, 1)
+
+    download_needle = '''        download_video(\n            video_url,\n            source_video_path,\n        )\n\n        if not os.path.exists(\n            source_video_path\n        ):\n\n            raise RuntimeError(\n                "영상 다운로드 실패: "\n                f"{source_video_path}"\n            )\n'''
+    download_replacement = '''        if not using_still_motion_fallback:\n            download_video(\n                video_url,\n                source_video_path,\n            )\n\n            if not os.path.exists(\n                source_video_path\n            ):\n\n                raise RuntimeError(\n                    "영상 다운로드 실패: "\n                    f"{source_video_path}"\n                )\n'''
+    if download_needle not in text:
+        raise RuntimeError("still fallback download anchor not found")
+    text = text.replace(download_needle, download_replacement, 1)
+
+    vertical_needle = '''        prepare_vertical_video(\n            source_video_path,\n            vertical_video_path,\n            duration,\n        )\n'''
+    vertical_replacement = '''        if not using_still_motion_fallback:\n            prepare_vertical_video(\n                source_video_path,\n                vertical_video_path,\n                duration,\n            )\n'''
+    if vertical_needle not in text:
+        raise RuntimeError("still fallback vertical-video anchor not found")
+    text = text.replace(vertical_needle, vertical_replacement, 1)
 engine.write_text(text, encoding="utf-8")
 
 
@@ -127,3 +166,4 @@ from quality.final_visual_semantic_qa import (
 main.write_text(text, encoding="utf-8")
 
 print("FINAL_VISUAL_SEMANTIC_QA_V1 installed")
+print("STILL_IMAGE_MOTION_FALLBACK_V1 installed")
