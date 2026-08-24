@@ -22,17 +22,11 @@ text = append_once(
 def _general_scene_strengthening_applicable(scene_query):
     anchors = extract_query_anchors(scene_query)
     if not anchors:
-        # Abstract/general narration without a concrete/domain anchor keeps the
-        # existing contextual selector behavior.
         return False
     return bool(_visual_is_concrete_query(scene_query) or len(anchors) >= 1)
 
 
 def general_scene_unknown_safe_tier(candidate, scene_query):
-    """Return (tier, label) for general concrete/mechanism stock selection.
-
-    Lower is better. This never manufactures visual TRUE from metadata.
-    """
     visual = candidate_visible_component_evidence(candidate, scene_query)
     semantic = concrete_visual_evidence(candidate, scene_query)
     compatibility = candidate_anchor_compatibility(candidate, scene_query)
@@ -44,33 +38,20 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
 
     if state == "TRUE" and int(decision.get("level", 99)) <= 3:
         return 1, "VISUALLY_VERIFIED_DIRECT"
-
-    if (
-        state == "UNKNOWN"
-        and bool(semantic.get("complete"))
-        and bool(compatibility.get("compatible"))
-        and mechanism_specific
-    ):
+    if state == "UNKNOWN" and bool(semantic.get("complete")) and bool(compatibility.get("compatible")) and mechanism_specific:
         return 3, "SEMANTIC_COMPLETE_UNKNOWN"
-
     if state == "UNKNOWN" and int(compatibility.get("matched", 0)) > 0:
         return 4, "SAME_DOMAIN_CONTEXTUAL_UNKNOWN"
-
-    # Explicit negative visual evidence is weaker than UNKNOWN evidence that
-    # preserves the requested domain/component semantics.
     if state == "FALSE":
         if int(compatibility.get("matched", 0)) > 0:
             return 5, "VISUAL_FALSE_CONTEXTUAL"
         return 6, "VISUAL_FALSE_CROSS_DOMAIN"
-
     if bool(decision.get("abstract")) or int(compatibility.get("matched", 0)) == 0:
         return 5, "CROSS_DOMAIN_OR_ABSTRACT_UNKNOWN"
-
     return 6, "LAST_RESORT"
 
 
 def semantic_safe_reuse_candidate(scene_query):
-    """Reuse an already-rendered same-anchor clip without claiming it is verified."""
     eligible = []
     for key, candidate in _SAFE_REUSE_HISTORY.items():
         if _SAFE_REUSE_COUNTS.get(key, 0) >= _SAFE_REUSE_MAX:
@@ -82,7 +63,6 @@ def semantic_safe_reuse_candidate(scene_query):
         compatibility = candidate_anchor_compatibility(candidate, scene_query)
         if not semantic.get("complete") or not compatibility.get("compatible"):
             continue
-        # Actual verified reuse is handled by #26 safe_reuse_candidate first.
         if str(visual.get("state") or "UNKNOWN").upper() == "TRUE":
             continue
         tier, _ = general_scene_unknown_safe_tier(candidate, scene_query)
@@ -135,15 +115,12 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
         if selected is not None:
             selected_tier, selected_mode = general_scene_unknown_safe_tier(selected, subject_filter_query)
 
-    # Existing visually verified reuse outranks every unverified fresh candidate.
     verified_reuse = safe_reuse_candidate(subject_filter_query)
     if verified_reuse is not None and selected_tier > 1:
         selected = verified_reuse
         selected_tier = 2
         selected_mode = "VERIFIED_COMPATIBLE_REUSE"
 
-    # UNKNOWN reuse is not VERIFIED. It only rescues a scene when the fresh choice
-    # has fallen to same-domain contextual or worse.
     if selected_tier >= 4:
         semantic_reuse = semantic_safe_reuse_candidate(subject_filter_query)
         if semantic_reuse is not None:
@@ -151,7 +128,19 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
             selected_tier = 3
             selected_mode = "SEMANTIC_SAFE_REUSE"
 
-    if selected is None:
+    anchors = extract_query_anchors(subject_filter_query)
+    # For anchored scenes, never fill with cross-domain/abstract stock. Returning
+    # None lets existing retry/AI/contextual fallback paths handle the scene.
+    if anchors and selected is not None and selected_tier >= 5:
+        print(
+            "[GENERAL_VISUAL_REJECT] "
+            f"candidate={selected.get('source_id', selected.get('id'))} "
+            f"anchors={'+'.join(anchors)} tier={selected_tier} reason=cross_domain"
+        )
+        selected = None
+        selected_mode = "REJECTED_CROSS_DOMAIN"
+
+    if selected is None and not anchors:
         selected = _general_parity_previous_choose_best_candidate(
             candidates,
             relevant_top_n=relevant_top_n,
@@ -177,4 +166,4 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
 )
 path.write_text(text, encoding="utf-8")
 
-print("✅ General-scene visual parity + UNKNOWN-safe selection applied; no new vision/API calls")
+print("✅ General-scene visual parity + UNKNOWN-safe selection applied; cross-domain anchored stock blocked")
