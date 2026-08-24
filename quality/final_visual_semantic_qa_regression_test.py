@@ -92,6 +92,14 @@ record_final_visual_scene(
     source = (ROOT / "main.py").read_text(encoding="utf-8")
     assert "FINAL_VISUAL_SEMANTIC_QA_V1" in source
     assert "validate_final_visual_semantic_qa(scenes)" in source
+
+    # Regress Run 32789403947: the still-image fallback rewrite must not remove
+    # the Scene lineage call installed immediately before video download.
+    engine_source = (ROOT / "video/video_engine.py").read_text(encoding="utf-8")
+    assert engine_source.count("FINAL_VISUAL_SCENE_RECORD_V1") == 1
+    record_at = engine_source.index("# FINAL_VISUAL_SCENE_RECORD_V1")
+    download_at = engine_source.index("# 4. 영상 다운로드", record_at)
+    assert record_at < download_at
     print("FINAL VISUAL SEMANTIC QA REGRESSION: PASS")
 
 
