@@ -11,14 +11,13 @@ SCRIPT_V2_RUNNER_PATH = Path("content/script_engine_v2_runner.py")
 def _apply_fixed_topic_soft_judges():
     text = CONSENSUS_PATH.read_text(encoding="utf-8")
     marker = "    summaries = summarize_pool(pool_results, reliability_report)\n    weighted_score = calculate_weighted_score(summaries)\n    disagreements = detect_disagreements(summaries)\n    low_confidence = detect_low_confidence(summaries)\n    critical_risks = detect_critical_risks(summaries)\n    low_reliability = detect_low_reliability(summaries)\n    weak_domains = detect_weak_domains(summaries)\n"
-    replacement = "    summaries = summarize_pool(pool_results, reliability_report)\n    fixed_topic = __import__(\"os\").environ.get(\"SHORTS_TOPIC\", \"\").strip()\n    decision_summaries = summaries\n    if fixed_topic:\n        # For an explicitly pinned production topic, Hook/Novelty/Visual judges\n        # remain advisory. FACT remains the only hard production gate.\n        fact_summary = summaries.get(\"fact\")\n        decision_summaries = {\"fact\": fact_summary} if isinstance(fact_summary, dict) else {}\n        print(\"🟢 FIXED TOPIC JUDGE MODE: hook/novelty/visual advisory, fact hard-gate\")\n    weighted_score = calculate_weighted_score(decision_summaries)\n    disagreements = detect_disagreements(decision_summaries)\n    low_confidence = detect_low_confidence(decision_summaries)\n    critical_risks = detect_critical_risks(decision_summaries)\n    low_reliability = detect_low_reliability(decision_summaries)\n    weak_domains = detect_weak_domains(decision_summaries)\n"
+    replacement = "    summaries = summarize_pool(pool_results, reliability_report)\n    fixed_topic = __import__(\"os\").environ.get(\"SHORTS_TOPIC\", \"\").strip()\n    decision_summaries = summaries\n    if fixed_topic:\n        fact_summary = summaries.get(\"fact\")\n        decision_summaries = {\"fact\": fact_summary} if isinstance(fact_summary, dict) else {}\n        print(\"🟢 FIXED TOPIC JUDGE MODE: hook/novelty/visual advisory, fact hard-gate\")\n    weighted_score = calculate_weighted_score(decision_summaries)\n    disagreements = detect_disagreements(decision_summaries)\n    low_confidence = detect_low_confidence(decision_summaries)\n    critical_risks = detect_critical_risks(decision_summaries)\n    low_reliability = detect_low_reliability(decision_summaries)\n    weak_domains = detect_weak_domains(decision_summaries)\n"
     if replacement in text:
         print("✅ fixed-topic soft Judge mode already applied")
         return
     if marker not in text:
         raise RuntimeError("fixed-topic soft Judge marker not found")
     text = text.replace(marker, replacement, 1)
-    # Good-enough floor checks must use the same fact-only decision set.
     text = text.replace(
         "meets_good_enough_floors(summaries)",
         "meets_good_enough_floors(decision_summaries)",
@@ -36,7 +35,11 @@ def _apply_script_v2_formal_ending_repair():
         print("✅ Script V2 common formal-ending repair already applied")
         return
     if marker not in text:
-        raise RuntimeError("Script V2 formal-ending repair marker not found")
+        # Production must never fail during installer setup because a prior
+        # hotfix changed this exact tuple shape. Existing speech-style gates
+        # still fail-close at runtime; this deterministic repair is optional.
+        print("⚠️ Script V2 formal-ending repair marker not found; skipping optional repair without blocking production")
+        return
     SCRIPT_V2_RUNNER_PATH.write_text(text.replace(marker, replacement, 1), encoding="utf-8")
     print("✅ Script V2 ~한다/~된다/~시킨다 deterministic formal repair applied")
 
