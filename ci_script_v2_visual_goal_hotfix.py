@@ -18,7 +18,6 @@ def _apply_fixed_topic_soft_judges():
     if marker not in text:
         raise RuntimeError("fixed-topic soft Judge marker not found")
     text = text.replace(marker, replacement, 1)
-    # Good-enough floor checks must use the same fact-only decision set.
     text = text.replace(
         "meets_good_enough_floors(summaries)",
         "meets_good_enough_floors(decision_summaries)",
@@ -43,40 +42,11 @@ def _apply_script_v2_formal_ending_repair():
 
 
 def _apply_fixed_topic_novelty_lock():
-    text = MAIN_PATH.read_text(encoding="utf-8")
-    if "🔒 FIXED TOPIC NOVELTY LOCK" in text:
-        print("✅ fixed-topic Novelty lock already installed")
-        return
-    pattern = re.compile(
-        r'(?P<indent>^[ \\t]*)if\\s*\\(\\s*status\\s*==\\s*["\\\']REGENERATE_TOPIC["\\\']\\s*\\)\\s*:\\s*\\n'
-        r'(?P=indent)[ \\t]+rejected_topic\\s*=\\s*str\\s*\\(',
-        re.MULTILINE,
-    )
-    match = pattern.search(text)
-    if not match:
-        print("⚠️ fixed-topic Novelty final-chain branch not found; soft Judge mode already prevents this production loop")
-        return
-    indent = match.group("indent")
-    inner = indent + "    "
-    replacement = (
-        f'{indent}if (\\n'
-        f'{inner}status\\n'
-        f'{inner}== "REGENERATE_TOPIC"\\n'
-        f'{indent}):\\n\\n'
-        f'{inner}fixed_topic = __import__("os").environ.get("SHORTS_TOPIC", "").strip()\\n'
-        f'{inner}reason_text = str(quality_result.get("reason", ""))\\n'
-        f'{inner}fixed_script = quality_result.get("script_data")\\n\\n'
-        f'{inner}if fixed_topic and "Novelty" in reason_text and isinstance(fixed_script, dict):\\n'
-        f'{inner}    fixed_script_topic = str(fixed_script.get("topic", current_topic)).strip()\\n'
-        f'{inner}    if fixed_script_topic == fixed_topic and quality_result.get("failure_type") != "FACT_CRITICAL":\\n'
-        f'{inner}        print("🔒 FIXED TOPIC NOVELTY LOCK")\\n'
-        f'{inner}        final_script = fixed_script\\n'
-        f'{inner}        break\\n\\n'
-        f'{inner}rejected_topic = str('
-    )
-    text = text[: match.start()] + replacement + text[match.end() :]
-    MAIN_PATH.write_text(text, encoding="utf-8")
-    print("✅ fixed-topic Novelty final-chain lock applied")
+    # The fixed-topic soft-Judge mode already prevents Hook/Novelty/Visual from
+    # blocking pinned-topic production. Keep this legacy optimization disabled
+    # so marker/regex drift can never stop production startup again.
+    print("⏭️ fixed-topic Novelty lock installer disabled; soft Judge mode is authoritative")
+    return
 
 
 def main():
