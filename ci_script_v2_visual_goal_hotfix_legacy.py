@@ -18,7 +18,7 @@ def _apply_single_missing_scene_recovery():
 
 # V2_SINGLE_MISSING_MIDDLE_SCENE_RECOVERY_V1
 def _recover_single_missing_middle_scene(script: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
-    """Recover only target-1 output; every other count mismatch remains fail-closed."""
+    """Recover only an unambiguous target-1 middle omission; otherwise fail closed."""
     result = deepcopy(script)
     scenes = result.get("scenes")
     contracts = plan.get("contracts") or []
@@ -35,15 +35,26 @@ def _recover_single_missing_middle_scene(script: Dict[str, Any], plan: Dict[str,
         and contracts[-1].get("role") == "payoff"
     ):
         return result
-    if len(scenes) < 2 or not all(isinstance(scene, dict) for scene in scenes[-2:]):
-        return result
+
+    # Only infer a missing middle beat when the surviving writer output proves
+    # that all four immutable narrative anchors are still in their expected
+    # positions. This avoids silently reinterpreting a missing ending as a
+    # middle omission.
+    anchor_pairs = ((0, 0), (1, 1), (-2, -2), (-1, -1))
+    for scene_pos, contract_pos in anchor_pairs:
+        scene = scenes[scene_pos] if len(scenes) >= abs(scene_pos) else None
+        contract = contracts[contract_pos]
+        if not isinstance(scene, dict) or not isinstance(contract, dict):
+            return result
+        if str(scene.get("text", "")).strip() != str(contract.get("locked_text", "")).strip():
+            return result
 
     before = len(scenes)
     insert_at = len(contracts) - 3
     scenes.insert(insert_at, {"text": "", "visual_goal": "", "keyword": ""})
     result["scenes"] = scenes
     print(
-        "🧩 V2 single missing middle scene reserved for local repair: "
+        "🧩 V2 single missing middle scene reserved for bounded recovery: "
         f"{before}/{len(contracts)} -> {len(scenes)}/{len(contracts)} "
         f"scene={insert_at + 1}"
     )
@@ -63,7 +74,7 @@ def _recover_single_missing_middle_scene(script: Dict[str, Any], plan: Dict[str,
         raise RuntimeError("Script V2 missing-scene flow anchor not found")
     text = text.replace(flow_marker, flow_replacement, 1)
     RUNNER_PATH.write_text(text, encoding="utf-8")
-    print("✅ Script V2 target-1 scene output routed into bounded local repair")
+    print("✅ Script V2 target-1 middle omission routed into bounded recovery")
 
 
 def main():
