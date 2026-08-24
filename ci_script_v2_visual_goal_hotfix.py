@@ -6,6 +6,7 @@ LEGACY_PATH = Path("ci_script_v2_visual_goal_hotfix_legacy.py")
 MAIN_PATH = Path("main.py")
 CONSENSUS_PATH = Path("quality/consensus.py")
 SCRIPT_V2_RUNNER_PATH = Path("content/script_engine_v2_runner.py")
+SCRIPT_V2_PATH = Path("content/script_engine_v2.py")
 
 
 def _apply_fixed_topic_soft_judges():
@@ -30,8 +31,6 @@ def _apply_fixed_topic_soft_judges():
 def _apply_script_v2_formal_ending_repair():
     text = SCRIPT_V2_RUNNER_PATH.read_text(encoding="utf-8")
 
-    # Patch the normalizer body instead of depending on the exact tuple layout;
-    # earlier production hotfixes can legitimately rewrite that tuple.
     body_marker = '    value = str(text or "").strip()\n    for pattern, replacement in _FORMAL_ENDING_REPAIRS:\n'
     body_replacement = (
         '    value = str(text or "").strip()\n'
@@ -41,6 +40,7 @@ def _apply_script_v2_formal_ending_repair():
         '    value = re.sub(r"설계다(?=[.!?…]*$)", "설계입니다", value)\n'
         '    value = re.sub(r"이유다(?=[.!?…]*$)", "이유입니다", value)\n'
         '    value = re.sub(r"구조다(?=[.!?…]*$)", "구조입니다", value)\n'
+        '    value = re.sub(r"시킨다(?=[.!?…]*$)", "시킵니다", value)\n'
         '    for pattern, replacement in _FORMAL_ENDING_REPAIRS:\n'
     )
     if body_replacement in text:
@@ -50,7 +50,53 @@ def _apply_script_v2_formal_ending_repair():
         print("⚠️ Script V2 formalizer body marker not found; skipping optional repair without blocking production")
         return
     SCRIPT_V2_RUNNER_PATH.write_text(text.replace(body_marker, body_replacement, 1), encoding="utf-8")
-    print("✅ Script V2 ~않다/~설계다 common endings repaired deterministically")
+    print("✅ Script V2 ~않다/~설계다/~시킨다 common endings repaired deterministically")
+
+
+def _apply_script_v2_neighbor_context_repair():
+    """Give bounded local repair the adjacent narration it needs to fix redundancy."""
+    text = SCRIPT_V2_PATH.read_text(encoding="utf-8")
+    marker = '# SCRIPT_V2_NEIGHBOR_CONTEXT_REPAIR_V1'
+    if marker not in text:
+        needle = '                "current_keyword": _text(scenes[index].get("keyword")),\n            })'
+        replacement = (
+            '                "current_keyword": _text(scenes[index].get("keyword")),\n'
+            '                # SCRIPT_V2_NEIGHBOR_CONTEXT_REPAIR_V1\n'
+            '                "previous_text": (\n'
+            '                    _text(scenes[index - 1].get("text"))\n'
+            '                    if index > 0 and isinstance(scenes[index - 1], dict)\n'
+            '                    else ""\n'
+            '                ),\n'
+            '                "next_text": (\n'
+            '                    _text(scenes[index + 1].get("text"))\n'
+            '                    if index + 1 < len(scenes) and isinstance(scenes[index + 1], dict)\n'
+            '                    else ""\n'
+            '                ),\n'
+            '            })'
+        )
+        if needle not in text:
+            raise RuntimeError("Script V2 local-repair target marker not found")
+        text = text.replace(needle, replacement, 1)
+        SCRIPT_V2_PATH.write_text(text, encoding="utf-8")
+        print("✅ Script V2 local repair now receives adjacent narration context")
+    else:
+        print("✅ Script V2 adjacent narration context already applied")
+
+    runner = SCRIPT_V2_RUNNER_PATH.read_text(encoding="utf-8")
+    instruction_old = (
+        '            "Every keyword must be 2-7 ASCII English words. Use formal Korean and preserve factual scope."\n'
+    )
+    instruction_new = (
+        '            "Every keyword must be 2-7 ASCII English words. Use formal Korean and preserve factual scope. "\n'
+        '            "When previous_text or next_text is supplied, make repaired narration semantically distinct "\n'
+        '            "from both adjacent scenes while preserving the target scene required concepts."\n'
+    )
+    if instruction_new not in runner:
+        if instruction_old not in runner:
+            raise RuntimeError("Script V2 local-repair instruction marker not found")
+        runner = runner.replace(instruction_old, instruction_new, 1)
+        SCRIPT_V2_RUNNER_PATH.write_text(runner, encoding="utf-8")
+        print("✅ Script V2 local repair explicitly avoids adjacent semantic duplication")
 
 
 def _apply_aviation_wing_query_domain_lock():
@@ -148,9 +194,6 @@ def _deterministic_keyword(scene, contract, plan, index):
 
 
 def _apply_fixed_topic_novelty_lock():
-    # The fixed-topic soft-Judge mode already prevents Hook/Novelty/Visual from
-    # blocking pinned-topic production. Keep this legacy optimization disabled
-    # so marker/regex drift can never stop production startup again.
     print("⏭️ fixed-topic Novelty lock installer disabled; soft Judge mode is authoritative")
     return
 
@@ -159,6 +202,7 @@ def main():
     runpy.run_path(str(LEGACY_PATH), run_name="__main__")
     _apply_fixed_topic_soft_judges()
     _apply_script_v2_formal_ending_repair()
+    _apply_script_v2_neighbor_context_repair()
     _apply_aviation_wing_query_domain_lock()
     _apply_aviation_window_query_domain_lock()
     _apply_fixed_topic_novelty_lock()
