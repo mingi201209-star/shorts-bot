@@ -53,6 +53,27 @@ def _apply_script_v2_formal_ending_repair():
     print("✅ Script V2 ~않다/~설계다/~시킨다 common endings repaired deterministically")
 
 
+def _apply_script_v2_formal_question_repair():
+    """Normalize common pinned-topic question forms into the required ~까요? ending."""
+    text = SCRIPT_V2_PATH.read_text(encoding="utf-8")
+    marker = '# SCRIPT_V2_FORMAL_QUESTION_REPAIR_V1'
+    if marker in text:
+        print("✅ Script V2 formal question repair already applied")
+        return
+    needle = '        replacements = (\n            (r"있을까$", "있을까요"),\n'
+    replacement = (
+        '        replacements = (\n'
+        '            # SCRIPT_V2_FORMAL_QUESTION_REPAIR_V1\n'
+        '            (r"무엇인가$", "무엇일까요"),\n'
+        '            (r"무엇입니까$", "무엇일까요"),\n'
+        '            (r"있을까$", "있을까요"),\n'
+    )
+    if needle not in text:
+        raise RuntimeError("Script V2 question normalizer marker not found")
+    SCRIPT_V2_PATH.write_text(text.replace(needle, replacement, 1), encoding="utf-8")
+    print("✅ Script V2 무엇인가?/무엇입니까? normalized to formal ~까요? question")
+
+
 def _apply_script_v2_neighbor_context_repair():
     """Give bounded local repair the adjacent narration it needs to fix redundancy."""
     text = SCRIPT_V2_PATH.read_text(encoding="utf-8")
@@ -202,6 +223,7 @@ def main():
     runpy.run_path(str(LEGACY_PATH), run_name="__main__")
     _apply_fixed_topic_soft_judges()
     _apply_script_v2_formal_ending_repair()
+    _apply_script_v2_formal_question_repair()
     _apply_script_v2_neighbor_context_repair()
     _apply_aviation_wing_query_domain_lock()
     _apply_aviation_window_query_domain_lock()
