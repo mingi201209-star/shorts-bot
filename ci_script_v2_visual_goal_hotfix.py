@@ -38,6 +38,7 @@ def _apply_script_v2_formal_ending_repair():
         '    # Deterministic formalization for common declarative endings that\n'
         '    # repeatedly survive writer/local-repair calls.\n'
         '    value = re.sub(r"않다(?=[.!?…]*$)", "않습니다", value)\n'
+        '    value = re.sub(r"시킨다(?=[.!?…]*$)", "시킵니다", value)\n'
         '    value = re.sub(r"설계다(?=[.!?…]*$)", "설계입니다", value)\n'
         '    value = re.sub(r"이유다(?=[.!?…]*$)", "이유입니다", value)\n'
         '    value = re.sub(r"구조다(?=[.!?…]*$)", "구조입니다", value)\n'
