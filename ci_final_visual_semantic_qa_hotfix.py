@@ -60,15 +60,12 @@ downloader.write_text(text, encoding="utf-8")
 
 engine = Path("video/video_engine.py")
 text = engine.read_text(encoding="utf-8")
-import_needle = '''from video.video_downloader import (
-    fetch_video,
-    download_video,
+import_needle = "from video.subtitle_engine import (\n"
+import_replacement = (
+    "from video.video_downloader import get_last_final_visual_selection\n"
+    "from quality.final_visual_semantic_qa import record_final_visual_scene\n\n"
+    + import_needle
 )
-'''
-import_replacement = import_needle + '''
-from video.video_downloader import get_last_final_visual_selection
-from quality.final_visual_semantic_qa import record_final_visual_scene
-'''
 if "FINAL_VISUAL_SCENE_RECORD_V1" not in text:
     if import_needle not in text:
         raise RuntimeError("final visual QA video_engine import anchor not found")
