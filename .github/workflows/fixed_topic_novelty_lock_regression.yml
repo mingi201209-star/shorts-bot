@@ -1,0 +1,21 @@
+name: Fixed Topic Novelty Lock Regression
+
+on:
+  pull_request:
+    paths:
+      - "ci_topic_input_hotfix.py"
+      - "quality/fixed_topic_novelty_lock_regression_test.py"
+      - ".github/workflows/fixed_topic_novelty_lock_regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run fixed-topic novelty lock regression
+        run: python quality/fixed_topic_novelty_lock_regression_test.py
