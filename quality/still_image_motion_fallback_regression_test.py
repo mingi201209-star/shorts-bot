@@ -1,6 +1,14 @@
 import os
+import sys
 import tempfile
 from pathlib import Path
+
+# Direct script execution sets sys.path[0] to quality/. Keep the repository
+# root importable so this regression behaves the same way in GitHub Actions
+# and when run locally as `python quality/..._test.py`.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from video import still_image_fallback as fallback
 
@@ -79,7 +87,7 @@ def main():
         fallback._verify_motion_clip = original_verify
         fallback.reset_still_image_budget()
 
-    source = (Path(__file__).resolve().parents[1] / "ci_final_visual_semantic_qa_hotfix.py").read_text(encoding="utf-8")
+    source = (REPO_ROOT / "ci_final_visual_semantic_qa_hotfix.py").read_text(encoding="utf-8")
     assert "STILL_IMAGE_MOTION_FALLBACK_V1" in source
     assert "GENERATED_STILL_MOTION" in source
     print("STILL IMAGE MOTION FALLBACK REGRESSION: PASS")
