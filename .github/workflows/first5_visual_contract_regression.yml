@@ -17,6 +17,7 @@ jobs:
         run: pip install -r requirements.txt
       - name: Apply production hotfix chain
         run: |
+          python ci_topic_input_hotfix.py
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
           python ci_fact_critical_hotfix.py
@@ -26,7 +27,6 @@ jobs:
           python ci_retention_hotfix.py
           python ci_first5_retention_tts_hotfix.py
           python ci_first5_visual_contract_hotfix.py
-          python ci_topic_input_hotfix.py
       - name: Run focused regression
         run: |
           python quality/first5_visual_contract_regression_test.py
