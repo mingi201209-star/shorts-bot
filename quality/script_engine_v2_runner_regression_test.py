@@ -204,6 +204,29 @@ def main():
     assert all(any(ch.isascii() and ch.isalpha() for ch in scene["keyword"]) for scene in latest_script["scenes"])
     assert len({scene["keyword"] for scene in latest_script["scenes"]}) >= max(6, len(latest_script["scenes"]) // 2)
 
+    # Run 32785394904: the approved reveal used ~시킨다 and the writer leaked
+    # the same reveal into the preceding unlocked scene. Repair both defects
+    # deterministically without adding calls or changing the locked fact.
+    counterexample = candidate()
+    counterexample["micro_narrative"]["reveal"] = (
+        "날개 끝이 위로 꺾이면 날개 위아래 압력 차가 끝단에서 강한 소용돌이를 만들고, "
+        "이 형상이 그 흐름을 약화시킨다."
+    )
+    counterexample_calls = []
+
+    def counterexample_call(payload, *, mode):
+        counterexample_calls.append(mode)
+        if mode != "writer":
+            raise AssertionError("locked-ending/adjacent-dedupe fixture must not spend repair calls")
+        generated = writer_script(counterexample)
+        generated["scenes"][-3]["text"] = counterexample["micro_narrative"]["reveal"]
+        return generated
+
+    recovered = generate_script_v2(counterexample, call_fn=counterexample_call)
+    assert counterexample_calls == ["writer"]
+    assert recovered["scenes"][-2]["text"].endswith("약화시킵니다.")
+    assert recovered["scenes"][-3]["text"] != recovered["scenes"][-2]["text"]
+
     failing_calls = []
 
     def structurally_invalid(payload, *, mode):
