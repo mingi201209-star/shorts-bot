@@ -85,7 +85,7 @@ sel = vd.choose_best_candidate([butterfly], subject_filter_query=query)
 assert sel["id"] == 6
 vd._mark_candidate_used(sel); assert vd.get_last_safe_reuse_offset() == 1.5
 sel = vd.choose_best_candidate([butterfly], subject_filter_query=query)
-assert sel["id"] == 3, sel
+assert sel is None, sel  # exhausted safe reuse must fail closed, never select cross-domain stock
 
 # E: narration/query with no concrete/domain anchor keeps existing abstract path.
 abstract_query = "sound wave abstract animation"
