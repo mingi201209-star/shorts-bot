@@ -85,13 +85,36 @@ _QUESTION_HOOK_REPAIRS = (
 )
 
 
-def _question_hook_to_observation(text: Any) -> str:
+_TOPIC_OBSERVATION_REPAIRS = (
+    (r"지 않는$", "지 않습니다"),
+    (r"하는$", "합니다"),
+    (r"되는$", "됩니다"),
+    (r"있는$", "있습니다"),
+    (r"없는$", "없습니다"),
+    (r"오는$", "옵니다"),
+    (r"가는$", "갑니다"),
+)
+
+
+def _topic_to_observation(topic: Any) -> str:
+    value = _text(topic).rstrip().rstrip(".?!")
+    value = re.sub(r"\s+이유$", "", value)
+    for pattern, replacement in _TOPIC_OBSERVATION_REPAIRS:
+        converted, count = re.subn(pattern, replacement, value)
+        if count:
+            return converted + "."
+    return ""
+
+
+def _question_hook_to_observation(text: Any, topic: Any = "") -> str:
     """Convert only known Korean question endings; unsupported forms still fail closed."""
     value = re.sub(r"^(?:그런데\s+)?왜\s+", "", _text(text)).rstrip().rstrip(".?!")
     for pattern, replacement in _QUESTION_HOOK_REPAIRS:
         converted, count = re.subn(pattern, replacement, value)
         if count:
             return converted + "."
+    if re.search(r"무엇일(?:까|까요)$", value):
+        return _topic_to_observation(topic)
     return ""
 
 
@@ -118,7 +141,7 @@ def build_narrative_plan(candidate: Dict[str, Any], approved_hook: str = "") -> 
         raise ValueError("missing narrative locks: " + ", ".join(missing))
 
     if "?" in hook or hook.endswith(("까요", "나요", "어요", "예요")):
-        hook = _question_hook_to_observation(hook)
+        hook = _question_hook_to_observation(hook, candidate.get("topic"))
         if not hook:
             raise ValueError("scene 1 hook must be an observable statement, not a question")
 
