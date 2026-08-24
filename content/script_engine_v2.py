@@ -74,6 +74,27 @@ def _concept_window(concepts: tuple[str, ...], start: int, width: int = 2) -> tu
     return tuple(concepts[(start + offset) % size] for offset in range(min(width, size)))
 
 
+_QUESTION_HOOK_REPAIRS = (
+    (r"있을까요$", "있습니다"),
+    (r"없을까요$", "없습니다"),
+    (r"일까요$", "입니다"),
+    (r"될까요$", "됩니다"),
+    (r"할까요$", "합니다"),
+    (r"올까요$", "옵니다"),
+    (r"갈까요$", "갑니다"),
+)
+
+
+def _question_hook_to_observation(text: Any) -> str:
+    """Convert only known Korean question endings; unsupported forms still fail closed."""
+    value = re.sub(r"^(?:그런데\s+)?왜\s+", "", _text(text)).rstrip().rstrip(".?!")
+    for pattern, replacement in _QUESTION_HOOK_REPAIRS:
+        converted, count = re.subn(pattern, replacement, value)
+        if count:
+            return converted + "."
+    return ""
+
+
 def build_narrative_plan(candidate: Dict[str, Any], approved_hook: str = "") -> Dict[str, Any]:
     """Build the narrative skeleton without spending an API call."""
     if not isinstance(candidate, dict):
@@ -97,7 +118,9 @@ def build_narrative_plan(candidate: Dict[str, Any], approved_hook: str = "") -> 
         raise ValueError("missing narrative locks: " + ", ".join(missing))
 
     if "?" in hook or hook.endswith(("까요", "나요", "어요", "예요")):
-        raise ValueError("scene 1 hook must be an observable statement, not a question")
+        hook = _question_hook_to_observation(hook)
+        if not hook:
+            raise ValueError("scene 1 hook must be an observable statement, not a question")
 
     hook = _normalize_locked_narration(hook, "phenomenon")
     if not question.startswith("그런데"):
