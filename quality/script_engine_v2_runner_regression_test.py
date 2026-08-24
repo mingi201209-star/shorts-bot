@@ -227,6 +227,29 @@ def main():
     assert recovered["scenes"][-2]["text"].endswith("약화시킵니다.")
     assert recovered["scenes"][-3]["text"] != recovered["scenes"][-2]["text"]
 
+    # Run 32790524280: the locked payoff survived all bounded calls with the
+    # non-formal ~위해서다 ending. Normalize style without changing its fact.
+    payoff_counterexample = candidate()
+    payoff_counterexample["micro_narrative"]["payoff"] = (
+        "날개 끝이 위로 꺾여 있는 것은 날개 위아래의 압력 차가 날개 끝에서 강한 "
+        "소용돌이를 만들어내고, 꺾인 형상이 그 소용돌이를 약화시켜 유도항력을 "
+        "줄이기 위해서다."
+    )
+    payoff_calls = []
+
+    def payoff_call(payload, *, mode):
+        payoff_calls.append(mode)
+        if mode != "writer":
+            raise AssertionError("locked payoff fixture must not spend repair calls")
+        return writer_script(payoff_counterexample)
+
+    payoff_recovered = generate_script_v2(
+        payoff_counterexample,
+        call_fn=payoff_call,
+    )
+    assert payoff_calls == ["writer"]
+    assert payoff_recovered["scenes"][-1]["text"].endswith("위해서입니다.")
+
     failing_calls = []
 
     def structurally_invalid(payload, *, mode):
