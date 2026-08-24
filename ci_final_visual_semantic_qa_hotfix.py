@@ -7,6 +7,16 @@ def append_once(text, marker, block):
     return text.rstrip() + "\n\n" + block.strip() + "\n"
 
 
+def replace_between(text, start_marker, end_marker, replacement, error_label):
+    start = text.find(start_marker)
+    if start < 0:
+        raise RuntimeError(f"{error_label} start marker not found")
+    end = text.find(end_marker, start)
+    if end < 0:
+        raise RuntimeError(f"{error_label} end marker not found")
+    return text[:start] + replacement + text[end:]
+
+
 downloader = Path("video/video_downloader.py")
 text = downloader.read_text(encoding="utf-8")
 text = append_once(
@@ -108,15 +118,10 @@ if "STILL_IMAGE_MOTION_FALLBACK_V1" not in text:
         raise RuntimeError("still fallback final visual import anchor not found")
     text = text.replace(import_anchor, import_block, 1)
 
-    no_video_needle = '''        if not video_url:
-
-            raise RuntimeError(
-                "Pexels에서 영상을 "
-                f"찾지 못했습니다: {keyword}"
-            )
-'''
+    # Later production hotfixes can change the exact wording/spacing of the
+    # no-video RuntimeError. Anchor only on the stable control-flow line and
+    # the next numbered section so installer ordering cannot break startup.
     no_video_replacement = '''        # STILL_IMAGE_MOTION_FALLBACK_V1
-        using_still_motion_fallback = False
         if not video_url:
             still_result = generate_still_motion_fallback(
                 item,
@@ -125,78 +130,36 @@ if "STILL_IMAGE_MOTION_FALLBACK_V1" not in text:
                 trigger_reason="no_semantically_safe_stock",
             )
             if still_result:
-                using_still_motion_fallback = True
+                # Reuse the existing generated-local-MP4 handoff installed by
+                # the bounded AI visual hotfix. Normal download/vertical paths
+                # remain untouched for all stock candidates.
+                video_url = vertical_video_path
                 set_last_final_visual_selection({
                     "accepted": True,
-                    "mode": still_result.get("mode", "GENERATED_STILL_MOTION"),
+                    "mode": still_result.get("mode", "GENERATED_STILL_MOTION_VERIFIED"),
                     "tier": int(still_result.get("tier", 3)),
-                    "visual_state": still_result.get("visual_state", "GENERATED"),
-                    "anchor_matched": 1,
-                    "anchor_total": 1,
+                    "visual_state": still_result.get("visual_state", "TRUE"),
+                    "anchor_matched": int(still_result.get("anchor_matched", 1)),
+                    "anchor_total": int(still_result.get("anchor_total", 1)),
                     "provider": still_result.get("provider", "openai_image"),
                     "source_id": still_result.get("source_id", "generated-still"),
-                    "metadata": "generated still image animated with slow zoom/pan and fade",
+                    "metadata": "verified generated still animated with slow zoom/pan and fade",
                 })
                 print(f"🖼️ STILL IMAGE MOTION FALLBACK scene={idx + 1}: {vertical_video_path}")
             else:
                 raise RuntimeError(
-                    "Pexels에서 영상을 찾지 못했고 정지 이미지 fallback도 실패했습니다: "
+                    "영상 후보가 없고 검증된 정지 이미지 fallback도 실패했습니다: "
                     f"{keyword}"
                 )
+
 '''
-    if no_video_needle not in text:
-        raise RuntimeError("still fallback no-video anchor not found")
-    text = text.replace(no_video_needle, no_video_replacement, 1)
-
-    download_needle = '''        download_video(
-            video_url,
-            source_video_path,
-        )
-
-        if not os.path.exists(
-            source_video_path
-        ):
-
-            raise RuntimeError(
-                "영상 다운로드 실패: "
-                f"{source_video_path}"
-            )
-'''
-    download_replacement = '''        if not using_still_motion_fallback:
-            download_video(
-                video_url,
-                source_video_path,
-            )
-
-            if not os.path.exists(
-                source_video_path
-            ):
-
-                raise RuntimeError(
-                    "영상 다운로드 실패: "
-                    f"{source_video_path}"
-                )
-'''
-    if download_needle not in text:
-        raise RuntimeError("still fallback download anchor not found")
-    text = text.replace(download_needle, download_replacement, 1)
-
-    vertical_needle = '''        prepare_vertical_video(
-            source_video_path,
-            vertical_video_path,
-            duration,
-        )
-'''
-    vertical_replacement = '''        if not using_still_motion_fallback:
-            prepare_vertical_video(
-                source_video_path,
-                vertical_video_path,
-                duration,
-            )
-'''
-    if vertical_needle not in text:
-        raise RuntimeError("still fallback vertical-video anchor not found")
-    text = text.replace(vertical_needle, vertical_replacement, 1)
+    text = replace_between(
+        text,
+        "        if not video_url:",
+        "        # ====================================================\n        # 4. 영상 다운로드",
+        no_video_replacement,
+        "still fallback no-video block",
+    )
 engine.write_text(text, encoding="utf-8")
 
 
