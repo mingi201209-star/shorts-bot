@@ -17,7 +17,7 @@ text = append_once(
 _QUERY_ANCHOR_GROUPS = {
     "aircraft": {"aircraft", "airplane", "plane", "aviation", "airliner"},
     "window": {"window", "windows", "pane", "panes"},
-    "wing": {"wing", "wings", "winglet", "winglets"},
+    "wing": {"wing", "wings", "winglet", "winglets", "wingtip", "wingtips"},
     "cabin": {"cabin", "passenger", "interior"},
     "bridge": {"bridge", "bridges"},
     "tunnel": {"tunnel", "tunnels"},
@@ -27,7 +27,7 @@ _QUERY_ANCHOR_GROUPS = {
 _QUERY_ATTRIBUTE_TERMS = {
     "rounded", "round", "corner", "corners", "shape", "pressure", "structural",
     "structure", "layer", "layers", "hole", "holes", "small", "detail", "closeup",
-    "mechanism", "pane", "panes",
+    "mechanism", "pane", "panes", "vortex", "airflow", "drag", "wingtip", "winglet",
 }
 
 
@@ -37,9 +37,12 @@ def extract_query_anchors(query):
     for canonical, aliases in _QUERY_ANCHOR_GROUPS.items():
         if words & aliases:
             anchors.append(canonical)
-    # Aircraft component narration must preserve both the domain and component.
-    if "aircraft" in anchors and "window" in anchors:
+    # Aircraft components must preserve both domain and component. A bare wing
+    # anchor can otherwise match birds/food/abstract stock and cause semantic drift.
+    if "window" in anchors and "aircraft" in anchors:
         return ["aircraft", "window"]
+    if "wing" in anchors:
+        return ["aircraft", "wing"]
     return anchors[:2]
 
 
@@ -82,12 +85,15 @@ def query_relaxation_ladder(query):
         if value and value != normalized and value not in variants:
             variants.append(value)
 
-    # Relax attributes first; never drop the compound aircraft+window anchor.
     if attributes:
         add(anchor_words + attributes[:2])
     if anchors == ["aircraft", "window"]:
         add(["aircraft", "window", "closeup"])
         add(["airplane", "cabin", "window"])
+    elif anchors == ["aircraft", "wing"]:
+        add(["airplane", "wing", "winglet"])
+        add(["aircraft", "wing", "closeup"])
+        add(["airplane", "wing"])
     else:
         add(anchor_words + ["detail"])
         add(anchor_words)
@@ -118,7 +124,6 @@ def visual_specificity_decision(candidate, scene_query):
     compatibility = candidate_anchor_compatibility(candidate, scene_query)
     anchors = extract_query_anchors(scene_query)
     if anchors:
-        # Full compound-anchor compatibility is required for direct/close tiers.
         if compatibility["compatible"]:
             pass
         elif compatibility["matched"] > 0:
