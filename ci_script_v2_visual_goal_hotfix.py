@@ -78,7 +78,15 @@ def _deterministic_keyword(scene, contract, plan, index):
         return value
 
     words = _ascii_keyword_words(value)
-    filtered = [word for word in words if word not in {"aircraft", "airplane", "plane", "aviation", "wing", "wings"}]
+    if (
+        any(word in {"aircraft", "airplane", "plane", "aviation"} for word in words)
+        and any(word in {"wing", "wings"} for word in words)
+    ):
+        return value
+    filtered = [
+        word for word in words
+        if word not in {"aircraft", "airplane", "plane", "aviation", "wing", "wings", "stage"}
+    ]
     locked = ["aircraft", "wing"] + filtered + ["stage", str(index)]
     locked = locked[:7]
     if len(locked) < 2:
