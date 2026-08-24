@@ -8,6 +8,7 @@ on:
       - "content/script_engine_v2_validation.py"
       - "content/script_generator_router.py"
       - "ci_script_v2_visual_goal_hotfix.py"
+      - "ci_script_v2_visual_goal_hotfix_legacy.py"
       - "quality/script_engine_v2_*"
       - "quality/script_generator_router_regression_test.py"
       - ".github/workflows/script_engine_v2_regression.yml"
@@ -34,6 +35,8 @@ jobs:
         run: |
           python -m py_compile \
             ci_script_v2_visual_goal_hotfix.py \
+            ci_script_v2_visual_goal_hotfix_legacy.py \
+            ci_script_v2_visual_goal_hotfix_legacy_base.py \
             content/script_engine_v2.py \
             content/script_engine_v2_runner.py \
             content/script_engine_v2_validation.py \
@@ -41,6 +44,7 @@ jobs:
             quality/script_engine_v2_regression_test.py \
             quality/script_engine_v2_failure_fixtures_test.py \
             quality/script_engine_v2_runner_regression_test.py \
+            quality/script_engine_v2_scene_count_recovery_regression_test.py \
             quality/script_engine_v2_text_alias_regression_test.py \
             quality/script_engine_v2_run_32696711123_regression_test.py \
             quality/script_generator_router_regression_test.py
@@ -53,6 +57,9 @@ jobs:
 
       - name: Bounded writer orchestration
         run: python -m quality.script_engine_v2_runner_regression_test
+
+      - name: One-scene-short bounded recovery
+        run: python -m quality.script_engine_v2_scene_count_recovery_regression_test
 
       - name: Run 32696711123 terminal recovery fixture
         run: python -m quality.script_engine_v2_run_32696711123_regression_test
