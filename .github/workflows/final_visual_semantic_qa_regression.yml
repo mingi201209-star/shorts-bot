@@ -1,0 +1,42 @@
+name: Final Visual Semantic QA Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_final_visual_semantic_qa_hotfix.py"
+      - "quality/final_visual_semantic_qa.py"
+      - "quality/final_visual_semantic_qa_regression_test.py"
+      - ".github/workflows/final_visual_semantic_qa_regression.yml"
+      - ".github/workflows/main.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Install production selection and final-render gates
+        run: |
+          python ci_video_provider_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_ai_visual_fallback_hotfix.py
+          python ci_ai_visual_mechanism_fallback_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+      - name: Run final visual semantic QA regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: |
+          python -m py_compile ci_final_visual_semantic_qa_hotfix.py quality/final_visual_semantic_qa.py quality/final_visual_semantic_qa_regression_test.py video/video_downloader.py video/video_engine.py main.py
+          python quality/final_visual_semantic_qa_regression_test.py
