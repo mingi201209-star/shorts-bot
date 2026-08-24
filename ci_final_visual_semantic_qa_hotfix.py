@@ -7,6 +7,16 @@ def append_once(text, marker, block):
     return text.rstrip() + "\n\n" + block.strip() + "\n"
 
 
+def replace_between(text, start_marker, end_marker, replacement, error_label):
+    start = text.find(start_marker)
+    if start < 0:
+        raise RuntimeError(f"{error_label} start marker not found")
+    end = text.find(end_marker, start)
+    if end < 0:
+        raise RuntimeError(f"{error_label} end marker not found")
+    return text[:start] + replacement + text[end:]
+
+
 downloader = Path("video/video_downloader.py")
 text = downloader.read_text(encoding="utf-8")
 text = append_once(
@@ -55,6 +65,17 @@ def get_last_final_visual_selection():
     return dict(_LAST_FINAL_VISUAL_SELECTION or {})
 ''',
 )
+text = append_once(
+    text,
+    "FINAL_VISUAL_GENERATED_LINEAGE_SETTER_V1",
+    r'''
+# FINAL_VISUAL_GENERATED_LINEAGE_SETTER_V1
+def set_last_final_visual_selection(selection):
+    global _LAST_FINAL_VISUAL_SELECTION
+    _LAST_FINAL_VISUAL_SELECTION = dict(selection or {})
+    return dict(_LAST_FINAL_VISUAL_SELECTION)
+''',
+)
 downloader.write_text(text, encoding="utf-8")
 
 
@@ -86,6 +107,59 @@ if "FINAL_VISUAL_SCENE_RECORD_V1" not in text:
     if selection_needle not in text:
         raise RuntimeError("final visual QA selection anchor not found")
     text = text.replace(selection_needle, selection_replacement, 1)
+
+if "STILL_IMAGE_MOTION_FALLBACK_V1" not in text:
+    import_anchor = "from video.video_downloader import get_last_final_visual_selection\n"
+    import_block = (
+        "from video.video_downloader import get_last_final_visual_selection, set_last_final_visual_selection\n"
+        "from video.still_image_fallback import generate_still_motion_fallback\n"
+    )
+    if import_anchor not in text:
+        raise RuntimeError("still fallback final visual import anchor not found")
+    text = text.replace(import_anchor, import_block, 1)
+
+    # Later production hotfixes can change the exact wording/spacing of the
+    # no-video RuntimeError. Anchor only on the stable control-flow line and
+    # the next numbered section so installer ordering cannot break startup.
+    no_video_replacement = '''        # STILL_IMAGE_MOTION_FALLBACK_V1
+        if not video_url:
+            still_result = generate_still_motion_fallback(
+                item,
+                output_path=vertical_video_path,
+                duration=duration,
+                trigger_reason="no_semantically_safe_stock",
+            )
+            if still_result:
+                # Reuse the existing generated-local-MP4 handoff installed by
+                # the bounded AI visual hotfix. Normal download/vertical paths
+                # remain untouched for all stock candidates.
+                video_url = vertical_video_path
+                set_last_final_visual_selection({
+                    "accepted": True,
+                    "mode": still_result.get("mode", "GENERATED_STILL_MOTION_VERIFIED"),
+                    "tier": int(still_result.get("tier", 3)),
+                    "visual_state": still_result.get("visual_state", "TRUE"),
+                    "anchor_matched": int(still_result.get("anchor_matched", 1)),
+                    "anchor_total": int(still_result.get("anchor_total", 1)),
+                    "provider": still_result.get("provider", "openai_image"),
+                    "source_id": still_result.get("source_id", "generated-still"),
+                    "metadata": "verified generated still animated with slow zoom/pan and fade",
+                })
+                print(f"🖼️ STILL IMAGE MOTION FALLBACK scene={idx + 1}: {vertical_video_path}")
+            else:
+                raise RuntimeError(
+                    "영상 후보가 없고 검증된 정지 이미지 fallback도 실패했습니다: "
+                    f"{keyword}"
+                )
+
+'''
+    text = replace_between(
+        text,
+        "        if not video_url:",
+        "        # ====================================================\n        # 4. 영상 다운로드",
+        no_video_replacement,
+        "still fallback no-video block",
+    )
 engine.write_text(text, encoding="utf-8")
 
 
@@ -127,3 +201,4 @@ from quality.final_visual_semantic_qa import (
 main.write_text(text, encoding="utf-8")
 
 print("FINAL_VISUAL_SEMANTIC_QA_V1 installed")
+print("STILL_IMAGE_MOTION_FALLBACK_V1 installed")
