@@ -3,7 +3,11 @@ import sys
 
 subprocess.run([sys.executable, "ci_script_v2_visual_goal_hotfix.py"], check=True)
 
-from content.script_engine_v2_runner import _normalize_repair_item, _normalize_scene_fields
+from content.script_engine_v2_runner import (
+    _apply_local_repairs,
+    _normalize_repair_item,
+    _normalize_scene_fields,
+)
 
 
 def main():
@@ -27,6 +31,33 @@ def main():
     })
     assert nested_repair["scene_index"] == 3
     assert nested_repair["text"] == "압력 차이 때문에 공기가 끝을 돌아 흐릅니다."
+
+    base_script = {
+        "scenes": [
+            {"text": "첫 장면", "visual_goal": "show first scene", "keyword": "first scene"},
+            {"text": "", "visual_goal": "show second scene", "keyword": "second scene"},
+            {"text": "", "visual_goal": "show third scene", "keyword": "third scene"},
+        ]
+    }
+    envelope_response = {
+        "result": {
+            "repairs": [
+                {"scene_number": 2, "narration": {"text": "두 번째 장면 대사입니다."}},
+                {"scene_index": 3, "voiceover": {"content": "세 번째 장면 대사입니다."}},
+            ]
+        }
+    }
+    repaired = _apply_local_repairs(base_script, envelope_response, {2, 3}, set())
+    assert repaired["scenes"][1]["text"] == "두 번째 장면 대사입니다."
+    assert repaired["scenes"][2]["text"] == "세 번째 장면 대사입니다."
+
+    alias_response = {
+        "scene_repairs": [
+            {"scene_index": 2, "spoken_line": "별칭 repair 리스트도 복구됩니다."},
+        ]
+    }
+    repaired = _apply_local_repairs(base_script, alias_response, {2}, set())
+    assert repaired["scenes"][1]["text"] == "별칭 repair 리스트도 복구됩니다."
 
     metadata_only = {
         "visual_description": {"text": "close-up of wingtip airflow"},
@@ -57,7 +88,7 @@ def main():
     normalized = _normalize_scene_fields(ambiguous)
     assert not str(normalized.get("text", "")).strip(), normalized
 
-    print("PASS: Script Engine V2 flat+nested writer/repair text alias normalization")
+    print("PASS: Script Engine V2 flat+nested writer/repair aliases + repair envelope normalization")
 
 
 if __name__ == "__main__":
