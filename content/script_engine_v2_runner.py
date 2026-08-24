@@ -47,6 +47,45 @@ def _extract_json(text: Any) -> Dict[str, Any]:
     raise ValueError("Script Engine V2 response did not contain a JSON object")
 
 
+def _writer_response_format(payload: Dict[str, Any], *, mode: str) -> Dict[str, Any]:
+    """Require the writer to return every planned scene without adding a retry."""
+    if mode != "writer":
+        return {"type": "json_object"}
+    scene_count = int(payload.get("target_scene_count") or 0)
+    if scene_count < 1:
+        raise ValueError("writer target_scene_count must be positive")
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "shorts_script",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "scenes": {
+                        "type": "array",
+                        "minItems": scene_count,
+                        "maxItems": scene_count,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "text": {"type": "string"},
+                                "visual_goal": {"type": "string"},
+                                "keyword": {"type": "string"},
+                            },
+                            "required": ["text", "visual_goal", "keyword"],
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                "required": ["title", "scenes"],
+                "additionalProperties": False,
+            },
+        },
+    }
+
+
 def _default_call(payload: Dict[str, Any], *, mode: str) -> Dict[str, Any]:
     authorize_call(MODEL)
     if mode == "writer":
@@ -72,7 +111,7 @@ def _default_call(payload: Dict[str, Any], *, mode: str) -> Dict[str, Any]:
             {"role": "system", "content": instruction},
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ],
-        response_format={"type": "json_object"},
+        response_format=_writer_response_format(payload, mode=mode),
     )
     record_usage(MODEL, response)
     return _extract_json(response.choices[0].message.content)
