@@ -51,6 +51,19 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
     return 6, "LAST_RESORT"
 
 
+def _partial_aviation_component_anchor(candidate, scene_query):
+    """Reject domain-only matches for concrete aircraft components before render."""
+    words = set(str(scene_query or "").lower().replace("-", " ").split())
+    aviation = bool(words & {"aircraft", "airplane", "aviation"})
+    component = bool(words & {"wing", "winglet", "wingtip", "window"})
+    if not (aviation and component):
+        return False
+    compatibility = candidate_anchor_compatibility(candidate, scene_query)
+    total = int(compatibility.get("total", 0) or 0)
+    matched = int(compatibility.get("matched", 0) or 0)
+    return total >= 2 and matched < total
+
+
 def semantic_safe_reuse_candidate(scene_query):
     eligible = []
     for key, candidate in _SAFE_REUSE_HISTORY.items():
@@ -129,6 +142,20 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
             selected_mode = "SEMANTIC_SAFE_REUSE"
 
     anchors = extract_query_anchors(subject_filter_query)
+    # For concrete aviation components, matching only the aircraft domain is not
+    # sufficient. Reject before render so retry/reuse/still fallback can take over.
+    if selected is not None and _partial_aviation_component_anchor(selected, subject_filter_query):
+        compatibility = candidate_anchor_compatibility(selected, subject_filter_query)
+        print(
+            "[GENERAL_VISUAL_REJECT] "
+            f"candidate={selected.get('source_id', selected.get('id'))} "
+            f"anchors={'+'.join(anchors)} "
+            f"anchor={compatibility.get('matched', 0)}/{compatibility.get('total', 0)} "
+            "reason=missing_aviation_component_anchor"
+        )
+        selected = None
+        selected_mode = "REJECTED_MISSING_AVIATION_COMPONENT"
+
     # For anchored scenes, never fill with cross-domain/abstract stock. Returning
     # None lets existing retry/AI/contextual fallback paths handle the scene.
     if anchors and selected is not None and selected_tier >= 5:
@@ -166,4 +193,4 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
 )
 path.write_text(text, encoding="utf-8")
 
-print("✅ General-scene visual parity + UNKNOWN-safe selection applied; cross-domain anchored stock blocked")
+print("✅ General-scene visual parity + UNKNOWN-safe selection applied; partial aviation components and cross-domain stock blocked")
