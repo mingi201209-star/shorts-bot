@@ -110,6 +110,7 @@ jobs:
           python ci_general_scene_visual_parity_hotfix.py
           python ci_script_validation_recovery_hotfix.py
           python ci_script_v2_visual_goal_hotfix.py
+          python ci_script_v2_gunggeum_formal_ending_hotfix.py
           python ci_final_visual_semantic_qa_hotfix.py
           python ci_cross_process_video_dedupe_hotfix.py
 
@@ -152,12 +153,13 @@ jobs:
             ci_subscriber_conversion_hotfix.py content/subscriber_conversion.py \
             ci_script_production_parity_hotfix.py ci_script_production_parity_bridge_hotfix.py \
             ci_adaptive_scene_count_hotfix.py ci_general_scene_visual_parity_hotfix.py \
-            ci_script_validation_recovery_hotfix.py ci_script_v2_visual_goal_hotfix.py ci_final_visual_semantic_qa_hotfix.py content/retention_structure.py \
+            ci_script_validation_recovery_hotfix.py ci_script_v2_visual_goal_hotfix.py ci_script_v2_gunggeum_formal_ending_hotfix.py ci_final_visual_semantic_qa_hotfix.py content/retention_structure.py \
             quality/retention_structure_experiment_regression_test.py \
             quality/subscriber_conversion_regression_test.py \
             quality/fixed_topic_gate_feedback_regression_test.py \
             quality/candidate_grounded_recovery_regression_test.py \
             quality/cross_process_video_dedupe_regression_test.py \
+            quality/script_v2_gunggeum_formal_ending_regression_test.py \
             main.py config.py content/candidate_explorer.py content/candidate_recovery.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py quality/final_render_integrity.py \
@@ -171,6 +173,7 @@ jobs:
           python quality/fixed_topic_gate_feedback_regression_test.py
           python quality/candidate_grounded_recovery_regression_test.py
           python quality/cross_process_video_dedupe_regression_test.py
+          python quality/script_v2_gunggeum_formal_ending_regression_test.py
           python -m quality.growth_candidate_shadow_regression_test
           python -m quality.retention_structure_experiment_regression_test
           python -m quality.subscriber_conversion_regression_test
