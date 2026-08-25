@@ -56,6 +56,26 @@ def record_final_visual_scene(scene_index, query, selection, *, hook_verified=Fa
     return entry
 
 
+def _missing_required_aviation_component_anchor(item):
+    """Fail closed when an aircraft component query only matches the domain.
+
+    Run 32793032527 selected drone footage for an ``aircraft wing`` scene:
+    compatibility matched only one of two anchors, so the aircraft domain was
+    present but the required wing component was not. Keep this deliberately
+    narrow to concrete aviation component queries; generated/hook paths are
+    unaffected.
+    """
+    query = str(item.get("query") or "").lower()
+    words = set(query.replace("-", " ").split())
+    aviation = bool(words & {"aircraft", "airplane", "aviation"})
+    component = bool(words & {"wing", "winglet", "wingtip", "window"})
+    if not (aviation and component):
+        return False
+    total = int(item.get("anchor_total", 0) or 0)
+    matched = int(item.get("anchor_matched", 0) or 0)
+    return total >= 2 and matched < total
+
+
 def validate_final_visual_semantic_qa(scenes):
     expected = len(list(scenes or []))
     by_index = {item["scene_index"]: item for item in _SCENE_REPORT}
@@ -63,7 +83,11 @@ def validate_final_visual_semantic_qa(scenes):
         item = json.loads(path.read_text(encoding="utf-8"))
         by_index[int(item["scene_index"])] = item
     ordered = sorted(by_index.values(), key=lambda item: item["scene_index"])
-    failures = [item for item in ordered if not item.get("accepted")]
+    failures = [
+        item
+        for item in ordered
+        if not item.get("accepted") or _missing_required_aviation_component_anchor(item)
+    ]
     seen = {item["scene_index"] for item in ordered}
     missing = [idx for idx in range(expected) if idx not in seen]
     payload = {

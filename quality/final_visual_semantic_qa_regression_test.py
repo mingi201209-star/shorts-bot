@@ -21,7 +21,7 @@ def expect_failure(scenes):
     except RuntimeError as exc:
         assert "FINAL_VISUAL_SEMANTIC_QA_FAILED" in str(exc)
         return
-    raise AssertionError("cross-domain final scene must fail closed")
+    raise AssertionError("cross-domain or component-missing final scene must fail closed")
 
 
 def main():
@@ -56,6 +56,24 @@ def main():
             })
             result = validate_final_visual_semantic_qa(scenes)
             assert result["status"] == "PASS"
+
+            # Regress production Run 32793032527: an aircraft-domain candidate
+            # (drone footage) matched 1/2 anchors for an aircraft-wing query and
+            # incorrectly passed final QA even though no wing was evidenced.
+            partial_component_scene = [{"keyword": "aircraft wing pressure difference stage 10"}]
+            reset_final_visual_semantic_report()
+            record_final_visual_scene(0, partial_component_scene[0]["keyword"], {
+                "accepted": True,
+                "mode": "SAME_DOMAIN_CONTEXTUAL_UNKNOWN",
+                "tier": 4,
+                "visual_state": "UNKNOWN",
+                "anchor_matched": 1,
+                "anchor_total": 2,
+                "provider": "pixabay",
+                "source_id": "314643",
+                "metadata": "drone nature beach camera technology aircraft uav travel sea",
+            })
+            expect_failure(partial_component_scene)
 
             # Production Scene rendering can happen in worker processes. Regress
             # Run 32787945275, where parent-only memory reported every scene missing.
