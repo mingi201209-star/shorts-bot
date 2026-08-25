@@ -106,6 +106,27 @@ def main():
             original_statement_question
         )
 
+        # Production Run 32853693033: a fixed statement topic ending in
+        # ~단다 still retained Candidate Explorer's question Hook. Project the
+        # exact statement into a formal observable opening before V2 locks it.
+        danda_item = candidate()
+        danda_item["topic"] = "비행기 엔진은 날개 아래에 단다"
+        danda_item["micro_narrative"]["hook"] = (
+            "왜 비행기 엔진은 날개 아래에 장착될까요?"
+        )
+        original_danda_question = danda_item["micro_narrative"]["hook"]
+        danda_result = router.generate_script(
+            {"topic": "aviation", "category": "항공"},
+            danda_item,
+        )
+        assert seen_candidates[-1]["micro_narrative"]["hook"] == (
+            "비행기 엔진은 날개 아래에 답니다."
+        )
+        assert danda_result["scenes"][0]["text"] == (
+            "비행기 엔진은 날개 아래에 답니다."
+        )
+        assert danda_item["micro_narrative"]["hook"] == original_danda_question
+
         # Production Run 32643474443 shape: Scene 1 is fixed, but the locked
         # Scene 2 question and payoff arrive in plain-form Korean. They must be
         # normalized before V2 freezes the narration contracts.
