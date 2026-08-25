@@ -6,7 +6,9 @@ on:
     paths:
       - "content/candidate_recovery.py"
       - "ci_candidate_grounded_recovery_hotfix.py"
+      - "ci_candidate_supply_recovery_hotfix.py"
       - "quality/candidate_grounded_recovery_regression_test.py"
+      - "quality/candidate_supply_recovery_search_regression_test.py"
       - "quality/candidate_recovery_production_chain_regression_test.py"
       - ".github/workflows/candidate_grounded_recovery_regression.yml"
       - ".github/workflows/main.yml"
@@ -24,7 +26,9 @@ jobs:
           python -m py_compile \
             content/candidate_recovery.py \
             ci_candidate_grounded_recovery_hotfix.py \
+            ci_candidate_supply_recovery_hotfix.py \
             quality/candidate_grounded_recovery_regression_test.py \
+            quality/candidate_supply_recovery_search_regression_test.py \
             quality/candidate_recovery_production_chain_regression_test.py \
             main.py
       - name: Reproduce production hotfix prefix from clean checkout
@@ -36,4 +40,6 @@ jobs:
           grep -q "CANDIDATE_RECOVERY_POOL" main.py
           grep -q "CANDIDATE GROUNDED RECOVERY" main.py
       - name: Run focused recovery regression
-        run: python quality/candidate_grounded_recovery_regression_test.py
+        run: |
+          python quality/candidate_grounded_recovery_regression_test.py
+          python quality/candidate_supply_recovery_search_regression_test.py
