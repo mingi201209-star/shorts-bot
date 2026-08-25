@@ -26,6 +26,16 @@ def _general_scene_strengthening_applicable(scene_query):
     return bool(_visual_is_concrete_query(scene_query) or len(anchors) >= 1)
 
 
+def _missing_required_aviation_component_anchor(candidate, scene_query):
+    anchors = set(extract_query_anchors(scene_query))
+    if "aircraft" not in anchors or not (anchors & {"wing", "window"}):
+        return False
+    compatibility = candidate_anchor_compatibility(candidate, scene_query)
+    total = int(compatibility.get("total", 0) or 0)
+    matched = int(compatibility.get("matched", 0) or 0)
+    return total >= 2 and matched < total
+
+
 def general_scene_unknown_safe_tier(candidate, scene_query):
     visual = candidate_visible_component_evidence(candidate, scene_query)
     semantic = concrete_visual_evidence(candidate, scene_query)
@@ -35,6 +45,11 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
     specific_hits = int(decision.get("specific_hits", 0) or 0)
     specific_total = int(decision.get("specific_total", 0) or 0)
     mechanism_specific = specific_total > 0 and specific_hits >= max(1, (specific_total + 1) // 2)
+
+    # Run 32796378299: metadata-only aircraft evidence must not satisfy a
+    # concrete wing/window query when the required component anchor is absent.
+    if state == "UNKNOWN" and _missing_required_aviation_component_anchor(candidate, scene_query):
+        return 5, "MISSING_REQUIRED_AVIATION_COMPONENT_UNKNOWN"
 
     if state == "TRUE" and int(decision.get("level", 99)) <= 3:
         return 1, "VISUALLY_VERIFIED_DIRECT"
