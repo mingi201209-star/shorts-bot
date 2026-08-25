@@ -223,5 +223,10 @@ from quality.final_visual_semantic_qa import (
     text = text.replace(production_needle, production_replacement, 1)
 main.write_text(text, encoding="utf-8")
 
+# Keep generated-still verification aligned with the actual dominance verifier
+# contract after every other visual hotfix has finished mutating its modules.
+from ci_still_image_verifier_contract_hotfix import main as _patch_still_image_verifier_contract
+_patch_still_image_verifier_contract()
+
 print("FINAL_VISUAL_SEMANTIC_QA_V1 installed")
 print("STILL_IMAGE_MOTION_FALLBACK_V1 installed")
