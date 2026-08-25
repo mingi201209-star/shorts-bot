@@ -60,6 +60,24 @@ def patch_still_fallback():
     if MARKER in text:
         return
 
+    # The production failure on Scene 8 showed a contract mismatch: generation
+    # could follow a broad visual_goal (aircraft touching the runway) while the
+    # fail-closed verifier correctly required every concrete keyword anchor
+    # (aircraft + wing). Align generation with that same existing verifier rule
+    # without weakening the verifier or adding calls/retries.
+    generation_prompt_needle = '''        "Show the exact physical subject named in the narration clearly and prominently. "
+        "No text, captions, logos, diagrams with invented labels, unrelated decorative objects, or cross-domain metaphors. "
+'''
+    generation_prompt_replacement = '''        "Show the exact physical subject named in the narration clearly and prominently. "
+        # STILL_IMAGE_VERIFIER_CONTRACT_V1
+        "Every concrete physical component named in the Search concept must also be visibly present, clear, and identifiable in-frame; do not merely imply it from context. "
+        "For example, an aircraft+wing search concept must visibly show both the aircraft and its wing even when the broader visual goal is landing or runway contact. "
+        "No text, captions, logos, diagrams with invented labels, unrelated decorative objects, or cross-domain metaphors. "
+'''
+    if text.count(generation_prompt_needle) != 1:
+        raise RuntimeError("still fallback generation prompt anchor mismatch")
+    text = text.replace(generation_prompt_needle, generation_prompt_replacement, 1)
+
     verifier_needle = '''    result = evaluate_hook_subject_dominance(candidate, scene)
     if result.get("obvious_generation_artifact", False):
         return False, result
