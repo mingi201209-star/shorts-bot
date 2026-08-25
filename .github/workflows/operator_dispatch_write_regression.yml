@@ -5,10 +5,13 @@ on:
     paths:
       - ".github/workflows/shorts_operator_dispatch.yml"
       - ".github/workflows/shorts_continuous_relay.yml"
+      - ".github/workflows/shorts_codex_failure_analysis.yml"
+      - ".github/codex/prompts/shorts-production-failure.md"
       - ".github/workflow-dispatch-allowlist.json"
       - ".github/workflows/operator_dispatch_write_regression.yml"
       - "quality/operator_dispatch_write_regression_test.py"
       - "quality/continuous_relay_regression_test.py"
+      - "quality/codex_failure_analysis_regression_test.py"
   workflow_dispatch:
 
 permissions:
@@ -26,3 +29,4 @@ jobs:
         run: |
           python quality/operator_dispatch_write_regression_test.py
           python quality/continuous_relay_regression_test.py
+          python quality/codex_failure_analysis_regression_test.py
