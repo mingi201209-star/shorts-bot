@@ -1,0 +1,127 @@
+name: Shorts Codex Failure Analysis
+
+on:
+  workflow_dispatch:
+    inputs:
+      failed_run_id:
+        description: "Exact failed Shorts Generator run ID"
+        required: true
+        type: string
+      failed_run_attempt:
+        description: "Exact failed run attempt"
+        required: true
+        type: string
+      failed_run_sha:
+        description: "Exact failed production SHA"
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: shorts-codex-analysis-${{ inputs.failed_run_id }}-${{ inputs.failed_run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  analyze:
+    if: >-
+      github.actor == github.repository_owner ||
+      github.actor == 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    outputs:
+      final_message: ${{ steps.codex.outputs.final-message }}
+
+    steps:
+      - name: Checkout exact failed production SHA
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.failed_run_sha }}
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify exact failed production and collect logs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          FAILED_RUN_ID: ${{ inputs.failed_run_id }}
+          FAILED_RUN_ATTEMPT: ${{ inputs.failed_run_attempt }}
+          FAILED_RUN_SHA: ${{ inputs.failed_run_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          metadata="$(gh api "repos/${REPO}/actions/runs/${FAILED_RUN_ID}")"
+          jq -e \
+            --arg sha "$FAILED_RUN_SHA" \
+            --argjson attempt "$FAILED_RUN_ATTEMPT" \
+            '.name == "Shorts Generator" and
+             .event == "workflow_dispatch" and
+             .head_branch == "main" and
+             .head_sha == $sha and
+             .status == "completed" and
+             .conclusion == "failure" and
+             .run_attempt == $attempt' <<<"$metadata" >/dev/null
+
+          gh run view "$FAILED_RUN_ID" --repo "$REPO" --log-failed > failed-run.log
+          test -s failed-run.log
+
+      - name: Check API key presence
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$OPENAI_KEY"
+
+      - name: Analyze failure with Codex
+        id: codex
+        uses: openai/codex-action@v1
+        with:
+          openai-api-key: ${{ secrets.OPENAI_KEY }}
+          prompt-file: .github/codex/prompts/shorts-production-failure.md
+          output-file: codex-failure-analysis.md
+          effort: low
+          sandbox: read-only
+          safety-strategy: drop-sudo
+          allow-users: ${{ github.repository_owner }}
+          allow-bots: github-actions[bot]
+          codex-args: '["--ephemeral"]'
+
+  checkpoint:
+    needs: analyze
+    if: >-
+      needs.analyze.result == 'success' &&
+      needs.analyze.outputs.final_message != ''
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Record immediate analysis on control issue
+        uses: actions/github-script@v7
+        env:
+          ANALYSIS: ${{ needs.analyze.outputs.final_message }}
+          FAILED_RUN_ID: ${{ inputs.failed_run_id }}
+          FAILED_RUN_ATTEMPT: ${{ inputs.failed_run_attempt }}
+          FAILED_RUN_SHA: ${{ inputs.failed_run_sha }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const marker = `<!-- shorts-codex-analysis:${process.env.FAILED_RUN_ID}:${process.env.FAILED_RUN_ATTEMPT} -->`;
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 33,
+              per_page: 100,
+            });
+            if (comments.some(comment => comment.body?.includes(marker))) return;
+            const analysis = process.env.ANALYSIS.slice(0, 20000);
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: 33,
+              body: `${marker}\nImmediate Codex failure analysis. SHA: ${process.env.FAILED_RUN_SHA}. Run: ${process.env.FAILED_RUN_ID}. Attempt: ${process.env.FAILED_RUN_ATTEMPT}.\n\n${analysis}`,
+            });
+
