@@ -198,6 +198,16 @@ jobs:
           echo "✅ SHORTS GENERATOR V3.2 FINISHED"
           echo "========================================"
 
+      - name: Preserve verified production artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: verified-shorts-${{ github.run_id }}-${{ github.sha }}
+          path: |
+            final_shorts_*.mp4
+            final_visual_semantic_qa.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Publish to YouTube and persist lineage
         env:
           ENABLE_YOUTUBE_UPLOAD: ${{ inputs.youtube_upload && '1' || '0' }}
