@@ -269,6 +269,33 @@ def main():
     assert haejunda_calls == ["writer"]
     assert haejunda_recovered["scenes"][2]["text"].endswith("해줍니다.")
 
+    # Run 32846689908: a fixed landing-gear topic drifted into generic
+    # efficiency/safety queries, so final visual semantic QA rejected Scenes 2-3.
+    # Keep the concrete aircraft landing-gear anchor in every generated query.
+    landing_gear_item = candidate()
+    landing_gear_item["topic"] = "비행기 착륙장치는 접히게 만든다"
+    landing_gear_item["micro_narrative"]["hook"] = (
+        "비행기 착륙장치는 비행 중 동체 안으로 접힙니다."
+    )
+    landing_gear_calls = []
+
+    def landing_gear_writer(payload, *, mode):
+        landing_gear_calls.append(mode)
+        if mode != "writer":
+            raise AssertionError("landing-gear query lock must not spend repair calls")
+        return writer_script(landing_gear_item)
+
+    landing_gear_script = generate_script_v2(
+        landing_gear_item,
+        call_fn=landing_gear_writer,
+    )
+    assert landing_gear_calls == ["writer"]
+    assert all(
+        all(anchor in scene["keyword"].lower() for anchor in ("aircraft", "landing", "gear"))
+        for scene in landing_gear_script["scenes"]
+    )
+    assert all("wing" not in scene["keyword"].lower() for scene in landing_gear_script["scenes"])
+
     failing_calls = []
 
     def structurally_invalid(payload, *, mode):
