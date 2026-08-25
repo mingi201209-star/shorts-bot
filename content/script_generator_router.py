@@ -33,6 +33,7 @@ def _observable_hook_from_candidate(candidate):
         (r"꺾여\s*있는$", "꺾여 있습니다"),
         (r"붙어\s*있는$", "붙어 있습니다"),
         (r"달려\s*있는$", "달려 있습니다"),
+        (r"만든다$", "만듭니다"),
         (r"있는$", "있습니다"),
         (r"인다$", "입니다"),
     )
@@ -46,7 +47,7 @@ def _observable_hook_from_candidate(candidate):
     # Only accept a deterministic projection when it is plainly a statement.
     # Otherwise leave the original Candidate untouched so V2 still fails closed.
     observation = observation.strip()
-    if observation and observation != source and "?" not in observation and observation.endswith(("습니다", "입니다")):
+    if observation and observation != source and "?" not in observation and observation.endswith(("습니다", "입니다", "니다")):
         micro = dict(micro)
         micro["hook"] = observation + "."
         result["micro_narrative"] = micro

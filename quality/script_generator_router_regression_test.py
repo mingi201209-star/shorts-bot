@@ -84,6 +84,28 @@ def main():
         assert question_result["micro_narrative"]["hook"] == "비행기 날개 끝이 위로 꺾여 있습니다."
         assert question_item["micro_narrative"]["hook"] == original_question
 
+        # Production Run 32840924781 shape: the exact fixed topic is already an
+        # observable statement, but Candidate Explorer returns a question Hook.
+        statement_topic_item = candidate()
+        statement_topic_item["topic"] = "비행기 날개는 일부러 휘어지게 만든다"
+        statement_topic_item["micro_narrative"]["hook"] = (
+            "왜 비행기 날개는 일부러 휘어지게 만들까요?"
+        )
+        original_statement_question = statement_topic_item["micro_narrative"]["hook"]
+        statement_result = router.generate_script(
+            {"topic": "aviation", "category": "항공"},
+            statement_topic_item,
+        )
+        assert seen_candidates[-1]["micro_narrative"]["hook"] == (
+            "비행기 날개는 일부러 휘어지게 만듭니다."
+        )
+        assert statement_result["scenes"][0]["text"] == (
+            "비행기 날개는 일부러 휘어지게 만듭니다."
+        )
+        assert statement_topic_item["micro_narrative"]["hook"] == (
+            original_statement_question
+        )
+
         # Production Run 32643474443 shape: Scene 1 is fixed, but the locked
         # Scene 2 question and payoff arrive in plain-form Korean. They must be
         # normalized before V2 freezes the narration contracts.
