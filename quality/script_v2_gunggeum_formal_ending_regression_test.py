@@ -40,6 +40,17 @@ def main():
         "비행기 바퀴는 착륙 전에 미리 돌지 않습니다."
     )
 
+    winglet_candidate = {
+        "topic": "비행기 날개 끝의 윙렛은 소용돌이를 줄여 연료를 아낀다",
+        "micro_narrative": {
+            "hook": "왜 비행기 날개 끝의 윙렛은 소용돌이를 줄여 연료를 아낄까?"
+        },
+    }
+    normalized_winglet = _observable_hook_from_candidate(winglet_candidate)
+    assert normalized_winglet["micro_narrative"]["hook"] == (
+        "비행기 날개 끝의 윙렛은 소용돌이를 줄여 연료를 아낍니다."
+    )
+
     runner_source = Path("content/script_engine_v2_runner.py").read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_runner = Path(tmpdir) / "script_engine_v2_runner.py"
