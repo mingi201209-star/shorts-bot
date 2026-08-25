@@ -1,0 +1,23 @@
+name: Script V2 Formal Ending Regression
+
+on:
+  pull_request:
+    paths:
+      - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
+      - "quality/script_v2_gunggeum_formal_ending_regression_test.py"
+      - ".github/workflows/script-v2-gunggeum-formal-ending-regression.yml"
+      - ".github/workflows/main.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run focused regression
+        run: python quality/script_v2_gunggeum_formal_ending_regression_test.py
