@@ -4,6 +4,7 @@ from content.script_engine_v2 import (
     build_narrative_plan,
     writer_payload,
 )
+from content.script_engine_v2_runner import _deterministic_keyword
 
 
 def candidate():
@@ -86,6 +87,20 @@ def main():
         assert "observable statement" in str(exc)
     else:
         raise AssertionError("unsupported question Hook must still fail closed")
+
+    wheel_plan = {
+        "topic": "비행기 바퀴는 착륙 전에 미리 돌지 않는다",
+        "angle": "착륙 바퀴 작동 원리",
+    }
+    for generic_keyword in ("fixed wheels", "design safety", "mechanism explanation"):
+        anchored = _deterministic_keyword(
+            {"keyword": generic_keyword, "visual_goal": generic_keyword},
+            {"required_concepts": []},
+            wheel_plan,
+            4,
+        )
+        assert anchored.startswith("aircraft landing gear wheel ")
+        assert 4 <= len(anchored.split()) <= 7
 
     print("PASS: Script Engine V2 adaptive deterministic narrative plan")
 
