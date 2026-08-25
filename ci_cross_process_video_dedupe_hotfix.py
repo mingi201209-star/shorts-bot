@@ -140,11 +140,20 @@ text = replace_once(
     "unified provider atomic claim",
 )
 
+# Production applies a long sequence of source-rewriting hotfixes before this
+# one. Keep one authoritative final helper definition at the end of the module
+# so an earlier duplicate helper from that composed state cannot shadow the
+# atomic boolean claim contract. Functions above resolve these globals at call
+# time, so this preserves behavior while making the final binding explicit.
+final_binding_marker = "# CROSS_PROCESS_VIDEO_DEDUPE_FINAL_BINDING_V2"
+if final_binding_marker not in text:
+    text = text.rstrip() + "\n\n" + final_binding_marker + "\n" + new_helpers + "\n"
+
 path.write_text(text, encoding="utf-8")
 
 # No hook_visual rewrite is needed here. ci_video_provider_hotfix.py already
 # routes hook selection through _mark_candidate_used(); because this hotfix
-# replaces that helper before runtime imports occur, hook selections use the
-# same atomic run-scoped filesystem claim automatically.
+# installs the final module binding before runtime imports occur, hook selections
+# use the same atomic run-scoped filesystem claim automatically.
 
 print("✅ Cross-process video source dedupe hotfix applied")
