@@ -1,5 +1,9 @@
 from pathlib import Path
 
+from ci_fixed_topic_gate_advisory_hotfix import (
+    apply_fixed_topic_gate_advisory,
+)
+
 
 MAIN_PATH = Path("main.py")
 EXPLORER_PATH = Path("content/candidate_explorer.py")
@@ -234,6 +238,8 @@ def patch_main():
             replacement,
             label,
         )
+
+    text = apply_fixed_topic_gate_advisory(text)
 
     MAIN_PATH.write_text(
         text,
