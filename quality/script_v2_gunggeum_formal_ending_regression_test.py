@@ -8,6 +8,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import ci_script_v2_gunggeum_formal_ending_hotfix as hotfix
+from content.script_generator_router import _observable_hook_from_candidate
 
 
 def _load_formalizer(source: str):
@@ -28,6 +29,17 @@ def _load_formalizer(source: str):
 
 
 def main():
+    production_candidate = {
+        "topic": "비행기 바퀴는 착륙 전에 미리 돌지 않는다",
+        "micro_narrative": {
+            "hook": "왜 비행기 바퀴는 착륙 전에 미리 돌지 않을까?"
+        },
+    }
+    normalized_candidate = _observable_hook_from_candidate(production_candidate)
+    assert normalized_candidate["micro_narrative"]["hook"] == (
+        "비행기 바퀴는 착륙 전에 미리 돌지 않습니다."
+    )
+
     runner_source = Path("content/script_engine_v2_runner.py").read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_runner = Path(tmpdir) / "script_engine_v2_runner.py"
