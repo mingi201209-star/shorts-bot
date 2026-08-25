@@ -1,0 +1,21 @@
+name: Still Image Verifier Contract Regression
+
+on:
+  pull_request:
+    paths:
+      - "ci_still_image_verifier_contract_hotfix.py"
+      - "ci_final_visual_semantic_qa_hotfix.py"
+      - "quality/still_image_verifier_contract_regression_test.py"
+      - ".github/workflows/still-image-verifier-contract-regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run verifier contract regression
+        run: python quality/still_image_verifier_contract_regression_test.py
