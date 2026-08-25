@@ -47,7 +47,7 @@ def _observable_hook_from_candidate(candidate):
     # Only accept a deterministic projection when it is plainly a statement.
     # Otherwise leave the original Candidate untouched so V2 still fails closed.
     observation = observation.strip()
-    if observation and observation != source and "?" not in observation and observation.endswith(("습니다", "입니다")):
+    if observation and observation != source and "?" not in observation and observation.endswith(("습니다", "입니다", "니다")):
         micro = dict(micro)
         micro["hook"] = observation + "."
         result["micro_narrative"] = micro
