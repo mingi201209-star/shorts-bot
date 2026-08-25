@@ -15,15 +15,19 @@ def main():
     original_generate = fallback._generate_image
     original_motion = fallback._motion_clip
     original_verify = fallback._verify_motion_clip
+    calls = {"generate": 0, "motion": 0, "verify": 0}
 
     def fake_generate(scene):
+        calls["generate"] += 1
         token = str(scene.get("scene_id") or scene.get("id") or "scene")
         return b"fixture", f"verified-still-budget-{token}"
 
     def fake_motion(_image_path, output_path, _duration):
+        calls["motion"] += 1
         Path(output_path).write_bytes(b"mp4")
 
     def fake_verify(_scene, _output_path):
+        calls["verify"] += 1
         return True, {"visible_components": ["aircraft", "wing"]}
 
     fallback._generate_image = fake_generate
@@ -65,12 +69,18 @@ def main():
 
             assert first is not None
             assert second is not None
-            assert third is None
+            # The generation ceiling remains exactly two. A third same-anchor
+            # scene may only reuse the most recently verified aircraft+wing
+            # still and must be re-verified; it cannot spend another generation.
+            assert third is not None
+            assert third["mode"] == "REUSED_VERIFIED_STILL_MOTION"
+            assert third["source_id"] == second["source_id"]
             assert fallback.still_image_generation_count() == 2
+            assert calls == {"generate": 2, "motion": 3, "verify": 3}
             assert first["mode"] == "GENERATED_STILL_MOTION_VERIFIED"
             assert second["mode"] == "GENERATED_STILL_MOTION_VERIFIED"
             assert first["source_id"] != second["source_id"]
-            assert not (tmp / "scene9.mp4").exists()
+            assert (tmp / "scene9.mp4").exists()
     finally:
         fallback._generate_image = original_generate
         fallback._motion_clip = original_motion
