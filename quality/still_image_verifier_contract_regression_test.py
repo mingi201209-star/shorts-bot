@@ -53,7 +53,10 @@ def main():
         patched_hook = hook_path.read_text(encoding="utf-8")
         patched_still = still_path.read_text(encoding="utf-8")
         assert patched_hook.count(hotfix.MARKER) == 1
-        assert patched_still.count(hotfix.MARKER) == 1
+        # The still fallback intentionally carries the same contract marker at
+        # both patched boundaries: generation prompt + verifier gate. Calling
+        # the hotfix twice must keep exactly those two markers (idempotent).
+        assert patched_still.count(hotfix.MARKER) == 2
         assert 'if not result.get("pass", False):' in patched_still
         assert '"visible_components"' in patched_hook
         assert '"factual_visual_contradiction"' in patched_hook
