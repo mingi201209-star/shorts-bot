@@ -44,17 +44,25 @@ def main():
         assert patched.count(hotfix.MARKER) == 1, "hotfix must be idempotent"
         formalize = _load_formalizer(patched)
 
-        production_counterexample = (
+        first_counterexample = (
             "비행기 엔진이 날개 아래에 장착된 모습을 보면, 그 이유가 궁금해진다."
         )
-        expected = (
+        first_expected = (
             "비행기 엔진이 날개 아래에 장착된 모습을 보면, 그 이유가 궁금해집니다."
         )
-        assert formalize(production_counterexample) == expected
+        assert formalize(first_counterexample) == first_expected
+
+        latest_production_counterexample = (
+            "이로 인해 비행기가 더 안전하게 비행할 수 있고, 엔진 고장 시에도 비행 제어가 용이해진다."
+        )
+        latest_expected = (
+            "이로 인해 비행기가 더 안전하게 비행할 수 있고, 엔진 고장 시에도 비행 제어가 용이해집니다."
+        )
+        assert formalize(latest_production_counterexample) == latest_expected
         assert formalize("유도항력이 줄어든다.") == "유도항력이 줄어듭니다."
         assert formalize("그 이유가 궁금해집니다.") == "그 이유가 궁금해집니다."
 
-    print("SCRIPT V2 궁금해진다 FORMAL ENDING REGRESSION: PASS")
+    print("SCRIPT V2 OBSERVED FORMAL ENDING REGRESSION: PASS")
 
 
 if __name__ == "__main__":
