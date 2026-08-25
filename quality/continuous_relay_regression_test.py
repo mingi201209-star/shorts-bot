@@ -29,7 +29,6 @@ for marker in required:
     assert marker in workflow, f"missing continuous relay guard: {marker}"
 
 for forbidden in (
-    "gh workflow run",
     "youtube_upload: true",
     "AI_VISUAL_FALLBACK_ENABLED: true",
     "--admin",
@@ -38,4 +37,6 @@ for forbidden in (
     assert forbidden not in workflow, f"unsafe relay behavior present: {forbidden}"
 
 assert workflow.count("gh run rerun") == 1
+assert workflow.count("gh workflow run") == 1
+assert 'gh workflow run "shorts_codex_failure_analysis.yml"' in workflow
 print("PASS: bounded event-driven Shorts relay contract")
