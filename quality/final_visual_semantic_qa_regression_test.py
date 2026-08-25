@@ -75,6 +75,25 @@ def main():
             })
             expect_failure(partial_component_scene)
 
+            # Regress the observed landing-gear production mismatch: narration
+            # requires the aircraft wheel/landing gear, but a broad aviation
+            # contextual candidate can otherwise survive with only the aircraft
+            # domain anchor and show unrelated bridge/coast scenery.
+            landing_gear_scene = [{"keyword": "aircraft landing gear wheel touchdown"}]
+            reset_final_visual_semantic_report()
+            record_final_visual_scene(0, landing_gear_scene[0]["keyword"], {
+                "accepted": True,
+                "mode": "SAME_DOMAIN_CONTEXTUAL_UNKNOWN",
+                "tier": 4,
+                "visual_state": "UNKNOWN",
+                "anchor_matched": 1,
+                "anchor_total": 2,
+                "provider": "pexels",
+                "source_id": "bridge-coast-counterexample",
+                "metadata": "aircraft travel coast bridge sea landscape",
+            })
+            expect_failure(landing_gear_scene)
+
             # Production Scene rendering can happen in worker processes. Regress
             # Run 32787945275, where parent-only memory reported every scene missing.
             reset_final_visual_semantic_report()
