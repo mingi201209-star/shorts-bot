@@ -28,7 +28,7 @@ def main():
 
     def fake_generate(scene):
         calls["generate"] += 1
-        return b"fake-png", "aircraft window accurate still"
+        return b"fake-png", "aircraft wing accurate still"
 
     def fake_motion(image_path, output_path, duration):
         calls["motion"] += 1
@@ -36,9 +36,11 @@ def main():
 
     def fake_verify(scene, output_path):
         calls["verify"] += 1
+        keyword = str(scene.get("keyword", ""))
+        visible = ["aircraft", "wing"] if "wing" in keyword else ["aircraft", "window"]
         return True, {
             "subject_visibility": 9,
-            "visible_components": ["aircraft", "window"],
+            "visible_components": visible,
             "obvious_generation_artifact": False,
             "factual_visual_contradiction": False,
         }
@@ -52,31 +54,64 @@ def main():
             old = os.getcwd()
             os.chdir(tmp)
             try:
-                scene = {
-                    "index": 4,
-                    "text": "비행기 창문에는 작은 구멍이 있습니다.",
-                    "visual_goal": "aircraft cabin window close-up with visible small hole",
-                    "keyword": "aircraft window pressure hole",
+                first_scene = {
+                    "index": 6,
+                    "text": "날개 끝 소용돌이를 줄이는 과정입니다.",
+                    "visual_goal": "aircraft wing vortex reduction",
+                    "keyword": "aircraft wing vortex reduction stage 7",
                 }
                 first = fallback.generate_still_motion_fallback(
-                    scene,
-                    output_path="vertical_video_4.mp4",
+                    first_scene,
+                    output_path="vertical_video_6.mp4",
                     duration=5.0,
                 )
                 assert first is not None
                 assert first["mode"] == "GENERATED_STILL_MOTION_VERIFIED"
                 assert first["visual_state"] == "TRUE"
                 assert first["provider"] == "openai_image"
-                assert Path("vertical_video_4.mp4").exists()
+                assert first["anchor_matched"] == first["anchor_total"] == 2
+                assert Path("vertical_video_6.mp4").exists()
                 assert calls == {"generate": 1, "motion": 1, "verify": 1}
 
+                # Regress production Run 32890094534: scene 9 exhausted the
+                # two-image generation ceiling after scenes 7/8, even though a
+                # previously verified aircraft+wing still could safely satisfy
+                # the same concrete anchor contract. Reuse must not spend a new
+                # image generation, and it must be re-verified for this scene.
+                same_anchor_scene = {
+                    "index": 8,
+                    "text": "날개 끝의 꺾인 형상이 유도항력을 줄입니다.",
+                    "visual_goal": "aircraft wing mechanism explanation",
+                    "keyword": "aircraft wing mechanism explanation stage 9",
+                }
                 second = fallback.generate_still_motion_fallback(
-                    scene,
-                    output_path="vertical_video_5.mp4",
+                    same_anchor_scene,
+                    output_path="vertical_video_8.mp4",
+                    duration=7.0,
+                )
+                assert second is not None
+                assert second["mode"] == "REUSED_VERIFIED_STILL_MOTION"
+                assert second["source_id"] == first["source_id"]
+                assert second["anchor_matched"] == second["anchor_total"] == 2
+                assert calls == {"generate": 1, "motion": 2, "verify": 2}
+                assert fallback.still_image_generation_count() == 1
+
+                # A different concrete component must still fail closed once
+                # the image-generation budget is exhausted; no broad-domain
+                # reuse is allowed.
+                different_anchor_scene = {
+                    "index": 9,
+                    "text": "비행기 창문을 보여줍니다.",
+                    "visual_goal": "aircraft window close-up",
+                    "keyword": "aircraft window pressure hole",
+                }
+                third = fallback.generate_still_motion_fallback(
+                    different_anchor_scene,
+                    output_path="vertical_video_9.mp4",
                     duration=5.0,
                 )
-                assert second is None
-                assert calls == {"generate": 1, "motion": 1, "verify": 1}
+                assert third is None
+                assert calls == {"generate": 1, "motion": 2, "verify": 2}
             finally:
                 os.chdir(old)
     finally:
