@@ -18,11 +18,13 @@ STILL_IMAGE_SIZE = os.environ.get("STILL_IMAGE_SIZE", "1024x1536")
 STILL_IMAGE_MAX_PER_VIDEO = int(os.environ.get("STILL_IMAGE_MAX_PER_VIDEO", "2"))
 
 _GENERATION_COUNT = 0
+_VERIFIED_STILL_CACHE = {}
 
 
 def reset_still_image_budget():
     global _GENERATION_COUNT
     _GENERATION_COUNT = 0
+    _VERIFIED_STILL_CACHE.clear()
 
 
 def still_image_generation_count():
@@ -31,6 +33,38 @@ def still_image_generation_count():
 
 def _scene_id(scene):
     return str(scene.get("scene_id") or scene.get("index") or scene.get("id") or "unknown")
+
+
+def _anchor_signature(scene):
+    """Return a narrow physical-component signature for verified-still reuse.
+
+    This deliberately does not import the production-hotfix-only
+    ``extract_query_anchors`` symbol: focused regressions import this module
+    before that installer runs. The signature is only a reuse prefilter; the
+    reused clip must still pass the full production vision/anchor verifier.
+    """
+    query = str(scene.get("keyword", "") or "").strip().lower().replace("-", " ")
+    words = set(query.split())
+    signature = []
+    if words & {"aircraft", "airplane", "aviation"}:
+        signature.append("aircraft")
+    if "winglet" in words:
+        signature.append("winglet")
+    elif "wingtip" in words or "wing" in words and "tip" in words:
+        signature.append("wingtip")
+    elif "wing" in words:
+        signature.append("wing")
+    if "window" in words:
+        signature.append("window")
+    if "landing gear" in query or ("landing" in words and "gear" in words):
+        signature.append("landing_gear")
+    if "wheel" in words or "wheels" in words:
+        signature.append("wheel")
+    if "tire" in words or "tires" in words or "tyre" in words or "tyres" in words:
+        signature.append("tire")
+    # No concrete component signature means no reuse. Broad aircraft-only
+    # context is intentionally insufficient for this optimization.
+    return tuple(signature) if len(signature) >= 2 else ()
 
 
 def _prompt(scene):
@@ -149,11 +183,56 @@ def _verify_motion_clip(scene, output_path):
     return True, result
 
 
+def _reuse_verified_still(scene, *, output_path, duration, trigger_reason):
+    signature = _anchor_signature(scene)
+    cached = dict(_VERIFIED_STILL_CACHE.get(signature) or {})
+    image_path = Path(str(cached.get("image_path") or ""))
+    if not signature or not image_path.is_file():
+        return None
+
+    try:
+        _motion_clip(image_path, output_path, duration)
+        verified, evidence = _verify_motion_clip(scene, output_path)
+        if not verified:
+            Path(output_path).unlink(missing_ok=True)
+            return None
+        print(
+            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=reused_verified "
+            f"count={_GENERATION_COUNT} trigger={trigger_reason} anchors={'+'.join(signature)}"
+        )
+        return {
+            "path": str(output_path),
+            "provider": cached.get("provider", "openai_image"),
+            "source_id": cached.get("source_id", "verified-still-reuse"),
+            "mode": "REUSED_VERIFIED_STILL_MOTION",
+            "tier": 2,
+            "visual_state": "TRUE",
+            "anchor_matched": len(signature),
+            "anchor_total": len(signature),
+            "visible_components": list(evidence.get("visible_components", []) or []),
+        }
+    except Exception as exc:
+        Path(output_path).unlink(missing_ok=True)
+        print(
+            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=reuse_failed "
+            f"reason={type(exc).__name__}"
+        )
+        return None
+
+
 def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reason="semantic_scarcity"):
     global _GENERATION_COUNT
     if not STILL_IMAGE_FALLBACK_ENABLED:
         return None
     if _GENERATION_COUNT >= STILL_IMAGE_MAX_PER_VIDEO:
+        reused = _reuse_verified_still(
+            scene,
+            output_path=output_path,
+            duration=duration,
+            trigger_reason=trigger_reason,
+        )
+        if reused:
+            return reused
         print(
             f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=budget_exhausted "
             f"count={_GENERATION_COUNT} trigger={trigger_reason}"
@@ -180,6 +259,14 @@ def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reas
             except FileNotFoundError:
                 pass
             return None
+        source_id = f"still-{digest}"
+        signature = _anchor_signature(scene)
+        if signature:
+            _VERIFIED_STILL_CACHE[signature] = {
+                "image_path": str(image_path),
+                "provider": "openai_image",
+                "source_id": source_id,
+            }
         print(
             f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=verified "
             f"count={_GENERATION_COUNT} model={STILL_IMAGE_MODEL} quality={STILL_IMAGE_QUALITY}"
@@ -187,10 +274,12 @@ def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reas
         return {
             "path": str(output_path),
             "provider": "openai_image",
-            "source_id": f"still-{digest}",
+            "source_id": source_id,
             "mode": "GENERATED_STILL_MOTION_VERIFIED",
             "tier": 2,
             "visual_state": "TRUE",
+            "anchor_matched": len(signature),
+            "anchor_total": len(signature),
             "visible_components": list(evidence.get("visible_components", []) or []),
         }
     except Exception as exc:
