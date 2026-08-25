@@ -19,6 +19,15 @@ def sample_script(topic="윙렛 각도를 더 세우면 왜 손해일까?"):
     return {
         "topic": topic,
         "title": "윙렛 각도의 숨은 손해",
+        "runtime_bucket": "38-48s",
+        "retention_structure": {
+            "version": 3,
+            "runtime_bucket": "38-48s",
+            "min_seconds": 38,
+            "max_seconds": 48,
+            "min_scenes": 10,
+            "max_scenes": 12,
+        },
         "scenes": [
             {
                 "text": "윙렛, 더 세우면 오히려 손해입니다.",
@@ -87,6 +96,10 @@ def main():
             assert manifest["fingerprint"][:12] in manifest["output_path"]
             loaded = json.loads(Path("final_content_manifest.json").read_text(encoding="utf-8"))
             assert loaded["topic"] == expected
+            assert loaded["runtime_bucket"] == "38-48s"
+            assert loaded["scene_count"] == 2
+            assert loaded["retention_structure"]["min_seconds"] == 38
+            assert loaded["retention_structure"]["max_seconds"] == 48
         finally:
             os.chdir(old_cwd)
 
@@ -103,7 +116,7 @@ def main():
     print("CASE B winglet->seatbelt drift blocked: PASS")
     print("CASE C fingerprint binds narration/visual contract: PASS")
     print("CASE D missing visual lineage blocked: PASS")
-    print("CASE E stale output isolation: PASS")
+    print("CASE E runtime diagnostics + stale output isolation: PASS")
     print("CASE F production installation: PASS")
 
 
