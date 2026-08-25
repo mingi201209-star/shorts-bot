@@ -44,6 +44,10 @@ with tempfile.TemporaryDirectory() as tmp:
         committed_text("ci_topic_input_hotfix.py"),
         encoding="utf-8",
     )
+    (work / "ci_fixed_topic_gate_advisory_hotfix.py").write_text(
+        committed_text("ci_fixed_topic_gate_advisory_hotfix.py"),
+        encoding="utf-8",
+    )
 
     gate_path = ROOT / "content" / "candidate_gate.py"
     gate_before = hashlib.sha256(gate_path.read_bytes()).hexdigest()
