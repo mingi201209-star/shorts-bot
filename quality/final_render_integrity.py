@@ -54,6 +54,19 @@ def build_content_manifest(script_data, expected_topic):
         "title": _clean((script_data or {}).get("title")),
         "scenes": normalized_scenes,
     }
+
+    # Observability only: preserve the already-decided retention contract so a
+    # production artifact can explain whether a short render was intentionally
+    # routed to a thin bucket or lost duration downstream. These fields do not
+    # affect routing, FACT gates, scene generation, or render timing.
+    runtime_bucket = _clean((script_data or {}).get("runtime_bucket"))
+    retention_structure = (script_data or {}).get("retention_structure")
+    payload["scene_count"] = len(normalized_scenes)
+    if runtime_bucket:
+        payload["runtime_bucket"] = runtime_bucket
+    if isinstance(retention_structure, dict):
+        payload["retention_structure"] = retention_structure
+
     canonical = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     fingerprint = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
     payload["fingerprint"] = fingerprint
