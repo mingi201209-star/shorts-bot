@@ -28,6 +28,7 @@ def _observable_hook_from_candidate(candidate):
     value = re.sub(r"\s*이유(?:는\s*무엇(?:일까|일까요)?)?$", "", value)
 
     replacements = (
+        (r"지 않는다$", "지 않습니다"),
         (r"되어\s*있는$", "되어 있습니다"),
         (r"돼\s*있는$", "돼 있습니다"),
         (r"꺾여\s*있는$", "꺾여 있습니다"),
