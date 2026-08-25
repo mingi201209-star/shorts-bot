@@ -95,3 +95,10 @@ jobs:
           fi
           post_checkpoint "blocked" "${reason}; no blind rerun was started. Exact failed-job logs must be diagnosed before a minimal fix or new-main dispatch."
 
+          gh workflow run "shorts_codex_failure_analysis.yml" \
+            --repo "$REPO" \
+            --ref main \
+            -f failed_run_id="$RUN_ID" \
+            -f failed_run_attempt="$RUN_ATTEMPT" \
+            -f failed_run_sha="$RUN_SHA"
+
