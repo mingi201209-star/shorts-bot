@@ -1,10 +1,13 @@
 import ast
+import sys
 import tempfile
 from pathlib import Path
 
-import ci_still_image_verifier_contract_hotfix as hotfix
-
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+import ci_still_image_verifier_contract_hotfix as hotfix
 
 
 def _load_normalizer(source):
@@ -31,6 +34,7 @@ def main():
 
         original_path = Path
         original_hook = hotfix.Path
+
         class RedirectPath:
             def __new__(cls, value):
                 if value == "video/hook_visual_dominance.py":
@@ -38,6 +42,7 @@ def main():
                 if value == "video/still_image_fallback.py":
                     return still_path
                 return original_path(value)
+
         hotfix.Path = RedirectPath
         try:
             hotfix.main()
