@@ -6,6 +6,7 @@ on:
     paths:
       - "ci_general_scene_visual_parity_hotfix.py"
       - "quality/general_scene_visual_parity_regression_test.py"
+      - "quality/aviation_component_selection_regression_test.py"
       - ".github/workflows/general_scene_visual_parity_regression.yml"
       - ".github/workflows/main.yml"
 
@@ -19,8 +20,10 @@ jobs:
           python-version: "3.11"
       - name: Install Python dependencies
         run: pip install -r requirements.txt
-      - name: Run general-scene visual parity regression
+      - name: Run general-scene visual parity regressions
         env:
           AI_VISUAL_FALLBACK_ENABLED: "false"
           AI_MAX_GENERATIONS_PER_VIDEO: "1"
-        run: python quality/general_scene_visual_parity_regression_test.py
+        run: |
+          python quality/general_scene_visual_parity_regression_test.py
+          python quality/aviation_component_selection_regression_test.py
