@@ -1,5 +1,12 @@
 """Regression for production Run 32796378299 partial aircraft-component selection."""
 
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from quality import general_scene_visual_parity_regression_test as base
 
 vd = base.vd
