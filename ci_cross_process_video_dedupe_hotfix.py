@@ -142,27 +142,9 @@ text = replace_once(
 
 path.write_text(text, encoding="utf-8")
 
-
-# Hook candidates share the exact same per-run claim directory. If another
-# worker/path already claimed a source, skip it rather than returning a duplicate.
-path = Path("video/hook_visual.py")
-text = path.read_text(encoding="utf-8")
-text = replace_once(
-    text,
-    '''        video_id = candidate.get("id")
-        _mark_candidate_used(candidate)
-''',
-    '''        video_id = candidate.get("id")
-        if not _mark_candidate_used(candidate):
-            print(
-                "[VIDEO_SOURCE_CLAIM_CONFLICT] "
-                f"provider={candidate.get('provider', 'pexels')} "
-                f"source_id={candidate.get('source_id', video_id)} scene=hook"
-            )
-            continue
-''',
-    "hook atomic source claim",
-)
-path.write_text(text, encoding="utf-8")
+# No hook_visual rewrite is needed here. ci_video_provider_hotfix.py already
+# routes hook selection through _mark_candidate_used(); because this hotfix
+# replaces that helper before runtime imports occur, hook selections use the
+# same atomic run-scoped filesystem claim automatically.
 
 print("✅ Cross-process video source dedupe hotfix applied")
