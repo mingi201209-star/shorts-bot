@@ -36,10 +36,35 @@ def _scene_id(scene):
 
 
 def _anchor_signature(scene):
-    from video.video_downloader import extract_query_anchors
+    """Return a narrow physical-component signature for verified-still reuse.
 
-    anchors = extract_query_anchors(str(scene.get("keyword", "") or ""))
-    return tuple(sorted(str(anchor).strip().lower() for anchor in anchors if str(anchor).strip()))
+    This deliberately does not import the production-hotfix-only
+    ``extract_query_anchors`` symbol: focused regressions import this module
+    before that installer runs. The signature is only a reuse prefilter; the
+    reused clip must still pass the full production vision/anchor verifier.
+    """
+    query = str(scene.get("keyword", "") or "").strip().lower().replace("-", " ")
+    words = set(query.split())
+    signature = []
+    if words & {"aircraft", "airplane", "aviation"}:
+        signature.append("aircraft")
+    if "winglet" in words:
+        signature.append("winglet")
+    elif "wingtip" in words or "wing" in words and "tip" in words:
+        signature.append("wingtip")
+    elif "wing" in words:
+        signature.append("wing")
+    if "window" in words:
+        signature.append("window")
+    if "landing gear" in query or ("landing" in words and "gear" in words):
+        signature.append("landing_gear")
+    if "wheel" in words or "wheels" in words:
+        signature.append("wheel")
+    if "tire" in words or "tires" in words or "tyre" in words or "tyres" in words:
+        signature.append("tire")
+    # No concrete component signature means no reuse. Broad aircraft-only
+    # context is intentionally insufficient for this optimization.
+    return tuple(signature) if len(signature) >= 2 else ()
 
 
 def _prompt(scene):
