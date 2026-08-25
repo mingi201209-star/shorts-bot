@@ -8,6 +8,8 @@ REPLACEMENT = (
     + '    # SCRIPT_V2_GUNGGEUM_FORMAL_ENDING_V1\n'
     + '    (r"궁금해진다(?=[.!?…]*$)", "궁금해집니다"),\n'
     + '    (r"용이해진다(?=[.!?…]*$)", "용이해집니다"),\n'
+    + '    (r"가능해진다(?=[.!?…]*$)", "가능해집니다"),\n'
+    + '    (r"사실(?=[.!?…]*$)", "사실입니다"),\n'
 )
 
 
@@ -22,7 +24,7 @@ def main():
             f"{text.count(NEEDLE)}"
         )
     RUNNER_PATH.write_text(text.replace(NEEDLE, REPLACEMENT, 1), encoding="utf-8")
-    print("✅ Script V2 궁금해진다/용이해진다 endings repaired deterministically")
+    print("✅ Script V2 observed formal endings repaired deterministically")
 
 
 if __name__ == "__main__":
