@@ -74,6 +74,17 @@ This is the only supply-recovery opportunity for this generation run.
 Do NOT relax any Candidate Explorer hard gate, anti-cliche rule, anti-fabrication
 rule, final sanity rule, or fact-safety rule.
 
+Before deciding REGENERATE, silently explore at least 6 materially distinct
+concrete observations or mechanisms inside the assigned direction. Do not emit
+that scratch list. Evaluate each against the SAME hard gates. A weak first idea
+is not evidence that the direction has zero supply.
+
+Prefer candidates whose observation, mechanism/constraint, direct result, and
+visual proof can all be named concretely from established knowledge. For
+aviation, avoid generic benefit-only ideas such as merely "safer", "more
+efficient", or "better performance"; the concrete observable element and the
+mechanism or constraint must carry the story.
+
 Search again for at least one concrete candidate that is:
 - a real, recognizable subject or observable detail,
 - driven by a specific non-obvious mechanism, purpose, constraint, or effect,
@@ -86,7 +97,8 @@ If verification is required, put concrete claims in fact_check_focus.
 
 Run the SAME Candidate Explorer hard gates and final sanity check from the
 system prompt. Return SELECTED only if a candidate genuinely survives them.
-Otherwise return REGENERATE. Return one JSON object only.
+Return REGENERATE only after the silent breadth search above still yields no
+candidate that survives the existing gates. Return one JSON object only.
 """
 
 
