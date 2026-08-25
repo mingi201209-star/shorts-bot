@@ -79,6 +79,14 @@ def main():
             "날개가 휘어지면 공기 흐름이 최적화되고, 그로 인해 항력 감소가 이루어집니다."
         )
         assert formalize(wing_production_counterexample) == wing_expected
+
+        question_counterexample = (
+            "비행기 날개가 휘어질 때, 공기 흐름에 미치는 영향은 무엇인지 설명해 주실 수 있나요?"
+        )
+        question_expected = (
+            "비행기 날개가 휘어질 때, 공기 흐름에 미치는 영향은 무엇인지 설명해 주실 수 있습니까?"
+        )
+        assert formalize(question_counterexample) == question_expected
         assert formalize("유도항력이 줄어든다.") == "유도항력이 줄어듭니다."
         assert formalize("그 이유가 궁금해집니다.") == "그 이유가 궁금해집니다."
 
