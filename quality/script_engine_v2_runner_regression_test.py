@@ -250,6 +250,25 @@ def main():
     assert payoff_calls == ["writer"]
     assert payoff_recovered["scenes"][-1]["text"].endswith("위해서입니다.")
 
+    # Run 32844712758: the writer exhausted bounded repair with an unlocked
+    # explanatory scene ending in ~해준다. Normalize this common plain ending
+    # deterministically without spending another model call.
+    haejunda_calls = []
+
+    def haejunda_writer(payload, *, mode):
+        haejunda_calls.append(mode)
+        if mode != "writer":
+            raise AssertionError("formal-ending fixture must not spend repair calls")
+        generated = writer_script(item)
+        generated["scenes"][2]["text"] = (
+            "둥근 형태는 압력 분포를 고르게 만들어 더 잘 견딜 수 있게 해준다."
+        )
+        return generated
+
+    haejunda_recovered = generate_script_v2(item, call_fn=haejunda_writer)
+    assert haejunda_calls == ["writer"]
+    assert haejunda_recovered["scenes"][2]["text"].endswith("해줍니다.")
+
     failing_calls = []
 
     def structurally_invalid(payload, *, mode):
