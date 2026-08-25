@@ -71,6 +71,14 @@ def main():
             "그 결과, 비행기의 연료 효율이 향상되고, 비행 중 안정성이 증가하여 안전한 비행이 가능해집니다."
         )
         assert formalize(latest_production_counterexample) == latest_expected
+
+        wing_production_counterexample = (
+            "날개가 휘어지면 공기 흐름이 최적화되고, 그로 인해 항력 감소가 이루어진다."
+        )
+        wing_expected = (
+            "날개가 휘어지면 공기 흐름이 최적화되고, 그로 인해 항력 감소가 이루어집니다."
+        )
+        assert formalize(wing_production_counterexample) == wing_expected
         assert formalize("유도항력이 줄어든다.") == "유도항력이 줄어듭니다."
         assert formalize("그 이유가 궁금해집니다.") == "그 이유가 궁금해집니다."
 
