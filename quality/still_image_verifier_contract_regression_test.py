@@ -53,10 +53,20 @@ def main():
         patched_hook = hook_path.read_text(encoding="utf-8")
         patched_still = still_path.read_text(encoding="utf-8")
         assert patched_hook.count(hotfix.MARKER) == 1
-        assert patched_still.count(hotfix.MARKER) == 1
+        # The still fallback intentionally carries the same contract marker at
+        # both patched boundaries: generation prompt + verifier gate. Calling
+        # the hotfix twice must keep exactly those two markers (idempotent).
+        assert patched_still.count(hotfix.MARKER) == 2
         assert 'if not result.get("pass", False):' in patched_still
         assert '"visible_components"' in patched_hook
         assert '"factual_visual_contradiction"' in patched_hook
+
+        # Production counterexample: narration/visual goal can be broader than
+        # the keyword contract ("aircraft and runway contact" vs aircraft+wing).
+        # Generation must explicitly preserve every concrete search component
+        # because verification is intentionally fail-closed on those anchors.
+        assert "Every concrete physical component named in the Search concept" in patched_still
+        assert "aircraft+wing search concept must visibly show both the aircraft and its wing" in patched_still
 
         normalize = _load_normalizer(patched_hook)
         accepted = normalize({
