@@ -165,6 +165,127 @@ GATE_RECORD_REPLACEMENT = '''                print_budget_status()
                     )
 '''
 
+GATE_RECORD_FIXED_TOPIC_MARKER = '''                print_budget_status()
+
+                if forced_topic:
+
+                    if topic_attempt == 1:
+
+                        print("")
+                        print(
+                            "➡️ 지정 주제 Gate 피드백으로 1회 재탐색"
+                        )
+
+                        continue
+
+                    print("")
+                    print(
+                        "⚠️ [FIXED_TOPIC_GATE_ADVISORY] "
+                        "편집성 Candidate Gate 거절은 1회 피드백 후 "
+                        "advisory로 전환; FACT 및 downstream 품질 Gate는 유지"
+                    )
+
+                else:
+
+                    if (
+                        topic_attempt
+                        < total_topic_attempts
+                    ):
+
+                        print("")
+
+                        print(
+                            "➡️ Candidate Explorer 재탐색"
+                        )
+
+                        continue
+
+                    raise RuntimeError(
+                        "Candidate Gate를 통과하는 "
+                        "Winner를 확보하지 못했습니다. "
+                        "마지막 이유: "
+                        f"{winner_gate.get('reason', '')}"
+                    )
+'''
+
+GATE_RECORD_FIXED_TOPIC_REPLACEMENT = '''                print_budget_status()
+
+                if forced_topic:
+
+                    if topic_attempt == 1:
+
+                        print("")
+                        print(
+                            "➡️ 지정 주제 Gate 피드백으로 1회 재탐색"
+                        )
+
+                        continue
+
+                    print("")
+                    print(
+                        "⚠️ [FIXED_TOPIC_GATE_ADVISORY] "
+                        "편집성 Candidate Gate 거절은 1회 피드백 후 "
+                        "advisory로 전환; FACT 및 downstream 품질 Gate는 유지"
+                    )
+
+                else:
+
+                    recovery_record = make_recovery_record(
+                        winner,
+                        winner_gate,
+                        attempt=topic_attempt,
+                    )
+
+                    if recovery_record is not None:
+                        recovery_candidates.append(recovery_record)
+                        print(
+                            "🧺 CANDIDATE_RECOVERY_POOL "
+                            f"eligible=true attempt={topic_attempt} "
+                            f"strength={recovery_record.get('strength')} "
+                            f"reason={recovery_record.get('eligibility_reason')}"
+                        )
+                    else:
+                        print(
+                            "🧺 CANDIDATE_RECOVERY_POOL "
+                            f"eligible=false attempt={topic_attempt}"
+                        )
+
+                    if (
+                        topic_attempt
+                        < total_topic_attempts
+                    ):
+
+                        print("")
+
+                        print(
+                            "➡️ Candidate Explorer 재탐색"
+                        )
+
+                        continue
+
+                    recovered = select_best_recovery(recovery_candidates)
+
+                    if recovered is not None:
+                        winner = recovered["candidate"]
+                        current_topic = str(winner.get("topic", "")).strip()
+                        print("")
+                        print("=" * 64)
+                        print("🛟 CANDIDATE GROUNDED RECOVERY")
+                        print("=" * 64)
+                        print("복구 소재:", current_topic)
+                        print("원래 Gate 이유:", recovered.get("gate_reason", ""))
+                        print("복구 근거:", recovered.get("eligibility_reason", ""))
+                        print("복구 attempt:", recovered.get("attempt"))
+                        print("➡️ bounded recovery로 Script Generator 진행")
+                    else:
+                        raise RuntimeError(
+                            "Candidate Gate를 통과하는 "
+                            "Winner를 확보하지 못했습니다. "
+                            "마지막 이유: "
+                            f"{winner_gate.get('reason', '')}"
+                        )
+'''
+
 
 def replace_exact(source, marker, replacement, name):
     if source.count(marker) != 1:
@@ -172,6 +293,30 @@ def replace_exact(source, marker, replacement, name):
             f"Candidate recovery {name} marker mismatch: {source.count(marker)}"
         )
     return source.replace(marker, replacement, 1)
+
+
+def replace_gate_recovery(source):
+    legacy_count = source.count(GATE_RECORD_MARKER)
+    fixed_topic_count = source.count(GATE_RECORD_FIXED_TOPIC_MARKER)
+
+    if legacy_count == 1 and fixed_topic_count == 0:
+        return source.replace(
+            GATE_RECORD_MARKER,
+            GATE_RECORD_REPLACEMENT,
+            1,
+        )
+
+    if legacy_count == 0 and fixed_topic_count == 1:
+        return source.replace(
+            GATE_RECORD_FIXED_TOPIC_MARKER,
+            GATE_RECORD_FIXED_TOPIC_REPLACEMENT,
+            1,
+        )
+
+    raise RuntimeError(
+        "Candidate recovery gate_recovery marker mismatch: "
+        f"legacy={legacy_count} fixed_topic={fixed_topic_count}"
+    )
 
 
 def replace_rejected_topic_guard(source):
@@ -255,12 +400,7 @@ else:
         "explorer_exhaustion",
     )
     text = replace_rejected_topic_guard(text)
-    text = replace_exact(
-        text,
-        GATE_RECORD_MARKER,
-        GATE_RECORD_REPLACEMENT,
-        "gate_recovery",
-    )
+    text = replace_gate_recovery(text)
 
     path.write_text(text, encoding="utf-8")
     print("✅ Bounded grounded Candidate recovery hotfix applied")
