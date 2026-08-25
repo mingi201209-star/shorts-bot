@@ -60,6 +60,14 @@ assert vd.general_scene_unknown_safe_tier(butterfly, query)[0] >= 5
 selected = vd.choose_best_candidate([butterfly, loading, nature, cabin, mechanism], subject_filter_query=query)
 assert selected["id"] == 1, selected
 
+# Run 32796378299: aircraft-domain drone/beach footage matched only 1/2
+# anchors for a concrete wing query. Reject it upstream so retry/safe reuse can run.
+reset()
+wing_query = "aircraft wing wingtip vortex stage 7"
+partial_wing = c(314643, "drone nature beach camera technology aircraft uav travel sea", 1)
+assert vd.general_scene_unknown_safe_tier(partial_wing, wing_query)[0] >= 5
+assert vd.choose_best_candidate([partial_wing], subject_filter_query=wing_query) is None
+
 # Production-like fetch_video path must also return the mechanism candidate, not nature/abstract.
 reset()
 orig_search, orig_key = vd.search_video_candidates, vd.PIXABAY_API_KEY
