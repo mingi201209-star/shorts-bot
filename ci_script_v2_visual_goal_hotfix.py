@@ -215,6 +215,62 @@ def _deterministic_keyword(scene, contract, plan, index):
     print("✅ fixed airplane-window scenes retain aircraft+window search anchors")
 
 
+
+def _apply_aviation_landing_gear_query_domain_lock():
+    text = SCRIPT_V2_RUNNER_PATH.read_text(encoding="utf-8")
+    marker = "# AVIATION_LANDING_GEAR_QUERY_DOMAIN_LOCK_V1"
+    if marker in text:
+        print("✅ aviation landing-gear query domain lock already applied")
+        return
+    block = r'''
+
+# AVIATION_LANDING_GEAR_QUERY_DOMAIN_LOCK_V1
+# Fixed aircraft landing-gear topics keep the actual component in every Scene
+# query so abstract fuel/cost/safety searches cannot pass as visual evidence.
+_script_v2_landing_gear_previous_deterministic_keyword = _deterministic_keyword
+
+
+def _deterministic_keyword(scene, contract, plan, index):
+    value = _script_v2_landing_gear_previous_deterministic_keyword(
+        scene, contract, plan, index
+    )
+    fixed_topic = os.environ.get("SHORTS_TOPIC", "").strip()
+    topic_text = " ".join((fixed_topic, str(plan.get("topic", "")))).lower()
+    gear_topic = any(
+        term in topic_text
+        for term in ("착륙장치", "랜딩기어", "landing gear", "undercarriage")
+    )
+    aviation_topic = any(
+        term in topic_text
+        for term in ("비행기", "항공", "aircraft", "airplane", "aviation")
+    )
+    if not (gear_topic and aviation_topic):
+        return value
+
+    words = _ascii_keyword_words(value)
+    if (
+        any(word in {"aircraft", "airplane", "plane", "aviation"} for word in words)
+        and "landing" in words
+        and "gear" in words
+    ):
+        return value
+    filtered = [
+        word for word in words
+        if word not in {
+            "aircraft", "airplane", "plane", "aviation", "landing", "gear",
+            "undercarriage", "wing", "wings", "stage",
+        }
+    ]
+    locked = ["aircraft", "landing", "gear"] + filtered[:2] + ["stage", str(index)]
+    result = " ".join(locked[:7])
+    if result != value:
+        print(f"🛬 AVIATION LANDING GEAR QUERY LOCK scene={index}: {result}")
+    return result
+'''
+    SCRIPT_V2_RUNNER_PATH.write_text(text.rstrip() + block + "\n", encoding="utf-8")
+    print("✅ fixed landing-gear scenes retain aircraft+landing+gear anchors")
+
+
 def _apply_fixed_topic_novelty_lock():
     print("⏭️ fixed-topic Novelty lock installer disabled; soft Judge mode is authoritative")
     return
@@ -228,6 +284,7 @@ def main():
     _apply_script_v2_neighbor_context_repair()
     _apply_aviation_wing_query_domain_lock()
     _apply_aviation_window_query_domain_lock()
+    _apply_aviation_landing_gear_query_domain_lock()
     _apply_fixed_topic_novelty_lock()
 
 
