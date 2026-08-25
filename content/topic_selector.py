@@ -89,6 +89,11 @@ AVIATION_TOPIC_POOL = [
 ]
 
 
+# 한 production 프로세스 안에서 같은 항공 탐색 방향을 다시 뽑아
+# 제한된 Candidate attempt를 낭비하지 않도록 사용한 방향을 기억한다.
+_AVIATION_DIRECTIONS_USED = set()
+
+
 # ============================================================
 # 전체 방향 풀
 # ============================================================
@@ -212,9 +217,22 @@ def choose_topic_direction():
     ).strip().lower()
 
     if run_scope == "aviation":
+        available = [
+            topic
+            for topic in AVIATION_TOPIC_POOL
+            if topic not in _AVIATION_DIRECTIONS_USED
+        ]
+
+        if not available:
+            _AVIATION_DIRECTIONS_USED.clear()
+            available = list(AVIATION_TOPIC_POOL)
+
+        selected_topic = random.choice(available)
+        _AVIATION_DIRECTIONS_USED.add(selected_topic)
+
         selected = {
             "category": "항공",
-            "topic": random.choice(AVIATION_TOPIC_POOL),
+            "topic": selected_topic,
         }
 
         print("✈️ Candidate scope: aviation")
