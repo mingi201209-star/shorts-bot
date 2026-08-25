@@ -52,11 +52,23 @@ def main():
         )
         assert formalize(first_counterexample) == first_expected
 
-        latest_production_counterexample = (
+        second_counterexample = (
             "이로 인해 비행기가 더 안전하게 비행할 수 있고, 엔진 고장 시에도 비행 제어가 용이해진다."
         )
-        latest_expected = (
+        second_expected = (
             "이로 인해 비행기가 더 안전하게 비행할 수 있고, 엔진 고장 시에도 비행 제어가 용이해집니다."
+        )
+        assert formalize(second_counterexample) == second_expected
+
+        fragment_counterexample = "비행 중 날개가 휘어지는 모습, 많은 사람들이 보지 못한 사실."
+        fragment_expected = "비행 중 날개가 휘어지는 모습, 많은 사람들이 보지 못한 사실입니다."
+        assert formalize(fragment_counterexample) == fragment_expected
+
+        latest_production_counterexample = (
+            "그 결과, 비행기의 연료 효율이 향상되고, 비행 중 안정성이 증가하여 안전한 비행이 가능해진다."
+        )
+        latest_expected = (
+            "그 결과, 비행기의 연료 효율이 향상되고, 비행 중 안정성이 증가하여 안전한 비행이 가능해집니다."
         )
         assert formalize(latest_production_counterexample) == latest_expected
         assert formalize("유도항력이 줄어든다.") == "유도항력이 줄어듭니다."
