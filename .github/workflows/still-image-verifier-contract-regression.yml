@@ -5,7 +5,9 @@ on:
     paths:
       - "ci_still_image_verifier_contract_hotfix.py"
       - "ci_final_visual_semantic_qa_hotfix.py"
+      - "video/still_image_fallback.py"
       - "quality/still_image_verifier_contract_regression_test.py"
+      - "quality/still_image_budget_regression_test.py"
       - ".github/workflows/still-image-verifier-contract-regression.yml"
   workflow_dispatch:
 
@@ -19,3 +21,5 @@ jobs:
           python-version: "3.11"
       - name: Run verifier contract regression
         run: python quality/still_image_verifier_contract_regression_test.py
+      - name: Run verified still budget regression
+        run: python quality/still_image_budget_regression_test.py
