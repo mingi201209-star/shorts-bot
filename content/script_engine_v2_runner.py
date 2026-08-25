@@ -189,6 +189,12 @@ def _formalize_common_ending(text: Any) -> str:
 def _deterministic_keyword(scene: Dict[str, Any], contract: Dict[str, Any], plan: Dict[str, Any], index: int) -> str:
     """Project failed keyword metadata into a bounded English search phrase."""
     current = str(scene.get("keyword", "")).strip()
+    topic = str(plan.get("topic", "")).strip()
+    if "비행기" in topic and "바퀴" in topic:
+        fixed = ["aircraft", "landing", "gear", "wheel"]
+        existing = _ascii_keyword_words(current)
+        anchored = fixed + [word for word in existing if word not in fixed]
+        return " ".join(anchored[:7])
     if _keyword_contract_ok(current):
         return current
 
