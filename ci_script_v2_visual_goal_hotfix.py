@@ -19,11 +19,17 @@ def _apply_fixed_topic_soft_judges():
     if marker not in text:
         raise RuntimeError("fixed-topic soft Judge marker not found")
     text = text.replace(marker, replacement, 1)
-    text = text.replace(
-        "meets_good_enough_floors(summaries)",
-        "meets_good_enough_floors(decision_summaries)",
-        1,
+    call_marker = (
+        "elif weighted_score >= GOOD_ENOUGH_SCORE "
+        "and meets_good_enough_floors(summaries):"
     )
+    call_replacement = (
+        "elif weighted_score >= GOOD_ENOUGH_SCORE "
+        "and meets_good_enough_floors(decision_summaries):"
+    )
+    if text.count(call_marker) != 1:
+        raise RuntimeError("fixed-topic Good Enough call marker mismatch")
+    text = text.replace(call_marker, call_replacement, 1)
     CONSENSUS_PATH.write_text(text, encoding="utf-8")
     print("✅ fixed-topic Hook/Novelty/Visual Judges are advisory; FACT remains hard-gate")
 
