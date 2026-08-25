@@ -58,6 +58,13 @@ def main():
         assert '"visible_components"' in patched_hook
         assert '"factual_visual_contradiction"' in patched_hook
 
+        # Production counterexample: narration/visual goal can be broader than
+        # the keyword contract ("aircraft and runway contact" vs aircraft+wing).
+        # Generation must explicitly preserve every concrete search component
+        # because verification is intentionally fail-closed on those anchors.
+        assert "Every concrete physical component named in the Search concept" in patched_still
+        assert "aircraft+wing search concept must visibly show both the aircraft and its wing" in patched_still
+
         normalize = _load_normalizer(patched_hook)
         accepted = normalize({
             "target_subject": "passenger aircraft wing",
