@@ -61,15 +61,21 @@ def _missing_required_aviation_component_anchor(item):
 
     Run 32793032527 selected drone footage for an ``aircraft wing`` scene:
     compatibility matched only one of two anchors, so the aircraft domain was
-    present but the required wing component was not. Keep this deliberately
-    narrow to concrete aviation component queries; generated/hook paths are
-    unaffected.
+    present but the required wing component was not. A later production render
+    exposed the same gap for landing-gear narration while unrelated bridge/coast
+    footage survived selection. Keep this deliberately narrow to concrete
+    aviation component queries; generated/hook paths are unaffected.
     """
     query = str(item.get("query") or "").lower()
-    words = set(query.replace("-", " ").split())
+    normalized = query.replace("-", " ")
+    words = set(normalized.split())
     aviation = bool(words & {"aircraft", "airplane", "aviation"})
     component = bool(words & {"wing", "winglet", "wingtip", "window"})
-    if not (aviation and component):
+    landing_gear_component = (
+        "landing gear" in normalized
+        or bool(words & {"wheel", "wheels", "tire", "tires", "tyre", "tyres"})
+    )
+    if not (aviation and (component or landing_gear_component)):
         return False
     total = int(item.get("anchor_total", 0) or 0)
     matched = int(item.get("anchor_matched", 0) or 0)
