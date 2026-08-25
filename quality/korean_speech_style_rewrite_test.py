@@ -88,7 +88,29 @@ def test_rewrite_falls_back_after_retry_limit():
     )
 
 
+def test_rewrite_prompt_requires_formal_endings():
+    prompt = rewrite_engine.build_rewrite_prompt(
+        _script("비행기 엔진은 날개 아래에 장착되어 있습니다."),
+        _consensus(),
+        ["hook"],
+    )
+
+    _assert(
+        "Rewrite prompt requires formal declarative endings",
+        "~습니다/~입니다/~합니다/~됩니다/~있습니다" in prompt,
+    )
+    _assert(
+        "production counterexample is explicitly prohibited",
+        "알고 계셨나요?" in prompt and "사용하지 않는다" in prompt,
+    )
+    _assert(
+        "formal source is not needlessly converted to a question",
+        "격식체 평서문이면 가능하면 질문형으로 바꾸지 않는다" in prompt,
+    )
+
+
 def main():
+    test_rewrite_prompt_requires_formal_endings()
     test_rewrite_retries_then_accepts_formal()
     test_rewrite_falls_back_after_retry_limit()
     print("✅ Rewrite formal speech-style regression suite passed")
