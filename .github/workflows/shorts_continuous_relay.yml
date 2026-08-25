@@ -1,0 +1,104 @@
+name: Shorts Continuous Relay
+
+on:
+  workflow_run:
+    workflows: ["Shorts Generator"]
+    types: [completed]
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+concurrency:
+  group: shorts-continuous-relay-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+  cancel-in-progress: false
+
+jobs:
+  relay:
+    if: >-
+      github.event.workflow_run.repository.full_name == github.repository &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Classify result and continue safe work
+        id: relay
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          CONTROL_ISSUE: "33"
+          MAX_TRANSIENT_ATTEMPTS: "2"
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          marker="<!-- shorts-relay:${RUN_ID}:${RUN_ATTEMPT} -->"
+          if gh api "repos/${REPO}/issues/${CONTROL_ISSUE}/comments" --paginate \
+            --jq '.[].body' | grep -Fqx "$marker"; then
+            echo "Relay checkpoint already exists for run ${RUN_ID} attempt ${RUN_ATTEMPT}."
+            exit 0
+          fi
+
+          post_checkpoint() {
+            local phase="$1"
+            local detail="$2"
+            gh issue comment "$CONTROL_ISSUE" --repo "$REPO" --body "${marker}
+          Continuous relay checkpoint. Phase: ${phase}. SHA: ${RUN_SHA}. Run: ${RUN_ID}. Attempt: ${RUN_ATTEMPT}. ${detail} ${RUN_URL}"
+          }
+
+          if [[ "$CONCLUSION" == "success" ]]; then
+            expected="verified-shorts-${RUN_ID}-${RUN_SHA}"
+            artifact=""
+            for attempt in {1..6}; do
+              artifact="$(gh api "repos/${REPO}/actions/runs/${RUN_ID}/artifacts" \
+                --jq ".artifacts[] | select(.name == \"${expected}\" and .expired == false and .size_in_bytes > 0) | [.id,.name,.size_in_bytes,.digest] | @tsv" | head -1)"
+              [[ -n "$artifact" ]] && break
+              sleep 5
+            done
+
+            if [[ -z "$artifact" ]]; then
+              post_checkpoint "blocked" "Successful production has no verified artifact named ${expected}; human or AI diagnosis is required."
+              exit 1
+            fi
+
+            IFS=$'\t' read -r artifact_id artifact_name artifact_size artifact_digest <<<"$artifact"
+            post_checkpoint "complete" "Verified artifact: ${artifact_name} (ID ${artifact_id}, ${artifact_size} bytes, ${artifact_digest})."
+            exit 0
+          fi
+
+          if [[ "$CONCLUSION" != "failure" ]]; then
+            post_checkpoint "blocked" "Production concluded as ${CONCLUSION}; automatic retry is intentionally disabled."
+            exit 0
+          fi
+
+          logs="$(mktemp)"
+          gh run view "$RUN_ID" --repo "$REPO" --log-failed >"$logs" 2>&1 || true
+          transient_pattern='timed out|timeout|HTTP (429|502|503|504)|rate limit|connection reset|service unavailable|temporary failure|runner.*lost|failed to download action'
+
+          if grep -Eiq "$transient_pattern" "$logs" && (( RUN_ATTEMPT < MAX_TRANSIENT_ATTEMPTS )); then
+            gh run rerun "$RUN_ID" --repo "$REPO" --failed
+            post_checkpoint "track" "Transient infrastructure/provider failure detected; failed jobs were rerun on the exact same SHA within the ${MAX_TRANSIENT_ATTEMPTS}-attempt ceiling."
+            exit 0
+          fi
+
+          if grep -Eiq "$transient_pattern" "$logs"; then
+            reason="Transient signature repeated at the retry ceiling"
+          else
+            reason="Deterministic or unclassified production failure"
+          fi
+          post_checkpoint "blocked" "${reason}; no blind rerun was started. Exact failed-job logs must be diagnosed before a minimal fix or new-main dispatch."
+
+          gh workflow run "shorts_codex_failure_analysis.yml" \
+            --repo "$REPO" \
+            --ref main \
+            -f failed_run_id="$RUN_ID" \
+            -f failed_run_attempt="$RUN_ATTEMPT" \
+            -f failed_run_sha="$RUN_SHA"
+
