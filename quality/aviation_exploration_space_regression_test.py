@@ -11,6 +11,7 @@ from content import topic_selector
 
 
 # Aviation scope must never fall back to the general science/traffic/history RNG pool.
+topic_selector._AVIATION_DIRECTIONS_USED.clear()
 with patch.dict(os.environ, {"SHORTS_CANDIDATE_SCOPE": "aviation"}, clear=False):
     with patch("content.topic_selector.random.choice", side_effect=lambda items: items[0]):
         selected = topic_selector.choose_topic_direction()
@@ -35,7 +36,24 @@ joined = "\n".join(topic_selector.AVIATION_TOPIC_POOL)
 for token in required_spaces:
     assert token in joined, token
 
+# A bounded production process must not waste Candidate attempts by drawing the
+# same aviation direction twice while untried directions remain. The pool only
+# cycles after every distinct direction has been used once.
+topic_selector._AVIATION_DIRECTIONS_USED.clear()
+with patch.dict(os.environ, {"SHORTS_CANDIDATE_SCOPE": "aviation"}, clear=False):
+    with patch("content.topic_selector.random.choice", side_effect=lambda items: items[0]):
+        first_cycle = [
+            topic_selector.choose_topic_direction()["topic"]
+            for _ in topic_selector.AVIATION_TOPIC_POOL
+        ]
+        cycled = topic_selector.choose_topic_direction()["topic"]
+
+assert first_cycle == topic_selector.AVIATION_TOPIC_POOL, first_cycle
+assert len(set(first_cycle)) == len(topic_selector.AVIATION_TOPIC_POOL), first_cycle
+assert cycled == topic_selector.AVIATION_TOPIC_POOL[0], cycled
+
 # Default behavior remains the existing general pool when aviation is not requested.
+topic_selector._AVIATION_DIRECTIONS_USED.clear()
 with patch.dict(os.environ, {}, clear=True):
     with patch("content.topic_selector.random.choice", side_effect=lambda items: items[0]):
         general = topic_selector.choose_topic_direction()
@@ -43,4 +61,4 @@ with patch.dict(os.environ, {}, clear=True):
 assert general in topic_selector.ALL_TOPICS, general
 assert general["category"] != "항공", general
 
-print("PASS: aviation scope stays inside aviation exploration space; default RNG preserved")
+print("PASS: aviation scope stays diverse inside one run and default RNG is preserved")
