@@ -7,7 +7,9 @@ on:
     paths:
       - "video/video_providers.py"
       - "ci_video_provider_hotfix.py"
+      - "ci_cross_process_video_dedupe_hotfix.py"
       - "quality/video_provider_pool_regression_test.py"
+      - "quality/cross_process_video_dedupe_regression_test.py"
       - ".github/workflows/main.yml"
       - ".github/workflows/video_provider_pool_regression.yml"
 
@@ -33,7 +35,10 @@ jobs:
           python ci_first5_retention_tts_hotfix.py
           python ci_first5_visual_contract_hotfix.py
           python ci_video_provider_hotfix.py
+          python ci_cross_process_video_dedupe_hotfix.py
           python ci_topic_input_hotfix.py
-          python -m py_compile video/video_providers.py video/video_downloader.py video/hook_visual.py video/video_engine.py
+          python -m py_compile ci_cross_process_video_dedupe_hotfix.py quality/cross_process_video_dedupe_regression_test.py video/video_providers.py video/video_downloader.py video/hook_visual.py video/video_engine.py
       - name: Run focused regression
-        run: python quality/video_provider_pool_regression_test.py
+        run: |
+          python quality/video_provider_pool_regression_test.py
+          python quality/cross_process_video_dedupe_regression_test.py
