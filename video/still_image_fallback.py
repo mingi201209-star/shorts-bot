@@ -12,7 +12,10 @@ STILL_IMAGE_FALLBACK_ENABLED = os.environ.get("STILL_IMAGE_FALLBACK_ENABLED", "1
 STILL_IMAGE_MODEL = os.environ.get("STILL_IMAGE_MODEL", "gpt-image-1.5")
 STILL_IMAGE_QUALITY = os.environ.get("STILL_IMAGE_QUALITY", "low")
 STILL_IMAGE_SIZE = os.environ.get("STILL_IMAGE_SIZE", "1024x1536")
-STILL_IMAGE_MAX_PER_VIDEO = int(os.environ.get("STILL_IMAGE_MAX_PER_VIDEO", "1"))
+# Keep this budget independent from the disabled Sora video-generation budget.
+# Production evidence can require two distinct verified stills when separate
+# concrete aviation scenes both have no semantically safe stock candidate.
+STILL_IMAGE_MAX_PER_VIDEO = int(os.environ.get("STILL_IMAGE_MAX_PER_VIDEO", "2"))
 
 _GENERATION_COUNT = 0
 
