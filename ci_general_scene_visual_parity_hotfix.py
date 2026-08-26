@@ -27,6 +27,18 @@ def _general_scene_strengthening_applicable(scene_query):
 
 
 def _missing_required_aviation_component_anchor(candidate, scene_query):
+    query_words = set(normalize_search_query(scene_query).split())
+    if {"aircraft", "jet", "engine", "chevron"}.issubset(query_words):
+        # Run 32922000250: generic aircraft/engine metadata made ten
+        # component-specific chevron scenes look same-domain even though no
+        # selected clip identified a chevron or serrated nacelle edge.
+        metadata_words = set(_candidate_metadata(candidate).split())
+        chevron_evidence = {
+            "chevron", "chevrons", "serrated", "sawtooth", "sawtoothed",
+        }
+        if not (metadata_words & chevron_evidence):
+            return True
+
     anchors = set(extract_query_anchors(scene_query))
     if "aircraft" not in anchors or not (anchors & {"wing", "window"}):
         return False
