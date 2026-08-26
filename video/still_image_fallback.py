@@ -224,15 +224,21 @@ def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reas
     global _GENERATION_COUNT
     if not STILL_IMAGE_FALLBACK_ENABLED:
         return None
+
+    # Prefer an already verified still for the exact same concrete component
+    # signature before spending another image generation. The reused motion
+    # clip is re-verified against the current scene, so this does not weaken the
+    # visual quality floor. If reuse fails, normal bounded generation continues.
+    reused = _reuse_verified_still(
+        scene,
+        output_path=output_path,
+        duration=duration,
+        trigger_reason=trigger_reason,
+    )
+    if reused:
+        return reused
+
     if _GENERATION_COUNT >= STILL_IMAGE_MAX_PER_VIDEO:
-        reused = _reuse_verified_still(
-            scene,
-            output_path=output_path,
-            duration=duration,
-            trigger_reason=trigger_reason,
-        )
-        if reused:
-            return reused
         print(
             f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=budget_exhausted "
             f"count={_GENERATION_COUNT} trigger={trigger_reason}"
