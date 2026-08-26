@@ -6,6 +6,7 @@ MARKER = "# SCRIPT_V2_GUNGGEUM_FORMAL_ENDING_V1"
 HOOK_MARKER = "# SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1"
 TOPIC_HOOK_MARKER = "# SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1"
 FINAL_HOOK_MARKER = "# SCRIPT_V2_FINAL_OBSERVABLE_HOOK_NORMALIZATION_V1"
+PLAIN_QUESTION_MARKER = "# SCRIPT_V2_PLAIN_QUESTION_BOUNDARY_V1"
 NEEDLE = '    (r"좋아진다(?=[.!?…]*$)", "좋아집니다"),\n'
 REPLACEMENT = (
     NEEDLE
@@ -45,6 +46,11 @@ FINAL_HOOK_REPLACEMENT = (
     + '    # already-approved terminal predicate repairs below. This preserves\n'
     + '    # the question presupposition as an observation without adding facts.\n'
     + '    value = re.sub(r"\\s+왜\\s+", " ", value)\n'
+)
+PLAIN_QUESTION_NEEDLE = '    if "?" in hook or hook.endswith(("까요", "나요", "어요", "예요")):\n'
+PLAIN_QUESTION_REPLACEMENT = (
+    '    # SCRIPT_V2_PLAIN_QUESTION_BOUNDARY_V1\n'
+    + '    if "?" in hook or hook.endswith(("까", "까요", "나요", "어요", "예요")):\n'
 )
 
 
@@ -88,6 +94,14 @@ def _patch_engine():
             )
         text = text.replace(FINAL_HOOK_NEEDLE, FINAL_HOOK_REPLACEMENT, 1)
         changed = True
+    if PLAIN_QUESTION_MARKER not in text:
+        if text.count(PLAIN_QUESTION_NEEDLE) != 1:
+            raise RuntimeError(
+                "Script V2 plain-question boundary marker mismatch: "
+                f"{text.count(PLAIN_QUESTION_NEEDLE)}"
+            )
+        text = text.replace(PLAIN_QUESTION_NEEDLE, PLAIN_QUESTION_REPLACEMENT, 1)
+        changed = True
     if changed:
         ENGINE_PATH.write_text(text, encoding="utf-8")
     return changed
@@ -99,7 +113,7 @@ def main():
     if not runner_changed and not engine_changed:
         print("✅ Script V2 observed formal-ending + recovered-hook repairs already applied")
         return
-    print("✅ Script V2 final observable Hook normalization + formal repairs applied deterministically")
+    print("✅ Script V2 final observable Hook normalization + plain-question boundary + formal repairs applied deterministically")
 
 
 if __name__ == "__main__":
