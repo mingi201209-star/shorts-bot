@@ -7,6 +7,7 @@ HOOK_MARKER = "# SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1"
 TOPIC_HOOK_MARKER = "# SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1"
 FINAL_HOOK_MARKER = "# SCRIPT_V2_FINAL_OBSERVABLE_HOOK_NORMALIZATION_V1"
 PLAIN_QUESTION_MARKER = "# SCRIPT_V2_PLAIN_QUESTION_BOUNDARY_V1"
+GROUNDED_TOPIC_QUESTION_MARKER = "# SCRIPT_V2_GROUNDED_TOPIC_QUESTION_FALLBACK_V1"
 NEEDLE = '    (r"좋아진다(?=[.!?…]*$)", "좋아집니다"),\n'
 REPLACEMENT = (
     NEEDLE
@@ -52,6 +53,32 @@ PLAIN_QUESTION_NEEDLE = '    if "?" in hook or hook.endswith(("까요", "나요"
 PLAIN_QUESTION_REPLACEMENT = (
     '    # SCRIPT_V2_PLAIN_QUESTION_BOUNDARY_V1\n'
     + '    if "?" in hook or hook.endswith(("까", "까요", "나요", "어요", "예요")):\n'
+)
+GROUNDED_TOPIC_QUESTION_NEEDLE = (
+    '    for pattern, replacement in _QUESTION_HOOK_REPAIRS:\n'
+    '        converted, count = re.subn(pattern, replacement, value)\n'
+    '        if count:\n'
+    '            return converted + "."\n'
+    '    return _topic_to_observation(topic)\n'
+)
+GROUNDED_TOPIC_QUESTION_REPLACEMENT = (
+    '    for pattern, replacement in _QUESTION_HOOK_REPAIRS:\n'
+    '        converted, count = re.subn(pattern, replacement, value)\n'
+    '        if count:\n'
+    '            return converted + "."\n'
+    '    grounded = _topic_to_observation(topic)\n'
+    '    if grounded:\n'
+    '        return grounded\n'
+    '    # SCRIPT_V2_GROUNDED_TOPIC_QUESTION_FALLBACK_V1\n'
+    '    # If the approved candidate topic is itself a question, preserve only\n'
+    '    # its observable presupposition using the same bounded repair table.\n'
+    '    topic_value = re.sub(r"^(?:그런데\\s+)?왜\\s+", "", _text(topic)).rstrip().rstrip(".?!")\n'
+    '    topic_value = re.sub(r"\\s+왜\\s+", " ", topic_value)\n'
+    '    for pattern, replacement in _QUESTION_HOOK_REPAIRS:\n'
+    '        converted, count = re.subn(pattern, replacement, topic_value)\n'
+    '        if count:\n'
+    '            return converted + "."\n'
+    '    return ""\n'
 )
 
 
@@ -103,6 +130,14 @@ def _patch_engine():
             )
         text = text.replace(PLAIN_QUESTION_NEEDLE, PLAIN_QUESTION_REPLACEMENT, 1)
         changed = True
+    if GROUNDED_TOPIC_QUESTION_MARKER not in text:
+        if text.count(GROUNDED_TOPIC_QUESTION_NEEDLE) != 1:
+            raise RuntimeError(
+                "Script V2 grounded-topic question fallback marker mismatch: "
+                f"{text.count(GROUNDED_TOPIC_QUESTION_NEEDLE)}"
+            )
+        text = text.replace(GROUNDED_TOPIC_QUESTION_NEEDLE, GROUNDED_TOPIC_QUESTION_REPLACEMENT, 1)
+        changed = True
     if changed:
         ENGINE_PATH.write_text(text, encoding="utf-8")
     return changed
@@ -114,7 +149,7 @@ def main():
     if not runner_changed and not engine_changed:
         print("✅ Script V2 observed formal-ending + recovered-hook repairs already applied")
         return
-    print("✅ Script V2 final observable Hook normalization + plain-question boundary + formal repairs applied deterministically")
+    print("✅ Script V2 final observable Hook normalization + grounded topic-question fallback + formal repairs applied deterministically")
 
 
 if __name__ == "__main__":
