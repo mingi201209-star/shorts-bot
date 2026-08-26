@@ -68,6 +68,33 @@ partial_wing = c(314643, "drone nature beach camera technology aircraft uav trav
 assert vd.general_scene_unknown_safe_tier(partial_wing, wing_query)[0] >= 5
 assert vd.choose_best_candidate([partial_wing], subject_filter_query=wing_query) is None
 
+# Run 32922000250: an aircraft/engine green-screen result is not evidence of
+# the serrated chevron component. Fail closed unless metadata names that part.
+reset()
+chevron_query = "aircraft jet engine chevron noise stage 1"
+generic_engine = c(
+    14096,
+    "flight plane aircraft jet engine green screen production",
+    1,
+)
+assert vd.general_scene_unknown_safe_tier(generic_engine, chevron_query)[0] >= 5
+assert vd.choose_best_candidate(
+    [generic_engine],
+    subject_filter_query=chevron_query,
+) is None
+
+reset()
+chevron_detail = c(
+    99,
+    "aircraft jet engine chevron serrated nacelle closeup",
+    1,
+)
+assert vd.general_scene_unknown_safe_tier(chevron_detail, chevron_query)[0] <= 4
+assert vd.choose_best_candidate(
+    [generic_engine, chevron_detail],
+    subject_filter_query=chevron_query,
+)["id"] == 99
+
 # Production-like fetch_video path must also return the mechanism candidate, not nature/abstract.
 reset()
 orig_search, orig_key = vd.search_video_candidates, vd.PIXABAY_API_KEY
