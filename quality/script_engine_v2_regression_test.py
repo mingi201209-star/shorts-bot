@@ -35,6 +35,9 @@ def main():
     assert _formalize_common_ending(
         "둥근 모서리는 압력이 창문 모서리에 고르게 분산되도록 돕는다."
     ).endswith("돕습니다.")
+    assert _formalize_common_ending(
+        "응력이 분산되어 특정 지점에 집중되지 않는다."
+    ).endswith("집중되지 않습니다.")
     assert plan["api_call_budget"] == 3 == MAX_SCRIPT_API_CALLS
     assert 7 <= count <= 13
     assert len(contracts) == count
