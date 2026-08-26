@@ -9,7 +9,6 @@ def replace_once(text, old, new, label):
         raise RuntimeError(f"{label} marker mismatch count={count}")
     return text.replace(old, new, 1)
 
-
 path = Path("video/video_downloader.py")
 text = path.read_text(encoding="utf-8")
 old_helpers = '''def _candidate_is_used(candidate):
@@ -109,4 +108,5 @@ print("✅ Cross-process video source dedupe hotfix applied")
 main_text = Path("main.py").read_text(encoding="utf-8")
 if "FINAL_VISUAL_SEMANTIC_QA_V1" in main_text:
     import ci_visual_quality_v1_hotfix  # noqa: F401,E402
+    import ci_candidate_competition_completion_hotfix  # noqa: F401,E402
     import ci_visual_quality_v1_completion_hotfix  # noqa: F401,E402
