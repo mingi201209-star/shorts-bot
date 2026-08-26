@@ -92,6 +92,7 @@ def main():
         patched_engine = temp_engine.read_text(encoding="utf-8")
         assert patched.count(hotfix.MARKER) == 1, "runner hotfix must be idempotent"
         assert patched_engine.count(hotfix.HOOK_MARKER) == 1, "engine hotfix must be idempotent"
+        assert patched_engine.count(hotfix.FINAL_HOOK_MARKER) == 1, "final hook normalization must be idempotent"
         formalize = _load_formalizer(patched)
         convert_hook = _load_question_hook_converter(patched_engine)
 
@@ -141,10 +142,6 @@ def main():
         assert formalize("유도항력이 줄어든다.") == "유도항력이 줄어듭니다."
         assert formalize("그 이유가 궁금해집니다.") == "그 이유가 궁금해집니다."
 
-        # Exact production failure from run 32937638137: bounded candidate
-        # recovery can surface an informal 왜 ... 할까? lock. This is only a
-        # grammatical projection of the question's presupposed visible action;
-        # it adds no new fact and spends no API call.
         recovered_question = (
             "왜 조종사와 승무원은 특정한 수신 신호를 사용하여 의사소통을 할까?"
         )
@@ -152,26 +149,34 @@ def main():
             "조종사와 승무원은 특정한 수신 신호를 사용하여 의사소통을 합니다."
         )
 
-        # Exact production failure from run 32940431816. Keep this repair
-        # bounded to the observed rounded-window predicate instead of adding a
-        # broad Korean conjugator that could invent or distort other hooks.
         rounded_window_question = "왜 비행기 창문은 네모가 아니라 둥근가?"
         assert convert_hook(rounded_window_question, "비행기 창문 모서리가 둥근 이유") == (
             "비행기 창문은 네모가 아니라 둥급니다."
         )
 
-        # Exact fixed-topic production wording from run 32942114383.
         rounded_design_question = "왜 비행기 창문 모서리는 둥글게 설계되었을까?"
         assert convert_hook(rounded_design_question, "비행기 창문 모서리가 둥근 이유") == (
             "비행기 창문 모서리는 둥글게 설계되었습니다."
         )
 
-        # The run 32943418575 family can surface unsupported question forms.
-        # Those may use only a topic that deterministically forms a statement.
         rounded_state_question = "왜 비행기 창문 모서리가 이런 모양인가요?"
         assert convert_hook(rounded_state_question, "비행기 창문 모서리가 둥근 이유") == (
             "비행기 창문 모서리가 둥급니다."
         )
+
+        # Exact production family from run 32958656902: fixed-topic hooks can
+        # place 왜 inside the sentence instead of at the front. Final Scene-1
+        # normalization removes only that interrogative marker, then applies
+        # the already-bounded predicate repair. No causal claim is invented.
+        embedded_why_hook = "비행기 날개에 있는 작은 갈고리는 왜 달려 있을까?"
+        assert convert_hook(embedded_why_hook, embedded_why_hook) == (
+            "비행기 날개에 있는 작은 갈고리는 달려 있습니다."
+        )
+        embedded_why_need_hook = "작은 갈고리는 비행기 날개에 왜 필요할까?"
+        assert convert_hook(embedded_why_need_hook, embedded_why_hook) == (
+            "작은 갈고리는 비행기 날개에 필요합니다."
+        )
+
         assert convert_hook("왜 이 장치가 움직이나요?", "명사형 주제") == ""
 
     print("SCRIPT V2 OBSERVED FORMAL ENDING REGRESSION: PASS")

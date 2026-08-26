@@ -5,6 +5,7 @@ ENGINE_PATH = Path("content/script_engine_v2.py")
 MARKER = "# SCRIPT_V2_GUNGGEUM_FORMAL_ENDING_V1"
 HOOK_MARKER = "# SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1"
 TOPIC_HOOK_MARKER = "# SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1"
+FINAL_HOOK_MARKER = "# SCRIPT_V2_FINAL_OBSERVABLE_HOOK_NORMALIZATION_V1"
 NEEDLE = '    (r"좋아진다(?=[.!?…]*$)", "좋아집니다"),\n'
 REPLACEMENT = (
     NEEDLE
@@ -35,6 +36,15 @@ TOPIC_HOOK_REPLACEMENT = (
     TOPIC_HOOK_NEEDLE
     + '    # SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1\n'
     + '    (r"둥근$", "둥급니다"),\n'
+)
+FINAL_HOOK_NEEDLE = '    value = re.sub(r"^(?:그런데\\s+)?왜\\s+", "", _text(text)).rstrip().rstrip(".?!")\n'
+FINAL_HOOK_REPLACEMENT = (
+    FINAL_HOOK_NEEDLE
+    + '    # SCRIPT_V2_FINAL_OBSERVABLE_HOOK_NORMALIZATION_V1\n'
+    + '    # Remove an embedded interrogative marker before applying only the\n'
+    + '    # already-approved terminal predicate repairs below. This preserves\n'
+    + '    # the question presupposition as an observation without adding facts.\n'
+    + '    value = re.sub(r"\\s+왜\\s+", " ", value)\n'
 )
 
 
@@ -70,6 +80,14 @@ def _patch_engine():
             )
         text = text.replace(TOPIC_HOOK_NEEDLE, TOPIC_HOOK_REPLACEMENT, 1)
         changed = True
+    if FINAL_HOOK_MARKER not in text:
+        if text.count(FINAL_HOOK_NEEDLE) != 1:
+            raise RuntimeError(
+                "Script V2 final-hook normalization marker mismatch: "
+                f"{text.count(FINAL_HOOK_NEEDLE)}"
+            )
+        text = text.replace(FINAL_HOOK_NEEDLE, FINAL_HOOK_REPLACEMENT, 1)
+        changed = True
     if changed:
         ENGINE_PATH.write_text(text, encoding="utf-8")
     return changed
@@ -81,7 +99,7 @@ def main():
     if not runner_changed and not engine_changed:
         print("✅ Script V2 observed formal-ending + recovered-hook repairs already applied")
         return
-    print("✅ Script V2 observed formal endings + recovered question hooks repaired deterministically")
+    print("✅ Script V2 final observable Hook normalization + formal repairs applied deterministically")
 
 
 if __name__ == "__main__":
