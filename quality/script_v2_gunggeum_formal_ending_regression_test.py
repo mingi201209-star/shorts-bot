@@ -93,6 +93,7 @@ def main():
         assert patched.count(hotfix.MARKER) == 1, "runner hotfix must be idempotent"
         assert patched_engine.count(hotfix.HOOK_MARKER) == 1, "engine hotfix must be idempotent"
         assert patched_engine.count(hotfix.FINAL_HOOK_MARKER) == 1, "final hook normalization must be idempotent"
+        assert patched_engine.count(hotfix.PLAIN_QUESTION_MARKER) == 1, "plain-question boundary must be idempotent"
         formalize = _load_formalizer(patched)
         convert_hook = _load_question_hook_converter(patched_engine)
 
@@ -164,10 +165,6 @@ def main():
             "비행기 창문 모서리가 둥급니다."
         )
 
-        # Exact production family from run 32958656902: fixed-topic hooks can
-        # place 왜 inside the sentence instead of at the front. Final Scene-1
-        # normalization removes only that interrogative marker, then applies
-        # the already-bounded predicate repair. No causal claim is invented.
         embedded_why_hook = "비행기 날개에 있는 작은 갈고리는 왜 달려 있을까?"
         assert convert_hook(embedded_why_hook, embedded_why_hook) == (
             "비행기 날개에 있는 작은 갈고리는 달려 있습니다."
@@ -176,6 +173,14 @@ def main():
         assert convert_hook(embedded_why_need_hook, embedded_why_hook) == (
             "작은 갈고리는 비행기 날개에 필요합니다."
         )
+
+        # Exact production failure from run 32961763350. Do not claim an
+        # unverified performance effect; retain only the visible, grounded fact.
+        performance_question = "이 작은 갈고리는 비행기의 비행 성능에 어떤 영향을 미칠까?"
+        assert convert_hook(performance_question, "명사형 주제") == (
+            "비행기 날개에는 작은 갈고리가 있습니다."
+        )
+        assert 'hook.endswith(("까", "까요", "나요", "어요", "예요"))' in patched_engine
 
         assert convert_hook("왜 이 장치가 움직이나요?", "명사형 주제") == ""
 
