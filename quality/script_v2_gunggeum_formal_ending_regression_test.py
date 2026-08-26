@@ -175,6 +175,19 @@ def main():
         )
         assert formalize("그 이유가 궁금해집니다.") == "그 이유가 궁금해집니다."
 
+        # Run 33023068374: two ordinary unlocked narration lines survived all
+        # bounded repair calls with plain declarative endings.
+        assert formalize(
+            "비행기 이착륙 시 승객들은 창문 덮개를 올려야 한다고 알려진다."
+        ) == (
+            "비행기 이착륙 시 승객들은 창문 덮개를 올려야 한다고 알려집니다."
+        )
+        assert formalize(
+            "비상 상황 발생 시 승무원과 승객이 빠르게 대처할 수 있도록 도와준다."
+        ) == (
+            "비상 상황 발생 시 승무원과 승객이 빠르게 대처할 수 있도록 도와줍니다."
+        )
+
         recovered_question = (
             "왜 조종사와 승무원은 특정한 수신 신호를 사용하여 의사소통을 할까?"
         )
