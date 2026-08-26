@@ -166,9 +166,9 @@ def main():
             "비행기 창문 모서리는 둥글게 설계되었습니다."
         )
 
-        # Run 32943418575 produced another surface form. Unsupported question
-        # endings may use only a topic that deterministically forms a statement.
-        rounded_state_question = "왜 비행기 창문 모서리는 둥글게 되어 있을까?"
+        # The run 32943418575 family can surface unsupported question forms.
+        # Those may use only a topic that deterministically forms a statement.
+        rounded_state_question = "왜 비행기 창문 모서리가 이런 모양인가요?"
         assert convert_hook(rounded_state_question, "비행기 창문 모서리가 둥근 이유") == (
             "비행기 창문 모서리가 둥급니다."
         )
