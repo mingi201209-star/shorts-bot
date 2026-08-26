@@ -137,6 +137,62 @@ record_final_visual_scene(
     record_at = engine_source.index("# FINAL_VISUAL_SCENE_RECORD_V1")
     download_at = engine_source.index("# 4. 영상 다운로드", record_at)
     assert record_at < download_at
+
+    # Regress production Run 33000942031: Visual Quality competition selected
+    # a valid Scene-1 clip but returned it directly, bypassing the wrapped
+    # selector that records final semantic lineage. Final QA then evaluated a
+    # stale rejected candidate and failed Scene 1. The selected winner must be
+    # passed back through the complete pre-competition selector stack.
+    competition_source = (
+        ROOT / "ci_candidate_competition_completion_hotfix.py"
+    ).read_text(encoding="utf-8")
+    selected_branch = competition_source.split(
+        'if _candidate_unique_key(original) == selected_key:', 1
+    )[1].split(
+        'return _vq_previous_choose_best_candidate(candidates,', 1
+    )[0]
+    assert "return _vq_previous_choose_best_candidate(" in selected_branch
+    assert "[original]" in selected_branch
+    assert "return original" not in selected_branch
+
+    # Exercise the real wrapper chain as well: competition can choose either
+    # eligible clip, but final lineage must identify that exact returned clip.
+    subprocess.run(
+        [sys.executable, str(ROOT / "ci_candidate_competition_completion_hotfix.py")],
+        cwd=ROOT,
+        check=True,
+    )
+    from video import video_downloader as downloader
+
+    downloader.USED_VIDEO_IDS.clear()
+    os.environ["VQ_SCENE_ROLE"] = "hook"
+    candidates = [
+        {
+            "id": source_id,
+            "source_id": source_id,
+            "provider": "pixabay",
+            "url": f"https://cdn.test/{source_id}.mp4",
+            "page_url": f"https://pixabay.test/aircraft-wing-{source_id}",
+            "title": "aircraft wing flap deployment",
+            "tags": "aircraft airplane wing flap deployment",
+            "search_position": position,
+            "width": 1080,
+            "height": 1920,
+            "duration": 8.0,
+        }
+        for position, source_id in enumerate((142647, 22245), start=1)
+    ]
+    selected = downloader.choose_best_candidate(
+        candidates,
+        subject_filter_query="aircraft wing flap deployment stage 1",
+    )
+    lineage = downloader.get_last_final_visual_selection()
+    assert selected is not None
+    assert str(lineage.get("source_id")) == str(selected.get("source_id")), (
+        selected,
+        lineage,
+    )
+    assert lineage.get("accepted") is True, lineage
     print("FINAL VISUAL SEMANTIC QA REGRESSION: PASS")
 
 
