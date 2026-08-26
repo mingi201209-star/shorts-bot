@@ -42,6 +42,7 @@ def _apply_script_v2_formal_ending_repair():
         '    value = str(text or "").strip()\n'
         '    # Deterministic formalization for common declarative endings that\n'
         '    # repeatedly survive writer/local-repair calls.\n'
+        '    value = re.sub(r"않는다(?=[.!?…]*$)", "않습니다", value)\n'
         '    value = re.sub(r"않다(?=[.!?…]*$)", "않습니다", value)\n'
         '    value = re.sub(r"설계다(?=[.!?…]*$)", "설계입니다", value)\n'
         '    value = re.sub(r"이유다(?=[.!?…]*$)", "이유입니다", value)\n'
@@ -58,7 +59,7 @@ def _apply_script_v2_formal_ending_repair():
         print("⚠️ Script V2 formalizer body marker not found; skipping optional repair without blocking production")
         return
     SCRIPT_V2_RUNNER_PATH.write_text(text.replace(body_marker, body_replacement, 1), encoding="utf-8")
-    print("✅ Script V2 ~않다/~설계다/~시킨다/~돕는다/~위해서다 endings repaired deterministically")
+    print("✅ Script V2 ~않는다/~않다/~설계다/~시킨다/~돕는다/~위해서다 endings repaired deterministically")
 
 
 def _apply_script_v2_formal_question_repair():
