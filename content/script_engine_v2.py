@@ -116,7 +116,7 @@ def _topic_to_observation(topic: Any) -> str:
 
 
 def _question_hook_to_observation(text: Any, topic: Any = "") -> str:
-    """Convert known Korean question endings; otherwise prefer a grounded topic observation."""
+    """Convert only known Korean question endings; unsupported forms still fail closed."""
     value = re.sub(r"^(?:그런데\s+)?왜\s+", "", _text(text)).rstrip().rstrip(".?!")
     if re.search(r"무엇일(?:까|까요)$", value):
         return _topic_to_observation(topic)
@@ -227,3 +227,131 @@ def apply_locked_scenes(script: Dict[str, Any], plan: Dict[str, Any]) -> Dict[st
     result["script_engine"] = "v2"
     result["runtime_bucket"] = plan.get("runtime_bucket")
     return result
+
+
+def writer_payload(candidate: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "topic": plan.get("topic"),
+        "angle": plan.get("angle"),
+        "facts": list(candidate.get("fact_check_focus") or []),
+        "visual_proof": list(candidate.get("visual_proof") or []),
+        "runtime_bucket": plan.get("runtime_bucket"),
+        "target_scene_count": plan.get("target_scene_count"),
+        "scene_contracts": plan.get("contracts") or [],
+        "rules": {
+            "formal_korean": True,
+            "easy_language": True,
+            "do_not_change_locked_text": True,
+            "answer_only_in_reveal_payoff": True,
+            "max_total_api_calls": MAX_SCRIPT_API_CALLS,
+        },
+    }
+
+
+_ENDING_REPAIRS = (
+    (r"줄여준다(?=[.!?…]*$)", "줄여줍니다"),
+    (r"감소시킨다(?=[.!?…]*$)", "감소시킵니다"),
+    (r"줄인다(?=[.!?…]*$)", "줄입니다"),
+    (r"높인다(?=[.!?…]*$)", "높입니다"),
+    (r"감소한다(?=[.!?…]*$)", "감소합니다"),
+    (r"줄어든다(?=[.!?…]*$)", "줄어듭니다"),
+    (r"늘어난다(?=[.!?…]*$)", "늘어납니다"),
+    (r"약해진다(?=[.!?…]*$)", "약해집니다"),
+    (r"강해진다(?=[.!?…]*$)", "강해집니다"),
+    (r"달라진다(?=[.!?…]*$)", "달라집니다"),
+    (r"좋아진다(?=[.!?…]*$)", "좋아집니다"),
+    (r"향상된다(?=[.!?…]*$)", "향상됩니다"),
+    (r"발생한다(?=[.!?…]*$)", "발생합니다"),
+    (r"만든다(?=[.!?…]*$)", "만듭니다"),
+    (r"한다(?=[.!?…]*$)", "합니다"),
+    (r"된다(?=[.!?…]*$)", "됩니다"),
+    (r"이다(?=[.!?…]*$)", "입니다"),
+    (r"있다(?=[.!?…]*$)", "있습니다"),
+    (r"없다(?=[.!?…]*$)", "없습니다"),
+)
+
+
+def deterministic_scene_repair(text: str, role: str) -> str:
+    value = _text(text)
+    for pattern, replacement in _ENDING_REPAIRS:
+        value = re.sub(pattern, replacement, value)
+    if role == "causal_clue" and value and not any(
+        token in value for token in CAUSAL_CLUE_TOKENS
+    ):
+        value = "원인의 첫 단서는 " + value
+    return value
+
+
+def repair_failed_scenes(
+    script: Dict[str, Any],
+    plan: Dict[str, Any],
+    failed_scene_indexes: list[int],
+) -> Dict[str, Any]:
+    """Repair only failed narration; locked text remains immutable."""
+    result = deepcopy(script)
+    scenes = result.get("scenes") or []
+    contracts = plan.get("contracts") or []
+    by_index = {int(item["index"]): item for item in contracts}
+
+    for scene_index in failed_scene_indexes:
+        contract = by_index.get(int(scene_index))
+        if not contract:
+            continue
+        index = int(scene_index) - 1
+        if index < 0 or index >= len(scenes) or not isinstance(scenes[index], dict):
+            continue
+        if contract.get("locked"):
+            scenes[index]["text"] = _normalize_locked_narration(
+                contract.get("locked_text", ""), contract.get("role", "")
+            )
+        else:
+            scenes[index]["text"] = deterministic_scene_repair(
+                scenes[index].get("text", ""), contract.get("role", "")
+            )
+        scenes[index]["role"] = contract.get("role", "")
+
+    result["scenes"] = scenes
+    return apply_locked_scenes(result, plan)
+
+
+def local_repair_payload(
+    script: Dict[str, Any],
+    plan: Dict[str, Any],
+    failed_scene_indexes: list[int],
+    reasons: list[str],
+) -> Dict[str, Any]:
+    """Allow metadata repair on locked scenes while keeping locked narration immutable."""
+    contracts = {int(item["index"]): item for item in plan.get("contracts") or []}
+    scenes = script.get("scenes") or []
+    targets = []
+    for scene_index in failed_scene_indexes:
+        contract = contracts.get(int(scene_index))
+        index = int(scene_index) - 1
+        if (
+            contract
+            and 0 <= index < len(scenes)
+            and isinstance(scenes[index], dict)
+        ):
+            targets.append({
+                "scene_index": int(scene_index),
+                "role": contract.get("role"),
+                "required_concepts": contract.get("required_concepts") or [],
+                "current_text": _text(scenes[index].get("text")),
+                "text_locked": bool(contract.get("locked")),
+                "locked_text": _text(contract.get("locked_text")) if contract.get("locked") else "",
+                "current_visual_goal": _text(scenes[index].get("visual_goal")),
+                "current_keyword": _text(scenes[index].get("keyword")),
+            })
+    return {
+        "targets": targets,
+        "validation_reasons": list(reasons or []),
+        "rules": {
+            "repair_only_targets": True,
+            "formal_korean": True,
+            "easy_language": True,
+            "do_not_rewrite_other_scenes": True,
+            "locked_scene_text_is_immutable": True,
+            "metadata_on_locked_scenes_may_be_repaired": True,
+            "max_local_repair_calls": MAX_LOCAL_REPAIR_CALLS,
+        },
+    }
