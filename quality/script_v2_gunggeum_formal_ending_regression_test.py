@@ -28,6 +28,25 @@ def _load_formalizer(source: str):
     return namespace["_formalize_common_ending"]
 
 
+def _load_question_hook_converter(source: str):
+    tree = ast.parse(source)
+    selected = []
+    wanted_assignments = {"_QUESTION_HOOK_REPAIRS", "_TOPIC_OBSERVATION_REPAIRS"}
+    wanted_functions = {"_text", "_topic_to_observation", "_question_hook_to_observation"}
+    for node in tree.body:
+        if isinstance(node, ast.Assign):
+            names = {target.id for target in node.targets if isinstance(target, ast.Name)}
+            if names & wanted_assignments:
+                selected.append(node)
+        elif isinstance(node, ast.FunctionDef) and node.name in wanted_functions:
+            selected.append(node)
+    module = ast.Module(body=selected, type_ignores=[])
+    namespace = {}
+    exec("import re\nfrom typing import Any", namespace)
+    exec(compile(module, "<question-hook-converter>", "exec"), namespace)
+    return namespace["_question_hook_to_observation"]
+
+
 def main():
     production_candidate = {
         "topic": "비행기 바퀴는 착륙 전에 미리 돌지 않는다",
@@ -52,20 +71,29 @@ def main():
     )
 
     runner_source = Path("content/script_engine_v2_runner.py").read_text(encoding="utf-8")
+    engine_source = Path("content/script_engine_v2.py").read_text(encoding="utf-8")
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_runner = Path(tmpdir) / "script_engine_v2_runner.py"
+        temp_engine = Path(tmpdir) / "script_engine_v2.py"
         temp_runner.write_text(runner_source, encoding="utf-8")
-        original_path = hotfix.RUNNER_PATH
+        temp_engine.write_text(engine_source, encoding="utf-8")
+        original_runner_path = hotfix.RUNNER_PATH
+        original_engine_path = hotfix.ENGINE_PATH
         try:
             hotfix.RUNNER_PATH = temp_runner
+            hotfix.ENGINE_PATH = temp_engine
             hotfix.main()
             hotfix.main()
         finally:
-            hotfix.RUNNER_PATH = original_path
+            hotfix.RUNNER_PATH = original_runner_path
+            hotfix.ENGINE_PATH = original_engine_path
 
         patched = temp_runner.read_text(encoding="utf-8")
-        assert patched.count(hotfix.MARKER) == 1, "hotfix must be idempotent"
+        patched_engine = temp_engine.read_text(encoding="utf-8")
+        assert patched.count(hotfix.MARKER) == 1, "runner hotfix must be idempotent"
+        assert patched_engine.count(hotfix.HOOK_MARKER) == 1, "engine hotfix must be idempotent"
         formalize = _load_formalizer(patched)
+        convert_hook = _load_question_hook_converter(patched_engine)
 
         first_counterexample = (
             "비행기 엔진이 날개 아래에 장착된 모습을 보면, 그 이유가 궁금해진다."
@@ -112,6 +140,18 @@ def main():
         assert formalize(question_counterexample) == question_expected
         assert formalize("유도항력이 줄어든다.") == "유도항력이 줄어듭니다."
         assert formalize("그 이유가 궁금해집니다.") == "그 이유가 궁금해집니다."
+
+        # Exact production failure from run 32937638137: bounded candidate
+        # recovery can surface an informal 왜 ... 할까? lock. This is only a
+        # grammatical projection of the question's presupposed visible action;
+        # it adds no new fact and spends no API call.
+        recovered_question = (
+            "왜 조종사와 승무원은 특정한 수신 신호를 사용하여 의사소통을 할까?"
+        )
+        assert convert_hook(recovered_question, "비행기 조종석과 객실 간의 커뮤니케이션 시스템") == (
+            "조종사와 승무원은 특정한 수신 신호를 사용하여 의사소통을 합니다."
+        )
+        assert convert_hook("왜 이 장치가 움직이나요?", "명사형 주제") == ""
 
     print("SCRIPT V2 OBSERVED FORMAL ENDING REGRESSION: PASS")
 
