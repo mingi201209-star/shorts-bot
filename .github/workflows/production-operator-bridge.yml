@@ -26,7 +26,13 @@ jobs:
           set -euo pipefail
           requested="${REQUEST#RUN-SHORTS:}"
           scope=""
+          topic=""
           case "$requested" in
+            *:aviation-flaps)
+              scope="aviation"
+              topic="비행기 날개 뒤쪽 플랩은 왜 이착륙 때 펼쳐질까"
+              requested="${requested%:aviation-flaps}"
+              ;;
             *:aviation) scope="aviation"; requested="${requested%:aviation}";;
           esac
           requested="$(printf '%s' "$requested" | tr -d '[:space:]')"
@@ -39,6 +45,7 @@ jobs:
           test "$requested" = "$main_sha"
           echo "sha=$requested" >> "$GITHUB_OUTPUT"
           echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "topic=$topic" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch production on latest main
         env:
@@ -46,7 +53,8 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ steps.request.outputs.sha }}
           SCOPE: ${{ steps.request.outputs.scope }}
+          TOPIC: ${{ steps.request.outputs.topic }}
         run: |
           set -euo pipefail
-          gh workflow run main.yml --repo "$REPO" --ref main -f expected_sha="$SHA" -f candidate_scope="$SCOPE"
-          echo "Dispatched main.yml from ref main with expected SHA $SHA and candidate scope ${SCOPE:-default}"
+          gh workflow run main.yml --repo "$REPO" --ref main -f expected_sha="$SHA" -f candidate_scope="$SCOPE" -f topic="$TOPIC"
+          echo "Dispatched main.yml from ref main with expected SHA $SHA, candidate scope ${SCOPE:-default}, and bounded topic ${TOPIC:-automatic}"

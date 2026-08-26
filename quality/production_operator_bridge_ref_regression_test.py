@@ -10,8 +10,10 @@ production = (ROOT / ".github/workflows/main.yml").read_text(encoding="utf-8")
 # separately as expected_sha.
 assert 'test "$requested" = "$main_sha"' in bridge
 assert 'case "$requested" in' in bridge
+assert '*:aviation-flaps)' in bridge
+assert 'topic="비행기 날개 뒤쪽 플랩은 왜 이착륙 때 펼쳐질까"' in bridge
 assert '*:aviation) scope="aviation"; requested="${requested%:aviation}";;' in bridge
-assert '-f expected_sha="$SHA" -f candidate_scope="$SCOPE"' in bridge
+assert '-f expected_sha="$SHA" -f candidate_scope="$SCOPE" -f topic="$TOPIC"' in bridge
 assert '--ref "$SHA"' not in bridge
 
 # Production re-verifies the current main commit and the dispatch-resolved SHA,
