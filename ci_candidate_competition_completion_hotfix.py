@@ -86,7 +86,17 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
     for original in supplied:
         if _candidate_unique_key(original) == selected_key:
             print(f"[VisualQuality] competition role={role} selected={selected.get('source_id', selected.get('id'))} supplied=2")
-            return original
+            # Re-enter the complete pre-competition selector stack for the
+            # single winner.  Besides preserving every existing hard gate,
+            # this lets the final semantic-QA wrapper record the winner's
+            # exact lineage instead of retaining a previously rejected search
+            # candidate (production Run 33000942031, Scene 1).
+            return _vq_previous_choose_best_candidate(
+                [original],
+                relevant_top_n=relevant_top_n,
+                historical=historical,
+                subject_filter_query=subject_filter_query,
+            )
     return _vq_previous_choose_best_candidate(candidates, relevant_top_n=relevant_top_n, historical=historical, subject_filter_query=subject_filter_query)
 '''
     path.write_text(text, encoding="utf-8")
