@@ -85,13 +85,7 @@ def _mark_candidate_used(candidate):
     return True
 '''
 
-text = replace_once(
-    text,
-    old_helpers,
-    new_helpers,
-    "cross-process provider source claims",
-)
-
+text = replace_once(text, old_helpers, new_helpers, "cross-process provider source claims")
 text = replace_once(
     text,
     '''        video_id = best.get("id")
@@ -113,7 +107,6 @@ text = replace_once(
 ''',
     "legacy pexels atomic claim",
 )
-
 text = replace_once(
     text,
     '''        if not best:
@@ -140,20 +133,13 @@ text = replace_once(
     "unified provider atomic claim",
 )
 
-# Production applies a long sequence of source-rewriting hotfixes before this
-# one. Keep one authoritative final helper definition at the end of the module
-# so an earlier duplicate helper from that composed state cannot shadow the
-# atomic boolean claim contract. Functions above resolve these globals at call
-# time, so this preserves behavior while making the final binding explicit.
 final_binding_marker = "# CROSS_PROCESS_VIDEO_DEDUPE_FINAL_BINDING_V2"
 if final_binding_marker not in text:
     text = text.rstrip() + "\n\n" + final_binding_marker + "\n" + new_helpers + "\n"
-
 path.write_text(text, encoding="utf-8")
 
-# No hook_visual rewrite is needed here. ci_video_provider_hotfix.py already
-# routes hook selection through _mark_candidate_used(); because this hotfix
-# installs the final module binding before runtime imports occur, hook selections
-# use the same atomic run-scoped filesystem claim automatically.
-
 print("✅ Cross-process video source dedupe hotfix applied")
+
+# VISUAL_QUALITY_V1_CHAIN: this file is the final production hotfix in main.yml,
+# so install the additive Director layer only after all existing visual rewrites.
+import ci_visual_quality_v1_hotfix  # noqa: F401,E402
