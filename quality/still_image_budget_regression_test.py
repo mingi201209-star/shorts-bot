@@ -26,9 +26,14 @@ def main():
         calls["motion"] += 1
         Path(output_path).write_bytes(b"mp4")
 
-    def fake_verify(_scene, _output_path):
+    def fake_verify(scene, _output_path):
         calls["verify"] += 1
-        return True, {"visible_components": ["aircraft", "wing"]}
+        keyword = str(scene.get("keyword", ""))
+        if "window" in keyword:
+            visible = ["aircraft", "window"]
+        else:
+            visible = ["aircraft", "wing"]
+        return True, {"visible_components": visible}
 
     fallback._generate_image = fake_generate
     fallback._motion_clip = fake_motion
@@ -38,48 +43,66 @@ def main():
     try:
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
+            scene_6 = {
+                "scene_id": 6,
+                "text": "날개의 유도항력을 설명합니다.",
+                "visual_goal": "비행기 날개와 윙렛",
+                "keyword": "aircraft wing induced drag",
+            }
             scene_7 = {
                 "scene_id": 7,
-                "text": "양력 증가의 메커니즘을 설명합니다.",
-                "visual_goal": "비행기 날개 양력 작용",
-                "keyword": "aircraft wing lift mechanism",
+                "text": "날개 압력 차이를 설명합니다.",
+                "visual_goal": "비행기 날개 압력 차이",
+                "keyword": "aircraft wing pressure difference",
             }
-            scene_8 = {
+            window_scene = {
                 "scene_id": 8,
-                "text": "날개 주변 공기 흐름을 설명합니다.",
-                "visual_goal": "비행기 날개 주변 공기 흐름",
-                "keyword": "aircraft wing airflow",
+                "text": "창문 구조를 설명합니다.",
+                "visual_goal": "비행기 창문",
+                "keyword": "aircraft window closeup",
             }
             scene_9 = {
                 "scene_id": 9,
-                "text": "세 번째 부족 장면",
+                "text": "다시 날개 효과를 설명합니다.",
                 "visual_goal": "비행기 날개",
-                "keyword": "aircraft wing",
+                "keyword": "aircraft wing fuel efficiency",
             }
 
             first = fallback.generate_still_motion_fallback(
-                scene_7, output_path=tmp / "scene7.mp4", duration=4.0
+                scene_6, output_path=tmp / "scene6.mp4", duration=4.0
             )
             second = fallback.generate_still_motion_fallback(
-                scene_8, output_path=tmp / "scene8.mp4", duration=4.0
+                scene_7, output_path=tmp / "scene7.mp4", duration=5.0
             )
             third = fallback.generate_still_motion_fallback(
+                window_scene, output_path=tmp / "scene8.mp4", duration=4.0
+            )
+            fourth = fallback.generate_still_motion_fallback(
                 scene_9, output_path=tmp / "scene9.mp4", duration=4.0
             )
 
             assert first is not None
+            # Same concrete aircraft+wing signature must reuse immediately,
+            # before a second generation is spent. This is the production
+            # Scene 6 -> Scene 7 resilience contract from run 32936072150.
             assert second is not None
-            # The generation ceiling remains exactly two. A third same-anchor
-            # scene may only reuse the most recently verified aircraft+wing
-            # still and must be re-verified; it cannot spend another generation.
-            assert third is not None
-            assert third["mode"] == "REUSED_VERIFIED_STILL_MOTION"
-            assert third["source_id"] == second["source_id"]
+            assert second["mode"] == "REUSED_VERIFIED_STILL_MOTION"
+            assert second["source_id"] == first["source_id"]
             assert fallback.still_image_generation_count() == 2
-            assert calls == {"generate": 2, "motion": 3, "verify": 3}
-            assert first["mode"] == "GENERATED_STILL_MOTION_VERIFIED"
-            assert second["mode"] == "GENERATED_STILL_MOTION_VERIFIED"
-            assert first["source_id"] != second["source_id"]
+
+            # A different component signature cannot borrow the wing still and
+            # therefore consumes the second, still-bounded generation.
+            assert third is not None
+            assert third["mode"] == "GENERATED_STILL_MOTION_VERIFIED"
+            assert third["source_id"] != first["source_id"]
+
+            # Once the budget is full, the verified wing still remains usable
+            # for another same-signature scene after current-scene verification.
+            assert fourth is not None
+            assert fourth["mode"] == "REUSED_VERIFIED_STILL_MOTION"
+            assert fourth["source_id"] == first["source_id"]
+            assert calls == {"generate": 2, "motion": 4, "verify": 4}
+            assert (tmp / "scene7.mp4").exists()
             assert (tmp / "scene9.mp4").exists()
     finally:
         fallback._generate_image = original_generate
