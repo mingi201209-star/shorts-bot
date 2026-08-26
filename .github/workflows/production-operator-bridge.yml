@@ -1,0 +1,46 @@
+name: Production Operator Bridge
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == github.repository_owner &&
+      startsWith(github.event.comment.body, 'RUN-SHORTS:')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve exact requested main SHA
+        id: request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUEST: ${{ github.event.comment.body }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          requested="${REQUEST#RUN-SHORTS:}"
+          requested="$(printf '%s' "$requested" | tr -d '[:space:]')"
+          main_sha="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+          if [ "$requested" = "main" ]; then
+            requested="$main_sha"
+          fi
+          test "${#requested}" -eq 40
+          case "$requested" in *[!0-9a-fA-F]*) exit 1;; esac
+          test "$requested" = "$main_sha"
+          echo "sha=$requested" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch production on latest main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ steps.request.outputs.sha }}
+        run: |
+          set -euo pipefail
+          gh workflow run main.yml --repo "$REPO" --ref "$SHA"
+          echo "Dispatched main.yml at exact main SHA $SHA"
