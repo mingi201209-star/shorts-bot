@@ -99,6 +99,8 @@ _TOPIC_OBSERVATION_REPAIRS = (
 def _topic_to_observation(topic: Any) -> str:
     value = _text(topic).rstrip().rstrip(".?!")
     value = re.sub(r"\s+이유$", "", value)
+    if re.search(r"(?:습니다|입니다|합니다|됩니다|줍니다)$", value):
+        return value + "."
     for pattern, replacement in _TOPIC_OBSERVATION_REPAIRS:
         converted, count = re.subn(pattern, replacement, value)
         if count:
@@ -115,7 +117,7 @@ def _question_hook_to_observation(text: Any, topic: Any = "") -> str:
         converted, count = re.subn(pattern, replacement, value)
         if count:
             return converted + "."
-    return ""
+    return _topic_to_observation(topic)
 
 
 def build_narrative_plan(candidate: Dict[str, Any], approved_hook: str = "") -> Dict[str, Any]:

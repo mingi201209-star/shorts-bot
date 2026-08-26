@@ -79,6 +79,19 @@ def main():
         "비행기 문이 비행 중 바깥쪽으로 바로 열리지 않습니다."
     )
 
+    fixed_topic_question = candidate()
+    fixed_topic_question["topic"] = (
+        "제트 엔진 뒤 톱니 모양 셰브론은 뜨거운 배기와 찬 공기를 "
+        "섞어 소음을 줄입니다"
+    )
+    fixed_topic_question["micro_narrative"]["hook"] = (
+        "왜 제트 엔진 뒤 톱니 모양 셰브론이 소음을 줄일까?"
+    )
+    repaired_fixed_topic = build_narrative_plan(fixed_topic_question)
+    assert repaired_fixed_topic["contracts"][0]["locked_text"] == (
+        fixed_topic_question["topic"] + "."
+    )
+
     unsupported = candidate()
     unsupported["micro_narrative"]["hook"] = "왜 날개가 움직이나요?"
     try:
