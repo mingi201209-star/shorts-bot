@@ -67,16 +67,13 @@ def _mark_candidate_used(candidate):
     key = _candidate_unique_key(candidate)
     if _candidate_is_used(candidate):
         return False
-
     claim_path = _candidate_claim_path(candidate)
     try:
         fd = os.open(claim_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError:
         return False
-
     with os.fdopen(fd, "w", encoding="utf-8") as handle:
         handle.write(str(key))
-
     USED_VIDEO_IDS.add(key)
     if str(candidate.get("provider") or "pexels") == "pexels":
         video_id = candidate.get("id")
@@ -96,10 +93,7 @@ text = replace_once(
 ''',
     '''        video_id = best.get("id")
         if not _mark_candidate_used(best):
-            print(
-                "[VIDEO_SOURCE_CLAIM_CONFLICT] "
-                f"provider=pexels source_id={video_id} scene=general"
-            )
+            print("[VIDEO_SOURCE_CLAIM_CONFLICT] " f"provider=pexels source_id={video_id} scene=general")
             continue
 
         print(
@@ -122,10 +116,7 @@ text = replace_once(
         provider = str(best.get("provider") or "pexels")
         source_id = best.get("source_id", best.get("id"))
         if not _mark_candidate_used(best):
-            print(
-                "[VIDEO_SOURCE_CLAIM_CONFLICT] "
-                f"provider={provider} source_id={source_id} scene=general"
-            )
+            print("[VIDEO_SOURCE_CLAIM_CONFLICT] " f"provider={provider} source_id={source_id} scene=general")
             continue
         print(f"[VIDEO_SELECTED] provider={provider} source_id={source_id} scene=general")
         return best["url"]
@@ -137,9 +128,11 @@ final_binding_marker = "# CROSS_PROCESS_VIDEO_DEDUPE_FINAL_BINDING_V2"
 if final_binding_marker not in text:
     text = text.rstrip() + "\n\n" + final_binding_marker + "\n" + new_helpers + "\n"
 path.write_text(text, encoding="utf-8")
-
 print("✅ Cross-process video source dedupe hotfix applied")
 
-# VISUAL_QUALITY_V1_CHAIN: this file is the final production hotfix in main.yml,
-# so install the additive Director layer only after all existing visual rewrites.
-import ci_visual_quality_v1_hotfix  # noqa: F401,E402
+# Some focused workflows intentionally apply cross-process dedupe early. Only
+# chain Director installation in the full production ordering, after Final
+# Visual Semantic QA has already patched main.py.
+main_text = Path("main.py").read_text(encoding="utf-8")
+if "FINAL_VISUAL_SEMANTIC_QA_V1" in main_text:
+    import ci_visual_quality_v1_hotfix  # noqa: F401,E402
