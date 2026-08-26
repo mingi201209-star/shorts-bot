@@ -13,6 +13,11 @@ on:
         required: false
         default: ""
         type: string
+      expected_sha:
+        description: "Optional exact current main SHA verified by the production operator bridge"
+        required: false
+        default: ""
+        type: string
       youtube_upload:
         description: "Explicitly upload the rendered Short to YouTube"
         required: false
@@ -28,13 +33,43 @@ on:
           - unlisted
           - public
 
+permissions:
+  contents: read
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Verify expected production SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          DISPATCH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$EXPECTED_SHA" ]; then
+            echo "No expected_sha supplied; checkout will remain pinned to dispatch SHA $DISPATCH_SHA"
+            exit 0
+          fi
+          test "${#EXPECTED_SHA}" -eq 40
+          case "$EXPECTED_SHA" in *[!0-9a-fA-F]*) exit 1;; esac
+          current_main="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+          if [ "$current_main" != "$EXPECTED_SHA" ]; then
+            echo "Expected SHA mismatch: current main=$current_main expected=$EXPECTED_SHA"
+            exit 1
+          fi
+          if [ "$DISPATCH_SHA" != "$EXPECTED_SHA" ]; then
+            echo "Dispatch SHA mismatch: github.sha=$DISPATCH_SHA expected=$EXPECTED_SHA"
+            exit 1
+          fi
+          echo "Verified production SHA: $EXPECTED_SHA"
+
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_sha || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
