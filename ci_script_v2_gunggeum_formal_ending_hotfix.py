@@ -4,6 +4,7 @@ RUNNER_PATH = Path("content/script_engine_v2_runner.py")
 ENGINE_PATH = Path("content/script_engine_v2.py")
 MARKER = "# SCRIPT_V2_GUNGGEUM_FORMAL_ENDING_V1"
 HOOK_MARKER = "# SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1"
+TOPIC_HOOK_MARKER = "# SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1"
 NEEDLE = '    (r"좋아진다(?=[.!?…]*$)", "좋아집니다"),\n'
 REPLACEMENT = (
     NEEDLE
@@ -29,6 +30,12 @@ HOOK_REPLACEMENT = (
     + '    (r"올까$", "옵니다"),\n'
     + '    (r"갈까$", "갑니다"),\n'
 )
+TOPIC_HOOK_NEEDLE = '_TOPIC_OBSERVATION_REPAIRS = (\n'
+TOPIC_HOOK_REPLACEMENT = (
+    TOPIC_HOOK_NEEDLE
+    + '    # SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1\n'
+    + '    (r"둥근$", "둥급니다"),\n'
+)
 
 
 def _patch_runner():
@@ -46,18 +53,26 @@ def _patch_runner():
 
 def _patch_engine():
     text = ENGINE_PATH.read_text(encoding="utf-8")
-    if HOOK_MARKER in text:
-        return False
-    if text.count(HOOK_NEEDLE) != 1:
-        raise RuntimeError(
-            "Script V2 recovered-hook insertion marker mismatch: "
-            f"{text.count(HOOK_NEEDLE)}"
-        )
-    ENGINE_PATH.write_text(
-        text.replace(HOOK_NEEDLE, HOOK_REPLACEMENT, 1),
-        encoding="utf-8",
-    )
-    return True
+    changed = False
+    if HOOK_MARKER not in text:
+        if text.count(HOOK_NEEDLE) != 1:
+            raise RuntimeError(
+                "Script V2 recovered-hook insertion marker mismatch: "
+                f"{text.count(HOOK_NEEDLE)}"
+            )
+        text = text.replace(HOOK_NEEDLE, HOOK_REPLACEMENT, 1)
+        changed = True
+    if TOPIC_HOOK_MARKER not in text:
+        if text.count(TOPIC_HOOK_NEEDLE) != 1:
+            raise RuntimeError(
+                "Script V2 recovered-topic insertion marker mismatch: "
+                f"{text.count(TOPIC_HOOK_NEEDLE)}"
+            )
+        text = text.replace(TOPIC_HOOK_NEEDLE, TOPIC_HOOK_REPLACEMENT, 1)
+        changed = True
+    if changed:
+        ENGINE_PATH.write_text(text, encoding="utf-8")
+    return changed
 
 
 def main():
