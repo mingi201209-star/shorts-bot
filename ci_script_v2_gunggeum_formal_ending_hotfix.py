@@ -19,6 +19,7 @@ HOOK_NEEDLE = '_QUESTION_HOOK_REPAIRS = (\n'
 HOOK_REPLACEMENT = (
     HOOK_NEEDLE
     + '    # SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1\n'
+    + '    (r"둥근가$", "둥급니다"),\n'
     + '    (r"있을까$", "있습니다"),\n'
     + '    (r"없을까$", "없습니다"),\n'
     + '    (r"일까$", "입니다"),\n'
