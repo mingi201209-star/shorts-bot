@@ -4,7 +4,10 @@ from content.script_engine_v2 import (
     build_narrative_plan,
     writer_payload,
 )
-from content.script_engine_v2_runner import _deterministic_keyword
+from content.script_engine_v2_runner import (
+    _deterministic_keyword,
+    _formalize_common_ending,
+)
 
 
 def candidate():
@@ -29,6 +32,9 @@ def main():
     contracts = plan["contracts"]
     count = plan["target_scene_count"]
 
+    assert _formalize_common_ending(
+        "둥근 모서리는 압력이 창문 모서리에 고르게 분산되도록 돕는다."
+    ).endswith("돕습니다.")
     assert plan["api_call_budget"] == 3 == MAX_SCRIPT_API_CALLS
     assert 7 <= count <= 13
     assert len(contracts) == count
