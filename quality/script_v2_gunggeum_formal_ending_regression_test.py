@@ -8,6 +8,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import ci_script_v2_gunggeum_formal_ending_hotfix as hotfix
+import ci_script_v2_visual_goal_hotfix as visual_hotfix
 from content.script_generator_router import _observable_hook_from_candidate
 
 
@@ -45,6 +46,20 @@ def _load_question_hook_converter(source: str):
     exec("import re\nfrom typing import Any", namespace)
     exec(compile(module, "<question-hook-converter>", "exec"), namespace)
     return namespace["_question_hook_to_observation"]
+
+
+def _load_question_normalizer(source: str):
+    tree = ast.parse(source)
+    selected = []
+    wanted_functions = {"_text", "_normalize_locked_narration"}
+    for node in tree.body:
+        if isinstance(node, ast.FunctionDef) and node.name in wanted_functions:
+            selected.append(node)
+    module = ast.Module(body=selected, type_ignores=[])
+    namespace = {}
+    exec("import re\nfrom typing import Any", namespace)
+    exec(compile(module, "<question-normalizer>", "exec"), namespace)
+    return namespace["_normalize_locked_narration"]
 
 
 def main():
@@ -96,6 +111,18 @@ def main():
         assert patched_engine.count(hotfix.PLAIN_QUESTION_MARKER) == 1, "plain-question boundary must be idempotent"
         formalize = _load_formalizer(patched)
         convert_hook = _load_question_hook_converter(patched_engine)
+
+        visual_engine = Path(tmpdir) / "visual_script_engine_v2.py"
+        visual_engine.write_text(engine_source, encoding="utf-8")
+        original_visual_engine_path = visual_hotfix.SCRIPT_V2_PATH
+        try:
+            visual_hotfix.SCRIPT_V2_PATH = visual_engine
+            visual_hotfix._apply_script_v2_formal_question_repair()
+        finally:
+            visual_hotfix.SCRIPT_V2_PATH = original_visual_engine_path
+        normalize_question = _load_question_normalizer(
+            visual_engine.read_text(encoding="utf-8")
+        )
 
         first_counterexample = (
             "비행기 엔진이 날개 아래에 장착된 모습을 보면, 그 이유가 궁금해진다."
@@ -168,6 +195,9 @@ def main():
         flap_question = "왜 비행기 날개 뒤쪽 플랩은 이착륙 때 펼쳐질까?"
         assert convert_hook(flap_question, flap_question) == (
             "비행기 날개 뒤쪽 플랩은 이착륙 때 펼쳐집니다."
+        )
+        assert normalize_question(flap_question, "question") == (
+            "왜 비행기 날개 뒤쪽 플랩은 이착륙 때 펼쳐질까요?"
         )
 
         rounded_state_question = "왜 비행기 창문 모서리가 이런 모양인가요?"
