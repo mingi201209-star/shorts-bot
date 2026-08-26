@@ -25,6 +25,10 @@ jobs:
         run: |
           set -euo pipefail
           requested="${REQUEST#RUN-SHORTS:}"
+          scope=""
+          case "$requested" in
+            *:aviation) scope="aviation"; requested="${requested%:aviation}";;
+          esac
           requested="$(printf '%s' "$requested" | tr -d '[:space:]')"
           main_sha="$(gh api "repos/$REPO/commits/main" --jq .sha)"
           if [ "$requested" = "main" ]; then
@@ -34,13 +38,15 @@ jobs:
           case "$requested" in *[!0-9a-fA-F]*) exit 1;; esac
           test "$requested" = "$main_sha"
           echo "sha=$requested" >> "$GITHUB_OUTPUT"
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch production on latest main
         env:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           SHA: ${{ steps.request.outputs.sha }}
+          SCOPE: ${{ steps.request.outputs.scope }}
         run: |
           set -euo pipefail
-          gh workflow run main.yml --repo "$REPO" --ref main -f expected_sha="$SHA"
-          echo "Dispatched main.yml from ref main with expected SHA $SHA"
+          gh workflow run main.yml --repo "$REPO" --ref main -f expected_sha="$SHA" -f candidate_scope="$SCOPE"
+          echo "Dispatched main.yml from ref main with expected SHA $SHA and candidate scope ${SCOPE:-default}"

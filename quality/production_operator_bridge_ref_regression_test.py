@@ -9,7 +9,9 @@ production = (ROOT / ".github/workflows/main.yml").read_text(encoding="utf-8")
 # requires a branch/tag ref. Pass main as the ref and carry the verified commit
 # separately as expected_sha.
 assert 'test "$requested" = "$main_sha"' in bridge
-assert 'gh workflow run main.yml --repo "$REPO" --ref main -f expected_sha="$SHA"' in bridge
+assert 'case "$requested" in' in bridge
+assert '*:aviation) scope="aviation"; requested="${requested%:aviation}";;' in bridge
+assert '-f expected_sha="$SHA" -f candidate_scope="$SCOPE"' in bridge
 assert '--ref "$SHA"' not in bridge
 
 # Production re-verifies the current main commit and the dispatch-resolved SHA,
