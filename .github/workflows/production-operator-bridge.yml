@@ -42,5 +42,5 @@ jobs:
           SHA: ${{ steps.request.outputs.sha }}
         run: |
           set -euo pipefail
-          gh workflow run main.yml --repo "$REPO" --ref "$SHA"
-          echo "Dispatched main.yml at exact main SHA $SHA"
+          gh workflow run main.yml --repo "$REPO" --ref main -f expected_sha="$SHA"
+          echo "Dispatched main.yml from ref main with expected SHA $SHA"
