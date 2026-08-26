@@ -151,6 +151,14 @@ def main():
         assert convert_hook(recovered_question, "비행기 조종석과 객실 간의 커뮤니케이션 시스템") == (
             "조종사와 승무원은 특정한 수신 신호를 사용하여 의사소통을 합니다."
         )
+
+        # Exact production failure from run 32940431816. Keep this repair
+        # bounded to the observed rounded-window predicate instead of adding a
+        # broad Korean conjugator that could invent or distort other hooks.
+        rounded_window_question = "왜 비행기 창문은 네모가 아니라 둥근가?"
+        assert convert_hook(rounded_window_question, "비행기 창문 모서리가 둥근 이유") == (
+            "비행기 창문은 네모가 아니라 둥급니다."
+        )
         assert convert_hook("왜 이 장치가 움직이나요?", "명사형 주제") == ""
 
     print("SCRIPT V2 OBSERVED FORMAL ENDING REGRESSION: PASS")
