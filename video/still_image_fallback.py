@@ -67,6 +67,23 @@ def _anchor_signature(scene):
     return tuple(signature) if len(signature) >= 2 else ()
 
 
+def _reuse_signatures(scene):
+    """Return only physically compatible cache signatures for this scene.
+
+    A verified winglet still visibly contains the aircraft wing as well, so it
+    may safely satisfy a later aircraft+wing scene after the normal full vision
+    verifier passes again. The reverse is intentionally forbidden: a generic
+    wing still cannot stand in for a scene that explicitly requires a winglet.
+    """
+    signature = _anchor_signature(scene)
+    if not signature:
+        return ()
+    signatures = [signature]
+    if signature == ("aircraft", "wing"):
+        signatures.extend((("aircraft", "winglet"), ("aircraft", "wingtip")))
+    return tuple(signatures)
+
+
 def _prompt(scene):
     narration = str(scene.get("text", "") or "").strip()
     visual_goal = str(scene.get("visual_goal", "") or "").strip()
@@ -146,9 +163,6 @@ def _motion_clip(image_path, output_path, duration):
 
 
 def _verify_motion_clip(scene, output_path):
-    # Reuse the already-bounded visual verifier used for generated Sora Hook
-    # visuals. This adds no new verifier implementation and fails closed if the
-    # generated still does not visibly contain the required query anchors.
     from video.hook_visual_dominance import evaluate_hook_subject_dominance
     from video.video_downloader import _anchor_aliases, extract_query_anchors
 
@@ -184,40 +198,39 @@ def _verify_motion_clip(scene, output_path):
 
 
 def _reuse_verified_still(scene, *, output_path, duration, trigger_reason):
-    signature = _anchor_signature(scene)
-    cached = dict(_VERIFIED_STILL_CACHE.get(signature) or {})
-    image_path = Path(str(cached.get("image_path") or ""))
-    if not signature or not image_path.is_file():
-        return None
-
-    try:
-        _motion_clip(image_path, output_path, duration)
-        verified, evidence = _verify_motion_clip(scene, output_path)
-        if not verified:
+    for signature in _reuse_signatures(scene):
+        cached = dict(_VERIFIED_STILL_CACHE.get(signature) or {})
+        image_path = Path(str(cached.get("image_path") or ""))
+        if not image_path.is_file():
+            continue
+        try:
+            _motion_clip(image_path, output_path, duration)
+            verified, evidence = _verify_motion_clip(scene, output_path)
+            if not verified:
+                Path(output_path).unlink(missing_ok=True)
+                continue
+            print(
+                f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=reused_verified "
+                f"count={_GENERATION_COUNT} trigger={trigger_reason} anchors={'+'.join(signature)}"
+            )
+            return {
+                "path": str(output_path),
+                "provider": cached.get("provider", "openai_image"),
+                "source_id": cached.get("source_id", "verified-still-reuse"),
+                "mode": "REUSED_VERIFIED_STILL_MOTION",
+                "tier": 2,
+                "visual_state": "TRUE",
+                "anchor_matched": len(_anchor_signature(scene)),
+                "anchor_total": len(_anchor_signature(scene)),
+                "visible_components": list(evidence.get("visible_components", []) or []),
+            }
+        except Exception as exc:
             Path(output_path).unlink(missing_ok=True)
-            return None
-        print(
-            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=reused_verified "
-            f"count={_GENERATION_COUNT} trigger={trigger_reason} anchors={'+'.join(signature)}"
-        )
-        return {
-            "path": str(output_path),
-            "provider": cached.get("provider", "openai_image"),
-            "source_id": cached.get("source_id", "verified-still-reuse"),
-            "mode": "REUSED_VERIFIED_STILL_MOTION",
-            "tier": 2,
-            "visual_state": "TRUE",
-            "anchor_matched": len(signature),
-            "anchor_total": len(signature),
-            "visible_components": list(evidence.get("visible_components", []) or []),
-        }
-    except Exception as exc:
-        Path(output_path).unlink(missing_ok=True)
-        print(
-            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=reuse_failed "
-            f"reason={type(exc).__name__}"
-        )
-        return None
+            print(
+                f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=reuse_failed "
+                f"reason={type(exc).__name__}"
+            )
+    return None
 
 
 def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reason="semantic_scarcity"):
@@ -225,10 +238,6 @@ def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reas
     if not STILL_IMAGE_FALLBACK_ENABLED:
         return None
 
-    # Prefer an already verified still for the exact same concrete component
-    # signature before spending another image generation. The reused motion
-    # clip is re-verified against the current scene, so this does not weaken the
-    # visual quality floor. If reuse fails, normal bounded generation continues.
     reused = _reuse_verified_still(
         scene,
         output_path=output_path,
