@@ -277,6 +277,63 @@ def _deterministic_keyword(scene, contract, plan, index):
     print("✅ fixed landing-gear scenes retain aircraft+landing+gear anchors")
 
 
+def _apply_aviation_engine_chevron_query_domain_lock():
+    text = SCRIPT_V2_RUNNER_PATH.read_text(encoding="utf-8")
+    marker = "# AVIATION_ENGINE_CHEVRON_QUERY_DOMAIN_LOCK_V1"
+    if marker in text:
+        print("✅ aviation engine-chevron query domain lock already applied")
+        return
+    block = r'''
+
+# AVIATION_ENGINE_CHEVRON_QUERY_DOMAIN_LOCK_V1
+# Fixed jet-engine chevron topics keep aircraft+jet+engine+chevron in every
+# Scene query. Abstract words such as design, mixing, sound, contact, impact,
+# or function must not drift into keyboards, DJs, cars, aliens, or machinery.
+_script_v2_engine_chevron_previous_deterministic_keyword = _deterministic_keyword
+
+
+def _deterministic_keyword(scene, contract, plan, index):
+    value = _script_v2_engine_chevron_previous_deterministic_keyword(
+        scene, contract, plan, index
+    )
+    fixed_topic = os.environ.get("SHORTS_TOPIC", "").strip()
+    topic_text = " ".join((fixed_topic, str(plan.get("topic", "")))).lower()
+    chevron_topic = any(
+        term in topic_text
+        for term in ("셰브론", "톱니 모양", "톱니모양", "chevron", "serrated")
+    )
+    engine_topic = any(
+        term in topic_text
+        for term in ("제트 엔진", "엔진", "jet engine", "engine nacelle")
+    )
+    aviation_topic = any(
+        term in topic_text
+        for term in ("비행기", "항공", "제트", "aircraft", "airplane", "aviation")
+    )
+    if not (chevron_topic and engine_topic and aviation_topic):
+        return value
+
+    words = _ascii_keyword_words(value)
+    required = ["aircraft", "jet", "engine", "chevron"]
+    if all(word in words for word in required):
+        return value
+    filtered = [
+        word for word in words
+        if word not in {
+            "aircraft", "airplane", "plane", "aviation", "jet", "engine",
+            "nacelle", "chevron", "chevrons", "serrated", "stage",
+        }
+    ]
+    locked = required + filtered[:1] + ["stage", str(index)]
+    result = " ".join(locked[:7])
+    if result != value:
+        print(f"🛩️ AVIATION ENGINE CHEVRON QUERY LOCK scene={index}: {result}")
+    return result
+'''
+    SCRIPT_V2_RUNNER_PATH.write_text(text.rstrip() + block + "\n", encoding="utf-8")
+    print("✅ fixed jet-engine chevron scenes retain aircraft+jet+engine+chevron anchors")
+
+
 def _apply_fixed_topic_novelty_lock():
     print("⏭️ fixed-topic Novelty lock installer disabled; soft Judge mode is authoritative")
     return
@@ -291,6 +348,7 @@ def main():
     _apply_aviation_wing_query_domain_lock()
     _apply_aviation_window_query_domain_lock()
     _apply_aviation_landing_gear_query_domain_lock()
+    _apply_aviation_engine_chevron_query_domain_lock()
     _apply_fixed_topic_novelty_lock()
 
 

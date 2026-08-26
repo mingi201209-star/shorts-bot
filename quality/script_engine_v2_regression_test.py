@@ -115,6 +115,32 @@ def main():
         assert anchored.startswith("aircraft landing gear wheel ")
         assert 4 <= len(anchored.split()) <= 7
 
+    chevron_plan = {
+        "topic": (
+            "제트 엔진 뒤 톱니 모양 셰브론은 뜨거운 배기와 찬 공기를 "
+            "섞어 소음을 줄입니다"
+        ),
+        "angle": "제트 엔진 셰브론 작동 원리",
+    }
+    for cross_domain_keyword in (
+        "chevron design",
+        "mixing air",
+        "noise reduction",
+        "air contact",
+        "environmental impact",
+    ):
+        anchored = _deterministic_keyword(
+            {
+                "keyword": cross_domain_keyword,
+                "visual_goal": cross_domain_keyword,
+            },
+            {"required_concepts": []},
+            chevron_plan,
+            5,
+        )
+        assert anchored.startswith("aircraft jet engine chevron ")
+        assert 4 <= len(anchored.split()) <= 7
+
     print("PASS: Script Engine V2 adaptive deterministic narrative plan")
 
 
