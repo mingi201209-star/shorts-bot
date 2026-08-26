@@ -141,6 +141,11 @@ def main():
         )
         assert formalize(question_counterexample) == question_expected
         assert formalize("유도항력이 줄어든다.") == "유도항력이 줄어듭니다."
+        assert formalize(
+            "카멜레온은 색을 바꾸는 능력으로 유명하지만, 그 이유는 의외로 복잡하다."
+        ) == (
+            "카멜레온은 색을 바꾸는 능력으로 유명하지만, 그 이유는 의외로 복잡합니다."
+        )
         assert formalize("그 이유가 궁금해집니다.") == "그 이유가 궁금해집니다."
 
         recovered_question = (
