@@ -165,6 +165,11 @@ def main():
             "비행기 창문 모서리는 둥글게 설계되었습니다."
         )
 
+        flap_question = "왜 비행기 날개 뒤쪽 플랩은 이착륙 때 펼쳐질까?"
+        assert convert_hook(flap_question, flap_question) == (
+            "비행기 날개 뒤쪽 플랩은 이착륙 때 펼쳐집니다."
+        )
+
         rounded_state_question = "왜 비행기 창문 모서리가 이런 모양인가요?"
         assert convert_hook(rounded_state_question, "비행기 창문 모서리가 둥근 이유") == (
             "비행기 창문 모서리가 둥급니다."
