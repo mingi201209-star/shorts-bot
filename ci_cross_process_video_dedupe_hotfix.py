@@ -108,5 +108,6 @@ print("✅ Cross-process video source dedupe hotfix applied")
 main_text = Path("main.py").read_text(encoding="utf-8")
 if "FINAL_VISUAL_SEMANTIC_QA_V1" in main_text:
     import ci_visual_quality_v1_hotfix  # noqa: F401,E402
+    import ci_subtitle_director_completion_hotfix  # noqa: F401,E402
     import ci_candidate_competition_completion_hotfix  # noqa: F401,E402
     import ci_visual_quality_v1_completion_hotfix  # noqa: F401,E402
