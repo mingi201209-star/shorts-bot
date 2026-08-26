@@ -49,6 +49,7 @@ def _apply_script_v2_formal_ending_repair():
         '    value = re.sub(r"구조다(?=[.!?…]*$)", "구조입니다", value)\n'
         '    value = re.sub(r"시킨다(?=[.!?…]*$)", "시킵니다", value)\n'
         '    value = re.sub(r"돕는다(?=[.!?…]*$)", "돕습니다", value)\n'
+        '    value = re.sub(r"보인다(?=[.!?…]*$)", "보입니다", value)\n'
         '    value = re.sub(r"위해서다(?=[.!?…]*$)", "위해서입니다", value)\n'
         '    for pattern, replacement in _FORMAL_ENDING_REPAIRS:\n'
     )
@@ -59,7 +60,7 @@ def _apply_script_v2_formal_ending_repair():
         print("⚠️ Script V2 formalizer body marker not found; skipping optional repair without blocking production")
         return
     SCRIPT_V2_RUNNER_PATH.write_text(text.replace(body_marker, body_replacement, 1), encoding="utf-8")
-    print("✅ Script V2 ~않는다/~않다/~설계다/~시킨다/~돕는다/~위해서다 endings repaired deterministically")
+    print("✅ Script V2 ~않는다/~않다/~설계다/~시킨다/~돕는다/~보인다/~위해서다 endings repaired deterministically")
 
 
 def _apply_script_v2_formal_question_repair():
