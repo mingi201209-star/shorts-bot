@@ -92,6 +92,18 @@ def main():
         fixed_topic_question["topic"] + "."
     )
 
+    geolkka_question = candidate()
+    geolkka_question["core_question"] = (
+        "왜 제트 엔진 뒤에 톱니 모양 셰브론이 있는 걸까?"
+    )
+    geolkka_question["micro_narrative"]["core_question"] = (
+        geolkka_question["core_question"]
+    )
+    repaired_geolkka = build_narrative_plan(geolkka_question)
+    assert repaired_geolkka["contracts"][1]["locked_text"] == (
+        "그런데 왜 제트 엔진 뒤에 톱니 모양 셰브론이 있는 걸까요?"
+    )
+
     unsupported = candidate()
     unsupported["micro_narrative"]["hook"] = "왜 날개가 움직이나요?"
     try:
