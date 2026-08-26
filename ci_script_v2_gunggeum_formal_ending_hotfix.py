@@ -22,6 +22,7 @@ HOOK_NEEDLE = '_QUESTION_HOOK_REPAIRS = (\n'
 HOOK_REPLACEMENT = (
     HOOK_NEEDLE
     + '    # SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1\n'
+    + '    (r"(?:이 )?작은 갈고리는 비행기의 비행 성능에 어떤 영향을 미칠까$", "비행기 날개에는 작은 갈고리가 있습니다"),\n'
     + '    (r"둥글게 설계되었을까$", "둥글게 설계되었습니다"),\n'
     + '    (r"둥근가$", "둥급니다"),\n'
     + '    (r"있을까$", "있습니다"),\n'
