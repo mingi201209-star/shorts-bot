@@ -68,6 +68,20 @@ partial_wing = c(314643, "drone nature beach camera technology aircraft uav trav
 assert vd.general_scene_unknown_safe_tier(partial_wing, wing_query)[0] >= 5
 assert vd.choose_best_candidate([partial_wing], subject_filter_query=wing_query) is None
 
+# Run 32938743453: Pixabay 3966 had matching aircraft/wing metadata, but
+# sampled production frames showed almost only sunset sky with the subject
+# reduced to an edge fragment. The exact known-bad asset must fail closed.
+reset()
+hidden_wing = dict(
+    c(3966, "plane sky flight height aviation airplane wing sunset", 1),
+    provider="pixabay",
+)
+assert vd.general_scene_unknown_safe_tier(hidden_wing, wing_query) == (
+    5,
+    "KNOWN_HIDDEN_SUBJECT_ASSET",
+)
+assert vd.choose_best_candidate([hidden_wing], subject_filter_query=wing_query) is None
+
 # Run 32922000250: an aircraft/engine green-screen result is not evidence of
 # the serrated chevron component. Fail closed unless metadata names that part.
 reset()

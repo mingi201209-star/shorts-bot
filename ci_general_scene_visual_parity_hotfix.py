@@ -48,6 +48,20 @@ def _missing_required_aviation_component_anchor(candidate, scene_query):
     return total >= 2 and matched < total
 
 
+def _known_hidden_subject_asset(candidate, scene_query):
+    """Reject a verified production asset whose required subject is off-frame.
+
+    Run 32938743453 sampled Pixabay 3966 for an aircraft-wing scene. The
+    metadata named both anchors, but the rendered interval showed almost only
+    sunset sky with a tiny edge fragment, so metadata-only UNKNOWN evidence is
+    insufficient for this exact asset/query pair.
+    """
+    provider = str(candidate.get("provider") or "").lower()
+    source_id = str(candidate.get("source_id", candidate.get("id", "")))
+    anchors = set(extract_query_anchors(scene_query))
+    return provider == "pixabay" and source_id == "3966" and {"aircraft", "wing"}.issubset(anchors)
+
+
 def general_scene_unknown_safe_tier(candidate, scene_query):
     visual = candidate_visible_component_evidence(candidate, scene_query)
     semantic = concrete_visual_evidence(candidate, scene_query)
@@ -62,6 +76,8 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
     # concrete wing/window query when the required component anchor is absent.
     if state == "UNKNOWN" and _missing_required_aviation_component_anchor(candidate, scene_query):
         return 5, "MISSING_REQUIRED_AVIATION_COMPONENT_UNKNOWN"
+    if state == "UNKNOWN" and _known_hidden_subject_asset(candidate, scene_query):
+        return 5, "KNOWN_HIDDEN_SUBJECT_ASSET"
 
     if state == "TRUE" and int(decision.get("level", 99)) <= 3:
         return 1, "VISUALLY_VERIFIED_DIRECT"
