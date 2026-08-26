@@ -77,6 +77,7 @@ def _apply_script_v2_formal_question_repair():
         '            (r"무엇인가$", "무엇일까요"),\n'
         '            (r"무엇입니까$", "무엇일까요"),\n'
         '            (r"걸까$", "걸까요"),\n'
+        '            (r"펼쳐질까$", "펼쳐질까요"),\n'
         '            (r"있을까$", "있을까요"),\n'
     )
     if needle not in text:
