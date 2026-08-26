@@ -1,0 +1,32 @@
+name: Subtitle Safety Calibration Regression
+
+on:
+  pull_request:
+    paths:
+      - 'quality/subtitle_safety.py'
+      - 'quality/subtitle_safety_regression_test.py'
+      - 'ci_visual_quality_v1_completion_hotfix.py'
+      - 'ci_candidate_competition_completion_hotfix.py'
+      - '.github/workflows/subtitle_safety_calibration_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  subtitle-safety-calibration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Compile scoped wiring
+        run: python -m py_compile quality/subtitle_safety.py quality/subtitle_safety_regression_test.py ci_visual_quality_v1_completion_hotfix.py ci_candidate_competition_completion_hotfix.py
+      - name: Deterministic scorer calibration
+        run: python -m quality.subtitle_safety_regression_test
+      - name: Preserve zero-budget contract
+        run: |
+          grep -n 'SUBTITLE_SAFE_CEILING = 0.35' quality/subtitle_safety.py
+          grep -n 'SUBTITLE_RELOCATION_MIN_MARGIN = 0.12' quality/subtitle_safety.py
+          grep -n 'AI_VISUAL_FALLBACK_ENABLED: "false"' .github/workflows/main.yml
+          grep -n 'V3_MAX_API_CALLS: "60"' .github/workflows/main.yml
+          grep -n 'V3_MAX_COST_USD: "0.05"' .github/workflows/main.yml
