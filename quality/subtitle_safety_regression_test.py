@@ -63,9 +63,16 @@ def main():
     assert min(busy.values()) > SUBTITLE_SAFE_CEILING
 
     d = Clip(banded(bottom_busy=True))
-    log_case("bottom_busy_top_clear", d)
+    bottom_busy_risks = log_case("bottom_busy_top_clear", d)
     result = assess_subtitle_placement(d, "bottom")
-    assert result["subtitle_obstruction"] and result["recommended_position"] == "top"
+    safest_clear_position = min(
+        (risk, position)
+        for position, risk in bottom_busy_risks.items()
+        if risk <= SUBTITLE_SAFE_CEILING
+    )[1]
+    assert result["subtitle_obstruction"]
+    assert result["recommended_position"] == safest_clear_position
+    assert result["recommended_position"] != "bottom"
 
     # A safe current position is stable even when another candidate is slightly lower.
     result = assess_subtitle_placement(Clip(frame()), "bottom")
