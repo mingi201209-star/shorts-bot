@@ -3,6 +3,7 @@ from pathlib import Path
 RUNNER_PATH = Path("content/script_engine_v2_runner.py")
 ENGINE_PATH = Path("content/script_engine_v2.py")
 MARKER = "# SCRIPT_V2_GUNGGEUM_FORMAL_ENDING_V1"
+GENERAL_DECLARATIVE_MARKER = "# SCRIPT_V2_GENERAL_HANDA_FORMAL_ENDING_V1"
 HOOK_MARKER = "# SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1"
 TOPIC_HOOK_MARKER = "# SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1"
 FINAL_HOOK_MARKER = "# SCRIPT_V2_FINAL_OBSERVABLE_HOOK_NORMALIZATION_V1"
@@ -20,6 +21,10 @@ REPLACEMENT = (
     + '    (r"도와준다(?=[.!?…]*$)", "도와줍니다"),\n'
     + '    (r"사실(?=[.!?…]*$)", "사실입니다"),\n'
     + '    (r"있나요(?=[?…]*$)", "있습니까"),\n'
+    + '    # SCRIPT_V2_GENERAL_HANDA_FORMAL_ENDING_V1\n'
+    + '    # Declarative-only terminal normalization. Deliberately excludes ? so\n'
+    + '    # question contracts remain owned by the existing question repair path.\n'
+    + '    (r"한다(?=[.!…]*$)", "합니다"),\n'
 )
 HOOK_NEEDLE = '_QUESTION_HOOK_REPAIRS = (\n'
 HOOK_REPLACEMENT = (
@@ -87,15 +92,34 @@ GROUNDED_TOPIC_QUESTION_REPLACEMENT = (
 
 def _patch_runner():
     text = RUNNER_PATH.read_text(encoding="utf-8")
-    if MARKER in text:
-        return False
-    if text.count(NEEDLE) != 1:
-        raise RuntimeError(
-            "Script V2 formal-ending insertion marker mismatch: "
-            f"{text.count(NEEDLE)}"
+    changed = False
+    if MARKER not in text:
+        if text.count(NEEDLE) != 1:
+            raise RuntimeError(
+                "Script V2 formal-ending insertion marker mismatch: "
+                f"{text.count(NEEDLE)}"
+            )
+        text = text.replace(NEEDLE, REPLACEMENT, 1)
+        changed = True
+    elif GENERAL_DECLARATIVE_MARKER not in text:
+        insertion = '    (r"있나요(?=[?…]*$)", "있습니까"),\n'
+        replacement = (
+            insertion
+            + '    # SCRIPT_V2_GENERAL_HANDA_FORMAL_ENDING_V1\n'
+            + '    # Declarative-only terminal normalization. Deliberately excludes ? so\n'
+            + '    # question contracts remain owned by the existing question repair path.\n'
+            + '    (r"한다(?=[.!…]*$)", "합니다"),\n'
         )
-    RUNNER_PATH.write_text(text.replace(NEEDLE, REPLACEMENT, 1), encoding="utf-8")
-    return True
+        if text.count(insertion) != 1:
+            raise RuntimeError(
+                "Script V2 general formal-ending insertion marker mismatch: "
+                f"{text.count(insertion)}"
+            )
+        text = text.replace(insertion, replacement, 1)
+        changed = True
+    if changed:
+        RUNNER_PATH.write_text(text, encoding="utf-8")
+    return changed
 
 
 def _patch_engine():
