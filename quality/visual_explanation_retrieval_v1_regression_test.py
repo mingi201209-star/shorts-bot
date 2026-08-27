@@ -17,6 +17,8 @@ def _scene(text, keyword, visual_goal=""):
 
 
 def main():
+    original_limit = vx.MAX_EXPLANATION_TRANSFORMS_PER_VIDEO
+
     # CASE 1: generic cruise is not itself a supported mechanism explanation.
     generic = _scene("비행기가 날고 있습니다.", "aircraft cruise")
     assert vx.plan_explanation(generic) is None
@@ -97,6 +99,7 @@ def main():
             assert blocked is None
         finally:
             vx._render_clip = original_render
+            vx.MAX_EXPLANATION_TRANSFORMS_PER_VIDEO = original_limit
             still._VERIFIED_STILL_CACHE.clear()
             vx.reset_visual_explanation_budget()
 
