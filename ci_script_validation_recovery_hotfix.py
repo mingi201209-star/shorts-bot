@@ -189,6 +189,24 @@ _SAFE_FORMAL_ENDING_REPAIRS = (
     (re.compile(r"보이죠([.!?…]*)$"), r"보입니다\1"),
     (re.compile(r"때문이죠([.!?…]*)$"), r"때문입니다\1"),
     (re.compile(r"보세요([.!?…]*)$"), r"볼 수 있습니다\1"),
+    # SCRIPT_FINAL_FORMAL_ENDING_PARITY_V1
+    # Mirror the already-approved Script V2 deterministic formalization at the
+    # production generator's last boundary before strict speech-style validation.
+    # Declarative-only patterns deliberately exclude '?' so question contracts
+    # remain owned by the existing question path.
+    (re.compile(r"않는다([.!…]*)$"), r"않습니다\1"),
+    (re.compile(r"줄어든다([.!…]*)$"), r"줄어듭니다\1"),
+    (re.compile(r"늘어난다([.!…]*)$"), r"늘어납니다\1"),
+    (re.compile(r"약해진다([.!…]*)$"), r"약해집니다\1"),
+    (re.compile(r"강해진다([.!…]*)$"), r"강해집니다\1"),
+    (re.compile(r"달라진다([.!…]*)$"), r"달라집니다\1"),
+    (re.compile(r"좋아진다([.!…]*)$"), r"좋아집니다\1"),
+    (re.compile(r"이루어진다([.!…]*)$"), r"이루어집니다\1"),
+    (re.compile(r"알려진다([.!…]*)$"), r"알려집니다\1"),
+    (re.compile(r"도와준다([.!…]*)$"), r"도와줍니다\1"),
+    (re.compile(r"워진다([.!…]*)$"), r"워집니다\1"),
+    (re.compile(r"되었다([.!…]*)$"), r"되었습니다\1"),
+    (re.compile(r"한다([.!…]*)$"), r"합니다\1"),
 )
 
 
@@ -197,6 +215,12 @@ def _script_safe_formal_ending_repair(text):
     for pattern, replacement in _SAFE_FORMAL_ENDING_REPAIRS:
         repaired = pattern.sub(replacement, value)
         if repaired != value:
+            before_ending = value.rstrip(".!…").split()[-1] if value else ""
+            after_ending = repaired.rstrip(".!…").split()[-1] if repaired else ""
+            print(
+                "[ScriptFinalNormalize] changed=true "
+                f"before_ending={before_ending!r} after_ending={after_ending!r}"
+            )
             return repaired
     return value
 
