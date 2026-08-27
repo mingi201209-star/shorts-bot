@@ -3,13 +3,17 @@ import os
 import re
 import runpy
 import shutil
+import sys
 import tempfile
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from quality.korean_speech_style import validate_scenes_speech_style
 
 
-ROOT = Path(__file__).resolve().parents[1]
 COUNTEREXAMPLE = (
     "윙렛은 날개 끝에서 발생하는 강한 소용돌이를 줄여주고, "
     "이로 인해 항력이 감소한다."
@@ -97,40 +101,31 @@ def _semantic_fingerprint(text):
 def main():
     namespace, source = _load_production_final_boundary()
 
-    # Composition guard: this test intentionally exercises the production-injected
-    # generator boundary rather than #215's Script V2 runner helper directly.
     assert "generated = _script_opening_lock_apply(" in source
     assert "valid, reason = validate_script(" in source
 
-    # CASE 1: exact production counterexample must be formalized at final boundary.
     result = _apply_final_boundary(namespace, COUNTEREXAMPLE)
     actual = result["scenes"][2]["text"]
     assert actual == EXPECTED, (actual, EXPECTED)
     valid, reason = validate_scenes_speech_style(result["scenes"])
     assert valid, reason
 
-    # CASE 2: a later rewrite may reintroduce plain declarative style; final boundary repairs again.
     rewritten = _apply_final_boundary(namespace, "항력이 감소한다.")
     assert rewritten["scenes"][2]["text"] == "항력이 감소합니다."
     valid, reason = validate_scenes_speech_style(rewritten["scenes"])
     assert valid, reason
 
-    # CASE 3: already-formal text is idempotent.
     formal = _apply_final_boundary(namespace, "항력이 감소합니다.")
     assert formal["scenes"][2]["text"] == "항력이 감소합니다."
 
-    # CASE 4: question contract remains untouched.
     repair = namespace["_script_safe_formal_ending_repair"]
     assert repair("왜 감소할까요?") == "왜 감소할까요?"
 
-    # CASE 5: non-terminal occurrence must not be rewritten.
     middle = "이 장치는 한다는 표현을 설명합니다."
     assert repair(middle) == middle
 
-    # CASE 6: semantic payload is unchanged apart from formal ending.
     assert _semantic_fingerprint(COUNTEREXAMPLE) == _semantic_fingerprint(EXPECTED)
 
-    # CASE 7: representative existing repairs remain intact.
     expected = {
         "효율이 줄어든다.": "효율이 줄어듭니다.",
         "효율이 늘어난다.": "효율이 늘어납니다.",
