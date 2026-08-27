@@ -249,7 +249,10 @@ def _deterministic_keyword(scene, contract, plan, index):
     topic_text = " ".join((fixed_topic, str(plan.get("topic", "")))).lower()
     gear_topic = any(
         term in topic_text
-        for term in ("착륙장치", "랜딩기어", "landing gear", "undercarriage")
+        for term in (
+            "착륙장치", "랜딩기어", "타이어",
+            "landing gear", "undercarriage", "tire", "tyre",
+        )
     )
     aviation_topic = any(
         term in topic_text
