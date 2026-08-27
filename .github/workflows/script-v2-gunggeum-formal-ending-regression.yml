@@ -5,6 +5,7 @@ on:
     paths:
       - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
       - "quality/script_v2_gunggeum_formal_ending_regression_test.py"
+      - "quality/script_v2_general_formal_ending_regression_test.py"
       - ".github/workflows/script-v2-gunggeum-formal-ending-regression.yml"
       - ".github/workflows/main.yml"
   workflow_dispatch:
@@ -20,4 +21,6 @@ jobs:
         with:
           python-version: "3.11"
       - name: Run focused regression
-        run: python quality/script_v2_gunggeum_formal_ending_regression_test.py
+        run: |
+          python quality/script_v2_gunggeum_formal_ending_regression_test.py
+          python quality/script_v2_general_formal_ending_regression_test.py
