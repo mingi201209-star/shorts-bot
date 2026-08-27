@@ -175,6 +175,19 @@ def main():
         )
         assert formalize("그 이유가 궁금해집니다.") == "그 이유가 궁금해집니다."
 
+        # Run 33095657123: both ordinary unlocked lines exhausted the bounded
+        # Script V2 repair calls with observed plain declarative endings.
+        assert formalize(
+            "비행기 이착륙 시, 객실의 조명이 갑자기 어두워진다."
+        ) == (
+            "비행기 이착륙 시, 객실의 조명이 갑자기 어두워집니다."
+        )
+        assert formalize(
+            "이런 조명은 비상 상황 발생 시 승객의 시각 적응을 돕고, 비상구를 더 잘 인식할 수 있도록 설계되었다."
+        ) == (
+            "이런 조명은 비상 상황 발생 시 승객의 시각 적응을 돕고, 비상구를 더 잘 인식할 수 있도록 설계되었습니다."
+        )
+
         # Run 33023068374: two ordinary unlocked narration lines survived all
         # bounded repair calls with plain declarative endings.
         assert formalize(

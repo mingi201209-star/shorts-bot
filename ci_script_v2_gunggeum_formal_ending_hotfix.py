@@ -4,6 +4,7 @@ RUNNER_PATH = Path("content/script_engine_v2_runner.py")
 ENGINE_PATH = Path("content/script_engine_v2.py")
 MARKER = "# SCRIPT_V2_GUNGGEUM_FORMAL_ENDING_V1"
 GENERAL_DECLARATIVE_MARKER = "# SCRIPT_V2_GENERAL_HANDA_FORMAL_ENDING_V1"
+OBSERVED_DECLARATIVE_MARKER = "# SCRIPT_V2_OBSERVED_DECLARATIVE_ENDING_V1"
 HOOK_MARKER = "# SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1"
 TOPIC_HOOK_MARKER = "# SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1"
 FINAL_HOOK_MARKER = "# SCRIPT_V2_FINAL_OBSERVABLE_HOOK_NORMALIZATION_V1"
@@ -25,6 +26,9 @@ REPLACEMENT = (
     + '    # Declarative-only terminal normalization. Deliberately excludes ? so\n'
     + '    # question contracts remain owned by the existing question repair path.\n'
     + '    (r"한다(?=[.!…]*$)", "합니다"),\n'
+    + '    # SCRIPT_V2_OBSERVED_DECLARATIVE_ENDING_V1\n'
+    + '    (r"워진다(?=[.!…]*$)", "워집니다"),\n'
+    + '    (r"되었다(?=[.!…]*$)", "되었습니다"),\n'
 )
 HOOK_NEEDLE = '_QUESTION_HOOK_REPAIRS = (\n'
 HOOK_REPLACEMENT = (
@@ -113,6 +117,21 @@ def _patch_runner():
         if text.count(insertion) != 1:
             raise RuntimeError(
                 "Script V2 general formal-ending insertion marker mismatch: "
+                f"{text.count(insertion)}"
+            )
+        text = text.replace(insertion, replacement, 1)
+        changed = True
+    elif OBSERVED_DECLARATIVE_MARKER not in text:
+        insertion = '    (r"한다(?=[.!…]*$)", "합니다"),\n'
+        replacement = (
+            insertion
+            + '    # SCRIPT_V2_OBSERVED_DECLARATIVE_ENDING_V1\n'
+            + '    (r"워진다(?=[.!…]*$)", "워집니다"),\n'
+            + '    (r"되었다(?=[.!…]*$)", "되었습니다"),\n'
+        )
+        if text.count(insertion) != 1:
+            raise RuntimeError(
+                "Script V2 observed formal-ending insertion marker mismatch: "
                 f"{text.count(insertion)}"
             )
         text = text.replace(insertion, replacement, 1)
