@@ -296,6 +296,32 @@ def main():
     )
     assert all("wing" not in scene["keyword"].lower() for scene in landing_gear_script["scenes"])
 
+    # Run 33098489196: a fixed aircraft-tire topic emitted the generic query
+    # `tire safety`, so final visual semantic QA rejected Scene 9. Treat tire
+    # terms as landing-gear topics and retain the aircraft component anchors.
+    tire_item = candidate()
+    tire_item["topic"] = "비행기 타이어가 착륙할 때 터지지 않는 이유"
+    tire_item["micro_narrative"]["hook"] = (
+        "비행기 타이어는 착륙 충격을 견디도록 설계되었습니다."
+    )
+    tire_calls = []
+
+    def tire_writer(payload, *, mode):
+        tire_calls.append(mode)
+        if mode != "writer":
+            raise AssertionError("aircraft-tire query lock must not spend repair calls")
+        generated = writer_script(tire_item)
+        for scene in generated["scenes"]:
+            scene["keyword"] = "tire safety"
+        return generated
+
+    tire_script = generate_script_v2(tire_item, call_fn=tire_writer)
+    assert tire_calls == ["writer"]
+    assert all(
+        all(anchor in scene["keyword"].lower() for anchor in ("aircraft", "landing", "gear"))
+        for scene in tire_script["scenes"]
+    )
+
     failing_calls = []
 
     def structurally_invalid(payload, *, mode):
