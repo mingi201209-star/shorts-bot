@@ -42,7 +42,7 @@ def _variant(scene, item):
     template = _template(item)
     mode = str((item or {}).get("mode") or "").upper()
     if template in SUPPORTED_TRANSFORMS and ("ANNOTATED" in mode or "EXPLANATORY" in mode):
-        return f"transform:{template}:{_norm((scene or {}).get('text'))}"
+        return f"transform:{template}"
     return "raw_physical_asset"
 
 
