@@ -33,5 +33,5 @@ jobs:
           pip install -r requirements.txt
       - name: Run focused regressions
         run: |
-          python quality/visual_diversity_preflight_regression_test.py
-          python quality/qa_render_artifact_regression_test.py
+          python -m quality.visual_diversity_preflight_regression_test
+          python -m quality.qa_render_artifact_regression_test
