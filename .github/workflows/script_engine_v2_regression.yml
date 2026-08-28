@@ -3,12 +3,15 @@ name: Script Engine V2 Regression
 on:
   pull_request:
     paths:
+      - "content/script_formal_endings.py"
       - "content/script_engine_v2.py"
       - "content/script_engine_v2_runner.py"
       - "content/script_engine_v2_validation.py"
       - "content/script_generator_router.py"
       - "ci_script_v2_visual_goal_hotfix.py"
+      - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
       - "quality/script_engine_v2_*"
+      - "quality/script_formal_ending_production_corpus_regression_test.py"
       - "quality/script_generator_router_regression_test.py"
       - ".github/workflows/script_engine_v2_regression.yml"
   workflow_dispatch:
@@ -19,21 +22,21 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install minimal dependencies
         run: python -m pip install openai
-
       - name: Apply V2 production hotfixes
-        run: python ci_script_v2_visual_goal_hotfix.py
-
+        run: |
+          python ci_script_v2_visual_goal_hotfix.py
+          python ci_script_v2_gunggeum_formal_ending_hotfix.py
       - name: Compile V2 modules
         run: |
           python -m py_compile \
             ci_script_v2_visual_goal_hotfix.py \
+            ci_script_v2_gunggeum_formal_ending_hotfix.py \
+            content/script_formal_endings.py \
             content/script_engine_v2.py \
             content/script_engine_v2_runner.py \
             content/script_engine_v2_validation.py \
@@ -43,26 +46,22 @@ jobs:
             quality/script_engine_v2_runner_regression_test.py \
             quality/script_engine_v2_text_alias_regression_test.py \
             quality/script_engine_v2_run_32696711123_regression_test.py \
-            quality/script_generator_router_regression_test.py
-
+            quality/script_generator_router_regression_test.py \
+            quality/script_formal_ending_production_corpus_regression_test.py
       - name: Deterministic narrative plan regression
         run: python -m quality.script_engine_v2_regression_test
-
       - name: Production failure fixtures
         run: python -m quality.script_engine_v2_failure_fixtures_test
-
       - name: Bounded writer orchestration
         run: python -m quality.script_engine_v2_runner_regression_test
-
       - name: Run 32696711123 terminal recovery fixture
         run: python -m quality.script_engine_v2_run_32696711123_regression_test
-
       - name: Writer text alias normalization
         run: python -m quality.script_engine_v2_text_alias_regression_test
-
       - name: Legacy-safe router regression
         run: python -m quality.script_generator_router_regression_test
-
+      - name: Production formal-ending corpus
+        run: python -m quality.script_formal_ending_production_corpus_regression_test
       - name: Enforce Script API ceiling
         run: |
           python - <<'PY'
