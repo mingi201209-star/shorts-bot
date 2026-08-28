@@ -1,0 +1,28 @@
+name: Automatic Aviation Candidate Throughput Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/candidate_recovery.py"
+      - "ci_candidate_supply_recovery_hotfix.py"
+      - "quality/automatic_aviation_candidate_throughput_regression_test.py"
+      - ".github/workflows/automatic_aviation_candidate_throughput_regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run focused Candidate throughput regression
+        run: python -m quality.automatic_aviation_candidate_throughput_regression_test
+      - name: Preserve existing Candidate recovery regression
+        run: python -m quality.candidate_grounded_recovery_regression_test
+      - name: Static production guard
+        run: |
+          grep -F 'MAX_TOPIC_REGENERATIONS = 2' ci_candidate_supply_recovery_hotfix.py
+          grep -F 'predictable_editorial_reject' content/candidate_recovery.py
+          git diff --check
