@@ -12,19 +12,19 @@ STILL_IMAGE_FALLBACK_ENABLED = os.environ.get("STILL_IMAGE_FALLBACK_ENABLED", "1
 STILL_IMAGE_MODEL = os.environ.get("STILL_IMAGE_MODEL", "gpt-image-1.5")
 STILL_IMAGE_QUALITY = os.environ.get("STILL_IMAGE_QUALITY", "low")
 STILL_IMAGE_SIZE = os.environ.get("STILL_IMAGE_SIZE", "1024x1536")
-# Keep this budget independent from the disabled Sora video-generation budget.
-# Production evidence can require two distinct verified stills when separate
-# concrete aviation scenes both have no semantically safe stock candidate.
 STILL_IMAGE_MAX_PER_VIDEO = int(os.environ.get("STILL_IMAGE_MAX_PER_VIDEO", "2"))
+MAX_INFORMATION_USES_PER_PHYSICAL_STILL = 2
 
 _GENERATION_COUNT = 0
 _VERIFIED_STILL_CACHE = {}
+_VERIFIED_SOURCE_USE_COUNTS = {}
 
 
 def reset_still_image_budget():
     global _GENERATION_COUNT
     _GENERATION_COUNT = 0
     _VERIFIED_STILL_CACHE.clear()
+    _VERIFIED_SOURCE_USE_COUNTS.clear()
 
 
 def still_image_generation_count():
@@ -35,14 +35,29 @@ def _scene_id(scene):
     return str(scene.get("scene_id") or scene.get("index") or scene.get("id") or "unknown")
 
 
-def _anchor_signature(scene):
-    """Return a narrow physical-component signature for verified-still reuse.
+def _is_information_scene(scene):
+    role = str((scene or {}).get("role") or (scene or {}).get("scene_role") or "").strip().lower()
+    return role not in {"transition", "atmosphere"}
 
-    This deliberately does not import the production-hotfix-only
-    ``extract_query_anchors`` symbol: focused regressions import this module
-    before that installer runs. The signature is only a reuse prefilter; the
-    reused clip must still pass the full production vision/anchor verifier.
-    """
+
+def _source_reuse_allowed(source_id, scene):
+    if not _is_information_scene(scene):
+        return True
+    return int(_VERIFIED_SOURCE_USE_COUNTS.get(str(source_id or ""), 0)) < MAX_INFORMATION_USES_PER_PHYSICAL_STILL
+
+
+def _register_source_use(source_id, scene):
+    if not source_id or not _is_information_scene(scene):
+        return
+    key = str(source_id)
+    _VERIFIED_SOURCE_USE_COUNTS[key] = int(_VERIFIED_SOURCE_USE_COUNTS.get(key, 0)) + 1
+
+
+def verified_source_use_count(source_id):
+    return int(_VERIFIED_SOURCE_USE_COUNTS.get(str(source_id or ""), 0))
+
+
+def _anchor_signature(scene):
     query = str(scene.get("keyword", "") or "").strip().lower().replace("-", " ")
     words = set(query.split())
     signature = []
@@ -62,19 +77,10 @@ def _anchor_signature(scene):
         signature.append("wheel")
     if "tire" in words or "tires" in words or "tyre" in words or "tyres" in words:
         signature.append("tire")
-    # No concrete component signature means no reuse. Broad aircraft-only
-    # context is intentionally insufficient for this optimization.
     return tuple(signature) if len(signature) >= 2 else ()
 
 
 def _reuse_signatures(scene):
-    """Return only physically compatible cache signatures for this scene.
-
-    A verified winglet still visibly contains the aircraft wing as well, so it
-    may safely satisfy a later aircraft+wing scene after the normal full vision
-    verifier passes again. The reverse is intentionally forbidden: a generic
-    wing still cannot stand in for a scene that explicitly requires a winglet.
-    """
     signature = _anchor_signature(scene)
     if not signature:
         return ()
@@ -201,7 +207,14 @@ def _reuse_verified_still(scene, *, output_path, duration, trigger_reason):
     for signature in _reuse_signatures(scene):
         cached = dict(_VERIFIED_STILL_CACHE.get(signature) or {})
         image_path = Path(str(cached.get("image_path") or ""))
+        source_id = str(cached.get("source_id") or "verified-still-reuse")
         if not image_path.is_file():
+            continue
+        if not _source_reuse_allowed(source_id, scene):
+            print(
+                f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=diversity_skip "
+                f"source_id={source_id} uses={verified_source_use_count(source_id)}"
+            )
             continue
         try:
             _motion_clip(image_path, output_path, duration)
@@ -209,14 +222,16 @@ def _reuse_verified_still(scene, *, output_path, duration, trigger_reason):
             if not verified:
                 Path(output_path).unlink(missing_ok=True)
                 continue
+            _register_source_use(source_id, scene)
             print(
                 f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=reused_verified "
-                f"count={_GENERATION_COUNT} trigger={trigger_reason} anchors={'+'.join(signature)}"
+                f"count={_GENERATION_COUNT} trigger={trigger_reason} anchors={'+'.join(signature)} "
+                f"source_uses={verified_source_use_count(source_id)}"
             )
             return {
                 "path": str(output_path),
                 "provider": cached.get("provider", "openai_image"),
-                "source_id": cached.get("source_id", "verified-still-reuse"),
+                "source_id": source_id,
                 "mode": "REUSED_VERIFIED_STILL_MOTION",
                 "tier": 2,
                 "visual_state": "TRUE",
@@ -282,9 +297,11 @@ def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reas
                 "provider": "openai_image",
                 "source_id": source_id,
             }
+        _register_source_use(source_id, scene)
         print(
             f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=verified "
-            f"count={_GENERATION_COUNT} model={STILL_IMAGE_MODEL} quality={STILL_IMAGE_QUALITY}"
+            f"count={_GENERATION_COUNT} model={STILL_IMAGE_MODEL} quality={STILL_IMAGE_QUALITY} "
+            f"source_uses={verified_source_use_count(source_id)}"
         )
         return {
             "path": str(output_path),

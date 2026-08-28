@@ -7,6 +7,7 @@ import os
 import re
 from copy import deepcopy
 
+from content.script_visual_budget import compact_duplicate_visual_demand
 from content.winglet_visual_beat_recovery import recover_unsupported_winglet_visual_beat
 
 
@@ -49,8 +50,6 @@ def _observable_hook_from_candidate(candidate):
             observation = converted
             break
 
-    # Only accept a deterministic projection when it is plainly a statement.
-    # Otherwise leave the original Candidate untouched so V2 still fails closed.
     observation = observation.strip()
     if observation and observation != source and "?" not in observation and observation.endswith(("습니다", "입니다", "니다")):
         micro = dict(micro)
@@ -61,7 +60,6 @@ def _observable_hook_from_candidate(candidate):
 
 
 def _formal_question(text):
-    """Normalize only narrow, semantics-preserving Korean question endings."""
     value = str(text or "").strip()
     if not value:
         return value
@@ -82,7 +80,6 @@ def _formal_question(text):
 
 
 def _formal_locked_statement(text):
-    """Normalize known safe declarative endings without changing factual scope."""
     value = str(text or "").strip()
     repairs = (
         (r"높아진다(?=[.!?…]*$)", "높아집니다"),
@@ -97,7 +94,6 @@ def _formal_locked_statement(text):
 
 
 def _normalize_locked_candidate_narration(candidate):
-    """Normalize locked Candidate narration before V2 builds immutable contracts."""
     result = deepcopy(candidate)
     micro = result.get("micro_narrative")
     if not isinstance(micro, dict):
@@ -186,11 +182,12 @@ def generate_script(topic_info, candidate):
             generated,
             normalized_candidate,
         )
-        return _normalize_v2_result(
+        normalized = _normalize_v2_result(
             recovered,
             topic_info,
             normalized_candidate,
         )
+        return compact_duplicate_visual_demand(normalized)
 
     if mode in ("legacy", "v1"):
         from content.script_generator import generate_script as legacy_generate_script
