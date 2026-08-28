@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import sys
 import tempfile
 import traceback as traceback_module
 from pathlib import Path
@@ -37,7 +36,7 @@ _PROGRESS: Dict[str, Any] = {
 }
 _TRACE_LINES = 0
 
-_SECRET_NAME_RE = re.compile(r"(api[_-]?key|token|secret|credential|password|authorization)", re.I)
+_SECRET_NAME_RE = re.compile(r"(api[_-]?key|(?:^|[_-])key$|token|secret|credential|password|authorization)", re.I)
 _BEARER_RE = re.compile(r"(?i)(authorization\s*[:=]\s*bearer\s+)[^\s]+")
 _KEY_VALUE_RE = re.compile(r"(?i)\b(api[_-]?key|token|secret|password|credential)\b\s*[:=]\s*[^\s,;]+")
 
