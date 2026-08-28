@@ -213,3 +213,23 @@ if MARKER in text:
 else:
     path.write_text(text + PATCH, encoding="utf-8")
     print("✅ Bounded Candidate Explorer supply recovery hotfix applied")
+
+# Candidate exploration throughput guard. Seven full topic attempts were useful
+# while the Explorer was being brought up, but production now has a bounded
+# supply-recovery call and a grounded recovery pool. Three total attempts are
+# enough to sample distinct aviation directions without burning the budget when
+# supply is weak. Downstream FACT/visual/script quality gates are unchanged.
+main_path = Path("main.py")
+main_text = main_path.read_text(encoding="utf-8")
+if "MAX_TOPIC_REGENERATIONS = 6" in main_text:
+    main_text = main_text.replace(
+        "MAX_TOPIC_REGENERATIONS = 6",
+        "MAX_TOPIC_REGENERATIONS = 2",
+        1,
+    )
+    main_path.write_text(main_text, encoding="utf-8")
+    print("✅ Candidate production attempts bounded to 3 total")
+elif "MAX_TOPIC_REGENERATIONS = 2" in main_text:
+    print("ℹ️ Candidate production attempt bound already applied")
+else:
+    raise RuntimeError("Candidate attempt bound marker mismatch")
