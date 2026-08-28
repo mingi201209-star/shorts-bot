@@ -1,0 +1,22 @@
+name: Script V2 Sentence Ending Composition Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/script_engine_v2_runner.py"
+      - "content/script_engine_v2_validation.py"
+      - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
+      - "quality/korean_speech_style.py"
+      - "quality/script_v2_sentence_ending_composition_regression_test.py"
+      - ".github/workflows/script_v2_sentence_ending_composition_regression.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run V2 production-composition regression
+        run: python quality/script_v2_sentence_ending_composition_regression_test.py
