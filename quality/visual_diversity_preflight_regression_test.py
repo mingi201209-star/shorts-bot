@@ -1,3 +1,10 @@
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 from quality.visual_diversity_preflight import (
     evaluate_visual_diversity,
     plan_bounded_diversity_repair,
