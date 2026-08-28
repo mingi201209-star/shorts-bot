@@ -1,0 +1,21 @@
+name: Script V2 Hotfix Composition Order Regression
+
+on:
+  pull_request:
+    paths:
+      - "ci_script_v2_visual_goal_hotfix.py"
+      - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
+      - "content/script_engine_v2_runner.py"
+      - "quality/script_v2_hotfix_composition_order_regression_test.py"
+      - ".github/workflows/script_v2_hotfix_composition_order_regression.yml"
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Reproduce production hotfix composition
+        run: python quality/script_v2_hotfix_composition_order_regression_test.py
