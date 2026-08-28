@@ -12,6 +12,7 @@ on:
       - "ci_script_v2_visual_goal_hotfix.py"
       - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
       - "quality/script_formal_ending_production_corpus_regression_test.py"
+      - "quality/script_formal_ending_production_preflight_test.py"
       - "quality/script_v2_*"
       - "quality/script_engine_v2_*"
       - "quality/script_visual_budget_regression_test.py"
@@ -49,9 +50,12 @@ jobs:
             content/script_engine_v2_runner.py \
             content/script_engine_v2_validation.py \
             ci_script_v2_gunggeum_formal_ending_hotfix.py \
-            quality/script_formal_ending_production_corpus_regression_test.py
+            quality/script_formal_ending_production_corpus_regression_test.py \
+            quality/script_formal_ending_production_preflight_test.py
       - name: Run production corpus AFTER
         run: python -m quality.script_formal_ending_production_corpus_regression_test
+      - name: Run deterministic production preflight
+        run: python -m quality.script_formal_ending_production_preflight_test
       - name: Run sentence composition regressions
         run: |
           python -m quality.script_v2_sentence_ending_composition_regression_test
@@ -99,10 +103,6 @@ jobs:
           python-version: "3.11"
       - name: Install minimal dependencies
         run: python -m pip install openai
-      - name: Apply production Script composition
-        run: |
-          python ci_script_v2_visual_goal_hotfix.py
-          python ci_script_v2_gunggeum_formal_ending_hotfix.py
       - name: Compile imports
         run: |
           python -m py_compile \
@@ -110,11 +110,11 @@ jobs:
             quality/korean_speech_style.py \
             quality/fact_critical_regeneration_test.py \
             quality/script_visual_budget_regression_test.py
-      - name: Korean speech style
+      - name: Korean speech style validator unchanged
         run: |
           python -m quality.korean_speech_style_test
           python -m quality.korean_speech_style_rewrite_test
-      - name: FACT Critical
+      - name: FACT Critical unchanged
         run: python -m quality.fact_critical_regeneration_test
       - name: Script-Visual Budget compatibility
         run: python -m quality.script_visual_budget_regression_test
