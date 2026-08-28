@@ -168,12 +168,13 @@ jobs:
           grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES\|HOOK_CONCRETE_VISUAL_EVIDENCE\|DIRECT_VERIFIED\|UNVERIFIED_CONTEXTUAL_FALLBACK\|HOOK_FALLBACK_QUALITY_FLOOR\|AI_VISUAL_SORA_FALLBACK" video/hook_visual.py
           grep -n "VISUAL_TRACE\|VISUAL_CONTRACT" video/video_engine.py
           grep -n "search_video_candidates\|VIDEO_SELECTED\|VIDEO_PROVIDER\|CURRENT_NARRATION_SEMANTIC_MATCH\|VISUAL_SPECIFICITY\|QUERY_SEMANTIC_INTEGRITY\|CONCRETE_VISUAL_EVIDENCE_SAFE_REUSE\|VISIBLE_EVIDENCE_PROVENANCE_GATE\|AI_VISUAL_GENERAL_SELECTION_TRACE\|GENERAL_SCENE_VISUAL_PARITY_UNKNOWN_SAFE" video/video_downloader.py video/hook_visual.py
+          grep -n "VISUAL_DIVERSITY_PREFLIGHT_V1" main.py
 
           python -m py_compile \
             ci_hotfix.py ci_novelty_budget_hotfix.py ci_fact_critical_hotfix.py ci_speech_style_hotfix.py \
             ci_hook_generation_hotfix.py ci_hook_pool_guard_hotfix.py ci_retention_hotfix.py \
             ci_first5_retention_tts_hotfix.py ci_first5_visual_contract_hotfix.py ci_video_provider_hotfix.py \
-            ci_cross_process_video_dedupe_hotfix.py \
+            ci_cross_process_video_dedupe_hotfix.py ci_visual_diversity_preflight_hotfix.py \
             ci_topic_input_hotfix.py ci_aviation_candidate_context_hotfix.py ci_aviation_candidate_specificity_hotfix.py \
             ci_aviation_context_signature_compat_hotfix.py ci_aviation_specificity_output_repair_hotfix.py \
             ci_aviation_specificity_projection_hotfix.py ci_candidate_grounded_recovery_hotfix.py \
@@ -195,6 +196,8 @@ jobs:
             quality/candidate_grounded_recovery_regression_test.py \
             quality/cross_process_video_dedupe_regression_test.py \
             quality/script_v2_gunggeum_formal_ending_regression_test.py \
+            quality/visual_diversity_preflight.py quality/visual_diversity_context.py \
+            quality/visual_diversity_preflight_regression_test.py quality/qa_render_artifact_regression_test.py \
             main.py config.py content/candidate_explorer.py content/candidate_recovery.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py quality/final_render_integrity.py \
@@ -210,6 +213,8 @@ jobs:
           python quality/candidate_grounded_recovery_regression_test.py
           python quality/cross_process_video_dedupe_regression_test.py
           python quality/script_v2_gunggeum_formal_ending_regression_test.py
+          python quality/visual_diversity_preflight_regression_test.py
+          python quality/qa_render_artifact_regression_test.py
           python -m quality.growth_candidate_shadow_regression_test
           python -m quality.retention_structure_experiment_regression_test
           python -m quality.subscriber_conversion_regression_test
@@ -253,6 +258,38 @@ jobs:
             artifacts/diagnostics/traceback.txt
             artifacts/diagnostics/progress.json
             artifacts/diagnostics/scene_trace.jsonl
+            visual_diversity_preflight.json
+            final_director_qa.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Prepare QA-only render status
+        if: ${{ failure() && hashFiles('final_shorts_*.mp4') != '' }}
+        run: |
+          cat > qa_render_status.json <<'EOF'
+          {
+            "approval": "NOT_UPLOAD_APPROVED",
+            "quality_state": "DIRECTOR_HOLD",
+            "purpose": "QA_DIAGNOSTIC_ONLY"
+          }
+          EOF
+
+      - name: Preserve QA-only render artifact
+        if: ${{ failure() && hashFiles('final_shorts_*.mp4') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-qa-render-${{ github.run_id }}
+          path: |
+            final_shorts_*.mp4
+            final_visual_semantic_qa.json
+            final_director_qa.json
+            visual_diversity_preflight.json
+            qa_render_status.json
+            artifacts/diagnostics/generator.log
+            artifacts/diagnostics/failure_summary.json
+            artifacts/diagnostics/traceback.txt
+            artifacts/diagnostics/progress.json
+            artifacts/diagnostics/scene_trace.jsonl
           if-no-files-found: warn
           retention-days: 30
 
@@ -263,6 +300,8 @@ jobs:
           path: |
             final_shorts_*.mp4
             final_visual_semantic_qa.json
+            final_director_qa.json
+            visual_diversity_preflight.json
           if-no-files-found: error
           retention-days: 30
 
