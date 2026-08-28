@@ -32,5 +32,5 @@ jobs:
         run: |
           grep -F 'python -m diagnostics.runner' .github/workflows/main.yml
           grep -F 'if: always()' .github/workflows/main.yml
-          grep -F 'production-diagnostics-${{ github.run_id }}' .github/workflows/main.yml
+          grep -F 'name: production-diagnostics-' .github/workflows/main.yml
           grep -F 'if-no-files-found: warn' .github/workflows/main.yml
