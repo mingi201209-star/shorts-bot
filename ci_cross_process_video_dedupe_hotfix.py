@@ -112,3 +112,4 @@ if "FINAL_VISUAL_SEMANTIC_QA_V1" in main_text:
     import ci_candidate_competition_completion_hotfix  # noqa: F401,E402
     import ci_visual_quality_v1_completion_hotfix  # noqa: F401,E402
     import ci_visual_explanation_retrieval_v1_hotfix  # noqa: F401,E402
+    import ci_visual_diversity_preflight_hotfix  # noqa: F401,E402

@@ -1,0 +1,37 @@
+name: Visual Diversity Preflight Regression
+
+on:
+  pull_request:
+    paths:
+      - "quality/visual_diversity_preflight.py"
+      - "quality/visual_diversity_preflight_regression_test.py"
+      - "quality/qa_render_artifact_regression_test.py"
+      - "quality/final_visual_semantic_qa.py"
+      - "quality/final_visual_director.py"
+      - "video/still_image_fallback.py"
+      - "ci_visual_diversity_preflight_hotfix.py"
+      - "ci_visual_explanation_retrieval_v1_hotfix.py"
+      - "ci_cross_process_video_dedupe_hotfix.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/visual_diversity_preflight_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run focused regressions
+        run: |
+          python quality/visual_diversity_preflight_regression_test.py
+          python quality/qa_render_artifact_regression_test.py
