@@ -42,6 +42,18 @@ def main():
     unsafe["template"] = "WINGLET_RESULT"
     assert not vx.annotation_fact_safe(vortex, unsafe)
 
+    # CASE 13 / production Run 33165353119 Scene 9: an already fact-gated
+    # winglet result beat phrased as flight performance must route to the
+    # existing bounded WINGLET_RESULT template instead of failing as unsupported.
+    performance = _scene(
+        "날개 끝의 구조는 비행 성능을 향상시킵니다.",
+        "aircraft wing stage 9",
+        "비행 성능을 보여주는 그래프",
+    )
+    performance_plan = vx.plan_explanation(performance)
+    assert performance_plan and performance_plan["template"] == "WINGLET_RESULT"
+    assert vx.annotation_fact_safe(performance, performance_plan)
+
     # CASE 9/10: unsupported/transition scenes do not get invented diagrams.
     assert vx.plan_explanation(_scene("잠시 공항 풍경을 봅니다.", "airport transition")) is None
     assert vx.plan_explanation(_scene("세포막 전위가 변합니다.", "cell membrane potential")) is None
