@@ -27,7 +27,7 @@ jobs:
       - name: Failure Diagnostics V1 regression
         run: |
           python -m py_compile diagnostics/failure_diagnostics.py diagnostics/runner.py quality/failure_diagnostics_regression_test.py
-          python quality/failure_diagnostics_regression_test.py
+          python -m quality.failure_diagnostics_regression_test
       - name: Verify production diagnostics upload contract
         run: |
           grep -F 'python -m diagnostics.runner' .github/workflows/main.yml
