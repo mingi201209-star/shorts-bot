@@ -5,6 +5,8 @@ RUNNER_PATH = Path("content/script_engine_v2_runner.py")
 ENGINE_PATH = Path("content/script_engine_v2.py")
 MARKER = "# SCRIPT_FORMAL_ENDING_PRODUCTION_CORPUS_V1"
 SENTENCE_GRANULAR_MARKER = "# SCRIPT_V2_SENTENCE_GRANULAR_FORMAL_ENDING_V1"
+GENERAL_DECLARATIVE_MARKER = "# SCRIPT_V2_GENERAL_HANDA_FORMAL_ENDING_V1"
+OBSERVED_DECLARATIVE_MARKER = "# SCRIPT_V2_OBSERVED_DECLARATIVE_ENDING_V1"
 LOCKED_PARITY_MARKER = "# SCRIPT_FORMAL_ENDING_LOCKED_PARITY_V1"
 HOOK_MARKER = "# SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1"
 TOPIC_HOOK_MARKER = "# SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1"
@@ -26,6 +28,8 @@ def _patch_runner():
         "def _formalize_common_ending(text: Any) -> str:\n"
         "    # SCRIPT_FORMAL_ENDING_PRODUCTION_CORPUS_V1\n"
         "    # SCRIPT_V2_SENTENCE_GRANULAR_FORMAL_ENDING_V1\n"
+        "    # SCRIPT_V2_GENERAL_HANDA_FORMAL_ENDING_V1\n"
+        "    # SCRIPT_V2_OBSERVED_DECLARATIVE_ENDING_V1\n"
         "    # Legacy composition class `한다(?=[.!…]*$)` now lives in the shared corpus.\n"
         "    # Questions retain their existing production contract; declaratives share\n"
         "    # one sentence-granular normalizer for locked/unlocked parity.\n"
@@ -48,21 +52,24 @@ def _patch_engine():
             r"def deterministic_scene_repair\(text: str, role: str\) -> str:\n.*?(?=\ndef repair_failed_scenes)",
             flags=re.DOTALL,
         )
+        match = pattern.search(text)
+        if not match:
+            raise RuntimeError("Script formal corpus engine function marker mismatch: 0")
+        original = match.group(0).rstrip()
         replacement = (
-            "def deterministic_scene_repair(text: str, role: str) -> str:\n"
-            "    # SCRIPT_FORMAL_ENDING_LOCKED_PARITY_V1\n"
-            "    # LOCK preserves factual/semantic content, not invalid speech style.\n"
-            "    from content.script_formal_endings import formalize_declarative_text\n"
-            "    value = formalize_declarative_text(_text(text))\n"
-            "    if role == \"causal_clue\" and value and not any(\n"
-            "        token in value for token in CAUSAL_CLUE_TOKENS\n"
-            "    ):\n"
-            "        value = \"원인의 첫 단서는 \" + value\n"
-            "    return value\n"
+            "_legacy_deterministic_scene_repair = None\n\n"
+            + original
+            + "\n\n"
+            + "# SCRIPT_FORMAL_ENDING_LOCKED_PARITY_V1\n"
+            + "_legacy_deterministic_scene_repair = deterministic_scene_repair\n\n"
+            + "def deterministic_scene_repair(text: str, role: str) -> str:\n"
+            + "    # Preserve every existing deterministic repair first, then apply only\n"
+            + "    # remaining corpus-backed declarative terminal normalization.\n"
+            + "    from content.script_formal_endings import formalize_declarative_text\n"
+            + "    value = _legacy_deterministic_scene_repair(text, role)\n"
+            + "    return formalize_declarative_text(value)\n"
         )
-        text, count = pattern.subn(replacement, text, count=1)
-        if count != 1:
-            raise RuntimeError(f"Script formal corpus engine function marker mismatch: {count}")
+        text = text[: match.start()] + replacement + text[match.end() :]
         changed = True
 
     hook_needle = "_QUESTION_HOOK_REPAIRS = (\n"
@@ -107,7 +114,7 @@ def _patch_engine():
     if PLAIN_QUESTION_MARKER not in text:
         replacement = "    # SCRIPT_V2_PLAIN_QUESTION_BOUNDARY_V1\n" + '    if "?" in hook or hook.endswith(("까", "까요", "나요", "어요", "예요")):\n'
         if text.count(plain_needle) != 1:
-            raise RuntimeError("Script V2 plain-question marker mismatch")
+            raise RuntimeError("Script V2 plain-question boundary marker mismatch")
         text = text.replace(plain_needle, replacement, 1)
         changed = True
 
