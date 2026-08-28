@@ -77,7 +77,7 @@ def plan_explanation(scene):
             "label": "공기 흐름",
             "source_priority": ("annotated_verified_still", "explanatory_2d"),
         }
-    if any(token in value for token in ("fuel", "efficiency", "efficient", "longer flight", "멀리", "연료", "효율", "항속")):
+    if any(token in value for token in ("fuel", "efficiency", "efficient", "longer flight", "flight performance", "멀리", "연료", "효율", "항속", "비행 성능")):
         return {
             "scene_role": "result",
             "subject": "winglet",
@@ -99,7 +99,7 @@ def annotation_fact_safe(scene, plan):
     if template == "WINGLET_FLOW":
         return any(token in value for token in ("airflow", "공기", "흐름"))
     if template == "WINGLET_RESULT":
-        return any(token in value for token in ("fuel", "efficiency", "efficient", "longer flight", "멀리", "연료", "효율", "항속"))
+        return any(token in value for token in ("fuel", "efficiency", "efficient", "longer flight", "flight performance", "멀리", "연료", "효율", "항속", "비행 성능"))
     return False
 
 
