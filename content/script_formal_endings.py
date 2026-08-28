@@ -1,8 +1,9 @@
-"""Shared deterministic Korean declarative ending normalization for Script V2.
+"""Shared deterministic Korean Script speech-style normalization.
 
-The rules are corpus-driven and intentionally narrow. Only terminal declarative
+Declarative rules are corpus-driven and intentionally narrow. Only terminal
 endings already represented by production/regression contracts are normalized.
-Questions, quoted/code-like text, and already-formal narration are left intact.
+Question handling remains a separate existing contract; quoted/code-like text
+and already-formal narration are left intact.
 """
 from __future__ import annotations
 
@@ -11,9 +12,6 @@ from typing import Any
 
 FORMAL_ENDING_CORPUS_VERSION = "v1"
 
-# Keep one production table for locked and unlocked narration. These classes are
-# backed by current/historical production regression contracts; this is not a
-# fuzzy Korean grammar engine.
 _DECLARATIVE_ENDING_REPAIRS = (
     (r"줄여준다(?=[.!…]*$)", "줄여줍니다"),
     (r"감소시킨다(?=[.!…]*$)", "감소시킵니다"),
@@ -26,6 +24,7 @@ _DECLARATIVE_ENDING_REPAIRS = (
     (r"않는다(?=[.!…]*$)", "않습니다"),
     (r"않다(?=[.!…]*$)", "않습니다"),
     (r"한다(?=[.!…]*$)", "합니다"),
+    (r"하다(?=[.!…]*$)", "합니다"),
     (r"된다(?=[.!…]*$)", "됩니다"),
     (r"설계다(?=[.!…]*$)", "설계입니다"),
     (r"이유다(?=[.!…]*$)", "이유입니다"),
@@ -47,9 +46,15 @@ _DECLARATIVE_ENDING_REPAIRS = (
     (r"이루어진다(?=[.!…]*$)", "이루어집니다"),
     (r"알려진다(?=[.!…]*$)", "알려집니다"),
     (r"도와준다(?=[.!…]*$)", "도와줍니다"),
-    (r"어두워진다(?=[.!…]*$)", "어두워집니다"),
+    (r"워진다(?=[.!…]*$)", "워집니다"),
     (r"되었다(?=[.!…]*$)", "되었습니다"),
     (r"사실(?=[.!…]*$)", "사실입니다"),
+)
+
+# Existing production question contract. This is deliberately separate from
+# declarative generalization so V1 does not invent a new question grammar path.
+_QUESTION_ENDING_REPAIRS = (
+    (r"있나요(?=[?…]*$)", "있습니까"),
 )
 
 _FORMAL_ENDING_RE = re.compile(
@@ -58,15 +63,28 @@ _FORMAL_ENDING_RE = re.compile(
 _QUOTE_OR_CODE_CHARS = ("'", '"', "`", "‘", "’", "“", "”")
 
 
+def _risky_literal_text(value: str) -> bool:
+    return any(mark in value for mark in _QUOTE_OR_CODE_CHARS)
+
+
+def formalize_existing_question_ending(text: Any) -> str:
+    """Preserve only the already-approved production question repair contract."""
+    value = str(text or "").strip()
+    if not value or _risky_literal_text(value):
+        return value
+    for pattern, replacement in _QUESTION_ENDING_REPAIRS:
+        converted, count = re.subn(pattern, replacement, value)
+        if count:
+            return converted
+    return value
+
+
 def formalize_declarative_sentence(text: Any) -> str:
     """Normalize one terminal declarative sentence, preserving risky text verbatim."""
-    value = str(text or "")
-    stripped = value.strip()
+    stripped = str(text or "").strip()
     if not stripped:
         return stripped
-    if "?" in stripped:
-        return stripped
-    if any(mark in stripped for mark in _QUOTE_OR_CODE_CHARS):
+    if "?" in stripped or _risky_literal_text(stripped):
         return stripped
     if _FORMAL_ENDING_RE.search(stripped):
         return stripped
@@ -80,19 +98,23 @@ def formalize_declarative_sentence(text: Any) -> str:
 
 
 def formalize_declarative_text(text: Any) -> str:
-    """Apply the terminal contract sentence-by-sentence outside quoted/code text."""
+    """Apply the declarative terminal contract independently to every sentence."""
     value = str(text or "").strip()
     if not value:
         return value
-    # V1 deliberately fails closed for any quoted/code-like narration rather than
-    # attempting a quote-aware Korean parser and accidentally mutating a quotation.
-    if any(mark in value for mark in _QUOTE_OR_CODE_CHARS):
+    if _risky_literal_text(value):
         return value
     parts = re.split(r"(?<=[.!?…])(\s*)", value)
     for index in range(0, len(parts), 2):
         if parts[index]:
             parts[index] = formalize_declarative_sentence(parts[index])
     return "".join(parts)
+
+
+def formalize_script_text(text: Any) -> str:
+    """Existing question contract followed by the shared declarative corpus."""
+    value = formalize_existing_question_ending(text)
+    return formalize_declarative_text(value)
 
 
 def declarative_repairs():
