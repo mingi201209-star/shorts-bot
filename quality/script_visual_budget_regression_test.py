@@ -43,6 +43,33 @@ def run():
     }
     protected_result = compact_duplicate_visual_demand(protected)
     assert len(protected_result["scenes"]) == 4
+
+    # Run 33183845374 production counterexample: exact information beats were
+    # repeated with different visual contracts. The later protected reveal/payoff
+    # must survive while the earlier intermediate duplicate is removed. If the
+    # protected payoff's visual contract is unsupported but the removed duplicate
+    # had an existing supported contract, the supported contract should move with
+    # the retained information beat without changing narration.
+    vortex_text = "날개 끝이 위로 꺾이면 날개 위아래의 압력 차가 소용돌이를 줄여줍니다."
+    result_text = "결과적으로 유도항력이 줄어들어 비행기의 연비가 개선됩니다."
+    production = {
+        "scenes": [
+            scene(vortex_text, "압력 차와 소용돌이의 관계", "aircraft wing vortex stage 9", "consequence"),
+            scene(result_text, "비행기의 연비 개선", "aircraft wing fuel efficiency stage 10", "consequence"),
+            scene(vortex_text, "비행기 날개 끝의 꺾인 형태", "aircraft wing wingtip design stage 11", "reveal"),
+            scene(result_text, "비행기 날개 끝의 꺾인 형태", "aircraft wing wingtip question stage 12", "payoff"),
+        ]
+    }
+    production_result = compact_duplicate_visual_demand(production)
+    assert len(production_result["scenes"]) == 2
+    assert [x["role"] for x in production_result["scenes"]] == ["reveal", "payoff"]
+    assert production_result["scenes"][0]["text"] == vortex_text
+    assert production_result["scenes"][1]["text"] == result_text
+    # Existing supported result visual contract must be preserved on the payoff.
+    assert production_result["scenes"][1]["visual_goal"] == "비행기의 연비 개선"
+    assert "fuel efficiency" in production_result["scenes"][1]["keyword"]
+    assert production_result["script_visual_budget"]["removed_duplicate_count"] == 2
+    assert production_result["script_visual_budget"]["extra_llm_calls"] == 0
     print("SCRIPT_VISUAL_BUDGET_V1_REGRESSION_PASS")
 
 
