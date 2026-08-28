@@ -7,7 +7,7 @@ from pathlib import Path
 
 from quality.korean_speech_style import validate_korean_speech_text
 
-# Actual production/regression corpus only. Provenance is intentionally explicit.
+# Actual production/regression corpus only. Provenance stays beside each fixture.
 CORPUS = [
     {
         "source": "Run 33185606044 / Job 98897699796",
@@ -63,6 +63,21 @@ CORPUS = [
         "source": "existing script_v2 formal-ending regression fixture",
         "input": "유도항력이 줄어든다.",
         "expected": "유도항력이 줄어듭니다.",
+    },
+    {
+        "source": "quality/script_engine_v2_regression_test.py production contract",
+        "input": "둥근 모서리는 압력이 창문 모서리에 고르게 분산되도록 돕는다.",
+        "expected": "둥근 모서리는 압력이 창문 모서리에 고르게 분산되도록 돕습니다.",
+    },
+    {
+        "source": "quality/script_engine_v2_regression_test.py production contract",
+        "input": "응력이 분산되어 특정 지점에 집중되지 않는다.",
+        "expected": "응력이 분산되어 특정 지점에 집중되지 않습니다.",
+    },
+    {
+        "source": "quality/script_engine_v2_regression_test.py production contract",
+        "input": "비행기 날개의 끝이 비행 중 위로 휘어지는 모습이 보인다.",
+        "expected": "비행기 날개의 끝이 비행 중 위로 휘어지는 모습이 보입니다.",
     },
 ]
 
@@ -157,12 +172,10 @@ def run_after_corpus():
         assert valid, (locked, reason)
 
     for value in NEGATIVE:
-        assert formalize_declarative_text(value) == value
+        assert formalize_declarative_text(value) == value, value
 
-    # Questions are owned by the existing question-normalization boundary.
     assert formalize_declarative_text("왜 소용돌이가 줄어들까?") == "왜 소용돌이가 줄어들까?"
 
-    # No semantic/factual prefix change: only the terminal ending differs.
     current_before = CORPUS[0]["input"].rsplit("줄인다", 1)[0]
     current_after = CORPUS[0]["expected"].rsplit("줄입니다", 1)[0]
     assert current_before == current_after
