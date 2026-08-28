@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import os
 
 
 _PLACEHOLDER_MARKERS = (
@@ -37,9 +38,10 @@ _HARD_REJECT_REASON_MARKERS = (
     "비어 있습니다",
 )
 
-# "Predictable" feedback is editorial, not a FACT/safety failure. It is kept
-# recoverable so automatic production can use the strongest grounded candidate
-# instead of spending the entire Candidate budget on repeated exploration.
+# "Predictable" feedback is editorial for automatic aviation discovery. It can
+# be recovered only in that mode so the system does not spend seven attempts on
+# near-identical exploration while still preserving strict novelty behavior in
+# other scopes.
 _PREDICTABLE_EDITORIAL_MARKERS = (
     "예상 가능",
     "예측 가능",
@@ -47,9 +49,7 @@ _PREDICTABLE_EDITORIAL_MARKERS = (
     "predictable conclusion",
 )
 
-# Strong explicit low-novelty judgements remain terminal. This preserves the
-# channel's non-obviousness floor while separating it from a softer prediction
-# that the viewer may guess the answer.
+# Strong explicit low-novelty judgements remain terminal.
 _NOVELTY_REJECT_REASON_MARKERS = (
     "뻔",
     "의외성이 부족",
@@ -132,6 +132,13 @@ def _reason_is_novelty_reject(reason):
     return any(marker in lowered for marker in _NOVELTY_REJECT_REASON_MARKERS)
 
 
+def _automatic_aviation_mode():
+    return (
+        os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower() == "aviation"
+        and not os.environ.get("SHORTS_TOPIC", "").strip()
+    )
+
+
 def recovery_eligibility(candidate, gate_result):
     """Return a fail-closed recovery decision for a gate-rejected Winner.
 
@@ -163,7 +170,9 @@ def recovery_eligibility(candidate, gate_result):
         return False, "hard_novelty_reject"
 
     if _reason_is_predictable_editorial(reason):
-        return True, "predictable_editorial_reject"
+        if _automatic_aviation_mode():
+            return True, "predictable_editorial_reject"
+        return False, "hard_novelty_reject"
 
     return True, "soft_editorial_reject"
 
