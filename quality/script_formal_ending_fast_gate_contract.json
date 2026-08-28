@@ -1,0 +1,6 @@
+{
+  "name": "Fast Script Gate V1",
+  "jobs": ["formal-corpus", "script-v2", "speech-fact-budget"],
+  "heavy_e2e_deferred_until_fast_gate_pass": true,
+  "required_ci_bypass": false
+}

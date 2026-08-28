@@ -1,0 +1,135 @@
+name: Fast Script Validation
+
+on:
+  pull_request:
+    paths:
+      - "content/script_formal_endings.py"
+      - "content/script_engine_v2.py"
+      - "content/script_engine_v2_runner.py"
+      - "content/script_engine_v2_validation.py"
+      - "content/script_generator_router.py"
+      - "content/script_visual_budget.py"
+      - "ci_script_v2_visual_goal_hotfix.py"
+      - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
+      - "quality/script_formal_ending_production_corpus_regression_test.py"
+      - "quality/script_formal_ending_production_preflight_test.py"
+      - "quality/script_v2_*"
+      - "quality/script_engine_v2_*"
+      - "quality/script_visual_budget_regression_test.py"
+      - "quality/korean_speech_style*.py"
+      - "quality/fact_critical_regeneration_test.py"
+      - ".github/workflows/script_fast_validation.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  formal-corpus:
+    name: Fast Script / Formal Corpus
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install minimal dependencies
+        run: python -m pip install openai
+      - name: Reproduce current production BEFORE
+        run: python -m quality.script_formal_ending_production_corpus_regression_test --before
+      - name: Apply production Script composition
+        run: |
+          python ci_script_v2_visual_goal_hotfix.py
+          python ci_script_v2_gunggeum_formal_ending_hotfix.py
+      - name: Compile corpus path
+        run: |
+          python -m py_compile \
+            content/script_formal_endings.py \
+            content/script_engine_v2.py \
+            content/script_engine_v2_runner.py \
+            content/script_engine_v2_validation.py \
+            ci_script_v2_gunggeum_formal_ending_hotfix.py \
+            quality/script_formal_ending_production_corpus_regression_test.py \
+            quality/script_formal_ending_production_preflight_test.py
+      - name: Run production corpus AFTER
+        run: python -m quality.script_formal_ending_production_corpus_regression_test
+      - name: Run deterministic production preflight
+        run: python -m quality.script_formal_ending_production_preflight_test
+      - name: Run production composition regressions
+        run: |
+          python -m quality.script_v2_sentence_ending_composition_regression_test
+          python -m quality.script_final_normalization_composition_regression_test
+          python -m quality.script_v2_gunggeum_formal_ending_regression_test
+          python -m quality.script_v2_general_formal_ending_regression_test
+          python -m quality.script_v2_hotfix_composition_order_regression_test
+
+  script-v2:
+    name: Fast Script / V2 Base Contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install minimal dependencies
+        run: python -m pip install openai
+      - name: Apply established V2 base hotfix
+        run: python ci_script_v2_visual_goal_hotfix.py
+      - name: Script Engine V2 focused suite
+        run: |
+          python -m quality.script_engine_v2_regression_test
+          python -m quality.script_engine_v2_failure_fixtures_test
+          python -m quality.script_engine_v2_runner_regression_test
+          python -m quality.script_engine_v2_run_32696711123_regression_test
+          python -m quality.script_engine_v2_text_alias_regression_test
+          python -m quality.script_generator_router_regression_test
+          python - <<'PY'
+          from content.script_engine_v2 import MAX_SCRIPT_API_CALLS, MAX_LOCAL_REPAIR_CALLS
+          assert MAX_SCRIPT_API_CALLS == 3
+          assert MAX_LOCAL_REPAIR_CALLS == 2
+          print("SCRIPT V2 CEILINGS: PASS")
+          PY
+
+  speech-fact-budget:
+    name: Fast Script / Speech FACT Budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install production dependencies
+        run: pip install -r requirements.txt
+      - name: Compile imports
+        run: |
+          python -m py_compile \
+            content/script_formal_endings.py \
+            quality/korean_speech_style.py \
+            quality/fact_critical_regeneration_test.py \
+            quality/script_visual_budget_regression_test.py
+      - name: Strict Korean speech validator smoke
+        run: |
+          python - <<'PY'
+          from quality.korean_speech_style import validate_korean_speech_text
+          for text in ("유도항력이 감소합니다.", "왜 이런 모양일까요?"):
+              ok, reason = validate_korean_speech_text(text, allow_nominal=False)
+              assert ok, (text, reason)
+          for text in ("유도항력이 감소한다.", "효율이 좋아요."):
+              ok, _ = validate_korean_speech_text(text, allow_nominal=False)
+              assert not ok, text
+          print("STRICT KOREAN SPEECH VALIDATOR: PASS")
+          PY
+      - name: FACT Critical unchanged
+        env:
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          PYTHONPATH=. python quality/fact_critical_regeneration_test.py
+      - name: Script-Visual Budget compatibility
+        run: python -m quality.script_visual_budget_regression_test

@@ -3,11 +3,15 @@ import os
 import re
 import runpy
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 COUNTEREXAMPLE = (
     "날개 끝 소용돌이가 줄어들면서 이로 인해 유도항력이 감소한다. "
     "다음 단계에서는 효율이 높아집니다."
@@ -67,6 +71,7 @@ def _load_formalizer(source):
 def main():
     source = _install_production_script_v2_chain()
     assert "SCRIPT_V2_SENTENCE_GRANULAR_FORMAL_ENDING_V1" in source
+    assert "SCRIPT_FORMAL_ENDING_PRODUCTION_CORPUS_V1" in source
     formalize = _load_formalizer(source)
     assert formalize(COUNTEREXAMPLE) == EXPECTED
     assert formalize("왜 유도항력이 감소할까요?") == "왜 유도항력이 감소할까요?"
