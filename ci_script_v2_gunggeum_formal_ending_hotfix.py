@@ -5,6 +5,7 @@ ENGINE_PATH = Path("content/script_engine_v2.py")
 MARKER = "# SCRIPT_V2_GUNGGEUM_FORMAL_ENDING_V1"
 GENERAL_DECLARATIVE_MARKER = "# SCRIPT_V2_GENERAL_HANDA_FORMAL_ENDING_V1"
 OBSERVED_DECLARATIVE_MARKER = "# SCRIPT_V2_OBSERVED_DECLARATIVE_ENDING_V1"
+SENTENCE_GRANULAR_MARKER = "# SCRIPT_V2_SENTENCE_GRANULAR_FORMAL_ENDING_V1"
 HOOK_MARKER = "# SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1"
 TOPIC_HOOK_MARKER = "# SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1"
 FINAL_HOOK_MARKER = "# SCRIPT_V2_FINAL_OBSERVABLE_HOOK_NORMALIZATION_V1"
@@ -30,6 +31,8 @@ REPLACEMENT = (
     + '    (r"워진다(?=[.!…]*$)", "워집니다"),\n'
     + '    (r"되었다(?=[.!…]*$)", "되었습니다"),\n'
 )
+FORMALIZER_NEEDLE = '''def _formalize_common_ending(text: Any) -> str:\n    value = str(text or "").strip()\n    for pattern, replacement in _FORMAL_ENDING_REPAIRS:\n        value = re.sub(pattern, replacement, value)\n    return value\n'''
+FORMALIZER_REPLACEMENT = '''def _formalize_common_ending(text: Any) -> str:\n    value = str(text or "").strip()\n    # SCRIPT_V2_SENTENCE_GRANULAR_FORMAL_ENDING_V1\n    # Strict Korean speech validation checks every sentence independently. Apply\n    # the already-approved ending repair table at the same sentence granularity\n    # so an internal sentence cannot bypass normalization just because a later\n    # sentence in the same scene is already formal. This adds no new repair rule.\n    parts = re.split(r"(?<=[.!?…])(\\s*)", value)\n    for index in range(0, len(parts), 2):\n        sentence = parts[index]\n        if not sentence:\n            continue\n        repaired = sentence\n        for pattern, replacement in _FORMAL_ENDING_REPAIRS:\n            repaired = re.sub(pattern, replacement, repaired)\n        parts[index] = repaired\n    return "".join(parts)\n'''
 HOOK_NEEDLE = '_QUESTION_HOOK_REPAIRS = (\n'
 HOOK_REPLACEMENT = (
     HOOK_NEEDLE
@@ -135,6 +138,14 @@ def _patch_runner():
                 f"{text.count(insertion)}"
             )
         text = text.replace(insertion, replacement, 1)
+        changed = True
+    if SENTENCE_GRANULAR_MARKER not in text:
+        if text.count(FORMALIZER_NEEDLE) != 1:
+            raise RuntimeError(
+                "Script V2 sentence-granular formalizer marker mismatch: "
+                f"{text.count(FORMALIZER_NEEDLE)}"
+            )
+        text = text.replace(FORMALIZER_NEEDLE, FORMALIZER_REPLACEMENT, 1)
         changed = True
     if changed:
         RUNNER_PATH.write_text(text, encoding="utf-8")
