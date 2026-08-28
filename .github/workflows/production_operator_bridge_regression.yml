@@ -1,0 +1,26 @@
+name: Production Operator Bridge Regression
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/production-operator-bridge.yml"
+      - ".github/scripts/production_operator_bridge_parser.py"
+      - "quality/production_operator_bridge_fixed_topic_regression_test.py"
+      - ".github/workflows/production_operator_bridge_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Syntax check parser and regression
+        run: python -m py_compile .github/scripts/production_operator_bridge_parser.py quality/production_operator_bridge_fixed_topic_regression_test.py
+      - name: Run fixed-topic bridge regression
+        run: python -m quality.production_operator_bridge_fixed_topic_regression_test
