@@ -31,8 +31,8 @@ REPLACEMENT = (
     + '    (r"워진다(?=[.!…]*$)", "워집니다"),\n'
     + '    (r"되었다(?=[.!…]*$)", "되었습니다"),\n'
 )
-FORMALIZER_NEEDLE = '''def _formalize_common_ending(text: Any) -> str:\n    value = str(text or "").strip()\n    for pattern, replacement in _FORMAL_ENDING_REPAIRS:\n        value = re.sub(pattern, replacement, value)\n    return value\n'''
-FORMALIZER_REPLACEMENT = '''def _formalize_common_ending(text: Any) -> str:\n    value = str(text or "").strip()\n    # SCRIPT_V2_SENTENCE_GRANULAR_FORMAL_ENDING_V1\n    # Strict Korean speech validation checks every sentence independently. Apply\n    # the already-approved ending repair table at the same sentence granularity\n    # so an internal sentence cannot bypass normalization just because a later\n    # sentence in the same scene is already formal. This adds no new repair rule.\n    parts = re.split(r"(?<=[.!?…])(\\s*)", value)\n    for index in range(0, len(parts), 2):\n        sentence = parts[index]\n        if not sentence:\n            continue\n        repaired = sentence\n        for pattern, replacement in _FORMAL_ENDING_REPAIRS:\n            repaired = re.sub(pattern, replacement, repaired)\n        parts[index] = repaired\n    return "".join(parts)\n'''
+FORMALIZER_TAIL_NEEDLE = '''    for pattern, replacement in _FORMAL_ENDING_REPAIRS:\n        value = re.sub(pattern, replacement, value)\n    return value\n'''
+FORMALIZER_TAIL_REPLACEMENT = '''    # SCRIPT_V2_SENTENCE_GRANULAR_FORMAL_ENDING_V1\n    # Strict Korean speech validation checks every sentence independently. Apply\n    # the already-approved ending repair table at the same sentence granularity\n    # so an internal sentence cannot bypass normalization just because a later\n    # sentence in the same scene is already formal. This adds no new repair rule.\n    parts = re.split(r"(?<=[.!?…])(\\s*)", value)\n    for index in range(0, len(parts), 2):\n        sentence = parts[index]\n        if not sentence:\n            continue\n        repaired = sentence\n        for pattern, replacement in _FORMAL_ENDING_REPAIRS:\n            repaired = re.sub(pattern, replacement, repaired)\n        parts[index] = repaired\n    return "".join(parts)\n'''
 HOOK_NEEDLE = '_QUESTION_HOOK_REPAIRS = (\n'
 HOOK_REPLACEMENT = (
     HOOK_NEEDLE
@@ -140,12 +140,12 @@ def _patch_runner():
         text = text.replace(insertion, replacement, 1)
         changed = True
     if SENTENCE_GRANULAR_MARKER not in text:
-        if text.count(FORMALIZER_NEEDLE) != 1:
+        if text.count(FORMALIZER_TAIL_NEEDLE) != 1:
             raise RuntimeError(
-                "Script V2 sentence-granular formalizer marker mismatch: "
-                f"{text.count(FORMALIZER_NEEDLE)}"
+                "Script V2 sentence-granular formalizer tail mismatch: "
+                f"{text.count(FORMALIZER_TAIL_NEEDLE)}"
             )
-        text = text.replace(FORMALIZER_NEEDLE, FORMALIZER_REPLACEMENT, 1)
+        text = text.replace(FORMALIZER_TAIL_NEEDLE, FORMALIZER_TAIL_REPLACEMENT, 1)
         changed = True
     if changed:
         RUNNER_PATH.write_text(text, encoding="utf-8")
