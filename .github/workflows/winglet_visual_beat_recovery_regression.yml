@@ -6,6 +6,7 @@ on:
       - "content/winglet_visual_beat_recovery.py"
       - "content/script_generator_router.py"
       - "quality/winglet_visual_beat_recovery_regression_test.py"
+      - "quality/winglet_upload_ready_33190260884_regression_test.py"
       - ".github/workflows/winglet_visual_beat_recovery_regression.yml"
   workflow_dispatch:
 
@@ -31,6 +32,7 @@ jobs:
             content/winglet_visual_beat_recovery.py \
             content/script_generator_router.py \
             quality/winglet_visual_beat_recovery_regression_test.py \
+            quality/winglet_upload_ready_33190260884_regression_test.py \
             quality/final_visual_director.py \
             quality/visual_quality_regression_test.py \
             ci_visual_quality_v1_hotfix.py \
@@ -40,6 +42,11 @@ jobs:
           V3_MAX_API_CALLS: "60"
           V3_MAX_COST_USD: "0.05"
         run: python -m quality.winglet_visual_beat_recovery_regression_test
+      - name: Run Run-33190260884 upload-ready regression
+        env:
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+        run: python -m quality.winglet_upload_ready_33190260884_regression_test
       - name: Preserve Script V2 router compatibility
         run: python -m quality.script_generator_router_regression_test
       - name: Preserve existing Visual Explanation support contract
@@ -54,6 +61,7 @@ jobs:
       - name: Static scope guard
         run: |
           grep -F 'WINGLET_UNSUPPORTED_VISUAL_BEAT_RECOVERY_V1' content/winglet_visual_beat_recovery.py
+          grep -F 'WINGLET_UPLOAD_REPAIR_33190260884_V1' content/winglet_visual_beat_recovery.py
           grep -F 'recover_unsupported_winglet_visual_beat' content/script_generator_router.py
           ! grep -E 'WINGLET_NOISE|AI_VISUAL_FALLBACK_ENABLED.*true|STILL_IMAGE_MAX_PER_VIDEO.*=' content/winglet_visual_beat_recovery.py
           git diff --check
