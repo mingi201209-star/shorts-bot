@@ -201,7 +201,8 @@ jobs:
             quality/final_render_integrity_regression_test.py quality/final_visual_semantic_qa.py \
             quality/final_visual_semantic_qa_regression_test.py quality/aviation_specificity_projection_regression_test.py \
             video/video_providers.py video/hook_visual.py video/hook_visual_dominance.py video/video_downloader.py \
-            video/video_engine.py video/subtitle_engine.py video/ai_visual_provider.py
+            video/video_engine.py video/subtitle_engine.py video/ai_visual_provider.py \
+            diagnostics/failure_diagnostics.py diagnostics/runner.py quality/failure_diagnostics_regression_test.py
 
           python quality/final_render_integrity_regression_test.py
           python quality/final_visual_semantic_qa_regression_test.py
@@ -212,6 +213,7 @@ jobs:
           python -m quality.growth_candidate_shadow_regression_test
           python -m quality.retention_structure_experiment_regression_test
           python -m quality.subscriber_conversion_regression_test
+          python quality/failure_diagnostics_regression_test.py
 
       - name: Run Shorts Generator V3.2
         env:
@@ -235,10 +237,24 @@ jobs:
           echo "========================================"
           echo "🚀 START SHORTS GENERATOR V3.2"
           echo "========================================"
-          python main.py
+          python -m diagnostics.runner
           echo "========================================"
           echo "✅ SHORTS GENERATOR V3.2 FINISHED"
           echo "========================================"
+
+      - name: Preserve production diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-diagnostics-${{ github.run_id }}
+          path: |
+            artifacts/diagnostics/generator.log
+            artifacts/diagnostics/failure_summary.json
+            artifacts/diagnostics/traceback.txt
+            artifacts/diagnostics/progress.json
+            artifacts/diagnostics/scene_trace.jsonl
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Preserve verified production artifact
         uses: actions/upload-artifact@v4

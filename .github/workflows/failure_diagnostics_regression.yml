@@ -1,0 +1,36 @@
+name: Failure Diagnostics V1 Regression
+
+on:
+  pull_request:
+    paths:
+      - "diagnostics/**"
+      - "quality/failure_diagnostics_regression_test.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/failure_diagnostics_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Failure Diagnostics V1 regression
+        run: |
+          python -m py_compile diagnostics/failure_diagnostics.py diagnostics/runner.py quality/failure_diagnostics_regression_test.py
+          python -m quality.failure_diagnostics_regression_test
+      - name: Verify production diagnostics upload contract
+        run: |
+          grep -F 'python -m diagnostics.runner' .github/workflows/main.yml
+          grep -F 'if: always()' .github/workflows/main.yml
+          grep -F 'name: production-diagnostics-' .github/workflows/main.yml
+          grep -F 'if-no-files-found: warn' .github/workflows/main.yml
