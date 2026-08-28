@@ -11,6 +11,7 @@ on:
       - "content/script_visual_budget.py"
       - "ci_script_v2_visual_goal_hotfix.py"
       - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
+      - "ci_visual_explanation_retrieval_v1_hotfix.py"
       - "quality/script_formal_ending_production_corpus_regression_test.py"
       - "quality/script_formal_ending_production_preflight_test.py"
       - "quality/script_v2_*"
@@ -35,13 +36,14 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install minimal dependencies
-        run: python -m pip install openai
+        run: python -m pip install openai Pillow
       - name: Reproduce current production BEFORE
         run: python -m quality.script_formal_ending_production_corpus_regression_test --before
       - name: Apply production Script composition
         run: |
           python ci_script_v2_visual_goal_hotfix.py
           python ci_script_v2_gunggeum_formal_ending_hotfix.py
+          python ci_visual_explanation_retrieval_v1_hotfix.py
       - name: Compile corpus path
         run: |
           python -m py_compile \
@@ -61,6 +63,8 @@ jobs:
           python -m quality.script_v2_sentence_ending_composition_regression_test
           python -m quality.script_final_normalization_composition_regression_test
           python -m quality.script_v2_gunggeum_formal_ending_regression_test
+          python -m quality.script_v2_general_formal_ending_regression_test
+          python -m quality.script_v2_hotfix_composition_order_regression_test
 
   script-v2:
     name: Fast Script / V2 Composition
@@ -102,7 +106,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install minimal dependencies
-        run: python -m pip install openai
+        run: python -m pip install openai Pillow
       - name: Compile imports
         run: |
           python -m py_compile \
@@ -110,11 +114,21 @@ jobs:
             quality/korean_speech_style.py \
             quality/fact_critical_regeneration_test.py \
             quality/script_visual_budget_regression_test.py
-      - name: Korean speech style validator unchanged
+      - name: Strict Korean speech validator smoke
         run: |
-          python -m quality.korean_speech_style_test
-          python -m quality.korean_speech_style_rewrite_test
+          python - <<'PY'
+          from quality.korean_speech_style import validate_korean_speech_text
+          for text in ("유도항력이 감소합니다.", "왜 이런 모양일까요?"):
+              ok, reason = validate_korean_speech_text(text, allow_nominal=False)
+              assert ok, (text, reason)
+          for text in ("유도항력이 감소한다.", "효율이 좋아요."):
+              ok, _ = validate_korean_speech_text(text, allow_nominal=False)
+              assert not ok, text
+          print("STRICT KOREAN SPEECH VALIDATOR: PASS")
+          PY
       - name: FACT Critical unchanged
         run: python -m quality.fact_critical_regeneration_test
       - name: Script-Visual Budget compatibility
-        run: python -m quality.script_visual_budget_regression_test
+        run: |
+          python ci_visual_explanation_retrieval_v1_hotfix.py
+          python -m quality.script_visual_budget_regression_test
