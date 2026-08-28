@@ -3,7 +3,7 @@
   "workflows": {
     "main.yml": {
       "ref": "main",
-      "allowed_inputs": ["topic", "candidate_scope", "youtube_upload", "youtube_privacy"]
+      "allowed_inputs": ["topic", "candidate_scope", "expected_sha", "youtube_upload", "youtube_privacy"]
     },
     "adaptive_scene_count_regression.yml": {
       "ref": "main",

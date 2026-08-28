@@ -18,6 +18,7 @@ assert workflows["main.yml"]["ref"] == "main"
 assert set(workflows["main.yml"]["allowed_inputs"]) == {
     "topic",
     "candidate_scope",
+    "expected_sha",
     "youtube_upload",
     "youtube_privacy",
 }
@@ -41,6 +42,12 @@ assert "startsWith(github.event.comment.body, '/workflow-run ')" in workflow
 assert "args=(workflow run \"$WORKFLOW\"" in workflow
 assert "gh \"\\${args[@]}\"" not in workflow
 assert 'gh "${args[@]}"' in workflow
+
+# Exact-main production can carry the current tested main SHA through the
+# existing allowlisted operator path. main.yml remains fail-closed on mismatch.
+assert 'expected_sha:' in main_workflow
+assert 'EXPECTED_SHA: ${{ inputs.expected_sha }}' in main_workflow
+assert 'ref: ${{ inputs.expected_sha || github.sha }}' in main_workflow
 
 # Upload remains explicit and fail-closed: operator dispatch can forward the
 # inputs, but main.yml defaults the mutation off and only turns it on when the
