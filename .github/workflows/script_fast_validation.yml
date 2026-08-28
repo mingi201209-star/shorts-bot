@@ -11,7 +11,6 @@ on:
       - "content/script_visual_budget.py"
       - "ci_script_v2_visual_goal_hotfix.py"
       - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
-      - "ci_visual_explanation_retrieval_v1_hotfix.py"
       - "quality/script_formal_ending_production_corpus_regression_test.py"
       - "quality/script_formal_ending_production_preflight_test.py"
       - "quality/script_v2_*"
@@ -36,14 +35,13 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install minimal dependencies
-        run: python -m pip install openai Pillow
+        run: python -m pip install openai
       - name: Reproduce current production BEFORE
         run: python -m quality.script_formal_ending_production_corpus_regression_test --before
       - name: Apply production Script composition
         run: |
           python ci_script_v2_visual_goal_hotfix.py
           python ci_script_v2_gunggeum_formal_ending_hotfix.py
-          python ci_visual_explanation_retrieval_v1_hotfix.py
       - name: Compile corpus path
         run: |
           python -m py_compile \
@@ -58,7 +56,7 @@ jobs:
         run: python -m quality.script_formal_ending_production_corpus_regression_test
       - name: Run deterministic production preflight
         run: python -m quality.script_formal_ending_production_preflight_test
-      - name: Run sentence composition regressions
+      - name: Run production composition regressions
         run: |
           python -m quality.script_v2_sentence_ending_composition_regression_test
           python -m quality.script_final_normalization_composition_regression_test
@@ -67,7 +65,7 @@ jobs:
           python -m quality.script_v2_hotfix_composition_order_regression_test
 
   script-v2:
-    name: Fast Script / V2 Composition
+    name: Fast Script / V2 Base Contracts
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -77,10 +75,6 @@ jobs:
           python-version: "3.11"
       - name: Install minimal dependencies
         run: python -m pip install openai
-      - name: Apply production Script composition
-        run: |
-          python ci_script_v2_visual_goal_hotfix.py
-          python ci_script_v2_gunggeum_formal_ending_hotfix.py
       - name: Script Engine V2 focused suite
         run: |
           python -m quality.script_engine_v2_regression_test
@@ -99,14 +93,14 @@ jobs:
   speech-fact-budget:
     name: Fast Script / Speech FACT Budget
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install minimal dependencies
-        run: python -m pip install openai Pillow
+      - name: Install production dependencies
+        run: pip install -r requirements.txt
       - name: Compile imports
         run: |
           python -m py_compile \
@@ -127,8 +121,13 @@ jobs:
           print("STRICT KOREAN SPEECH VALIDATOR: PASS")
           PY
       - name: FACT Critical unchanged
-        run: python -m quality.fact_critical_regeneration_test
-      - name: Script-Visual Budget compatibility
+        env:
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
         run: |
-          python ci_visual_explanation_retrieval_v1_hotfix.py
-          python -m quality.script_visual_budget_regression_test
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          PYTHONPATH=. python quality/fact_critical_regeneration_test.py
+      - name: Script-Visual Budget compatibility
+        run: python -m quality.script_visual_budget_regression_test
