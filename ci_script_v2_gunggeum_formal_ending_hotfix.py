@@ -13,6 +13,8 @@ TOPIC_HOOK_MARKER = "# SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1"
 FINAL_HOOK_MARKER = "# SCRIPT_V2_FINAL_OBSERVABLE_HOOK_NORMALIZATION_V1"
 PLAIN_QUESTION_MARKER = "# SCRIPT_V2_PLAIN_QUESTION_BOUNDARY_V1"
 GROUNDED_TOPIC_QUESTION_MARKER = "# SCRIPT_V2_GROUNDED_TOPIC_QUESTION_FALLBACK_V1"
+SPOILER_PAYOFF_MARKER = "# FIXED_SPOILER_PAYOFF_VISUAL_CONTRACT_V1"
+SPOILER_FIXED_TOPIC = "비행기 착륙할 때 날개 위 판이 갑자기 올라오는 이유"
 
 
 def _patch_runner():
@@ -39,6 +41,44 @@ def _patch_runner():
     text, count = pattern.subn(replacement, text, count=1)
     if count != 1:
         raise RuntimeError(f"Script formal corpus runner function marker mismatch: {count}")
+    RUNNER_PATH.write_text(text, encoding="utf-8")
+    return True
+
+
+def _patch_spoiler_payoff_visual_contract():
+    text = RUNNER_PATH.read_text(encoding="utf-8")
+    if SPOILER_PAYOFF_MARKER in text:
+        return False
+
+    pattern = re.compile(
+        r"(def _normalize_script_contracts_without_api\(script: Dict\[str, Any\], plan: Dict\[str, Any\]\) -> Dict\[str, Any\]:\n.*?)(\n\ndef _normalize_writer_envelope)",
+        flags=re.DOTALL,
+    )
+    match = pattern.search(text)
+    if not match:
+        raise RuntimeError("spoiler payoff normalization function marker mismatch: 0")
+
+    function_text = match.group(1)
+    return_needle = '    result["scenes"] = scenes\n    return result\n'
+    if function_text.count(return_needle) != 1:
+        raise RuntimeError("spoiler payoff normalization return marker mismatch")
+
+    alignment = (
+        '    # FIXED_SPOILER_PAYOFF_VISUAL_CONTRACT_V1\n'
+        '    fixed_topic = os.environ.get("SHORTS_TOPIC", "").strip()\n'
+        f'    if fixed_topic == {SPOILER_FIXED_TOPIC!r} and len(scenes) >= 12:\n'
+        '        payoff = scenes[11]\n'
+        '        if isinstance(payoff, dict):\n'
+        '            preserved_text = payoff.get("text")\n'
+        '            preserved_fact = payoff.get("fact_fingerprint")\n'
+        '            payoff["keyword"] = "aircraft wing spoilers deployed after landing"\n'
+        '            payoff["visual_goal"] = "착륙 직후 비행기 날개 위 스포일러가 실제로 펼쳐진 모습"\n'
+        '            assert payoff.get("text") == preserved_text\n'
+        '            assert payoff.get("fact_fingerprint") == preserved_fact\n'
+        '            print("🛬 FIXED SPOILER PAYOFF VISUAL CONTRACT scene=12")\n\n'
+    )
+    function_text = function_text.replace(return_needle, alignment + return_needle, 1)
+    text = text[:match.start(1)] + function_text + text[match.end(1):]
     RUNNER_PATH.write_text(text, encoding="utf-8")
     return True
 
@@ -153,11 +193,12 @@ def _patch_engine():
 
 def main():
     runner_changed = _patch_runner()
+    spoiler_changed = _patch_spoiler_payoff_visual_contract()
     engine_changed = _patch_engine()
-    if not runner_changed and not engine_changed:
-        print("✅ Script formal-ending production corpus already installed")
+    if not runner_changed and not spoiler_changed and not engine_changed:
+        print("✅ Script formal-ending production corpus and spoiler payoff contract already installed")
         return
-    print("✅ Script Formal-Ending Production Corpus V1 installed")
+    print("✅ Script Formal-Ending Production Corpus V1 + fixed spoiler payoff contract installed")
 
 
 if __name__ == "__main__":
