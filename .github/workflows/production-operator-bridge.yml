@@ -16,7 +16,11 @@ jobs:
       startsWith(github.event.comment.body, 'RUN-SHORTS:')
     runs-on: ubuntu-latest
     steps:
-      - name: Resolve exact requested main SHA
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Resolve exact requested main SHA and bounded topic
         id: request
         env:
           GH_TOKEN: ${{ github.token }}
@@ -24,28 +28,8 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          requested="${REQUEST#RUN-SHORTS:}"
-          scope=""
-          topic=""
-          case "$requested" in
-            *:aviation-flaps)
-              scope="aviation"
-              topic="비행기 날개 뒤쪽 플랩은 왜 이착륙 때 펼쳐질까"
-              requested="${requested%:aviation-flaps}"
-              ;;
-            *:aviation) scope="aviation"; requested="${requested%:aviation}";;
-          esac
-          requested="$(printf '%s' "$requested" | tr -d '[:space:]')"
           main_sha="$(gh api "repos/$REPO/commits/main" --jq .sha)"
-          if [ "$requested" = "main" ]; then
-            requested="$main_sha"
-          fi
-          test "${#requested}" -eq 40
-          case "$requested" in *[!0-9a-fA-F]*) exit 1;; esac
-          test "$requested" = "$main_sha"
-          echo "sha=$requested" >> "$GITHUB_OUTPUT"
-          echo "scope=$scope" >> "$GITHUB_OUTPUT"
-          echo "topic=$topic" >> "$GITHUB_OUTPUT"
+          python .github/scripts/production_operator_bridge_parser.py "$REQUEST" "$main_sha" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch production on latest main
         env:
@@ -53,8 +37,13 @@ jobs:
           REPO: ${{ github.repository }}
           SHA: ${{ steps.request.outputs.sha }}
           SCOPE: ${{ steps.request.outputs.scope }}
-          TOPIC: ${{ steps.request.outputs.topic }}
+          TOPIC_B64: ${{ steps.request.outputs.topic_b64 }}
         run: |
           set -euo pipefail
-          gh workflow run main.yml --repo "$REPO" --ref main -f expected_sha="$SHA" -f candidate_scope="$SCOPE" -f topic="$TOPIC"
-          echo "Dispatched main.yml from ref main with expected SHA $SHA, candidate scope ${SCOPE:-default}, and bounded topic ${TOPIC:-automatic}"
+          TOPIC="$(printf '%s' "$TOPIC_B64" | base64 --decode)"
+          gh workflow run main.yml --repo "$REPO" --ref main \
+            -f expected_sha="$SHA" \
+            -f candidate_scope="$SCOPE" \
+            -f topic="$TOPIC" \
+            -f youtube_upload=false
+          echo "Dispatched main.yml from ref main with expected SHA $SHA, candidate scope ${SCOPE:-default}, and bounded topic ${TOPIC:-automatic}; youtube_upload=false"
