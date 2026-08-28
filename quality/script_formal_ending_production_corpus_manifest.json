@@ -1,0 +1,25 @@
+{
+  "version": "v1",
+  "purpose": "Production-provenance corpus for strict Korean formal-ending normalization",
+  "current_counterexample": {
+    "run": 33185606044,
+    "job": 98897699796,
+    "input": "날개 끝에서 압력 차가 강한 소용돌이를 만들어내고, 위로 꺾인 형태가 그 소용돌이를 줄인다.",
+    "expected": "날개 끝에서 압력 차가 강한 소용돌이를 만들어내고, 위로 꺾인 형태가 그 소용돌이를 줄입니다."
+  },
+  "historical_provenance": [
+    "Run 33095657123 regression fixtures: 어두워진다, 설계되었다",
+    "Run 33023068374 regression fixtures: 알려진다, 도와준다",
+    "Existing Script V2 production regressions: 궁금해진다, 용이해진다, 가능해진다, 이루어진다, 줄어든다",
+    "Existing Script Engine V2 production ending contract: 감소한다",
+    "#221 sentence-granular composition counterexample class: internal sentence 감소한다"
+  ],
+  "contract": {
+    "terminal_declarative_only": true,
+    "questions_excluded": true,
+    "locked_unlocked_parity": true,
+    "semantic_content_change": false,
+    "extra_llm_calls": 0,
+    "validator_unchanged": true
+  }
+}
