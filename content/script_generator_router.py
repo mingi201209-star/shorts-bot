@@ -7,6 +7,8 @@ import os
 import re
 from copy import deepcopy
 
+from content.winglet_visual_beat_recovery import recover_unsupported_winglet_visual_beat
+
 
 def _observable_hook_from_candidate(candidate):
     """Project a question-shaped Candidate hook into a grounded observation."""
@@ -179,8 +181,13 @@ def generate_script(topic_info, candidate):
         from content.script_engine_v2_runner import generate_script_v2
         normalized_candidate = _observable_hook_from_candidate(candidate)
         normalized_candidate = _normalize_locked_candidate_narration(normalized_candidate)
+        generated = generate_script_v2(normalized_candidate)
+        recovered = recover_unsupported_winglet_visual_beat(
+            generated,
+            normalized_candidate,
+        )
         return _normalize_v2_result(
-            generate_script_v2(normalized_candidate),
+            recovered,
             topic_info,
             normalized_candidate,
         )

@@ -1,0 +1,104 @@
+name: Winglet Visual Beat Recovery Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/winglet_visual_beat_recovery.py"
+      - "content/script_generator_router.py"
+      - "quality/winglet_visual_beat_recovery_regression_test.py"
+      - ".github/workflows/winglet_visual_beat_recovery_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile focused modules
+        run: |
+          python -m py_compile \
+            content/winglet_visual_beat_recovery.py \
+            content/script_generator_router.py \
+            quality/winglet_visual_beat_recovery_regression_test.py \
+            quality/final_visual_director.py \
+            quality/visual_quality_regression_test.py \
+            ci_visual_quality_v1_hotfix.py \
+            ci_cross_process_video_dedupe_hotfix.py
+      - name: Run Run-33169424813 counterexample regression
+        env:
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+        run: python -m quality.winglet_visual_beat_recovery_regression_test
+      - name: Preserve Script V2 router compatibility
+        run: python -m quality.script_generator_router_regression_test
+      - name: Preserve existing Visual Explanation support contract
+        run: python quality/visual_explanation_retrieval_v1_regression_test.py
+      - name: Preserve Visual Quality V1 contract
+        run: |
+          python -m quality.visual_quality_regression_test
+          grep -n 'MAX_DIRECTOR_REPAIR_SCENES = 2' quality/final_visual_director.py
+          grep -n 'MAX_DIRECTOR_RECOVERY_ROUNDS = 2' quality/final_visual_director.py
+          grep -n 'list(candidates or \[\])\[:max_candidates\]' quality/final_visual_director.py
+          grep -n 'scene_clips\[repair_index\] = create_scene' ci_visual_quality_v1_hotfix.py
+      - name: Static scope guard
+        run: |
+          grep -F 'WINGLET_UNSUPPORTED_VISUAL_BEAT_RECOVERY_V1' content/winglet_visual_beat_recovery.py
+          grep -F 'recover_unsupported_winglet_visual_beat' content/script_generator_router.py
+          ! grep -E 'WINGLET_NOISE|AI_VISUAL_FALLBACK_ENABLED.*true|STILL_IMAGE_MAX_PER_VIDEO.*=' content/winglet_visual_beat_recovery.py
+          git diff --check
+
+  provider-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Apply provider production hotfix chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          python ci_video_provider_hotfix.py
+          python ci_cross_process_video_dedupe_hotfix.py
+          python ci_topic_input_hotfix.py
+      - name: Preserve Provider and dedupe contracts
+        run: |
+          python quality/video_provider_pool_regression_test.py
+          python quality/cross_process_video_dedupe_regression_test.py
+
+  general-visual-parity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Preserve general-scene visual parity
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: python quality/general_scene_visual_parity_regression_test.py
