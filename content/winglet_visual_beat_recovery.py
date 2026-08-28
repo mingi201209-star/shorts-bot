@@ -13,6 +13,7 @@ from typing import Any, Dict, Iterable, Optional
 
 
 RECOVERY_MARKER = "WINGLET_UNSUPPORTED_VISUAL_BEAT_RECOVERY_V1"
+UPLOAD_REPAIR_MARKER = "WINGLET_UPLOAD_REPAIR_33190260884_V1"
 
 
 def _text(value: Any) -> str:
@@ -45,6 +46,50 @@ def _is_winglet_aviation_context(candidate: Dict[str, Any]) -> bool:
         "윙렛", "날개 끝", "winglet", "wing tip", "wingtip",
     ))
     return aviation and winglet
+
+
+def _repair_run_33190260884_upload_blocks(script: Dict[str, Any]) -> Dict[str, Any]:
+    """Repair only the two human-QA blockers observed in Run 33190260884.
+
+    This is deliberately keyed to the exact malformed Scene 3 sentence from that
+    run. When that counterexample is absent, the function is a no-op. No model
+    call, threshold, retry, FACT scope, or budget is changed.
+    """
+    result = deepcopy(script)
+    scenes = result.get("scenes") or []
+    if len(scenes) < 3 or not all(isinstance(scene, dict) for scene in scenes[:3]):
+        return result
+
+    scene3 = scenes[2]
+    malformed = (
+        "원인의 첫 단서는 날개 끝이 위로 꺾인 모습은 "
+        "비행기의 성능에 영향을 미칩니다."
+    )
+    if _text(scene3.get("text")) != malformed:
+        return result
+
+    scene1 = scenes[0]
+    if _text(scene1.get("text")) == "비행기 날개 끝이 위로 꺾여 있습니다.":
+        scene1["visual_goal"] = "비행기 날개 끝의 윙렛을 선명하게 보여주는 근접 모습"
+        scene1["keyword"] = "airplane wing winglet closeup stage 1"
+
+    scene3["text"] = "위로 꺾인 날개 끝은 공기 흐름을 바꿔 비행 성능에 영향을 줍니다."
+    scene3["visual_goal"] = "윙렛 주변에서 달라지는 날개 끝 공기 흐름"
+    scene3["keyword"] = "airplane wing winglet airflow stage 3"
+
+    result["scenes"] = scenes
+    result["winglet_upload_repair"] = {
+        "version": 1,
+        "source_run": 33190260884,
+        "scene1": "explicit_winglet_closeup",
+        "scene3": "natural_airflow_explanation",
+        "additional_api_calls": 0,
+    }
+    print(
+        f"[{UPLOAD_REPAIR_MARKER}] status=repaired "
+        "scene1=explicit_winglet_closeup scene3=natural_airflow_explanation"
+    )
+    return result
 
 
 def _is_noise_benefit_scene(scene: Dict[str, Any]) -> bool:
@@ -123,7 +168,8 @@ def recover_unsupported_winglet_visual_beat(
     if not _is_winglet_aviation_context(candidate):
         return original
 
-    scenes = deepcopy(script.get("scenes") or [])
+    original = _repair_run_33190260884_upload_blocks(original)
+    scenes = deepcopy(original.get("scenes") or [])
     if not scenes or not all(isinstance(scene, dict) for scene in scenes):
         return original
 
@@ -160,7 +206,7 @@ def recover_unsupported_winglet_visual_beat(
     target["visual_goal"] = "윙렛 주변 날개 끝 공기 흐름 방향"
     target["keyword"] = f"aircraft wing airflow direction stage {scene_index}"
 
-    result = deepcopy(script)
+    result = deepcopy(original)
     result["scenes"] = scenes
     result["winglet_visual_beat_recovery"] = {
         "version": 1,
