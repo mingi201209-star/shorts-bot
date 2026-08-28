@@ -4,6 +4,7 @@ import re
 RUNNER_PATH = Path("content/script_engine_v2_runner.py")
 ENGINE_PATH = Path("content/script_engine_v2.py")
 MARKER = "# SCRIPT_FORMAL_ENDING_PRODUCTION_CORPUS_V1"
+LOCKED_PARITY_MARKER = "# SCRIPT_FORMAL_ENDING_LOCKED_PARITY_V1"
 HOOK_MARKER = "# SCRIPT_V2_RECOVERED_QUESTION_HOOK_V1"
 TOPIC_HOOK_MARKER = "# SCRIPT_V2_RECOVERED_TOPIC_HOOK_V1"
 FINAL_HOOK_MARKER = "# SCRIPT_V2_FINAL_OBSERVABLE_HOOK_NORMALIZATION_V1"
@@ -11,20 +12,23 @@ PLAIN_QUESTION_MARKER = "# SCRIPT_V2_PLAIN_QUESTION_BOUNDARY_V1"
 GROUNDED_TOPIC_QUESTION_MARKER = "# SCRIPT_V2_GROUNDED_TOPIC_QUESTION_FALLBACK_V1"
 
 
+def _ensure_shared_import(text: str) -> tuple[str, bool]:
+    import_line = "from content.script_formal_endings import formalize_declarative_text\n"
+    if import_line in text:
+        return text, False
+    needle = "import re\n"
+    if text.count(needle) < 1:
+        raise RuntimeError("Script formal corpus import marker missing")
+    return text.replace(needle, needle + import_line, 1), True
+
+
 def _patch_runner():
     text = RUNNER_PATH.read_text(encoding="utf-8")
     changed = False
+    text, imported = _ensure_shared_import(text)
+    changed = changed or imported
 
     if MARKER not in text:
-        import_needle = "import re\n"
-        import_replacement = (
-            import_needle
-            + "from content.script_formal_endings import formalize_declarative_text\n"
-        )
-        if text.count(import_needle) < 1:
-            raise RuntimeError("Script formal corpus import marker missing")
-        text = text.replace(import_needle, import_replacement, 1)
-
         pattern = re.compile(
             r"def _formalize_common_ending\(text: Any\) -> str:\n.*?(?=\ndef _deterministic_keyword)",
             flags=re.DOTALL,
@@ -32,8 +36,7 @@ def _patch_runner():
         replacement = (
             "def _formalize_common_ending(text: Any) -> str:\n"
             "    # SCRIPT_FORMAL_ENDING_PRODUCTION_CORPUS_V1\n"
-            "    # One shared deterministic terminal-normalization boundary for locked\n"
-            "    # and unlocked narration. Questions remain owned by the question path.\n"
+            "    # Shared deterministic terminal normalization for unlocked/final text.\n"
             "    return formalize_declarative_text(text)\n"
         )
         text, count = pattern.subn(replacement, text, count=1)
@@ -51,6 +54,31 @@ def _patch_runner():
 def _patch_engine():
     text = ENGINE_PATH.read_text(encoding="utf-8")
     changed = False
+    text, imported = _ensure_shared_import(text)
+    changed = changed or imported
+
+    if LOCKED_PARITY_MARKER not in text:
+        pattern = re.compile(
+            r"def deterministic_scene_repair\(text: str, role: str\) -> str:\n.*?(?=\ndef repair_failed_scenes)",
+            flags=re.DOTALL,
+        )
+        replacement = (
+            "def deterministic_scene_repair(text: str, role: str) -> str:\n"
+            "    # SCRIPT_FORMAL_ENDING_LOCKED_PARITY_V1\n"
+            "    # LOCK preserves factual/semantic content, not invalid speech style.\n"
+            "    value = formalize_declarative_text(_text(text))\n"
+            "    if role == \"causal_clue\" and value and not any(\n"
+            "        token in value for token in CAUSAL_CLUE_TOKENS\n"
+            "    ):\n"
+            "        value = \"원인의 첫 단서는 \" + value\n"
+            "    return value\n"
+        )
+        text, count = pattern.subn(replacement, text, count=1)
+        if count != 1:
+            raise RuntimeError(
+                f"Script formal corpus engine function marker mismatch: {count}"
+            )
+        changed = True
 
     hook_needle = "_QUESTION_HOOK_REPAIRS = (\n"
     if HOOK_MARKER not in text:
