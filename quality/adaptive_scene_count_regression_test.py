@@ -45,11 +45,9 @@ assert getattr(runtime.validate_scenes, "_adaptive_scene_count_v3", False), (
 )
 
 runtime._SCRIPT_PARITY_ACTIVE_CONTEXT = design_context
-for count in (6, 7, 8, 10):
+for count in (5, 6, 7, 8, 10):
     valid, reason = runtime.validate_scenes([scene(i) for i in range(count)])
     assert valid, (count, reason)
-valid, reason = runtime.validate_scenes([scene(i) for i in range(5)])
-assert not valid and "설계형 장면 수 부족" in reason, reason
 
 runtime._SCRIPT_PARITY_ACTIVE_CONTEXT = normal_context
 valid, reason = runtime.validate_scenes([scene(i) for i in range(10)])
@@ -58,18 +56,30 @@ valid, reason = runtime.validate_scenes([scene(i) for i in range(12)])
 assert valid, reason
 
 runtime._SCRIPT_PARITY_ACTIVE_CONTEXT = design_context
-valid, reason = sg.validate_scenes([scene(i) for i in range(6)])
+valid, reason = sg.validate_scenes([scene(i) for i in range(5)])
 assert valid, reason
 
 assert hasattr(runtime, "_adaptive_scene_count_instruction")
 instruction = runtime._adaptive_scene_count_instruction(design_context)
-assert "보통 6~8 Scene" in instruction
-assert "새 정보가 실제로 필요하면" in instruction
+assert "보통 6~7 Scene" in instruction
+assert "hard minimum이 아니다" in instruction
+assert "5 Scene 이하도 허용" in instruction
+assert "8 Scene 이상" in instruction
+assert "무엇이 새 정보인지 답할 수 없으면" in instruction
 assert "12~13 Scene" in runtime._adaptive_scene_count_instruction(normal_context)
-assert "25~35초" in runtime._adaptive_duration_instruction(design_context)
+
+duration = runtime._adaptive_duration_instruction(design_context)
+assert "20~35초" in duration
+assert "18~20초" in duration
+assert "목표 시간을 채우려고" in duration
+
+length = runtime._adaptive_length_instruction(design_context)
+assert "목표 시간을 채우기 위해" in length
+assert "설명이 끝났다면 즉시 종료" in length
 
 source = (ROOT / "content" / "script_generator.py").read_text(encoding="utf-8")
 assert "{_adaptive_scene_count_instruction(candidate)}" in source
-assert "RETENTION STORY V1" in source
+assert "[LENGTH]\n{_adaptive_length_instruction(candidate)}\n\n[OUTPUT]" in source
+assert "Retention Story V2" in (ROOT / "ci_adaptive_scene_count_hotfix.py").read_text(encoding="utf-8")
 
-print("PASS: adaptive scene count allows dense 6-8 scene design shorts without forcing compression")
+print("PASS: adaptive scene count treats 6-7 as preference and permits shorter complete design scripts")

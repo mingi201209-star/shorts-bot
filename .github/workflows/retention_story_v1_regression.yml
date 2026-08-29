@@ -6,6 +6,7 @@ on:
       - "ci_adaptive_scene_count_hotfix.py"
       - "quality/adaptive_scene_count_regression_test.py"
       - "quality/retention_story_v1_regression_test.py"
+      - "quality/retention_story_v2_writer_contract_regression_test.py"
       - ".github/workflows/retention_story_v1_regression.yml"
   workflow_dispatch:
 
@@ -23,10 +24,14 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile focused files
-        run: python -m py_compile ci_adaptive_scene_count_hotfix.py quality/adaptive_scene_count_regression_test.py quality/retention_story_v1_regression_test.py
+        run: python -m py_compile ci_adaptive_scene_count_hotfix.py quality/adaptive_scene_count_regression_test.py quality/retention_story_v1_regression_test.py quality/retention_story_v2_writer_contract_regression_test.py
       - name: Adaptive scene-count regression
         run: python quality/adaptive_scene_count_regression_test.py
       - name: Reset hotfix-mutated source
         run: git checkout -- content/script_generator.py
       - name: Retention Story V1 counterexample regression
         run: python quality/retention_story_v1_regression_test.py
+      - name: Reset hotfix-mutated source again
+        run: git checkout -- content/script_generator.py
+      - name: Retention Story V2 Writer contract regression
+        run: python quality/retention_story_v2_writer_contract_regression_test.py

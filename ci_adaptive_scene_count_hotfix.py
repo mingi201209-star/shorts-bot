@@ -1,12 +1,11 @@
+import re
 from pathlib import Path
 
 
-# Retention Story V1:
-# dense design explainers must not be padded to a fixed scene floor. Production
-# run 33223881121 showed the failure mode directly: generic summary scenes such
-# as "성능을 높입니다" / "역할은 매우 중요합니다" added no information and
-# produced an abstract `important role` visual query. Keep this deterministic:
-# no extra LLM call, no new factual claim, no visual-threshold change.
+# Retention Story V2:
+# Writer contract first: do not make the Writer fill a scene/duration quota after
+# the information is complete. V1's deterministic filler compressor stays intact
+# as a compatibility safety net; V2 does not add new post-processing deletion rules.
 path = Path("content/script_generator.py")
 text = path.read_text(encoding="utf-8")
 
@@ -16,17 +15,32 @@ if old_scene_instruction not in text and new_scene_instruction not in text:
     raise RuntimeError("adaptive scene-count prompt marker not found")
 text = text.replace(old_scene_instruction, new_scene_instruction, 1)
 
-old_duration_instruction = "새 소재를 탐색하지 말고 확정 Winner를 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초,\n"
-new_duration_instruction = "새 소재를 탐색하지 말고 확정 Winner를 {_adaptive_duration_instruction(candidate)},\n"
-if old_duration_instruction in text:
-    text = text.replace(old_duration_instruction, new_duration_instruction, 1)
+# Script production parity already owns the intro duration sentence. Keep that
+# composition boundary and override its helper below instead of rewriting prompt text.
+if "{_script_parity_duration_opening(candidate)}" not in text:
+    raise RuntimeError("script parity duration helper boundary not found")
+
+length_pattern = r"\[LENGTH\]\n.*?\n\n\[OUTPUT\]"
+length_replacement = "[LENGTH]\n{_adaptive_length_instruction(candidate)}\n\n[OUTPUT]"
+text, length_count = re.subn(
+    length_pattern,
+    length_replacement,
+    text,
+    count=1,
+    flags=re.DOTALL,
+)
+if length_count != 1 and "{_adaptive_length_instruction(candidate)}" not in text:
+    raise RuntimeError("adaptive length prompt boundary not found")
 
 if "ADAPTIVE_SCENE_COUNT_FOR_DENSE_DESIGN_V3" not in text:
     text += r'''
 
 # ADAPTIVE_SCENE_COUNT_FOR_DENSE_DESIGN_V3
+# V2 contract: 6~7 is a preference, not a validation floor. Keep a separate
+# compatibility floor for V1 compression so V2 does not widen post-processing.
+ADAPTIVE_DESIGN_VALIDATION_MIN_SCENES = 1
 ADAPTIVE_DESIGN_MIN_SCENES = 6
-ADAPTIVE_DESIGN_PREFERRED_MAX_SCENES = 8
+ADAPTIVE_DESIGN_PREFERRED_MAX_SCENES = 7
 
 _RETENTION_PROTECTED_ROLES = {
     "hook", "phenomenon", "question", "core_question", "evidence", "contrast",
@@ -38,9 +52,6 @@ _RETENTION_FILLER_PATTERNS = (
     r"(?:은|는|이|가).{0,18}성능을\s*(?:높|향상)\w*\.?$",
     r"(?:은|는|이|가).{0,18}도움이\s*됩니다\.?$",
 )
-# Context nouns such as "이륙/착륙" do not by themselves make a summary novel.
-# These markers represent an actual mechanism, measurable consequence, contrast,
-# or state change inside the candidate sentence.
 _RETENTION_CONCRETE_PROGRESS_MARKERS = (
     "왜", "때문", "압력", "양력", "항력", "속도", "각도", "공기", "흐름", "증가",
     "감소", "낮", "높", "펼", "접", "분산", "전달", "조절", "변화", "반대로",
@@ -80,22 +91,48 @@ def _adaptive_scene_count_is_design(candidate=None):
 def _adaptive_duration_instruction(candidate):
     if _adaptive_scene_count_is_design(candidate):
         return (
-            "정보량이 충분하면 약 25~35초로 압축하되 숫자를 맞추기 위해 Scene을 "
-            "추가하거나 삭제하지 마라"
+            "필요한 만큼만 설명하되 보통 20~35초를 선호한다. 목표 시간을 채우려고 내용을 늘리지 말고 "
+            "18~20초에 설명이 충분하면 그대로 끝내라"
         )
     return f"{TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초"
+
+
+def _adaptive_length_instruction(candidate):
+    if _adaptive_scene_count_is_design(candidate):
+        return (
+            "전체 길이는 정보량의 결과다. 목표 시간을 채우기 위해 문장이나 Scene을 추가하지 마라. "
+            "설명이 끝났다면 즉시 종료하고, 하나의 자연스러운 인과를 Scene 수 때문에 잘게 쪼개지 마라."
+        )
+    return (
+        f"전체 TTS가 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초가 되도록 충분한 문장 분량을 만든다. "
+        "너무 짧은 문장을 억지로 Scene 수만 맞추려고 잘게 쪼개지 마라."
+    )
 
 
 def _adaptive_scene_count_instruction(candidate):
     if _adaptive_scene_count_is_design(candidate):
         return (
-            f"설계형 주제는 보통 {ADAPTIVE_DESIGN_MIN_SCENES}~{ADAPTIVE_DESIGN_PREFERRED_MAX_SCENES} Scene을 우선하되 "
-            f"새 정보가 실제로 필요하면 {MAX_SCENES} Scene까지 허용한다. "
-            "Scene 수를 맞추기 위해 같은 mechanism/result를 반복하거나 filler를 추가하지 마라. "
-            "각 intermediate Scene은 새로운 사실/원인/원리/의문/반전/대조/payoff 진전/의미 있는 visual 변화 중 "
-            "최소 하나가 있을 때만 유지한다. 인접 Scene이 하나의 causal step이면 자연스럽게 합쳐도 된다."
+            f"Scene 수는 목표가 아니라 상한/가이드다. 일반적인 설명형 Shorts는 보통 "
+            f"{ADAPTIVE_DESIGN_MIN_SCENES}~{ADAPTIVE_DESIGN_PREFERRED_MAX_SCENES} Scene을 선호하지만 hard minimum이 아니다. "
+            "내용이 짧으면 5 Scene 이하도 허용하고, 필요한 설명이 끝나면 즉시 종료한다. "
+            f"반대로 새 정보가 실제로 필요하면 8 Scene 이상도 {MAX_SCENES} Scene까지 허용한다. "
+            "Scene 수를 채우기 위한 mechanism_n, 같은 결론의 재진술, 중간 요약 filler를 추가하지 마라. "
+            "각 intermediate Scene은 이전 Scene까지 없던 새 사실/새 원인 또는 메커니즘/새 의문/반전 또는 대조/"
+            "payoff 진전/의미 있는 visual 변화 중 최소 하나를 가져야 한다. 무엇이 새 정보인지 답할 수 없으면 그 Scene을 만들지 마라. "
+            "'중요합니다', '핵심 역할을 합니다', '성능을 높입니다', '도움이 됩니다' 같은 표현도 새 정보 없이 앞 내용을 요약할 뿐이면 독립 Scene으로 만들지 마라. "
+            "인접 Scene이 하나의 자연스러운 causal step이면 한 Scene에서 한 호흡으로 설명한다."
         )
     return f"{MIN_SCENES}~{MAX_SCENES} Scene의 Shorts로 발전시켜라."
+
+
+# Keep the existing production-parity prompt composition. Only change the design
+# branch of the helper; non-design topics retain the original behavior.
+_retention_v2_original_duration_opening = _script_parity_duration_opening
+
+def _script_parity_duration_opening(candidate):
+    if _adaptive_scene_count_is_design(candidate):
+        return f"새 소재를 탐색하지 말고 확정 Winner를 {_adaptive_duration_instruction(candidate)},"
+    return _retention_v2_original_duration_opening(candidate)
 
 
 def _retention_scene_role(scene):
@@ -171,7 +208,7 @@ def _install_adaptive_scene_validator(runtime):
         if not isinstance(scenes, list):
             return False, "scenes가 배열이 아님"
         if _adaptive_scene_count_runtime_is_design(runtime):
-            if len(scenes) < ADAPTIVE_DESIGN_MIN_SCENES:
+            if len(scenes) < ADAPTIVE_DESIGN_VALIDATION_MIN_SCENES:
                 return False, f"설계형 장면 수 부족: {len(scenes)}"
             if len(scenes) > runtime.MAX_SCENES:
                 return False, f"장면 수 초과: {len(scenes)}"
@@ -224,7 +261,7 @@ def validate_scenes(scenes):
     if not isinstance(scenes, list):
         return False, "scenes가 배열이 아님"
     if _adaptive_scene_count_is_design():
-        if len(scenes) < ADAPTIVE_DESIGN_MIN_SCENES:
+        if len(scenes) < ADAPTIVE_DESIGN_VALIDATION_MIN_SCENES:
             return False, f"설계형 장면 수 부족: {len(scenes)}"
         if len(scenes) > MAX_SCENES:
             return False, f"장면 수 초과: {len(scenes)}"
@@ -239,4 +276,4 @@ validate_scenes._adaptive_scene_count_v3 = True
 '''
 
 path.write_text(text, encoding="utf-8")
-print("✅ Retention Story V1 adaptive scene-count + filler compression applied")
+print("✅ Retention Story V2 Writer contract applied; V1 compressor unchanged")
