@@ -40,17 +40,16 @@ normal_context = {
 
 runtime = getattr(sg, "_SCRIPT_PARITY_RUNTIME", None) or getattr(sg, "_LEGACY", None)
 assert runtime is not None, "production compatibility runtime missing"
-assert getattr(runtime.validate_scenes, "_adaptive_scene_count_v2", False), (
+assert getattr(runtime.validate_scenes, "_adaptive_scene_count_v3", False), (
     "adaptive validator not installed on production runtime"
 )
 
 runtime._SCRIPT_PARITY_ACTIVE_CONTEXT = design_context
-valid, reason = runtime.validate_scenes([scene(i) for i in range(8)])
-assert valid, reason
-valid, reason = runtime.validate_scenes([scene(i) for i in range(7)])
+for count in (6, 7, 8, 10):
+    valid, reason = runtime.validate_scenes([scene(i) for i in range(count)])
+    assert valid, (count, reason)
+valid, reason = runtime.validate_scenes([scene(i) for i in range(5)])
 assert not valid and "설계형 장면 수 부족" in reason, reason
-valid, reason = runtime.validate_scenes([scene(i) for i in range(10)])
-assert valid, reason
 
 runtime._SCRIPT_PARITY_ACTIVE_CONTEXT = normal_context
 valid, reason = runtime.validate_scenes([scene(i) for i in range(10)])
@@ -59,18 +58,18 @@ valid, reason = runtime.validate_scenes([scene(i) for i in range(12)])
 assert valid, reason
 
 runtime._SCRIPT_PARITY_ACTIVE_CONTEXT = design_context
-valid, reason = sg.validate_scenes([scene(i) for i in range(8)])
+valid, reason = sg.validate_scenes([scene(i) for i in range(6)])
 assert valid, reason
 
-# The prompt helper belongs to the production compatibility runtime. Check that
-# runtime directly, then also verify the patched source contains the no-padding rule.
-assert hasattr(runtime, "_adaptive_scene_count_instruction"), (
-    "adaptive prompt helper missing on production runtime"
-)
-assert "12 Scene을 채우기 위해" in runtime._adaptive_scene_count_instruction(design_context)
+assert hasattr(runtime, "_adaptive_scene_count_instruction")
+instruction = runtime._adaptive_scene_count_instruction(design_context)
+assert "보통 6~8 Scene" in instruction
+assert "새 정보가 실제로 필요하면" in instruction
 assert "12~13 Scene" in runtime._adaptive_scene_count_instruction(normal_context)
+assert "25~35초" in runtime._adaptive_duration_instruction(design_context)
+
 source = (ROOT / "content" / "script_generator.py").read_text(encoding="utf-8")
 assert "{_adaptive_scene_count_instruction(candidate)}" in source
-assert "12 Scene을 채우기 위해" in source
+assert "RETENTION STORY V1" in source
 
-print("PASS: adaptive scene count installed on production compatibility runtime")
+print("PASS: adaptive scene count allows dense 6-8 scene design shorts without forcing compression")
