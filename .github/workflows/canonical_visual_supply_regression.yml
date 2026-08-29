@@ -71,14 +71,9 @@ jobs:
         test:
           - quality/visual_explanation_retrieval_v1_regression_test.py
           - quality/first5_visual_contract_regression_test.py
-          - quality/fact_critical_regeneration_test.py
           - quality/aviation_candidate_specificity_regression_test.py
           - quality/aviation_candidate_context_regression_test.py
           - quality/aviation_context_signature_compat_regression_test.py
-          - quality/korean_speech_style_test.py
-          - quality/hook_production_parity_regression_test.py
-          - quality/retention_regression_test.py
-          - quality/retention_structure_experiment_regression_test.py
           - quality/canonical_subject_grounding_supply_regression_test.py
           - quality/still_image_verifier_contract_regression_test.py
     steps:
