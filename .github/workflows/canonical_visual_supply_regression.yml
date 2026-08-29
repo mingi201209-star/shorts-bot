@@ -47,6 +47,13 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
+      - name: Compose established visual-contract production state
+        run: |
+          python ci_visual_subject_anchor_contract_v1_hotfix.py
+          python ci_visual_subject_anchor_contract_v2_hotfix.py
+          python ci_visual_subject_anchor_fallback_inheritance_hotfix.py
+          python ci_visual_claim_semantic_fallback_hotfix.py
+          python ci_canonical_visual_supply_contract_hotfix.py
       - name: Run 33254306556 Scene 2 PASS propagation counterexamples
         run: python quality/run_33254306556_still_pass_propagation_regression_test.py
 
