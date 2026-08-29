@@ -100,3 +100,39 @@ def subject_anchor_words(scene):
     if words & {"chevron", "chevrons", "serrated", "serration", "serrations"}:
         anchors.append("chevron")
     return anchors
+
+
+def trusted_grounding_present(scene):
+    """Require explicit pre-existing grounding provenance for deterministic claims."""
+    if not isinstance(scene, dict):
+        return False
+    supply = scene.get("_canonical_visual_supply") or {}
+    if not isinstance(supply, dict):
+        return False
+    return bool(
+        str(supply.get("grounding_source") or "").strip()
+        and str(supply.get("canonical_subject") or "").strip()
+    )
+
+
+def chevron_flow_mixing_supported(scene):
+    """Strict eligibility for the Scene-4 deterministic mechanism visual.
+
+    This is intentionally narrower than lexical recognition. It requires the
+    grounded owner, complete compound subject identity, complete flow+mixing
+    explanatory nucleus, and trusted grounding provenance. It never grants
+    eligibility to the Scene-5 noise-reduction result claim.
+    """
+    if not isinstance(scene, dict):
+        return False
+    if str(scene.get("owned_claim_id") or "").strip() != "chevron_flow_mixing":
+        return False
+    if str(scene.get("role") or scene.get("causal_role") or "").strip() not in {"mechanism_change", "mechanism"}:
+        return False
+    if not trusted_grounding_present(scene):
+        return False
+    if set(subject_anchor_words(scene)) != {"aircraft", "engine", "chevron"}:
+        return False
+    if set(required_explanatory_groups(scene)) != {"flow", "mixing"}:
+        return False
+    return True
