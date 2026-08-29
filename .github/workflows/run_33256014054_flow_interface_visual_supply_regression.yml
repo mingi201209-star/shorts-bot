@@ -1,0 +1,76 @@
+name: Run 33256014054 Flow Interface Visual Supply Regression
+
+on:
+  pull_request:
+    paths:
+      - "video/grounded_explanatory_visual.py"
+      - "video/visual_explanation.py"
+      - "ci_grounded_explanatory_visual_supply_hotfix.py"
+      - "ci_visual_explanation_retrieval_v1_hotfix.py"
+      - "ci_cross_process_video_dedupe_hotfix.py"
+      - "quality/run_33256014054_flow_interface_visual_supply_regression_test.py"
+      - ".github/workflows/run_33256014054_flow_interface_visual_supply_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Static checks
+        run: |
+          python -m py_compile \
+            video/grounded_explanatory_visual.py \
+            ci_grounded_explanatory_visual_supply_hotfix.py \
+            quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          git diff --check
+      - name: Run 33256014054 counterexamples
+        run: |
+          git reset --hard HEAD && git clean -fd
+          python quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+      - name: Visual explanation retrieval
+        run: |
+          git reset --hard HEAD && git clean -fd
+          python quality/visual_explanation_retrieval_v1_regression_test.py
+          git reset --hard HEAD && git clean -fd
+          python quality/visual_explanation_retrieval_v1_contract_test.py
+      - name: Visual subject and canonical supply
+        run: |
+          git reset --hard HEAD && git clean -fd
+          python quality/visual_subject_anchor_contract_v1_regression_test.py
+          git reset --hard HEAD && git clean -fd
+          python quality/run_33248013901_visual_anchor_regression_test.py
+          git reset --hard HEAD && git clean -fd
+          python quality/run_33251901169_visual_supply_regression_test.py
+      - name: Still verifier and 256 propagation
+        run: |
+          git reset --hard HEAD && git clean -fd
+          python quality/still_image_verifier_contract_regression_test.py
+          git reset --hard HEAD && git clean -fd
+          python quality/run_33254306556_still_pass_propagation_regression_test.py
+      - name: Final visual semantic QA with production installer contract
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: |
+          git reset --hard HEAD && git clean -fd
+          python ci_video_provider_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+          python quality/final_visual_semantic_qa_regression_test.py
+          python quality/still_image_motion_fallback_regression_test.py
