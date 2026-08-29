@@ -1,13 +1,13 @@
 """Canonical Subject Grounding Supply V1.
 
 This module supplies identity metadata; it does NOT change the Canonical Subject
-Grounding Gate V1.  The trust boundary is deliberately asymmetric:
+Grounding Gate V1. The trust boundary is deliberately asymmetric:
 
 * Candidate-model fields are untrusted hints.
 * Only repo-owned or caller-injected trusted identity records may populate the
   private ``_trusted_grounding_evidence`` channel.
 * A record is usable only when its documented physical-feature observation and
-  context jointly match the Candidate text.  The resolver never maps one
+  context jointly match the Candidate text. The resolver never maps one
   appearance word directly to a technical entity.
 
 No network/API call, retry, or model call is performed here.
@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 import re
-from typing import Any, Dict, Iterable, List, Sequence
+from typing import Any, Dict, List, Sequence
 
 
 _TRUSTED_RECORD_TYPE = "trusted_subject_identity"
@@ -155,7 +155,7 @@ def supply_trusted_subject_grounding(
         if _valid_trusted_record(record) and _record_matches_candidate(text, record):
             matches.append(record)
 
-    # Fail closed on no match OR competing identities.  The supplier never
+    # Fail closed on no match OR competing identities. The supplier never
     # chooses between multiple plausible physical identities.
     canonicals = {_normalize(record.get("canonical_subject")) for record in matches}
     if len(matches) != 1 or len(canonicals) != 1:
@@ -177,10 +177,10 @@ def supply_trusted_subject_grounding(
     return result
 
 
-# Repo-owned authoritative identity provenance.  These are evidence records,
-# not surface-word mappings.  Each record binds an official source statement to
-# a complete physical observation + context; the generic resolver above decides
-# whether a Candidate actually matches that evidence.
+# Repo-owned authoritative identity provenance. These are evidence records,
+# not surface-word mappings. Each record binds an official source statement to
+# complete physical observation/context descriptions; the generic resolver
+# above decides whether a Candidate actually matches that evidence.
 PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
     {
         "record_type": "trusted_subject_identity",
@@ -188,12 +188,14 @@ PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
         "canonical_subject": "jet engine nacelle/nozzle chevrons",
         "identity_confidence": 0.98,
         "feature_descriptions": [
-            "sawtooth or serrated trailing edges",
-            "엔진 뒤쪽의 톱니 모양 또는 톱니처럼 생긴 가장자리",
+            "sawtooth or serrated trailing edges on a jet engine nacelle or nozzle",
+            "비행기 엔진 뒤는 톱니처럼 생긴 가장자리",
+            "비행기 엔진 뒤쪽의 톱니 모양 가장자리",
         ],
         "context_descriptions": [
             "jet engine nacelle or nozzle on an aircraft",
             "비행기 제트 엔진 나셀 또는 노즐 뒤쪽",
+            "비행기 엔진 뒤는",
             "비행기 엔진 뒤쪽",
         ],
         "source": "https://www.nasa.gov/image-article/nasa-contribution-chevrons/",
