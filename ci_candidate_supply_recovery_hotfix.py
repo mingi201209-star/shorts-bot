@@ -213,3 +213,7 @@ if MARKER in text:
 else:
     path.write_text(text + PATCH, encoding="utf-8")
     print("✅ Bounded Candidate Explorer supply recovery hotfix applied")
+
+# Keep semantic identity fail-close in the existing bounded Candidate recovery
+# production chain. This adds no API call and does not increase retries.
+import ci_canonical_subject_grounding_hotfix

@@ -1,0 +1,63 @@
+name: Canonical Subject Grounding Regression
+
+on:
+  pull_request:
+    paths:
+      - "quality/canonical_subject_grounding.py"
+      - "quality/canonical_subject_grounding_regression_test.py"
+      - "quality/canonical_subject_grounding_production_wiring_regression_test.py"
+      - "quality/judge.py"
+      - "main.py"
+      - "content/candidate_explorer.py"
+      - "ci_candidate_supply_recovery_hotfix.py"
+      - "ci_canonical_subject_grounding_hotfix.py"
+      - ".github/workflows/canonical_subject_grounding_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Focused Canonical Subject Grounding regression
+        run: python -m quality.canonical_subject_grounding_regression_test
+      - name: Apply production grounding composition
+        run: python ci_candidate_supply_recovery_hotfix.py
+      - name: Production boundary wiring regression
+        run: python -m quality.canonical_subject_grounding_production_wiring_regression_test
+      - name: Syntax check touched runtime surfaces
+        run: |
+          python -m py_compile \
+            quality/canonical_subject_grounding.py \
+            ci_canonical_subject_grounding_hotfix.py \
+            ci_candidate_supply_recovery_hotfix.py \
+            content/candidate_explorer.py \
+            quality/judge.py \
+            main.py
+      - name: Install Script V2 dependency
+        run: python -m pip install openai
+      - name: Apply established Script V2 base hotfix
+        run: python ci_script_v2_visual_goal_hotfix.py
+      - name: Script V2 deterministic regressions
+        run: |
+          python -m quality.script_engine_v2_regression_test
+          python -m quality.script_engine_v2_failure_fixtures_test
+          python -m quality.script_engine_v2_runner_regression_test
+          python -m quality.script_engine_v2_run_32696711123_regression_test
+          python -m quality.script_engine_v2_text_alias_regression_test
+          python -m quality.script_generator_router_regression_test
+          python - <<'PY'
+          from content.script_engine_v2 import MAX_SCRIPT_API_CALLS, MAX_LOCAL_REPAIR_CALLS
+          assert MAX_SCRIPT_API_CALLS == 3
+          assert MAX_LOCAL_REPAIR_CALLS == 2
+          print("SCRIPT V2 API CEILING: PASS")
+          PY
+      - name: Install Visual Subject Anchor test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Visual Subject Anchor Contract V1 regression
+        run: python quality/visual_subject_anchor_contract_v1_regression_test.py
