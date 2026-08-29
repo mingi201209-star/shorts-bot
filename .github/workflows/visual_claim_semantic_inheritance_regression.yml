@@ -1,0 +1,23 @@
+name: Visual Claim Semantic Inheritance Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_visual_claim_semantic_inheritance_hotfix.py'
+      - 'ci_visual_claim_semantic_inheritance_regression_test.py'
+      - 'ci_visual_subject_anchor_fallback_inheritance_hotfix.py'
+      - '.github/workflows/visual_claim_semantic_inheritance_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run Run-33250343057 regression
+        run: python ci_visual_claim_semantic_inheritance_regression_test.py
