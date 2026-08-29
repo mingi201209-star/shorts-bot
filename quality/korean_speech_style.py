@@ -32,6 +32,17 @@ CASUAL_POLITE_RE = re.compile(
     r"(?:해요|돼요|되어요|이에요|예요|거예요|것이에요|나요|군요|네요|죠|세요|요)$"
 )
 
+# Speech-style validation is about finite sentence endings. A short title-like,
+# nominal, or rhetorical fragment has no finite predicate ending to classify as
+# 하십시오체 vs 반말. Keep common informal finite endings explicit so allowing
+# fragments cannot admit ordinary plain declarative/imperative/question forms.
+INFORMAL_FINITE_RE = re.compile(
+    r"(?:한다|된다|인다|진다|간다|온다|난다|준다|둔다|본다|쓴다|"
+    r"찾는다|줄인다|줄어든다|낮아진다|펼쳐진다|돌아간다|"
+    r"있다|없다|같다|이다|아니다|한다|했다|됐다|된다|"
+    r"일까|인가|는가|냐|니|자|라)$"
+)
+
 
 def _clean_sentence(text):
     return str(text or "").strip().strip('\"\'“”‘’()[]{}<>').strip()
@@ -44,6 +55,31 @@ def _terminal(text):
 def _is_nominal_hook(text):
     terminal = _terminal(text)
     return bool(terminal) and terminal.endswith(HOOK_NOMINAL_ENDINGS)
+
+
+def _is_nonfinite_fragment(sentence):
+    """Return True only when there is no finite speech-style ending to judge."""
+    cleaned = _clean_sentence(sentence)
+    terminal = _terminal(cleaned)
+    if not terminal:
+        return False
+
+    if terminal.endswith(FORMAL_ENDINGS) or CASUAL_POLITE_RE.search(terminal):
+        return False
+    if INFORMAL_FINITE_RE.search(terminal):
+        return False
+
+    # Non-formal questions are still finite utterances, not fragments.
+    if cleaned.rstrip().endswith("?"):
+        return False
+
+    # Any remaining terminal ending in plain-declarative ~다 is conservatively
+    # treated as finite. This protects unseen 반말 predicates without a broad
+    # morphology rewrite; fragments such as "..., 과연." do not end this way.
+    if terminal.endswith("다"):
+        return False
+
+    return True
 
 
 def validate_korean_speech_text(text, *, allow_nominal=False):
@@ -81,6 +117,11 @@ def validate_korean_speech_text(text, *, allow_nominal=False):
             continue
 
         if allow_nominal and _is_nominal_hook(sentence):
+            continue
+
+        # A fragment has no finite predicate ending, so there is no speech-style
+        # ending to reject. This is distinct from allowing an informal sentence.
+        if _is_nonfinite_fragment(sentence):
             continue
 
         return False, f"격식체(하십시오체) 이외 종결 감지: {sentence}"
