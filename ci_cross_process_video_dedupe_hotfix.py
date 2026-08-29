@@ -121,3 +121,4 @@ if "FINAL_VISUAL_SEMANTIC_QA_V1" in main_text:
 # Writer compliance is deliberately applied last in the existing production hotfix
 # chain so earlier Script V2 installers cannot overwrite the plan-first contract.
 import ci_writer_compliance_plan_hotfix  # noqa: F401,E402
+import ci_grounded_claim_plan_hotfix  # noqa: F401,E402
