@@ -8,8 +8,9 @@ import importlib
 import runpy
 
 
-# Reproduce the production hotfix composition before importing the V2 modules.
+# Reproduce the production Writer composition before importing the V2 modules.
 runpy.run_path("ci_writer_compliance_plan_hotfix.py", run_name="__main__")
+runpy.run_path("ci_grounded_claim_plan_hotfix.py", run_name="__main__")
 
 import content.script_engine_v2 as engine
 import content.script_engine_v2_runner as runner
@@ -176,9 +177,9 @@ def assert_run_332398_plan_and_rejection():
         "scenes": [
             _scene("비행기 엔진 뒤는 톱니처럼 생겼습니다.", "aircraft jet engine chevron"),
             _scene("그런데 비행기 엔진 뒤가 톱니처럼 생긴 이유는 무엇일까요?", "jet engine chevron detail"),
-            _scene("엔진 뒤에서는 뜨거운 배기 흐름과 더 차가운 바깥 흐름이 서로 만납니다.", "jet exhaust flow interface"),
+            _scene("엔진 뒤에서는 뜨거운 배기 흐름과 더 차가운 바깥 공기 흐름이 서로 만납니다.", "jet exhaust flow interface"),
             _scene("톱니 가장자리는 이 두 흐름이 섞이는 방식을 바꿉니다.", "chevron exhaust flow mixing"),
-            _scene("그래서 두 흐름의 경계가 한꺼번에 끊기지 않고 더 점진적으로 섞입니다.", "chevron gradual flow mixing"),
+            _scene("그래서 두 흐름 사이의 급격한 경계가 더 점진적인 전환으로 바뀝니다.", "chevron gradual flow transition"),
             _scene("그 결과 셰브론의 주된 효과는 제트 소음을 줄이는 것입니다.", "jet engine noise reduction"),
         ],
     }
