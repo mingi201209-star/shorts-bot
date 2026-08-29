@@ -44,9 +44,27 @@ jobs:
         run: |
           git reset --hard HEAD
           git clean -fd
+      - name: Apply FACT Critical production hotfix chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
       - name: FACT Critical regression
-        run: python -m quality.fact_critical_regeneration_test
+        env:
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+        run: PYTHONPATH=. python quality/fact_critical_regeneration_test.py
+      - name: Restore checkout after FACT installer regression
+        run: |
+          git reset --hard HEAD
+          git clean -fd
+      - name: Apply established Script V2 production hotfix
+        run: python ci_script_v2_visual_goal_hotfix.py
       - name: Script V2 regression
         run: python -m quality.script_engine_v2_regression_test
+      - name: Restore checkout after Script V2 installer regression
+        run: |
+          git reset --hard HEAD
+          git clean -fd
       - name: Visual Subject Anchor regression
-        run: python -m quality.visual_subject_anchor_contract_v1_regression_test
+        run: PYTHONPATH=. python quality/visual_subject_anchor_contract_v1_regression_test.py
