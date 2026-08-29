@@ -23,7 +23,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install focused runtime dependency
-        run: python -m pip install requests
+        run: python -m pip install requests openai
       - name: Run verifier contract regression
         run: python quality/still_image_verifier_contract_regression_test.py
       - name: Run verified still budget regression
