@@ -56,12 +56,12 @@ def run():
             _trusted_record(
                 "jet engine nacelle/nozzle chevrons",
                 feature_descriptions=(
-                    "sawtooth or serrated trailing edges",
-                    "엔진 뒤쪽의 톱니 모양 또는 톱니처럼 생긴 가장자리",
+                    "sawtooth or serrated trailing edges on a jet engine nacelle or nozzle",
+                    "비행기 엔진 뒤는 톱니처럼 생긴 가장자리",
                 ),
                 context_descriptions=(
                     "jet engine nacelle or nozzle on an aircraft",
-                    "비행기 엔진 뒤쪽",
+                    "비행기 엔진 뒤는",
                 ),
                 source="NASA: nasa.gov/image-article/nasa-contribution-chevrons/",
             )
@@ -110,7 +110,7 @@ def run():
                 ),
                 context_descriptions=(
                     "aircraft wing high-lift device",
-                    "비행기 날개",
+                    "비행기 날개의",
                 ),
                 source="FAA Airplane Flying Handbook",
             )
@@ -127,7 +127,7 @@ def run():
             _trusted_record(
                 "aircraft trailing-edge flap",
                 feature_descriptions=("비행기 날개의 플랩",),
-                context_descriptions=("비행기 날개",),
+                context_descriptions=("비행기 날개의",),
                 source="FAA Airplane Flying Handbook",
             )
         ],
