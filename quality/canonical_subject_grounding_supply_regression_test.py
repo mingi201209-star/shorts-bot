@@ -6,7 +6,7 @@ trusted supplier was not actually installed on the live Candidate path.
 """
 
 from pathlib import Path
-import importlib
+import runpy
 import subprocess
 import sys
 
@@ -181,17 +181,21 @@ def run():
     print("CASE F non-physical concept unchanged: PASS")
 
     # Production-path regression: run the real Candidate hotfix wiring, then
-    # traverse validate_explorer_output's actual normalization/copy path.
+    # execute the patched file from disk so no parent-process module cache can
+    # hide the installer output. This traverses validate_explorer_output's real
+    # normalization/copy path before the Supply wrapper receives the result.
     _apply_production_candidate_wiring()
-    import content.candidate_explorer as candidate_explorer
-    candidate_explorer = importlib.reload(candidate_explorer)
+    candidate_explorer = runpy.run_path(
+        "content/candidate_explorer.py",
+        run_name="production_candidate_explorer_regression",
+    )
 
     parsed = {
         "status": "SELECTED",
         "winner": _production_candidate(FIXED_CHEVRON_TOPIC),
         "runner_up": None,
     }
-    production_result = candidate_explorer.validate_explorer_output(parsed)
+    production_result = candidate_explorer["validate_explorer_output"](parsed)
     winner = production_result["winner"]
 
     assert winner["canonical_subject"] == EXPECTED_CHEVRON_CANONICAL, winner
