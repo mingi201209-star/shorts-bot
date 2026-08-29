@@ -6,14 +6,14 @@ survives stock fallback, still generation/reuse, Vision evidence and explanation
 """
 from pathlib import Path
 import runpy
-import subprocess
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# Established subject + explanatory stock guards (#253/#254).
+# Established subject/explanatory guards (#253/#254), including their false-
+# positive corpus, run first on the pristine checkout and expose helpers below.
 base = runpy.run_path(str(ROOT / "quality/run_33248013901_visual_anchor_regression_test.py"))
 vd = base["vd"]
 candidate = base["candidate"]
@@ -31,7 +31,6 @@ from video import grounded_explanatory_visual as gev  # noqa: E402
 from video import hook_visual_dominance as dominance  # noqa: E402
 from video import still_image_fallback as still  # noqa: E402
 from video import visual_explanation as vx  # noqa: E402
-
 
 SCENE3 = {
     "scene_id": 3,
@@ -101,8 +100,7 @@ try:
 
     # K. #256 trusted parent-domain behavior remains unchanged for Scene 2.
     dominance.evaluate_hook_subject_dominance = lambda candidate, scene: vision_result(
-        visible_components=["engine", "chevron", "airflow"],
-        explanatory_groups=[],
+        visible_components=["engine", "chevron", "airflow"], explanatory_groups=[]
     )
     verified, evidence = still._verify_motion_clip(SCENE2, ROOT / "mock-scene2.mp4")
     assert verified is True, evidence
@@ -121,14 +119,12 @@ finally:
 
 # C/D/E/F. #254 still controls stock/fallback acceptance.
 scene3_query = strengthened(
-    "jet engine flow interface",
-    narration=SCENE3["text"],
-    goal=SCENE3["visual_goal"],
+    "jet engine flow interface", narration=SCENE3["text"], goal=SCENE3["visual_goal"]
 )
 for bad in (
-    candidate(56001, "aircraft airplane aviation jet engine closeup detail"),  # C generic engine
-    candidate(56002, "aircraft jet engine exhaust airflow plume"),  # D flow only
-    candidate(56003, "water fluid boundary interface junction meeting"),  # E no jet-engine subject
+    candidate(56001, "aircraft airplane aviation jet engine closeup detail"),
+    candidate(56002, "aircraft jet engine exhaust airflow plume"),
+    candidate(56003, "water fluid boundary interface junction meeting"),
 ):
     tier, _ = vd.general_scene_unknown_safe_tier(bad, "airplane engine detail")
     assert tier >= 5, (bad.get("id"), tier)
@@ -137,8 +133,7 @@ complete = candidate(56004, "aircraft jet engine exhaust airflow plume boundary 
 tier, label = vd.general_scene_unknown_safe_tier(complete, "airplane engine detail")
 assert tier < 5, (tier, label)
 
-# F. Specificity fallback may change lexical query, but the authoritative
-# contract still retains the entire explanatory nucleus.
+# F. Lexical fallback may broaden, but authority still retains flow+interface.
 fallbacks = vd._general_fallback_queries(scene3_query)
 assert fallbacks, fallbacks
 selection_contract = vd.get_current_visual_subject_anchor_contract()
@@ -148,14 +143,14 @@ for fallback in fallbacks:
     tier, _ = vd.general_scene_unknown_safe_tier(complete, fallback)
     assert tier < 5, (fallback, tier)
 
-# G. Still generation and reuse signatures preserve both explanatory groups.
+# G. Still generation/reuse preserves both explanatory groups.
 prompt = still._prompt(SCENE3).lower()
 assert "flow" in prompt and "interface" in prompt and "single" in prompt, prompt
 signature = still._anchor_signature(SCENE3)
 assert "explain:flow" in signature and "explain:interface" in signature, signature
 assert still._anchor_signature(SCENE2) != signature
 
-# G2. VisualExplanation safely supports this grounded relation without an API call.
+# G2. VisualExplanation safely supports this grounded relation with zero API calls.
 plan = vx.plan_explanation(SCENE3)
 assert plan and plan.get("template") == "FLOW_INTERFACE", plan
 assert vx.annotation_fact_safe(SCENE3, plan) is True
@@ -182,7 +177,7 @@ finally:
     (ROOT / "mock-flow-interface.mp4").unlink(missing_ok=True)
 
 # H. Scene 4 #254 behavior remains: flow+mixing required in addition to subject.
-scene4_query = strengthened(
+strengthened(
     "jet engine chevron flow mixing",
     narration="톱니 모양 셰브론은 배기 흐름과 주변 흐름이 섞이는 방식을 바꿉니다.",
     goal="제트 엔진 뒤 셰브론과 흐름 혼합을 보여준다.",
@@ -195,7 +190,7 @@ tier, _ = vd.general_scene_unknown_safe_tier(mixing, "airplane engine chevron de
 assert tier < 5
 
 # I. Scene 5 #254 behavior remains: noise+reduction required.
-scene5_query = strengthened(
+strengthened(
     "jet engine noise reduction",
     narration="대표적인 결과는 제트 엔진 소음 감소입니다.",
     goal="제트 엔진과 소음 감소 결과를 보여준다.",
@@ -207,10 +202,7 @@ noise_reduction = candidate(56008, "aircraft jet engine acoustic noise reduction
 tier, _ = vd.general_scene_unknown_safe_tier(noise_reduction, "airplane engine")
 assert tier < 5
 
-# J. Re-run the established counterexample suites: 1/3, 2/3, gas-stove/
-# Unreal Engine, clock/engineering and green-screen/chroma stay fail-closed;
-# #255 supply and #256 state propagation remain intact.
-subprocess.run([sys.executable, str(ROOT / "quality/run_33251901169_visual_supply_regression_test.py")], cwd=ROOT, check=True)
-subprocess.run([sys.executable, str(ROOT / "quality/run_33254306556_still_pass_propagation_regression_test.py")], cwd=ROOT, check=True)
-
+# J. The established #253/#254 false-positive corpus already executed at the top
+# in its pristine-install state. Dedicated #255/#256 workflows run independently
+# in CI so runtime installers are not re-applied to an already patched checkout.
 print("RUN 33256014054 FLOW_INTERFACE GROUNDED VISUAL SUPPLY REGRESSION: PASS")
