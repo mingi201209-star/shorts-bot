@@ -228,5 +228,11 @@ main.write_text(text, encoding="utf-8")
 from ci_still_image_verifier_contract_hotfix import main as _patch_still_image_verifier_contract
 _patch_still_image_verifier_contract()
 
+# Run 33259567582: after #256 is installed, make the same existing Vision call
+# return explicit required subject groups and preserve approved structured
+# chevron aliases. This does not add a call or relax any gate.
+from ci_still_vision_evidence_groups_hotfix import main as _patch_still_vision_evidence_groups
+_patch_still_vision_evidence_groups()
+
 print("FINAL_VISUAL_SEMANTIC_QA_V1 installed")
 print("STILL_IMAGE_MOTION_FALLBACK_V1 installed")
