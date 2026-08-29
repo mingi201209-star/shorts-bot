@@ -22,16 +22,22 @@ def _base_candidate(topic: str):
     }
 
 
-def _trusted_record(canonical: str, *, feature: str, context: str, source: str):
+def _trusted_record(
+    canonical: str,
+    *,
+    feature_descriptions,
+    context_descriptions,
+    source: str,
+):
     return {
         "record_type": "trusted_subject_identity",
         "canonical_subject": canonical,
         "subject_kind": "physical_entity",
         "identity_confidence": 0.97,
-        "feature_description": feature,
-        "context_description": context,
+        "feature_descriptions": list(feature_descriptions),
+        "context_descriptions": list(context_descriptions),
         "source": source,
-        "detail": f"trusted source explicitly identifies {feature} as {canonical}",
+        "detail": f"trusted source explicitly identifies the documented feature as {canonical}",
     }
 
 
@@ -49,8 +55,14 @@ def run():
         trusted_records=[
             _trusted_record(
                 "jet engine nacelle/nozzle chevrons",
-                feature="sawtooth or serrated trailing edges",
-                context="jet engine nacelle or nozzle on an aircraft",
+                feature_descriptions=(
+                    "sawtooth or serrated trailing edges",
+                    "엔진 뒤쪽의 톱니 모양 또는 톱니처럼 생긴 가장자리",
+                ),
+                context_descriptions=(
+                    "jet engine nacelle or nozzle on an aircraft",
+                    "비행기 엔진 뒤쪽",
+                ),
                 source="NASA: nasa.gov/image-article/nasa-contribution-chevrons/",
             )
         ],
@@ -92,8 +104,14 @@ def run():
         trusted_records=[
             _trusted_record(
                 "aircraft trailing-edge flap",
-                feature="flap on the trailing edge of an aircraft wing",
-                context="aircraft wing high-lift device",
+                feature_descriptions=(
+                    "flap on the trailing edge of an aircraft wing",
+                    "비행기 날개의 플랩",
+                ),
+                context_descriptions=(
+                    "aircraft wing high-lift device",
+                    "비행기 날개",
+                ),
                 source="FAA Airplane Flying Handbook",
             )
         ],
@@ -108,8 +126,8 @@ def run():
         trusted_records=[
             _trusted_record(
                 "aircraft trailing-edge flap",
-                feature="flap on the trailing edge of an aircraft wing",
-                context="aircraft wing high-lift device",
+                feature_descriptions=("비행기 날개의 플랩",),
+                context_descriptions=("비행기 날개",),
                 source="FAA Airplane Flying Handbook",
             )
         ],
