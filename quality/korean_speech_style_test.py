@@ -16,6 +16,8 @@ def test_sentence_examples():
         "개미는 태양을 이용해 방향을 찾습니다.",
         "이 구조에는 놀라운 이유가 있습니다.",
         "왜 이런 모양일까요?",
+        "바로 이 부분입니다.",
+        "엔진 앞의 소용돌이 무늬입니다.",
     ]
     fail_examples = [
         "개미는 태양을 이용해 방향을 찾아요.",
@@ -25,6 +27,10 @@ def test_sentence_examples():
         "태양의 위치를 이용한다.",
         "놀라운 비밀이 있다.",
         "왜 이런 모양일까?",
+        "플랩이 펼쳐진다.",
+        "엔진이 돌아간다.",
+        "압력이 줄어든다.",
+        "중요한 역할을 한다.",
     ]
 
     for text in pass_examples:
@@ -34,6 +40,21 @@ def test_sentence_examples():
     for text in fail_examples:
         valid, reason = validate_korean_speech_text(text)
         _assert(f"non-formal example rejected: {text} / {reason}", not valid)
+
+
+def test_rhetorical_fragment_policy():
+    production_fixture = "비행기 날개 끝에 달린 작은 막대, 과연."
+    valid, reason = validate_korean_speech_text(production_fixture)
+    _assert(f"Run 33229150693 non-finite rhetorical fragment accepted: {reason}", valid)
+
+    fragment_examples = [
+        "날개 끝의 작은 막대.",
+        "그렇다면 진짜 이유는 무엇인지, 과연.",
+        "엔진 앞의 작은 표시, 바로 이것.",
+    ]
+    for text in fragment_examples:
+        valid, reason = validate_korean_speech_text(text)
+        _assert(f"non-finite fragment is not misclassified as informal: {text} / {reason}", valid)
 
 
 def test_multi_sentence_and_multi_scene():
@@ -113,6 +134,7 @@ def test_nonformal_hook_cannot_win():
 
 def main():
     test_sentence_examples()
+    test_rhetorical_fragment_policy()
     test_multi_sentence_and_multi_scene()
     test_nominal_hook_policy()
     test_nonformal_hook_cannot_win()
