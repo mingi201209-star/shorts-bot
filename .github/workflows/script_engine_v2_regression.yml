@@ -104,10 +104,10 @@ jobs:
       # Run composition-mutating Writer regressions last so the established V2
       # checks above continue to exercise the uncomposed base exactly as before.
       - name: Writer Compliance Plan-First regression
-        run: python quality/writer_compliance_plan_regression_test.py
+        run: python -m quality.writer_compliance_plan_regression_test
 
       - name: Grounded Claim Plan regression
-        run: python quality/script_engine_v2_grounded_claim_plan_regression_test.py
+        run: python -m quality.script_engine_v2_grounded_claim_plan_regression_test
 
       - name: Run 33241229064 grounded causal-role counterexample
-        run: python quality/grounded_causal_role_distinction_regression_test.py
+        run: python -m quality.grounded_causal_role_distinction_regression_test
