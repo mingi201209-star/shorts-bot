@@ -43,7 +43,18 @@ def _source_evidence(subject):
             "evidence_type": "source_backed_identity",
             "supports_subject": subject,
             "source": "verified-test-source",
-            "detail": f"The source identifies the physical subject as {subject}.",
+            "detail": f"The trusted source identifies the subject as {subject}.",
+        }
+    ]
+
+
+def _explicit_evidence(subject):
+    return [
+        {
+            "evidence_type": "explicit_candidate_identity",
+            "supports_subject": subject,
+            "source": "candidate_text",
+            "detail": f"The Candidate explicitly names {subject}.",
         }
     ]
 
@@ -55,7 +66,7 @@ def test_run_33230137096_unknown_small_rod_blocks_mechanism():
     assert result["mechanism_inference_allowed"] is False
 
 
-def test_ambiguous_surface_description_can_proceed_after_real_grounding():
+def test_model_authored_source_claim_cannot_self_ground_ambiguous_subject():
     candidate = _physical_candidate(
         "비행기 날개 끝의 작은 막대는 왜 달려 있을까",
         "static discharger",
@@ -63,26 +74,39 @@ def test_ambiguous_surface_description_can_proceed_after_real_grounding():
         _source_evidence("static discharger"),
     )
     result = evaluate_candidate_subject_grounding(candidate)
+    assert result["status"] == "BLOCK"
+    assert result["mechanism_inference_allowed"] is False
+
+
+def test_ambiguous_surface_description_can_proceed_after_trusted_grounding():
+    candidate = _physical_candidate(
+        "비행기 날개 끝의 작은 막대는 왜 달려 있을까",
+        "static discharger",
+        0.96,
+        [],
+    )
+    candidate["_trusted_grounding_evidence"] = _source_evidence("static discharger")
+    result = evaluate_candidate_subject_grounding(candidate)
     assert result["status"] == "PASS"
     assert result["mechanism_inference_allowed"] is True
 
 
 def test_explicit_winglet_with_grounding_keeps_existing_path():
     candidate = _physical_candidate(
-        "비행기 윙렛은 왜 위로 꺾여 있을까",
+        "비행기 winglet은 왜 위로 꺾여 있을까",
         "winglet",
         0.99,
-        _source_evidence("winglet"),
+        _explicit_evidence("winglet"),
     )
     assert evaluate_candidate_subject_grounding(candidate)["status"] == "PASS"
 
 
 def test_explicit_flap_with_grounding_keeps_existing_path():
     candidate = _physical_candidate(
-        "비행기 플랩은 착륙할 때 왜 펼쳐질까",
+        "비행기 flap은 착륙할 때 왜 펼쳐질까",
         "flap",
         0.99,
-        _source_evidence("flap"),
+        _explicit_evidence("flap"),
     )
     assert evaluate_candidate_subject_grounding(candidate)["status"] == "PASS"
 
@@ -122,14 +146,14 @@ def test_fact_cannot_pass_unknown_identity_on_mechanism_plausibility():
     assert result["failure_type"] == "SUBJECT_IDENTITY_UNRESOLVED"
 
 
-def test_fact_allows_grounded_identity_to_reach_normal_fact_judge():
+def test_fact_allows_prevalidated_grounded_identity_to_reach_normal_fact_judge():
     script_data = {
-        "topic": "비행기 윙렛은 왜 위로 꺾여 있을까",
+        "topic": "비행기 winglet은 왜 위로 꺾여 있을까",
         "subject_grounding": {
             "subject_kind": "physical_entity",
             "canonical_subject": "winglet",
             "subject_identity_confidence": 0.99,
-            "grounding_evidence": _source_evidence("winglet"),
+            "grounding_evidence": _explicit_evidence("winglet"),
         },
         "scenes": [],
     }
@@ -139,12 +163,13 @@ def test_fact_allows_grounded_identity_to_reach_normal_fact_judge():
 if __name__ == "__main__":
     tests = [
         test_run_33230137096_unknown_small_rod_blocks_mechanism,
-        test_ambiguous_surface_description_can_proceed_after_real_grounding,
+        test_model_authored_source_claim_cannot_self_ground_ambiguous_subject,
+        test_ambiguous_surface_description_can_proceed_after_trusted_grounding,
         test_explicit_winglet_with_grounding_keeps_existing_path,
         test_explicit_flap_with_grounding_keeps_existing_path,
         test_non_physical_transition_does_not_false_positive,
         test_fact_cannot_pass_unknown_identity_on_mechanism_plausibility,
-        test_fact_allows_grounded_identity_to_reach_normal_fact_judge,
+        test_fact_allows_prevalidated_grounded_identity_to_reach_normal_fact_judge,
     ]
     for test in tests:
         test()
