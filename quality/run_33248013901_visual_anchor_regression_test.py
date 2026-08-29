@@ -82,8 +82,14 @@ assert vd.candidate_anchor_compatibility(correct, scene4_query)["compatible"] is
 assert vd.choose_best_candidate([correct], subject_filter_query=scene4_query) is not None
 
 
-# Run 33249110048: the original Scene contract must survive the entire
-# specificity ladder. Fallback query wording must not weaken 3 required anchors.
+# Run 33249110048: re-establish the opening Scene contract exactly as production
+# does before entering that Scene's specificity ladder, then change only the
+# retrieval query wording. The original required anchors must stay authoritative.
+opening_query = strengthened(
+    "airflow detail stage 1",
+    narration="비행기 엔진 뒤는 톱니처럼 생겼습니다.",
+    goal="비행기 엔진 뒤 톱니 모양 배기구를 명확하게 보여준다.",
+)
 fallback_query = "airplane engine chevron detail"
 engine_only = candidate(99101, "engine turbine machinery detail")
 aircraft_engine = candidate(99102, "aircraft airplane aviation jet engine detail")
