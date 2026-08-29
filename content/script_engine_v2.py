@@ -159,7 +159,9 @@ def build_narrative_plan(candidate: Dict[str, Any], approved_hook: str = "") -> 
     concepts = tuple((focus + visual)[:6])
 
     retention = build_retention_plan(candidate)
-    scene_count = max(7, min(13, int(retention["min_scenes"])))
+    scene_count = int(retention["target_scene_count"])
+    if scene_count < 5:
+        raise ValueError("retention target_scene_count must preserve opening/reveal/payoff roles")
 
     contracts = [
         SceneContract(1, "phenomenon", True, hook, forbidden=("question", "answer")),
@@ -236,6 +238,14 @@ def writer_payload(candidate: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str,
             "easy_language": True,
             "do_not_change_locked_text": True,
             "answer_only_in_reveal_payoff": True,
+            "new_information_each_scene": True,
+            "do_not_restate_previous_mechanism": True,
+            "single_payoff_only": True,
+            "do_not_pad_runtime_or_scene_count": True,
+            "no_generic_evaluation_scene": True,
+            "no_visual_goal_or_meta_narration": True,
+            "no_positive_effect_unless_supported_by_facts": True,
+            "compress_single_causal_chain": True,
             "max_total_api_calls": MAX_SCRIPT_API_CALLS,
         },
     }
@@ -345,6 +355,10 @@ def local_repair_payload(
             "do_not_rewrite_other_scenes": True,
             "locked_scene_text_is_immutable": True,
             "metadata_on_locked_scenes_may_be_repaired": True,
+            "new_information_each_scene": True,
+            "do_not_restate_previous_mechanism_or_payoff": True,
+            "no_generic_evaluation_scene": True,
+            "no_positive_effect_unless_supported_by_facts": True,
             "max_local_repair_calls": MAX_LOCAL_REPAIR_CALLS,
         },
     }
