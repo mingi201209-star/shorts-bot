@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - "ci_canonical_visual_supply_contract_hotfix.py"
+      - "ci_still_image_verifier_contract_hotfix.py"
       - "ci_visual_subject_anchor_contract_v2_hotfix.py"
       - "ci_visual_subject_anchor_fallback_inheritance_hotfix.py"
       - "ci_visual_claim_semantic_fallback_hotfix.py"
       - "quality/canonical_subject_grounding_supply.py"
       - "quality/run_33251901169_visual_supply_regression_test.py"
+      - "quality/run_33254306556_still_pass_propagation_regression_test.py"
       - "video/video_downloader.py"
       - "video/video_engine.py"
       - "video/still_image_fallback.py"
@@ -20,11 +22,13 @@ on:
     branches: [main]
     paths:
       - "ci_canonical_visual_supply_contract_hotfix.py"
+      - "ci_still_image_verifier_contract_hotfix.py"
       - "ci_visual_subject_anchor_contract_v2_hotfix.py"
       - "ci_visual_subject_anchor_fallback_inheritance_hotfix.py"
       - "ci_visual_claim_semantic_fallback_hotfix.py"
       - "quality/canonical_subject_grounding_supply.py"
       - "quality/run_33251901169_visual_supply_regression_test.py"
+      - "quality/run_33254306556_still_pass_propagation_regression_test.py"
       - "video/video_downloader.py"
       - "video/video_engine.py"
       - "video/still_image_fallback.py"
@@ -33,6 +37,19 @@ on:
       - ".github/workflows/canonical_visual_supply_regression.yml"
 
 jobs:
+  pass-propagation:
+    runs-on: ubuntu-latest
+    env:
+      PYTHONPATH: .
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run 33254306556 Scene 2 PASS propagation counterexamples
+        run: python quality/run_33254306556_still_pass_propagation_regression_test.py
+
   focused:
     runs-on: ubuntu-latest
     env:
@@ -43,7 +60,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
-      - name: Run 33251901169 supply counterexamples
+      - name: Run 33251901169 canonical supply counterexamples
         run: python quality/run_33251901169_visual_supply_regression_test.py
 
   script-v2:
@@ -69,6 +86,9 @@ jobs:
       fail-fast: false
       matrix:
         test:
+          - quality/final_visual_semantic_qa_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
+          - quality/fact_critical_regeneration_test.py
           - quality/visual_explanation_retrieval_v1_regression_test.py
           - quality/first5_visual_contract_regression_test.py
           - quality/aviation_candidate_specificity_regression_test.py
