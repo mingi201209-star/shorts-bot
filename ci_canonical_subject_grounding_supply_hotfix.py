@@ -9,31 +9,39 @@ PATCH = r'''
 
 # CANONICAL_SUBJECT_GROUNDING_SUPPLY_V1
 # Deterministic trusted provenance supplier. Runs after all model/schema repair
-# output and before Candidate validation/Gate evaluation. No API call or retry.
+# output and before Candidate Gate evaluation. No API call or retry.
 from quality.canonical_subject_grounding_supply import (
     PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS,
     supply_trusted_subject_grounding,
 )
 
-_original_validate_candidate_before_grounding_supply = validate_candidate
+_original_validate_explorer_output_before_grounding_supply = validate_explorer_output
 
 
-def validate_candidate(candidate, *, prefix, runner_up=False):
-    if isinstance(candidate, dict):
-        supplied = supply_trusted_subject_grounding(
-            candidate,
+def validate_explorer_output(data):
+    # Let the complete production validation/repair/normalization chain finish
+    # first. Earlier wrappers are allowed to rebuild Candidate dicts; supplying
+    # trusted metadata before that point would be lost by those copies.
+    result = _original_validate_explorer_output_before_grounding_supply(data)
+
+    if not isinstance(result, dict) or str(result.get("status", "")).strip().upper() != "SELECTED":
+        return result
+
+    winner = result.get("winner")
+    if isinstance(winner, dict):
+        result["winner"] = supply_trusted_subject_grounding(
+            winner,
             trusted_records=PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS,
         )
-        # Preserve object identity for downstream callers that keep a reference
-        # to the parsed Candidate dict. Private provenance is attached only by
-        # the deterministic supplier above, never by model output.
-        candidate.clear()
-        candidate.update(supplied)
-    return _original_validate_candidate_before_grounding_supply(
-        candidate,
-        prefix=prefix,
-        runner_up=runner_up,
-    )
+
+    runner_up = result.get("runner_up")
+    if isinstance(runner_up, dict):
+        result["runner_up"] = supply_trusted_subject_grounding(
+            runner_up,
+            trusted_records=PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS,
+        )
+
+    return result
 '''
 
 
@@ -48,5 +56,6 @@ def main():
     print("✅ Canonical Subject Grounding Supply V1 applied")
 
 
-if __name__ == "__main__":
-    main()
+# This installer is imported by the existing production Candidate hotfix chain.
+# Execute on import so the production wiring actually installs the supplier.
+main()
