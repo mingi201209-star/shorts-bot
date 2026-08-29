@@ -1,19 +1,20 @@
 """Run 33254306556 Scene 2 still Vision PASS propagation regression.
 
-The production counterexample was:
+Production counterexample:
 - strict Vision result.pass=True
 - visible_components=engine+chevron+airflow
 - no generation artifact / factual contradiction
 - trusted canonical subject=jet engine nacelle/nozzle chevrons
 - outer still state incorrectly became rejected_by_vision
 
-This regression keeps Vision and concrete subject checks fail-closed while allowing
-an already-verified jet-engine subassembly close-up to satisfy its trusted aircraft
-parent-domain anchor without requiring a separate whole-aircraft component in-frame.
+This is a focused state-transition regression. Existing downloader/#253/#254 suites
+own the global query-anchor implementation; this fixture supplies only that narrow
+interface so it does not need to reconstruct the entire production hotfix graph.
 No network/model call is performed.
 """
 from pathlib import Path
 import sys
+import types
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -60,10 +61,39 @@ def vision_result(*, passed, visible):
     }
 
 
+# _verify_motion_clip imports only these two downloader helpers. Keep the test
+# focused on the still acceptance transition; full downloader semantics remain
+# covered by the existing visual-anchor/canonical-supply regressions.
+fake_downloader = types.ModuleType("video.video_downloader")
+
+
+def extract_query_anchors(query):
+    words = set(str(query or "").lower().replace("/", " ").split())
+    ordered = []
+    for anchor in ("aircraft", "engine", "chevron"):
+        if anchor in words:
+            ordered.append(anchor)
+    return ordered
+
+
+def _anchor_aliases(anchor):
+    aliases = {
+        "aircraft": {"aircraft", "airplane", "plane", "jet"},
+        "engine": {"engine", "jet engine", "nacelle"},
+        "chevron": {"chevron", "chevrons", "serrated", "sawtooth"},
+    }
+    return aliases.get(anchor, {anchor})
+
+
+fake_downloader.extract_query_anchors = extract_query_anchors
+fake_downloader._anchor_aliases = _anchor_aliases
+original_downloader_module = sys.modules.get("video.video_downloader")
+sys.modules["video.video_downloader"] = fake_downloader
+
 original_eval = dominance.evaluate_hook_subject_dominance
 try:
     # A. Exact LIVE contradiction: strict Vision PASS + engine/chevron proof must
-    # survive the still-specific parent-domain aggregation.
+    # survive the still-specific trusted parent-domain aggregation.
     dominance.evaluate_hook_subject_dominance = lambda candidate, scene: vision_result(
         passed=True,
         visible=["engine", "chevron", "airflow"],
@@ -76,7 +106,7 @@ try:
     assert evidence.get("pass") is True
     assert evidence.get("parent_domain_satisfied") == ["aircraft"], evidence
 
-    # B. Vision FAIL stays fail-closed even with the same visible components.
+    # B. Vision FAIL remains fail-closed even with the same visible components.
     dominance.evaluate_hook_subject_dominance = lambda candidate, scene: vision_result(
         passed=False,
         visible=["engine", "chevron", "airflow"],
@@ -87,7 +117,7 @@ try:
     )
     assert verified is False, evidence
 
-    # C. A partial engine-only still still cannot escape the chevron hard proof.
+    # C. A partial engine-only still still cannot escape chevron proof.
     dominance.evaluate_hook_subject_dominance = lambda candidate, scene: vision_result(
         passed=True,
         visible=["engine", "airflow"],
@@ -98,8 +128,8 @@ try:
     )
     assert verified is False, evidence
 
-    # D. The parent-domain exception is trusted-canonical only. Removing the
-    # canonical profile restores the literal aircraft+engine+chevron requirement.
+    # D. The parent-domain exception is trusted-canonical only. Without trusted
+    # canonical metadata, literal aircraft+engine+chevron remains required.
     untrusted_scene = dict(SCENE)
     untrusted_scene.pop("_canonical_visual_supply", None)
     dominance.evaluate_hook_subject_dominance = lambda candidate, scene: vision_result(
@@ -112,7 +142,7 @@ try:
     )
     assert verified is False, evidence
 
-    # E. Existing fully explicit 3/3 still remains accepted.
+    # E. Existing explicit 3/3 still remains accepted.
     dominance.evaluate_hook_subject_dominance = lambda candidate, scene: vision_result(
         passed=True,
         visible=["aircraft", "engine", "chevron", "airflow"],
@@ -124,5 +154,9 @@ try:
     assert verified is True, evidence
 finally:
     dominance.evaluate_hook_subject_dominance = original_eval
+    if original_downloader_module is None:
+        sys.modules.pop("video.video_downloader", None)
+    else:
+        sys.modules["video.video_downloader"] = original_downloader_module
 
 print("RUN 33254306556 STILL VISION PASS PROPAGATION REGRESSION: PASS")
