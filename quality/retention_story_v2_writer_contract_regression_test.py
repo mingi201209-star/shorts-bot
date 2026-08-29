@@ -20,12 +20,16 @@ sg = importlib.reload(importlib.import_module("content.script_generator"))
 runtime = getattr(sg, "_SCRIPT_PARITY_RUNTIME", None) or getattr(sg, "_LEGACY", None)
 assert runtime is not None
 
+# Use the same design-causality classification boundary production uses. This is
+# deliberately topic-agnostic; V2 is a Writer contract for design/structure/function
+# explainers, not a flap-specific rule.
 context = {
-    "topic": "비행기 날개 뒤쪽 플랩은 왜 이착륙 때 펼쳐질까",
-    "angle": "플랩이 낮은 속도에서 필요한 양력을 만드는 이유",
-    "core_question": "왜 이착륙 때만 플랩을 펼치는가",
+    "topic": "비행기 날개 뒤쪽 플랩 구조",
+    "angle": "플랩 구조와 기능이 낮은 속도에서 어떻게 작동하는가",
+    "core_question": "이 구조는 왜 이착륙 때 펼쳐지는가",
 }
 runtime._SCRIPT_PARITY_ACTIVE_CONTEXT = context
+assert runtime.design_causality_applicable(context), context
 
 scene_contract = runtime._adaptive_scene_count_instruction(context)
 duration_contract = runtime._adaptive_duration_instruction(context)
