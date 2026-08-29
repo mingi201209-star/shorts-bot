@@ -36,8 +36,14 @@ jobs:
           git clean -fd
       - name: Canonical Subject Grounding regression
         run: python -m quality.canonical_subject_grounding_regression_test
+      - name: Apply Candidate Grounded Recovery production hotfix
+        run: python ci_candidate_grounded_recovery_hotfix.py
       - name: Candidate Grounded Recovery regression
         run: python -m quality.candidate_grounded_recovery_regression_test
+      - name: Restore checkout after recovery installer regression
+        run: |
+          git reset --hard HEAD
+          git clean -fd
       - name: FACT Critical regression
         run: python -m quality.fact_critical_regeneration_test
       - name: Script V2 regression
