@@ -38,10 +38,13 @@ _RETENTION_FILLER_PATTERNS = (
     r"(?:은|는|이|가).{0,18}성능을\s*(?:높|향상)\w*\.?$",
     r"(?:은|는|이|가).{0,18}도움이\s*됩니다\.?$",
 )
+# Context nouns such as "이륙/착륙" do not by themselves make a summary novel.
+# These markers represent an actual mechanism, measurable consequence, contrast,
+# or state change inside the candidate sentence.
 _RETENTION_CONCRETE_PROGRESS_MARKERS = (
     "왜", "때문", "압력", "양력", "항력", "속도", "각도", "공기", "흐름", "증가",
     "감소", "낮", "높", "펼", "접", "분산", "전달", "조절", "변화", "반대로",
-    "없으면", "없다면", "착륙", "이륙", "결과", "그래서", "따라서",
+    "없으면", "없다면", "결과", "그래서", "따라서",
 )
 
 
@@ -109,8 +112,6 @@ def _retention_is_generic_filler(scene):
         return False
     if not any(re.search(pattern, body) for pattern in _RETENTION_FILLER_PATTERNS):
         return False
-    # A generic ending is allowed when the same sentence also carries a concrete
-    # mechanism/contrast/payoff step. The phrase itself is never globally banned.
     concrete_hits = sum(marker in body for marker in _RETENTION_CONCRETE_PROGRESS_MARKERS)
     return concrete_hits <= 1
 
