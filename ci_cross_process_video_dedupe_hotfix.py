@@ -125,3 +125,4 @@ import ci_grounded_claim_plan_hotfix  # noqa: F401,E402
 import ci_grounded_causal_role_hotfix  # noqa: F401,E402
 import ci_grounded_causal_contrast_hotfix  # noqa: F401,E402
 import ci_live_script_blockers_hotfix  # noqa: F401,E402
+import ci_run_33245676515_script_contract_hotfix  # noqa: F401,E402
