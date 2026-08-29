@@ -1,0 +1,72 @@
+name: Canonical Visual Supply Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_canonical_visual_supply_contract_hotfix.py"
+      - "ci_visual_subject_anchor_contract_v2_hotfix.py"
+      - "ci_visual_subject_anchor_fallback_inheritance_hotfix.py"
+      - "ci_visual_claim_semantic_fallback_hotfix.py"
+      - "quality/canonical_subject_grounding_supply.py"
+      - "quality/run_33251901169_visual_supply_regression_test.py"
+      - "video/video_downloader.py"
+      - "video/video_engine.py"
+      - "video/still_image_fallback.py"
+      - "video/visual_explanation.py"
+      - "main.py"
+      - ".github/workflows/canonical_visual_supply_regression.yml"
+  push:
+    branches: [main]
+    paths:
+      - "ci_canonical_visual_supply_contract_hotfix.py"
+      - "ci_visual_subject_anchor_contract_v2_hotfix.py"
+      - "ci_visual_subject_anchor_fallback_inheritance_hotfix.py"
+      - "ci_visual_claim_semantic_fallback_hotfix.py"
+      - "quality/canonical_subject_grounding_supply.py"
+      - "quality/run_33251901169_visual_supply_regression_test.py"
+      - "video/video_downloader.py"
+      - "video/video_engine.py"
+      - "video/still_image_fallback.py"
+      - "video/visual_explanation.py"
+      - "main.py"
+      - ".github/workflows/canonical_visual_supply_regression.yml"
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run 33251901169 supply counterexamples
+        run: python quality/run_33251901169_visual_supply_regression_test.py
+
+  related-regressions:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/visual_explanation_retrieval_v1_regression_test.py
+          - quality/first5_visual_contract_regression_test.py
+          - quality/fact_critical_regeneration_test.py
+          - quality/script_engine_v2_regression_test.py
+          - quality/aviation_candidate_specificity_regression_test.py
+          - quality/aviation_candidate_context_regression_test.py
+          - quality/aviation_context_signature_compat_regression_test.py
+          - quality/korean_speech_style_test.py
+          - quality/hook_production_parity_regression_test.py
+          - quality/retention_regression_test.py
+          - quality/retention_structure_experiment_regression_test.py
+          - quality/canonical_subject_grounding_supply_regression_test.py
+          - quality/still_image_verifier_contract_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python ${{ matrix.test }}
