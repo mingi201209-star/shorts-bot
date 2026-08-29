@@ -22,10 +22,6 @@ from content.grounded_claim_plan import _claim_effect_signatures as _grounded_cl
 
 _previous_evidence_state_delta_before_semantic_state = _evidence_state_delta
 
-# Determiners, degree/pace words and boundary-local context can modify the same
-# physical relation without creating a distinct downstream state. This list is
-# relation-agnostic and applies only after the existing grounded matcher says the
-# current transition is already semantically covered by the previous claim.
 _SEMANTIC_STATE_DELTA_MODIFIERS = {
     "the", "a", "an", "two", "both", "more", "less", "much", "slightly",
     "gradually", "progressively", "steadily", "further", "across", "along",
@@ -35,6 +31,25 @@ _SEMANTIC_STATE_DELTA_MODIFIERS = {
     "점차", "점진적", "점진적으로", "서서히", "경계", "경계면", "사이",
     "따라", "걸쳐", "방식", "정도", "두", "양쪽", "더욱", "보다",
 }
+
+
+def _semantic_delta_term(term):
+    """Normalize shallow English morphology before judging lexical novelty.
+
+    Run 33244982236 showed that `flow` versus `flows` can keep a modifier-only
+    transition alive even though both claims have the same grounded semantic
+    nucleus. Keep this intentionally narrow: only regular plural morphology is
+    normalized here; no topic-specific vocabulary or new semantic authority is
+    introduced.
+    """
+    value = _text(term).lower().strip()
+    if len(value) > 4 and value.endswith("ies"):
+        return value[:-3] + "y"
+    if len(value) > 4 and value.endswith("es") and not value.endswith(("ses", "xes", "zes")):
+        return value[:-1]
+    if len(value) > 3 and value.endswith("s") and not value.endswith("ss"):
+        return value[:-1]
+    return value
 
 
 def _semantic_state_delta(previous_claim, current_claim):
@@ -48,9 +63,6 @@ def _semantic_state_delta(previous_claim, current_claim):
     if not evidence_phrase:
         return dict(lexical, semantic_supported=False, semantic_reason="missing evidence phrase")
 
-    # Existing grounded semantic relation normalization is authoritative here.
-    # If the transition no longer matches the previous claim, it is genuinely
-    # distinct enough to preserve without any modifier heuristic.
     previous_covers_transition = _grounded_claim_matches_text(
         evidence_phrase, previous_claim
     )
@@ -58,21 +70,35 @@ def _semantic_state_delta(previous_claim, current_claim):
     current_effects = _grounded_claim_effect_signatures(current_claim)
     new_effects = current_effects - previous_effects
 
+    previous_scope_terms = {
+        _semantic_delta_term(term)
+        for value in _claim_scope_values(previous_claim)
+        for term in re.findall(r"[A-Za-z][A-Za-z'-]*|[가-힣]+", _text(value))
+        if _semantic_delta_term(term)
+    }
     raw_novel_terms = list(lexical.get("novel_terms") or [])
-    substantive_terms = [
-        term for term in raw_novel_terms
-        if _text(term).lower() not in _SEMANTIC_STATE_DELTA_MODIFIERS
-    ]
+    substantive_terms = []
+    for term in raw_novel_terms:
+        normalized = _semantic_delta_term(term)
+        if not normalized:
+            continue
+        if normalized in _SEMANTIC_STATE_DELTA_MODIFIERS:
+            continue
+        # Morphological variants already present in the previous trusted scope
+        # are not evidence for a new downstream state (`flow` vs `flows`).
+        if normalized in previous_scope_terms:
+            continue
+        substantive_terms.append(normalized)
 
-    semantic_supported = (
-        (not previous_covers_transition)
-        or bool(new_effects)
-        or bool(substantive_terms)
-    )
+    # A genuinely new grounded effect/state always survives. Otherwise require
+    # substantive semantic delta beyond morphology/modifiers. The matcher remains
+    # useful diagnostic evidence but no longer lets a phrase-level miss alone
+    # create a new Scene, which was the live false negative in Run 33244982236.
+    semantic_supported = bool(new_effects) or bool(substantive_terms)
     reason = (
         "distinct grounded semantic state"
         if semantic_supported
-        else "same grounded semantic nucleus with modifier-only delta"
+        else "same grounded semantic nucleus with modifier-or-morphology-only delta"
     )
     return {
         **lexical,
@@ -147,8 +173,6 @@ if ROUTER_MARKER not in router:
     router += r'''
 
 # LIVE_SCRIPT_LOCKED_HOOK_FORMALIZATION_V1
-# The opening observation is locked before Writer repair, so apply the already
-# shared deterministic formal-ending corpus at the router boundary as well.
 _previous_normalize_locked_candidate_narration_before_hook_formal = (
     _normalize_locked_candidate_narration
 )
