@@ -1,4 +1,4 @@
-"""Production counterexamples from Runs 33243842268, 33244982236, and 33245676515."""
+"""Production counterexamples from Runs 33243842268, 33244982236, 33245676515, and 33246584198."""
 import importlib
 import runpy
 
@@ -8,6 +8,7 @@ runpy.run_path("ci_grounded_causal_role_hotfix.py", run_name="__main__")
 runpy.run_path("ci_grounded_causal_contrast_hotfix.py", run_name="__main__")
 runpy.run_path("ci_live_script_blockers_hotfix.py", run_name="__main__")
 runpy.run_path("ci_run_33245676515_script_contract_hotfix.py", run_name="__main__")
+runpy.run_path("ci_grounded_keyword_contract_hotfix.py", run_name="__main__")
 
 import content.script_engine_v2 as engine
 import content.script_engine_v2_runner as runner
@@ -141,14 +142,15 @@ def assert_f_run_33245676515_five_scene_keyword_variety_passes():
     script = _compact_keyword_script(plan, [
         "jet engine chevron",
         "jet engine nozzle",
-        "exhaust core flow",
-        "chevron flow mixing",
-        "jet noise reduction",
+        "jet engine exhaust core flow",
+        "jet engine chevron flow mixing",
+        "jet engine noise reduction",
     ])
     _, failures = validation.validate_scene_basics(script, plan)
     reasons = " | ".join(str(item.get("reason", "")) for item in failures)
     assert "keyword variety too low" not in reasons, reasons
     assert "keyword not grounded" not in reasons, reasons
+    assert "keyword missing canonical subject context" not in reasons, reasons
 
 
 def assert_g_actual_keyword_collapse_still_fails():
@@ -164,9 +166,9 @@ def assert_h_unrelated_keyword_filler_still_fails():
     script = _compact_keyword_script(plan, [
         "jet engine chevron",
         "jet engine nozzle",
-        "exhaust core flow",
-        "innovative abstract novelty",
-        "jet noise reduction",
+        "jet engine exhaust core flow",
+        "jet engine innovative abstract novelty",
+        "jet engine noise reduction",
     ])
     _, failures = validation.validate_scene_basics(script, plan)
     reasons = " | ".join(str(item.get("reason", "")) for item in failures)
@@ -204,6 +206,75 @@ def assert_j_grounded_explicit_causal_clue_passes_and_writer_receives_contract()
     assert "causally relevant" in scene3["answer_target"], scene3
 
 
+def assert_k_run_33246584198_normalizer_generates_claim_aware_keywords():
+    plan = engine.build_narrative_plan(_candidate(_live_chevron_claims()))
+    raw = _compact_keyword_script(plan, ["aircraft mechanism detail"] * 5)
+    normalized = runner._normalize_script_contracts_without_api(raw, plan)
+    keywords = [scene["keyword"] for scene in normalized["scenes"]]
+    factual = keywords[2:]
+    assert len(set(factual)) == 3, keywords
+    assert "flow" in factual[0] and "interface" in factual[0], factual
+    assert "chevron" in factual[1] and "mixing" in factual[1], factual
+    assert "noise" in factual[2] and "reduction" in factual[2], factual
+    for keyword in factual:
+        assert "jet" in keyword and "engine" in keyword, factual
+    _, failures = validation.validate_scene_basics(normalized, plan)
+    reasons = " | ".join(str(item.get("reason", "")) for item in failures)
+    assert "keyword variety too low" not in reasons, reasons
+    assert "keyword not grounded" not in reasons, reasons
+    assert "keyword missing canonical subject context" not in reasons, reasons
+
+
+def assert_l_stage_only_decoration_does_not_count_as_diversity():
+    plan = engine.build_narrative_plan(_candidate(_live_chevron_claims()))
+    script = _compact_keyword_script(plan, [
+        "aircraft engine stage 1",
+        "aircraft engine stage 2",
+        "aircraft engine stage 3",
+        "aircraft engine stage 4",
+        "aircraft engine stage 5",
+    ])
+    _, failures = validation.validate_scene_basics(script, plan)
+    reasons = " | ".join(str(item.get("reason", "")) for item in failures)
+    assert "keyword variety too low" in reasons, reasons
+
+
+def assert_m_canonical_identity_without_claim_specific_term_fails():
+    plan = engine.build_narrative_plan(_candidate(_live_chevron_claims()))
+    script = _compact_keyword_script(plan, [
+        "jet engine chevron",
+        "jet engine chevron",
+        "jet engine chevron",
+        "jet engine chevron",
+        "jet engine chevron",
+    ])
+    _, failures = validation.validate_scene_basics(script, plan)
+    reasons = " | ".join(str(item.get("reason", "")) for item in failures)
+    assert "keyword not grounded in owned claim evidence" in reasons, reasons
+
+
+def assert_n_claim_term_without_canonical_context_fails():
+    plan = engine.build_narrative_plan(_candidate(_live_chevron_claims()))
+    script = _compact_keyword_script(plan, [
+        "jet engine chevron",
+        "jet engine nozzle",
+        "exhaust core flow interface",
+        "chevron flow mixing",
+        "noise reduction",
+    ])
+    _, failures = validation.validate_scene_basics(script, plan)
+    reasons = " | ".join(str(item.get("reason", "")) for item in failures)
+    assert "keyword missing canonical subject context" in reasons, reasons
+
+
+def assert_o_non_grounded_legacy_keyword_path_is_preserved():
+    scene = {"keyword": "city bridge detail", "visual_goal": "city bridge close view"}
+    contract = {"required_concepts": ["bridge structure"]}
+    plan = {"topic": "도시 다리는 왜 이런 구조일까", "angle": "structure"}
+    result = runner._deterministic_keyword(scene, contract, plan, 1)
+    assert result == "city bridge detail", result
+
+
 def main():
     assert_a_live_chevrons_collapse_to_five_scenes()
     assert_b_distinct_downstream_state_stays_separate()
@@ -215,9 +286,14 @@ def main():
     assert_h_unrelated_keyword_filler_still_fails()
     assert_i_scene3_passive_state_without_causal_clue_fails()
     assert_j_grounded_explicit_causal_clue_passes_and_writer_receives_contract()
+    assert_k_run_33246584198_normalizer_generates_claim_aware_keywords()
+    assert_l_stage_only_decoration_does_not_count_as_diversity()
+    assert_m_canonical_identity_without_claim_specific_term_fails()
+    assert_n_claim_term_without_canonical_context_fails()
+    assert_o_non_grounded_legacy_keyword_path_is_preserved()
     assert engine.MAX_SCRIPT_API_CALLS == 3
     assert engine.MAX_LOCAL_REPAIR_CALLS == 2
-    print("RUN 33245676515 COMPACT SCRIPT CONTRACT REGRESSION: PASS")
+    print("RUN 33246584198 GROUNDED KEYWORD CONTRACT REGRESSION: PASS")
 
 
 if __name__ == "__main__":
