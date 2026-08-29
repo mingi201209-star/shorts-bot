@@ -1,0 +1,59 @@
+name: Visual Anchor Post-Merge Production Once
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/visual_anchor_postmerge_production_once.yml"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  verify-and-dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Re-run deterministic Visual Subject Anchor counterexamples
+        run: python quality/visual_subject_anchor_contract_v1_regression_test.py
+
+      - name: Verify exact current main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          current_main="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+          test "$current_main" = "$EXPECTED_SHA"
+          echo "Verified exact main: $EXPECTED_SHA"
+
+      - name: Dispatch exactly one new aviation production
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EXPECTED_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          gh workflow run main.yml \
+            --repo "$REPO" \
+            --ref main \
+            -f topic='비행기 날개 끝의 작은 막대는 왜 달려 있을까' \
+            -f candidate_scope='aviation' \
+            -f expected_sha="$EXPECTED_SHA" \
+            -f youtube_upload='false' \
+            -f youtube_privacy='private'
+          echo "Dispatched one production for exact SHA $EXPECTED_SHA"
