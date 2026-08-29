@@ -15,10 +15,19 @@ if old_scene_instruction not in text and new_scene_instruction not in text:
     raise RuntimeError("adaptive scene-count prompt marker not found")
 text = text.replace(old_scene_instruction, new_scene_instruction, 1)
 
-old_duration_instruction = "새 소재를 탐색하지 말고 확정 Winner를 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초,\n"
-new_duration_instruction = "새 소재를 탐색하지 말고 확정 Winner를 {_adaptive_duration_instruction(candidate)},\n"
-if old_duration_instruction in text:
-    text = text.replace(old_duration_instruction, new_duration_instruction, 1)
+# Earlier production hotfixes can rewrite the literal target-duration expression,
+# so replace this one Writer sentence by its stable semantic boundary rather than
+# depending on the pristine TARGET_MIN/TARGET_MAX text.
+duration_pattern = r"새 소재를 탐색하지 말고 확정 Winner를 [^\n]*,\n"
+duration_replacement = "새 소재를 탐색하지 말고 확정 Winner를 {_adaptive_duration_instruction(candidate)},\n"
+text, duration_count = re.subn(
+    duration_pattern,
+    duration_replacement,
+    text,
+    count=1,
+)
+if duration_count != 1 and duration_replacement not in text:
+    raise RuntimeError("adaptive duration prompt boundary not found")
 
 length_pattern = r"\[LENGTH\]\n.*?\n\n\[OUTPUT\]"
 length_replacement = "[LENGTH]\n{_adaptive_length_instruction(candidate)}\n\n[OUTPUT]"
