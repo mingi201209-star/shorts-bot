@@ -24,9 +24,13 @@ HOTFIXES = (
 )
 for hotfix in HOTFIXES:
     subprocess.run([sys.executable, str(ROOT / hotfix)], cwd=ROOT, check=True)
-anchor_hotfix = ROOT / "ci_visual_subject_anchor_contract_v1_hotfix.py"
-if anchor_hotfix.exists():
-    subprocess.run([sys.executable, str(anchor_hotfix)], cwd=ROOT, check=True)
+for optional_hotfix in (
+    "ci_visual_subject_anchor_contract_v1_hotfix.py",
+    "ci_visual_subject_anchor_contract_v1_completion_hotfix.py",
+):
+    candidate_hotfix = ROOT / optional_hotfix
+    if candidate_hotfix.exists():
+        subprocess.run([sys.executable, str(candidate_hotfix)], cwd=ROOT, check=True)
 
 from video import video_downloader as vd
 from quality import final_visual_semantic_qa as fvs
@@ -63,9 +67,6 @@ def strengthened(query, narration=NARRATION, goal=GOAL, visual_type="real_world_
     )
 
 
-# Run 33227410361 deterministic counterexamples. BEFORE, these generic queries
-# have 0 required anchors and the wrong result is treated as compatible. AFTER,
-# source context must restore aircraft/engine/spinner before selection.
 fixtures = (
     ("engine design", candidate(2708, "red car automobile rotating studio engine design")),
     ("curious question", candidate(114894, "meerkat curious cute vigilant animal")),
@@ -84,14 +85,11 @@ for original_query, wrong in fixtures:
     assert compatibility["compatible"] is False, (original_query, query, compatibility)
     assert vd.choose_best_candidate([wrong], subject_filter_query=query) is None, (original_query, query)
 
-# A correct result remains selectable and complete.
 correct = candidate(9001, "aircraft airplane turbofan jet engine spinner spiral closeup")
 query = strengthened("engine design")
 assert vd.candidate_anchor_compatibility(correct, query)["compatible"] is True
 assert vd.choose_best_candidate([correct], subject_filter_query=query)["source_id"] == 9001
 
-# Scene 4: narration requires the concrete subject even if visual_goal/query drift
-# to a generic graph. This is validation/retrieval protection, not Writer repair.
 scene4_query = strengthened(
     "performance graph",
     narration="핵심은 비행기 엔진 앞 소용돌이 무늬의 실제 사진입니다.",
@@ -101,7 +99,6 @@ assert {"aircraft", "engine", "spinner"}.issubset(set(vd.extract_query_anchors(s
 graph = candidate(20833, "performance graph line chart business statistics")
 assert vd.choose_best_candidate([graph], subject_filter_query=scene4_query) is None
 
-# Vacuous 0/0 PASS becomes an explicit fail-close.
 missing = {
     "query": "engine design",
     "accepted": True,
@@ -114,8 +111,6 @@ assert hasattr(fvs, "_missing_required_subject_anchor"), "vacuous 0/0 semantic P
 assert fvs._missing_required_subject_anchor(missing) is True
 assert missing.get("failure_reason") == "missing_required_subject_anchor"
 
-# Negative regressions: generic/non-subject scenes remain generic and are not
-# forced into the aviation domain.
 for narration, goal, query in (
     ("분위기가 잠시 바뀝니다.", "soft atmospheric transition", "soft transition clouds"),
     ("수치는 계속 증가합니다.", "generic performance graph", "performance graph"),
@@ -125,8 +120,6 @@ for narration, goal, query in (
     if hasattr(vd, "get_current_visual_subject_anchor_contract"):
         assert vd.get_current_visual_subject_anchor_contract()["required"] is False
 
-# Already-specific aviation queries are preserved, not rewritten into a fixed
-# spinner string. Existing Visual Explanation-style aircraft/window subjects stay valid.
 wing_query = strengthened(
     "aircraft wing wingtip vortex",
     narration="비행기 날개 끝에서 소용돌이가 생깁니다.",
