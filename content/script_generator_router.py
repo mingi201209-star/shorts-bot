@@ -11,24 +11,42 @@ from content.script_visual_budget import compact_duplicate_visual_demand
 from content.winglet_visual_beat_recovery import recover_unsupported_winglet_visual_beat
 
 
-def _observable_hook_from_candidate(candidate):
-    """Project a question-shaped Candidate hook into a grounded observation."""
-    result = deepcopy(candidate)
-    micro = result.get("micro_narrative")
-    if not isinstance(micro, dict):
-        return result
+def _question_like(text):
+    value = str(text or "").strip()
+    return bool(value) and (
+        "?" in value
+        or value.startswith(("왜 ", "그런데 왜 "))
+        or bool(re.search(r"\b왜\b", value))
+        or value.endswith(("을까", "ㄹ까", "일까", "을까요", "ㄹ까요", "일까요"))
+    )
 
-    hook = str(micro.get("hook", "")).strip()
-    if hook and "?" not in hook and not hook.startswith(("왜 ", "그런데 왜 ")):
-        return result
 
-    topic = str(result.get("topic", "")).strip()
-    source = topic or hook
+def _observable_statement(text):
+    """Project only supported Korean observation forms; otherwise fail closed."""
+    source = str(text or "").strip()
+    if not source:
+        return ""
+
     value = source.rstrip(" ?.!…").strip()
     value = re.sub(r"^그런데\s+왜\s+", "", value)
     value = re.sub(r"^왜\s+", "", value)
     value = re.sub(r"\s*그\s*이유(?:는\s*무엇(?:일까|일까요)?)?$", "", value)
     value = re.sub(r"\s*이유(?:는\s*무엇(?:일까|일까요)?)?$", "", value)
+
+    # Opening-role contract: a fixed topic may itself be a why-question even
+    # though Scene 1 must remain an observable statement. Convert only concrete
+    # predicate shapes whose physical observation is already present in text.
+    embedded_why_repairs = (
+        (r"^(.+?(?:은|는|이|가))\s+왜\s+(.+?)\s*생겼(?:을까|을까요)$", r"\1 \2 생겼습니다"),
+        (r"^(.+?(?:은|는|이|가))\s+왜\s+(.+?)\s*되어\s*있(?:을까|을까요)$", r"\1 \2 되어 있습니다"),
+        (r"^(.+?(?:은|는|이|가))\s+왜\s+(.+?)\s*있(?:을까|을까요)$", r"\1 \2 있습니다"),
+    )
+    observation = value
+    for pattern, replacement in embedded_why_repairs:
+        converted, count = re.subn(pattern, replacement, observation)
+        if count:
+            observation = converted
+            break
 
     replacements = (
         (r"지 않는다$", "지 않습니다"),
@@ -43,7 +61,6 @@ def _observable_hook_from_candidate(candidate):
         (r"있는$", "있습니다"),
         (r"인다$", "입니다"),
     )
-    observation = value
     for pattern, replacement in replacements:
         converted, count = re.subn(pattern, replacement, observation)
         if count:
@@ -51,9 +68,46 @@ def _observable_hook_from_candidate(candidate):
             break
 
     observation = observation.strip()
-    if observation and observation != source and "?" not in observation and observation.endswith(("습니다", "입니다", "니다")):
+    if (
+        observation
+        and "?" not in observation
+        and not re.search(r"\b왜\b", observation)
+        and observation.endswith(("습니다", "입니다", "니다"))
+    ):
+        return observation + "."
+    return ""
+
+
+def _observable_hook_from_candidate(candidate):
+    """Keep Candidate question role separate from the Scene 1 observation role."""
+    result = deepcopy(candidate)
+    micro = result.get("micro_narrative")
+    if not isinstance(micro, dict):
+        return result
+
+    hook = str(micro.get("hook", "")).strip()
+    if hook and not _question_like(hook):
+        return result
+
+    # Reuse already-existing Candidate information only. No LLM call and no new
+    # factual claim: prefer an explicit observation when present, then the fixed
+    # topic, then the question-shaped hook itself. Unsupported forms stay intact
+    # so Script V2's observable-statement validation continues to fail closed.
+    sources = (
+        result.get("observation"),
+        micro.get("observation"),
+        result.get("topic"),
+        hook,
+    )
+    observation = ""
+    for source in sources:
+        observation = _observable_statement(source)
+        if observation:
+            break
+
+    if observation and observation != hook:
         micro = dict(micro)
-        micro["hook"] = observation + "."
+        micro["hook"] = observation
         result["micro_narrative"] = micro
         print(f"🧩 Router opening normalized without API: {micro['hook']}")
     return result
