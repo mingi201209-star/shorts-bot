@@ -228,5 +228,11 @@ main.write_text(text, encoding="utf-8")
 from ci_still_image_verifier_contract_hotfix import main as _patch_still_image_verifier_contract
 _patch_still_image_verifier_contract()
 
+from ci_still_vision_evidence_groups_hotfix import main as _patch_still_vision_evidence_groups
+_patch_still_vision_evidence_groups()
+
+from ci_still_vision_evidence_trace_hotfix import main as _patch_still_vision_evidence_trace
+_patch_still_vision_evidence_trace()
+
 print("FINAL_VISUAL_SEMANTIC_QA_V1 installed")
 print("STILL_IMAGE_MOTION_FALLBACK_V1 installed")
