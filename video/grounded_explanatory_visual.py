@@ -20,7 +20,7 @@ EXPLANATORY_TERM_GROUPS = {
 
 _GROUP_VISIBLE_REQUIREMENTS = {
     "flow": "a flow itself must be directly visible as airflow, exhaust, a stream, or a plume",
-    "interface": "a meeting/interface/boundary/junction between two distinct visible flow or fluid regions must be directly visible; one isolated plume is not enough",
+    "interface": "a meeting/interface/boundary/junction between two distinct visible flow or fluid regions must be directly visible; a single isolated plume is not enough",
     "mixing": "two or more visible flow regions must visibly mix, blend, or interleave; a static part close-up is not enough",
     "noise": "visible evidence must directly represent sound/noise rather than merely showing the source object",
     "reduction": "the visual must directly represent a reduction/lowering comparison or state, not merely the presence of the source object",
