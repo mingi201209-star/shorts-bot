@@ -32,14 +32,11 @@ def patch_dominance_verifier():
     anchor = '    keyword = str(scene.get("keyword", "") or "").strip()\n'
     text = _replace_once(text, anchor, anchor + '''    required_explanatory = required_explanatory_groups(scene)\n    explanatory_requirement = generation_requirement(scene)\n''', "grounded explanatory verifier keyword")
 
-    # Later first-five/still installers may add lines around this part of the
-    # prompt. Anchor only on stable individual prompt lines, not their spacing.
+    # Later first-five/still installers rewrite surrounding prompt prose. This
+    # line survives composition, so attach the entire relation instruction here.
     anchor = 'Observable action required: {str(action_required).lower()}\n'
-    text = _replace_once(text, anchor, anchor + '''Required explanatory groups: {", ".join(required_explanatory) if required_explanatory else "none"}\nGrounded explanatory visibility rule: {explanatory_requirement or "none"}\n''', "grounded explanatory verifier prompt header")
-
-    anchor = 'Identify the concrete subject explicitly promised by the Hook. Then score:\n'
-    instructions = '''When required explanatory groups are present, inspect them independently from subject dominance.\nReturn a group in visible_explanatory_groups ONLY when that relation/state is directly visible in the supplied frames.\nFor interface, a single exhaust plume is insufficient: directly show a meeting, boundary, interface, or junction between distinct visible flow/fluid regions.\nDo not infer an explanatory group from narration, keyword, subject identity, or engineering knowledge.\n\n'''
-    text = _replace_once(text, anchor, instructions + anchor, "grounded explanatory verifier prompt instruction")
+    prompt_extra = '''Required explanatory groups: {", ".join(required_explanatory) if required_explanatory else "none"}\nGrounded explanatory visibility rule: {explanatory_requirement or "none"}\nWhen required explanatory groups are present, inspect them independently from subject dominance.\nReturn a group in visible_explanatory_groups ONLY when that relation/state is directly visible in the supplied frames.\nFor interface, a single exhaust plume is insufficient: directly show a meeting, boundary, interface, or junction between distinct visible flow/fluid regions.\nDo not infer an explanatory group from narration, keyword, subject identity, or engineering knowledge.\n'''
+    text = _replace_once(text, anchor, anchor + prompt_extra, "grounded explanatory verifier prompt")
 
     anchor = '  "visible_components": ["aircraft", "wing"],\n'
     text = _replace_once(text, anchor, anchor + '  "visible_explanatory_groups": [],\n', "grounded explanatory verifier JSON")
