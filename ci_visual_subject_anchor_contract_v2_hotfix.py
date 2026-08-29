@@ -72,3 +72,6 @@ print("✅ Visual Subject Anchor Contract V2 applied: compound aviation identity
 import ci_visual_subject_anchor_fallback_inheritance_hotfix  # noqa: F401,E402
 # Run 33250343057: grounded explanatory relation survives the same fallback.
 import ci_visual_claim_semantic_fallback_hotfix  # noqa: F401,E402
+# Run 33251901169: strengthen opening supply only after #253/#254 guards exist.
+import ci_canonical_visual_supply_contract_hotfix as _canonical_visual_supply  # noqa: E402
+_canonical_visual_supply.main()
