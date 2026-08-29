@@ -59,9 +59,6 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
     if normalize_search_query(scene_query) != normalize_search_query(contract.get("effective_query")):
         return tier, label
 
-    # A stock clip that explicitly advertises an unkeyed chroma background is
-    # not acceptable real-world evidence. This is metadata fail-close, not a
-    # score/threshold relaxation and does not consume another retrieval retry.
     visual_type = str(contract.get("visual_type") or "real_world_broll")
     if visual_type == "real_world_broll" and _explicit_chroma_stock(candidate):
         return 6, "EXPLICIT_CHROMA_STOCK_REJECTED"
@@ -71,6 +68,7 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
 
 print("✅ Visual Subject Anchor Contract V2 applied: compound aviation identity + explicit chroma fail-close")
 
-# Run 33249110048 showed that query-string equality was too narrow: the same
-# Scene contract must survive specificity-ladder fallback queries.
+# Run 33249110048: physical subject contract survives specificity fallback.
 import ci_visual_subject_anchor_fallback_inheritance_hotfix  # noqa: F401,E402
+# Run 33250343057: grounded explanatory relation survives the same fallback.
+import ci_visual_claim_semantic_fallback_hotfix  # noqa: F401,E402
