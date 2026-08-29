@@ -7,15 +7,14 @@ It is intentionally provider-free and does not weaken existing Hook/FACT/visual 
 from copy import deepcopy
 import re
 
-RETENTION_STRUCTURE_VERSION = 3
+RETENTION_STRUCTURE_VERSION = 4
 
-# Knowledge Shorts now target roughly one minute. Shorter buckets remain for
-# genuinely thin candidates, but mechanism-rich topics should have enough room
-# for cause -> mechanism -> effect -> real-world meaning without filler.
+# Runtime is a preference, not a quota. Scene count is derived from the amount
+# of distinct supported information instead of padding every topic to a minute.
 RUNTIME_BUCKETS = {
-    "38-48s": {"min_seconds": 38, "max_seconds": 48, "min_scenes": 10, "max_scenes": 12},
-    "50-60s": {"min_seconds": 50, "max_seconds": 60, "min_scenes": 12, "max_scenes": 14},
-    "55-60s": {"min_seconds": 55, "max_seconds": 60, "min_scenes": 13, "max_scenes": 15},
+    "20-28s": {"min_seconds": 20, "max_seconds": 28},
+    "24-35s": {"min_seconds": 24, "max_seconds": 35},
+    "30-42s": {"min_seconds": 30, "max_seconds": 42},
 }
 
 _LONG_SIGNALS = (
@@ -29,6 +28,43 @@ _CAUSAL_CLUE_SIGNALS = (
     "때문", "원인", "압력", "힘", "공기", "구조", "작동", "차이", "분산", "조절", "균형",
 )
 _TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]{2,}")
+
+_GENERIC_EVALUATION_PATTERNS = (
+    r"혁신적(?:인)?\s*(?:디자인|설계|구조)",
+    r"긍정적(?:인)?\s*영향",
+    r"좋은\s*(?:디자인|결과|효과|구조)",
+    r"훌륭한\s*(?:디자인|설계|구조)",
+    r"매우\s*(?:중요|효과적)",
+)
+_META_NARRATION_PATTERNS = (
+    r"실제\s*(?:사진|영상)입니다",
+    r"다이어그램입니다",
+    r"화면에\s*(?:보이는|나오는)",
+    r"visual[_ ]?goal",
+)
+_POSITIVE_EFFECT_TERMS = {
+    "efficiency": ("효율", "연료", "efficiency", "fuel"),
+    "performance": ("성능", "performance"),
+    "stability": ("안정성", "안정적", "stability"),
+}
+_SEMANTIC_ATOMS = {
+    "noise_reduction": (
+        ("소음", "noise"),
+        ("줄", "감소", "낮", "완화", "reduce", "quiet"),
+    ),
+    "vortex_reduction": (
+        ("소용돌이", "vortex"),
+        ("줄", "감소", "약", "reduce"),
+    ),
+    "airflow_mixing": (
+        ("공기", "배기", "흐름", "airflow", "exhaust", "air"),
+        ("섞", "혼합", "mix", "조절", "control"),
+    ),
+    "experience_payoff": (
+        ("승객", "여행", "주변 환경", "환경", "공항", "passenger", "comfort", "environment"),
+        ("편안", "쾌적", "영향", "부담", "quiet", "comfort", "소음"),
+    ),
+}
 
 
 def _candidate_text(candidate):
@@ -48,41 +84,42 @@ def _candidate_text(candidate):
     return " ".join(parts).lower()
 
 
-def classify_runtime_bucket(candidate):
-    """Classify a Candidate without network/model calls."""
-    if not isinstance(candidate, dict):
-        raise TypeError("candidate must be a mapping")
-
+def _evidence_counts(candidate):
     text = _candidate_text(candidate)
     visual_proof = candidate.get("visual_proof") or []
     facts = candidate.get("fact_check_focus") or []
-    micro = candidate.get("micro_narrative") or {}
-
     long_hits = sum(1 for signal in _LONG_SIGNALS if signal in text)
     mechanism_hits = sum(1 for signal in _MECHANISM_SIGNALS if signal in text)
     evidence_items = len(visual_proof) if isinstance(visual_proof, list) else 1
     fact_items = len(facts) if isinstance(facts, list) else 1
+    return long_hits, mechanism_hits, evidence_items, fact_items
 
-    # Rich history/redesign or multi-fact mechanism topics get the full minute.
-    if long_hits >= 2 or (long_hits >= 1 and fact_items >= 3):
-        return "55-60s"
-    if mechanism_hits >= 2 or evidence_items >= 2 or fact_items >= 2:
-        return "50-60s"
 
-    # Thin candidates are not padded to one minute; they still get substantially
-    # more room than the old 24-30 second bucket.
-    if (
-        fact_items <= 1
-        and evidence_items <= 1
-        and isinstance(micro, dict)
-        and micro.get("reveal")
-        and micro.get("payoff")
-    ):
-        return "38-48s"
+def suggest_scene_count(candidate):
+    """Choose a content-derived scene count; do not pad to a runtime quota."""
+    long_hits, mechanism_hits, evidence_items, fact_items = _evidence_counts(candidate)
+    count = 5  # phenomenon, question, causal clue, reveal, payoff
+    if fact_items >= 2 or evidence_items >= 2:
+        count += 1
+    if mechanism_hits >= 2:
+        count += 1
+    if long_hits >= 1:
+        count += 1
+    if long_hits >= 2 and (fact_items + evidence_items) >= 5:
+        count += 1
+    return count
 
-    if isinstance(micro, dict) and micro.get("reveal") and micro.get("payoff"):
-        return "38-48s"
-    return "50-60s"
+
+def classify_runtime_bucket(candidate):
+    """Classify a preferred duration without network/model calls."""
+    if not isinstance(candidate, dict):
+        raise TypeError("candidate must be a mapping")
+    count = suggest_scene_count(candidate)
+    if count <= 6:
+        return "20-28s"
+    if count <= 8:
+        return "24-35s"
+    return "30-42s"
 
 
 def build_retention_plan(candidate):
@@ -91,6 +128,7 @@ def build_retention_plan(candidate):
     return {
         "version": RETENTION_STRUCTURE_VERSION,
         "runtime_bucket": bucket,
+        "target_scene_count": suggest_scene_count(candidate),
         **spec,
         "first5_contract": [
             {"role": "phenomenon", "window": "0.0-1.5s"},
@@ -103,11 +141,11 @@ def build_retention_plan(candidate):
 
 def runtime_instruction(plan):
     return (
-        f"Retention 실험 bucket={plan['runtime_bucket']}: 전체 TTS를 "
-        f"{plan['min_seconds']}~{plan['max_seconds']}초, "
-        f"{plan['min_scenes']}~{plan['max_scenes']} Scene으로 만든다. "
-        "길이는 반복으로 채우지 않는다. 현상, 원인, 작동 원리, 실제 효과, 현실적 의미 또는 추가 흥미 사실처럼 "
-        "각 Scene마다 새로운 정보 단계를 추가하고, 근거가 없는 사실은 만들지 않는다."
+        f"Retention preferred bucket={plan['runtime_bucket']}: 전체 TTS는 보통 "
+        f"{plan['min_seconds']}~{plan['max_seconds']}초를 선호하지만 시간은 quota가 아니다. "
+        f"현재 근거가 지지하는 정보량 기준 target_scene_count={plan['target_scene_count']}를 사용한다. "
+        "목표 시간을 채우려고 문장이나 Scene을 추가하지 않는다. 각 Scene은 이전 Scene에 없던 "
+        "새 정보를 최소 하나 추가하고, 같은 mechanism/payoff를 표현만 바꿔 반복하지 않는다."
     )
 
 
@@ -116,7 +154,7 @@ def first5_prompt_contract():
 
 
 def density_prompt_contract():
-    return """[RETENTION DENSITY — REQUIRED]\n- 답이 이미 완결된 뒤 같은 뜻을 다시 요약하지 않는다.\n- 동일 mechanism/result를 표현만 바꿔 반복하지 않는다.\n- 답에 필요하지 않고 화면으로 증명하기도 어려운 문장은 제거한다.\n- 한 Scene에는 핵심 개념 1개를 우선한다.\n- 50~60초형에서는 현상→원인/제약→작동 원리→결과→현실적 의미→추가 흥미 사실→회수 순으로 가능한 만큼 새로운 정보를 전진시킨다.\n- 근거가 없는 역사, 사고, 수치, 효과를 길이 확보용으로 지어내지 않는다.\n- 가능한 경우 2.5~4초마다 새로운 시각 정보가 나타나도록 Scene/visual_goal을 설계한다.\n"""
+    return """[RETENTION STORY V2 — REQUIRED]\n- 각 Scene은 앞 Scene들에 없던 NEW INFORMATION을 최소 하나 추가한다.\n- 이미 설명한 mechanism/result/payoff를 표현만 바꿔 새 Scene으로 만들지 않는다.\n- 단순 평가, 일반적인 긍정 표현, visual_goal/meta 설명은 독립 narration Scene이 될 수 없다.\n- 한 causal chain은 자연스럽게 압축하며 같은 원리를 여러 summary Scene으로 쪼개지 않는다.\n- payoff는 마지막에 한 번 명확하게 회수하고 그 뒤 comfort/benefit/result를 반복하지 않는다.\n- 5~8 Scene, 20~35초는 짧은 설명형 Shorts의 선호값일 뿐 quota가 아니다.\n- 설명이 더 짧게 끝나면 짧게 끝낸다. 목표 시간을 채우려고 문장이나 Scene을 추가하지 않는다.\n- facts에 없는 효율/성능/안정성 같은 일반적 positive effect를 길이 확보용으로 만들지 않는다.\n"""
 
 
 def _normalized_tokens(text):
@@ -128,6 +166,122 @@ def _text_similarity(left, right):
     if not a or not b:
         return 0.0
     return len(a & b) / max(1, len(a | b))
+
+
+def _contains_any(text, terms):
+    value = str(text or "").lower()
+    return any(term.lower() in value for term in terms)
+
+
+def _semantic_atoms(text):
+    atoms = set()
+    for name, (left_terms, right_terms) in _SEMANTIC_ATOMS.items():
+        if _contains_any(text, left_terms) and _contains_any(text, right_terms):
+            atoms.add(name)
+    return atoms
+
+
+def _supported_fact_text(plan):
+    values = []
+    if isinstance(plan, dict):
+        for contract in plan.get("contracts") or []:
+            if isinstance(contract, dict):
+                values.extend(str(x) for x in contract.get("required_concepts") or [] if x)
+    return " ".join(values).lower()
+
+
+def validate_new_information(scenes, plan=None):
+    """Return scene-local failures for semantic repetition/filler without LLM calls."""
+    if not isinstance(scenes, list):
+        return [{"scene_index": None, "reason": "scenes must be a list"}]
+
+    contracts = (plan or {}).get("contracts") or []
+    role_by_index = {
+        int(item.get("index")): str(item.get("role", ""))
+        for item in contracts
+        if isinstance(item, dict) and item.get("index") is not None
+    }
+    locked_by_index = {
+        int(item.get("index")): bool(item.get("locked"))
+        for item in contracts
+        if isinstance(item, dict) and item.get("index") is not None
+    }
+    support_text = _supported_fact_text(plan or {})
+    failures = []
+
+    atom_occurrences = {}
+    for index, scene in enumerate(scenes, start=1):
+        if not isinstance(scene, dict):
+            continue
+        text = str(scene.get("text", "")).strip()
+        if not text:
+            continue
+
+        if any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in _GENERIC_EVALUATION_PATTERNS):
+            failures.append({
+                "scene_index": index,
+                "reason": "new-information contract: generic evaluation filler is not a scene",
+            })
+
+        if any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in _META_NARRATION_PATTERNS):
+            failures.append({
+                "scene_index": index,
+                "reason": "new-information contract: visual/meta narration is not new story information",
+            })
+
+        for effect, terms in _POSITIVE_EFFECT_TERMS.items():
+            if _contains_any(text, terms) and not _contains_any(support_text, terms):
+                failures.append({
+                    "scene_index": index,
+                    "reason": f"fact-safe filler guard: unsupported generic positive effect ({effect})",
+                })
+
+        for atom in _semantic_atoms(text):
+            atom_occurrences.setdefault(atom, []).append(index)
+
+    for atom, indexes in atom_occurrences.items():
+        if len(indexes) < 2:
+            continue
+
+        if atom == "experience_payoff":
+            protected = [
+                i for i in indexes
+                if role_by_index.get(i) == "payoff" and locked_by_index.get(i)
+            ]
+            anchor = protected[-1] if protected else indexes[0]
+        else:
+            protected = [
+                i for i in indexes
+                if role_by_index.get(i) == "reveal" and locked_by_index.get(i)
+            ]
+            anchor = protected[-1] if protected else indexes[0]
+
+        for index in indexes:
+            if index == anchor:
+                continue
+            # A final locked payoff may restate the user-facing consequence once
+            # after a locked reveal; the payoff semantic is checked separately.
+            if (
+                atom != "experience_payoff"
+                and role_by_index.get(index) == "payoff"
+                and locked_by_index.get(index)
+            ):
+                continue
+            if atom == "experience_payoff":
+                reason = f"payoff contract: scene repeats payoff already reserved for scene {anchor}"
+            else:
+                reason = f"new-information contract: scene repeats semantic claim {atom} reserved for scene {anchor}"
+            failures.append({"scene_index": index, "reason": reason})
+
+    deduped = []
+    seen = set()
+    for failure in failures:
+        key = (failure.get("scene_index"), failure.get("reason"))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(failure)
+    return deduped
 
 
 def validate_first5_progression(scenes):
