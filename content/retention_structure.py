@@ -98,7 +98,10 @@ def _evidence_counts(candidate):
 def suggest_scene_count(candidate):
     """Choose a content-derived scene count; do not pad to a runtime quota."""
     long_hits, mechanism_hits, evidence_items, fact_items = _evidence_counts(candidate)
-    count = 5  # phenomenon, question, causal clue, reveal, payoff
+    # Six is the smallest practical V2 story: opening observation, question,
+    # causal clue, one explanatory step, reveal, payoff. Extra scenes require
+    # additional supported information; runtime never creates slots by itself.
+    count = 6
     if fact_items >= 2 or evidence_items >= 2:
         count += 1
     if mechanism_hits >= 2:
@@ -229,12 +232,15 @@ def validate_new_information(scenes, plan=None):
                 "reason": "new-information contract: visual/meta narration is not new story information",
             })
 
-        for effect, terms in _POSITIVE_EFFECT_TERMS.items():
-            if _contains_any(text, terms) and not _contains_any(support_text, terms):
-                failures.append({
-                    "scene_index": index,
-                    "reason": f"fact-safe filler guard: unsupported generic positive effect ({effect})",
-                })
+        # This is a Writer-filler guard, not a second FACT Judge. Candidate-owned
+        # locked reveal/payoff text remains under the existing FACT pipeline.
+        if not locked_by_index.get(index, False):
+            for effect, terms in _POSITIVE_EFFECT_TERMS.items():
+                if _contains_any(text, terms) and not _contains_any(support_text, terms):
+                    failures.append({
+                        "scene_index": index,
+                        "reason": f"fact-safe filler guard: unsupported generic positive effect ({effect})",
+                    })
 
         for atom in _semantic_atoms(text):
             atom_occurrences.setdefault(atom, []).append(index)
