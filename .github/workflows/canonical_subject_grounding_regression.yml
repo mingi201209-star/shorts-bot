@@ -25,11 +25,11 @@ jobs:
         with:
           python-version: "3.11"
       - name: Focused Canonical Subject Grounding regression
-        run: python quality/canonical_subject_grounding_regression_test.py
+        run: python -m quality.canonical_subject_grounding_regression_test
       - name: Apply production grounding composition
         run: python ci_candidate_supply_recovery_hotfix.py
       - name: Production boundary wiring regression
-        run: python quality/canonical_subject_grounding_production_wiring_regression_test.py
+        run: python -m quality.canonical_subject_grounding_production_wiring_regression_test
       - name: Syntax check touched runtime surfaces
         run: |
           python -m py_compile \
