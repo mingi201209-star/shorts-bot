@@ -7,7 +7,12 @@ on:
       - "quality/canonical_subject_grounding_supply_regression_test.py"
       - "ci_canonical_subject_grounding_supply_hotfix.py"
       - "ci_candidate_supply_recovery_hotfix.py"
+      - "ci_candidate_grounded_recovery_hotfix.py"
+      - "ci_aviation_candidate_context_hotfix.py"
+      - "ci_aviation_candidate_specificity_hotfix.py"
+      - "ci_aviation_context_signature_compat_hotfix.py"
       - "ci_aviation_specificity_output_repair_hotfix.py"
+      - "ci_aviation_specificity_projection_hotfix.py"
       - ".github/workflows/canonical_subject_grounding_supply_regression.yml"
 
 permissions:
@@ -21,5 +26,45 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Focused Grounding Supply regression
+      - name: Install production Python dependencies
+        run: pip install -r requirements.txt
+      - name: Production-path Grounding Supply regression
         run: python -m quality.canonical_subject_grounding_supply_regression_test
+      - name: Restore checkout after runtime installer regression
+        run: |
+          git reset --hard HEAD
+          git clean -fd
+      - name: Canonical Subject Grounding regression
+        run: python -m quality.canonical_subject_grounding_regression_test
+      - name: Apply Candidate Grounded Recovery production hotfix
+        run: python ci_candidate_grounded_recovery_hotfix.py
+      - name: Candidate Grounded Recovery regression
+        run: python -m quality.candidate_grounded_recovery_regression_test
+      - name: Restore checkout after recovery installer regression
+        run: |
+          git reset --hard HEAD
+          git clean -fd
+      - name: Apply FACT Critical production hotfix chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+      - name: FACT Critical regression
+        env:
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+        run: PYTHONPATH=. python quality/fact_critical_regeneration_test.py
+      - name: Restore checkout after FACT installer regression
+        run: |
+          git reset --hard HEAD
+          git clean -fd
+      - name: Apply established Script V2 production hotfix
+        run: python ci_script_v2_visual_goal_hotfix.py
+      - name: Script V2 regression
+        run: python -m quality.script_engine_v2_regression_test
+      - name: Restore checkout after Script V2 installer regression
+        run: |
+          git reset --hard HEAD
+          git clean -fd
+      - name: Visual Subject Anchor regression
+        run: PYTHONPATH=. python quality/visual_subject_anchor_contract_v1_regression_test.py
