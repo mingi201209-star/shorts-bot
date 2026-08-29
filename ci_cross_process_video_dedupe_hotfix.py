@@ -117,6 +117,10 @@ if "FINAL_VISUAL_SEMANTIC_QA_V1" in main_text:
     # is the final retrieval/semantic boundary in production composition.
     import ci_visual_subject_anchor_contract_v1_hotfix  # noqa: F401,E402
     import ci_visual_subject_anchor_contract_v1_completion_hotfix  # noqa: F401,E402
+    # Run 33256014054: once #253/#254/#255/#256 are fully composed, carry the
+    # already-grounded explanatory nucleus into still/Vision/explanation supply.
+    import ci_grounded_explanatory_visual_supply_hotfix as _grounded_explanatory_supply  # noqa: E402
+    _grounded_explanatory_supply.main()
 
 # Writer compliance is deliberately applied last in the existing production hotfix
 # chain so earlier Script V2 installers cannot overwrite the plan-first contract.
