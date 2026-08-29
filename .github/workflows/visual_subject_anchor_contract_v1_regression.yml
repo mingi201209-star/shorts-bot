@@ -1,0 +1,24 @@
+name: Visual Subject Anchor Contract V1 Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_visual_subject_anchor_contract_v1_hotfix.py"
+      - "quality/visual_subject_anchor_contract_v1_regression_test.py"
+      - "quality/final_visual_semantic_qa.py"
+      - ".github/workflows/visual_subject_anchor_contract_v1_regression.yml"
+      - ".github/workflows/main.yml"
+
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+      - name: Run Visual Subject Anchor Contract V1 regression
+        run: python quality/visual_subject_anchor_contract_v1_regression_test.py
