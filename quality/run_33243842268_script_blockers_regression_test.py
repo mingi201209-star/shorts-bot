@@ -1,4 +1,4 @@
-"""Production counterexamples from Runs 33243842268 and 33244982236."""
+"""Production counterexamples from Runs 33243842268, 33244982236, and 33245676515."""
 import importlib
 import runpy
 
@@ -7,16 +7,21 @@ runpy.run_path("ci_grounded_claim_plan_hotfix.py", run_name="__main__")
 runpy.run_path("ci_grounded_causal_role_hotfix.py", run_name="__main__")
 runpy.run_path("ci_grounded_causal_contrast_hotfix.py", run_name="__main__")
 runpy.run_path("ci_live_script_blockers_hotfix.py", run_name="__main__")
+runpy.run_path("ci_run_33245676515_script_contract_hotfix.py", run_name="__main__")
 
 import content.script_engine_v2 as engine
 import content.script_engine_v2_runner as runner
+import content.script_engine_v2_validation as validation
 import content.script_generator_router as router
+import content.retention_structure as retention
 from content.script_formal_endings import formalize_declarative_text
 from quality import script_engine_v2_grounded_claim_plan_regression_test as grounded_base
 
 engine = importlib.reload(engine)
 runner = importlib.reload(runner)
+validation = importlib.reload(validation)
 router = importlib.reload(router)
+retention = importlib.reload(retention)
 
 
 def _claim(claim_id, claim_type, evidence, scopes):
@@ -100,9 +105,9 @@ def assert_d_unsupported_drag_fuel_stability_still_fail():
         _scene("그 결과 제트 소음이 줄고 안정성도 증가합니다."),
     ]}
     hostile = engine.apply_locked_scenes(hostile, plan)
-    validation = runner._combined_validation(hostile, plan)
-    assert validation["valid"] is False, validation
-    reasons = " | ".join(validation["reasons"])
+    validation_result = runner._combined_validation(hostile, plan)
+    assert validation_result["valid"] is False, validation_result
+    reasons = " | ".join(validation_result["reasons"])
     assert "unplanned factual claim" in reasons, reasons
 
 
@@ -112,15 +117,107 @@ def assert_e_locked_scene1_uses_shared_formal_corpus():
     assert formalize_declarative_text("플랩이 펼쳐진다.") == "플랩이 펼쳐진다."
 
 
+def _compact_keyword_script(plan, keywords):
+    texts = [
+        "비행기 엔진 뒤쪽의 톱니 모양이 눈에 띕니다.",
+        "그런데 왜 비행기 엔진 뒤는 톱니처럼 생겼을까요?",
+        "뜨거운 배기 흐름과 더 차가운 공기의 차이가 노즐 경계에서 만납니다.",
+        "톱니 가장자리는 두 흐름이 섞이는 방식을 바꿉니다.",
+        "그 변화는 제트 소음을 줄이는 데 도움을 줍니다.",
+    ]
+    scenes = []
+    for text, keyword, contract in zip(texts, keywords, plan["contracts"]):
+        scenes.append({
+            "text": text,
+            "visual_goal": "jet engine chevron mechanism close view",
+            "keyword": keyword,
+            "role": contract["role"],
+        })
+    return {"title": "chevrons", "scenes": scenes}
+
+
+def assert_f_run_33245676515_five_scene_keyword_variety_passes():
+    plan = engine.build_narrative_plan(_candidate(_live_chevron_claims()))
+    script = _compact_keyword_script(plan, [
+        "jet engine chevron",
+        "jet engine nozzle",
+        "exhaust core flow",
+        "chevron flow mixing",
+        "jet noise reduction",
+    ])
+    _, failures = validation.validate_scene_basics(script, plan)
+    reasons = " | ".join(str(item.get("reason", "")) for item in failures)
+    assert "keyword variety too low" not in reasons, reasons
+    assert "keyword not grounded" not in reasons, reasons
+
+
+def assert_g_actual_keyword_collapse_still_fails():
+    plan = engine.build_narrative_plan(_candidate(_live_chevron_claims()))
+    script = _compact_keyword_script(plan, ["jet engine chevron"] * 5)
+    _, failures = validation.validate_scene_basics(script, plan)
+    reasons = " | ".join(str(item.get("reason", "")) for item in failures)
+    assert "keyword variety too low" in reasons, reasons
+
+
+def assert_h_unrelated_keyword_filler_still_fails():
+    plan = engine.build_narrative_plan(_candidate(_live_chevron_claims()))
+    script = _compact_keyword_script(plan, [
+        "jet engine chevron",
+        "jet engine nozzle",
+        "exhaust core flow",
+        "innovative abstract novelty",
+        "jet noise reduction",
+    ])
+    _, failures = validation.validate_scene_basics(script, plan)
+    reasons = " | ".join(str(item.get("reason", "")) for item in failures)
+    assert "keyword not grounded in owned claim evidence" in reasons, reasons
+
+
+def _first5_scenes(scene3_text):
+    return [
+        {"text": "엔진 뒤 톱니가 보입니다.", "visual_goal": "jet engine chevrons", "retention_role": "phenomenon"},
+        {"text": "그런데 왜 이런 모양일까요?", "visual_goal": "jet engine nozzle", "retention_role": "question"},
+        {"text": scene3_text, "visual_goal": "jet exhaust interface", "retention_role": "causal_clue"},
+    ]
+
+
+def assert_i_scene3_passive_state_without_causal_clue_fails():
+    ok, reason = retention.validate_first5_progression(
+        _first5_scenes("두 흐름은 노즐 경계에서 만납니다.")
+    )
+    assert ok is False, reason
+    assert "explicit causal clue" in reason, reason
+
+
+def assert_j_grounded_explicit_causal_clue_passes_and_writer_receives_contract():
+    ok, reason = retention.validate_first5_progression(
+        _first5_scenes("두 흐름의 속도 차이 때문에 노즐 경계의 조건이 달라집니다.")
+    )
+    assert ok is True, reason
+
+    plan = engine.build_narrative_plan(_candidate(_live_chevron_claims()))
+    payload = engine.writer_payload(_candidate(_live_chevron_claims()), plan)
+    scene3 = payload["scene_contracts"][2]
+    assert scene3["causal_role"] == "mechanism_input", scene3
+    assert scene3["must_explain_causal_relevance_to_next_claim"] is True, scene3
+    assert scene3["next_owned_claim_id"] == "chevron_flow_mixing", scene3
+    assert "causally relevant" in scene3["answer_target"], scene3
+
+
 def main():
     assert_a_live_chevrons_collapse_to_five_scenes()
     assert_b_distinct_downstream_state_stays_separate()
     assert_c_distinct_multistep_grounding_keeps_eight_scenes()
     assert_d_unsupported_drag_fuel_stability_still_fail()
     assert_e_locked_scene1_uses_shared_formal_corpus()
+    assert_f_run_33245676515_five_scene_keyword_variety_passes()
+    assert_g_actual_keyword_collapse_still_fails()
+    assert_h_unrelated_keyword_filler_still_fails()
+    assert_i_scene3_passive_state_without_causal_clue_fails()
+    assert_j_grounded_explicit_causal_clue_passes_and_writer_receives_contract()
     assert engine.MAX_SCRIPT_API_CALLS == 3
     assert engine.MAX_LOCAL_REPAIR_CALLS == 2
-    print("RUN 33244982236 MORPHOLOGY COLLAPSE REGRESSION: PASS")
+    print("RUN 33245676515 COMPACT SCRIPT CONTRACT REGRESSION: PASS")
 
 
 if __name__ == "__main__":
