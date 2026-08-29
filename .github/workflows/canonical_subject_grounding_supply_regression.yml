@@ -1,0 +1,25 @@
+name: Canonical Subject Grounding Supply Regression
+
+on:
+  pull_request:
+    paths:
+      - "quality/canonical_subject_grounding_supply.py"
+      - "quality/canonical_subject_grounding_supply_regression_test.py"
+      - "ci_canonical_subject_grounding_supply_hotfix.py"
+      - "ci_candidate_supply_recovery_hotfix.py"
+      - "ci_aviation_specificity_output_repair_hotfix.py"
+      - ".github/workflows/canonical_subject_grounding_supply_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Focused Grounding Supply regression
+        run: python -m quality.canonical_subject_grounding_supply_regression_test

@@ -217,3 +217,7 @@ else:
 # Keep semantic identity fail-close in the existing bounded Candidate recovery
 # production chain. This adds no API call and does not increase retries.
 import ci_canonical_subject_grounding_hotfix
+
+# Supply trusted identity provenance only after the fail-close Gate contract is
+# installed. This layer is deterministic and adds no API call or retry.
+import ci_canonical_subject_grounding_supply_hotfix
