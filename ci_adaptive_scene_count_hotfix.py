@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 
@@ -19,15 +20,17 @@ new_duration_instruction = "새 소재를 탐색하지 말고 확정 Winner를 {
 if old_duration_instruction in text:
     text = text.replace(old_duration_instruction, new_duration_instruction, 1)
 
-old_length_instruction = (
-    "전체 TTS가 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초가 되도록 충분한 문장 분량을 만든다.\n"
-    "너무 짧은 문장을 억지로 Scene 수만 맞추려고 잘게 쪼개지 마라.\n"
+length_pattern = r"\[LENGTH\]\n.*?\n\n\[OUTPUT\]"
+length_replacement = "[LENGTH]\n{_adaptive_length_instruction(candidate)}\n\n[OUTPUT]"
+text, length_count = re.subn(
+    length_pattern,
+    length_replacement,
+    text,
+    count=1,
+    flags=re.DOTALL,
 )
-new_length_instruction = "{_adaptive_length_instruction(candidate)}\n"
-if old_length_instruction in text:
-    text = text.replace(old_length_instruction, new_length_instruction, 1)
-elif new_length_instruction not in text:
-    raise RuntimeError("adaptive length prompt marker not found")
+if length_count != 1 and "{_adaptive_length_instruction(candidate)}" not in text:
+    raise RuntimeError("adaptive length prompt boundary not found")
 
 if "ADAPTIVE_SCENE_COUNT_FOR_DENSE_DESIGN_V3" not in text:
     text += r'''
