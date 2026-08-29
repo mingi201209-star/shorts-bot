@@ -16,6 +16,7 @@ on:
       - "ci_grounded_causal_contrast_hotfix.py"
       - "ci_live_script_blockers_hotfix.py"
       - "ci_cross_process_video_dedupe_hotfix.py"
+      - "ci_visual_claim_semantic_fallback_hotfix.py"
       - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
       - "quality/retention_story_v2_production_counterexample_test.py"
       - "quality/writer_compliance_plan_regression_test.py"
