@@ -95,7 +95,7 @@ def assert_short_plan_contract():
 
 def assert_repair_feedback(plan):
     scenes = []
-    for contract in plan["contracts"]:
+    for _contract in plan["contracts"]:
         scenes.append({
             "text": "새 정보를 설명합니다.",
             "visual_goal": "구조의 실제 변화를 가까이 보여줍니다.",
@@ -104,7 +104,12 @@ def assert_repair_feedback(plan):
     owner = int(plan["reserved_claim_owners"]["noise_reduction"])
     offending = 4 if owner != 4 else 3
     reason = f"new-information contract: scene repeats semantic claim noise_reduction reserved for scene {owner}"
-    payload = engine.local_repair_payload(scenes={"scenes": scenes} if False else {"scenes": scenes}, plan=plan, failed_scene_indexes=[offending], reasons=[reason])
+    payload = engine.local_repair_payload(
+        {"scenes": scenes},
+        plan,
+        [offending],
+        [reason],
+    )
     target = payload["targets"][0]
     assert target["scene_index"] == offending
     assert target["duplicate_claim"] == "noise_reduction"
