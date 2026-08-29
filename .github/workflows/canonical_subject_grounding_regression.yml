@@ -5,11 +5,12 @@ on:
     paths:
       - "quality/canonical_subject_grounding.py"
       - "quality/canonical_subject_grounding_regression_test.py"
+      - "quality/canonical_subject_grounding_production_wiring_regression_test.py"
       - "quality/judge.py"
       - "main.py"
       - "content/candidate_explorer.py"
+      - "ci_candidate_supply_recovery_hotfix.py"
       - "ci_canonical_subject_grounding_hotfix.py"
-      - ".github/workflows/main.yml"
       - ".github/workflows/canonical_subject_grounding_regression.yml"
 
 permissions:
@@ -25,3 +26,16 @@ jobs:
           python-version: "3.11"
       - name: Focused Canonical Subject Grounding regression
         run: python quality/canonical_subject_grounding_regression_test.py
+      - name: Apply production grounding composition
+        run: python ci_candidate_supply_recovery_hotfix.py
+      - name: Production boundary wiring regression
+        run: python quality/canonical_subject_grounding_production_wiring_regression_test.py
+      - name: Syntax check touched runtime surfaces
+        run: |
+          python -m py_compile \
+            quality/canonical_subject_grounding.py \
+            ci_canonical_subject_grounding_hotfix.py \
+            ci_candidate_supply_recovery_hotfix.py \
+            content/candidate_explorer.py \
+            quality/judge.py \
+            main.py
