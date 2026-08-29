@@ -6,6 +6,7 @@ mechanism reasoning is allowed to proceed.
 
 It deliberately does not identify objects itself. Identity must arrive as
 structured Candidate grounding metadata; otherwise the contract fails closed.
+A model-authored source string is not trusted provenance.
 """
 
 from __future__ import annotations
@@ -72,36 +73,39 @@ def _normalize_evidence(value: Any) -> List[Dict[str, str]]:
     return normalized
 
 
-def _evidence_supports_subject(
+def _explicit_evidence_supports_subject(
     evidence: Dict[str, str],
     *,
     canonical_subject: str,
     candidate_text: str,
 ) -> bool:
-    evidence_type = _text(evidence.get("evidence_type")).lower()
+    if _text(evidence.get("evidence_type")).lower() != "explicit_candidate_identity":
+        return False
     supports = _normalized_subject(evidence.get("supports_subject"))
     canonical = _normalized_subject(canonical_subject)
-
     if not canonical or supports != canonical:
         return False
+    # The model cannot relabel an ambiguous surface description merely by
+    # asserting a technical name in metadata. The name must exist in the
+    # Candidate's actual story text.
+    return canonical in candidate_text
 
-    if evidence_type == "explicit_candidate_identity":
-        # This evidence is only valid when the canonical name is actually
-        # present in Candidate text. The model cannot relabel an ambiguous
-        # surface description merely by asserting a new canonical name.
-        return canonical in candidate_text
 
-    if evidence_type == "source_backed_identity":
-        # A source-backed identity needs an actual source handle and an
-        # identity-specific detail. The gate does not judge source truth; it
-        # only prevents an empty/pending evidence state from masquerading as
-        # grounding.
-        return bool(
-            _text(evidence.get("source"))
-            and _text(evidence.get("detail"))
-        )
-
-    return False
+def _trusted_source_evidence_supports_subject(
+    evidence: Dict[str, str],
+    *,
+    canonical_subject: str,
+) -> bool:
+    if _text(evidence.get("evidence_type")).lower() != "source_backed_identity":
+        return False
+    supports = _normalized_subject(evidence.get("supports_subject"))
+    canonical = _normalized_subject(canonical_subject)
+    return bool(
+        canonical
+        and supports == canonical
+        and _text(evidence.get("source"))
+        and _text(evidence.get("detail"))
+    )
 
 
 def normalize_candidate_subject_metadata(candidate: Dict[str, Any]) -> Dict[str, Any]:
@@ -131,7 +135,14 @@ def _blocked(reason: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def evaluate_candidate_subject_grounding(candidate: Dict[str, Any]) -> Dict[str, Any]:
-    """Evaluate identity only; never infer or repair a subject identity."""
+    """Evaluate identity only; never infer or repair a subject identity.
+
+    ``grounding_evidence`` is model-visible metadata. It can prove an explicit
+    identity only when the canonical name is literally present in Candidate
+    text. Source-backed identity for an otherwise ambiguous object must arrive
+    through the private ``_trusted_grounding_evidence`` channel, populated by
+    trusted pipeline code rather than Candidate model output.
+    """
 
     metadata = normalize_candidate_subject_metadata(candidate)
     subject_kind = metadata["subject_kind"]
@@ -166,18 +177,34 @@ def evaluate_candidate_subject_grounding(candidate: Dict[str, Any]) -> Dict[str,
         )
 
     candidate_text = _candidate_text(candidate)
-    valid_evidence = [
+    explicit_evidence = [
         item
         for item in metadata["grounding_evidence"]
-        if _evidence_supports_subject(
+        if _explicit_evidence_supports_subject(
             item,
             canonical_subject=canonical_subject,
             candidate_text=candidate_text,
         )
     ]
+
+    # Never trust a source/citation string authored inside Candidate output as
+    # provenance. A future grounding retriever may attach evidence here after
+    # independently verifying it; current production simply rejects ambiguous
+    # identities when that trusted channel is absent.
+    trusted_evidence = _normalize_evidence(candidate.get("_trusted_grounding_evidence"))
+    trusted_source_evidence = [
+        item
+        for item in trusted_evidence
+        if _trusted_source_evidence_supports_subject(
+            item,
+            canonical_subject=canonical_subject,
+        )
+    ]
+
+    valid_evidence = explicit_evidence + trusted_source_evidence
     if not valid_evidence:
         return _blocked(
-            "no evidence supports the canonical physical subject identity",
+            "no trusted evidence supports the canonical physical subject identity",
             metadata,
         )
 
@@ -195,7 +222,8 @@ def fact_identity_precheck(script_data: Dict[str, Any]):
     """Return a deterministic FACT critical result when identity is unresolved.
 
     ``None`` means FACT may proceed to its normal mechanism/factual review.
-    This check intentionally executes before any FACT API call.
+    This check intentionally executes before any FACT API call. Evidence inside
+    ``subject_grounding`` was already validated by the pre-Writer trust boundary.
     """
 
     if not isinstance(script_data, dict):
@@ -209,18 +237,16 @@ def fact_identity_precheck(script_data: Dict[str, Any]):
     if subject_kind == _NON_PHYSICAL_KIND:
         return None
 
-    probe = {
+    metadata = {
         "subject_kind": subject_kind,
-        "canonical_subject": grounding.get("canonical_subject"),
-        "subject_identity_confidence": grounding.get("subject_identity_confidence"),
-        "grounding_evidence": grounding.get("grounding_evidence"),
-        # source-backed evidence remains verifiable without Candidate text;
-        # explicit-candidate evidence was already verified by the pre-Writer
-        # gate and is preserved here.
-        "topic": script_data.get("topic", ""),
+        "canonical_subject": _text(grounding.get("canonical_subject")),
+        "subject_identity_confidence": _confidence(
+            grounding.get("subject_identity_confidence")
+        ),
+        "grounding_evidence": _normalize_evidence(
+            grounding.get("grounding_evidence")
+        ),
     }
-
-    metadata = normalize_candidate_subject_metadata(probe)
     canonical = _normalized_subject(metadata["canonical_subject"])
     evidence = metadata["grounding_evidence"]
 
