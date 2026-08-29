@@ -147,6 +147,12 @@ def main():
     assert_distinct_mechanisms_and_long_topics()
     assert engine.MAX_SCRIPT_API_CALLS == 3
     assert engine.MAX_LOCAL_REPAIR_CALLS == 2
+
+    # Keep the Run 33239832517 grounded-claim counterexample on the existing
+    # Script Engine V2 regression surface; no workflow/bridge is added.
+    from quality.script_engine_v2_grounded_claim_plan_regression_test import main as grounded_claim_main
+    grounded_claim_main()
+
     print("WRITER COMPLIANCE PLAN-FIRST REGRESSION: PASS")
 
 
