@@ -13,11 +13,13 @@ on:
       - "ci_writer_compliance_plan_hotfix.py"
       - "ci_grounded_claim_plan_hotfix.py"
       - "ci_grounded_causal_role_hotfix.py"
+      - "ci_grounded_causal_contrast_hotfix.py"
       - "ci_cross_process_video_dedupe_hotfix.py"
       - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
       - "quality/retention_story_v2_production_counterexample_test.py"
       - "quality/writer_compliance_plan_regression_test.py"
       - "quality/grounded_causal_role_distinction_regression_test.py"
+      - "quality/run_33242742380_grounded_causal_contrast_regression_test.py"
       - "quality/script_engine_v2_*"
       - "quality/script_generator_router_regression_test.py"
       - ".github/workflows/script_engine_v2_regression.yml"
@@ -47,6 +49,7 @@ jobs:
             ci_writer_compliance_plan_hotfix.py \
             ci_grounded_claim_plan_hotfix.py \
             ci_grounded_causal_role_hotfix.py \
+            ci_grounded_causal_contrast_hotfix.py \
             content/retention_structure.py \
             content/script_engine_v2.py \
             content/script_engine_v2_runner.py \
@@ -63,7 +66,8 @@ jobs:
             quality/canonical_subject_grounding_regression_test.py \
             quality/writer_compliance_plan_regression_test.py \
             quality/script_engine_v2_grounded_claim_plan_regression_test.py \
-            quality/grounded_causal_role_distinction_regression_test.py
+            quality/grounded_causal_role_distinction_regression_test.py \
+            quality/run_33242742380_grounded_causal_contrast_regression_test.py
 
       - name: Retention Story V2 production counterexample
         run: python -m quality.retention_story_v2_production_counterexample_test
@@ -109,5 +113,8 @@ jobs:
       - name: Grounded Claim Plan regression
         run: python -m quality.script_engine_v2_grounded_claim_plan_regression_test
 
-      - name: Run 33241229064 grounded causal-role counterexample
+      - name: Grounded Causal Role regression
         run: python -m quality.grounded_causal_role_distinction_regression_test
+
+      - name: Run 33242742380 grounded causal contrast counterexample
+        run: python -m quality.run_33242742380_grounded_causal_contrast_regression_test
