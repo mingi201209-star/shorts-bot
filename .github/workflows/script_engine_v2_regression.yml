@@ -3,6 +3,7 @@ name: Script Engine V2 Regression
 on:
   pull_request:
     paths:
+      - "content/retention_structure.py"
       - "content/script_formal_endings.py"
       - "content/script_engine_v2.py"
       - "content/script_engine_v2_runner.py"
@@ -10,6 +11,7 @@ on:
       - "content/script_generator_router.py"
       - "ci_script_v2_visual_goal_hotfix.py"
       - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
+      - "quality/retention_story_v2_production_counterexample_test.py"
       - "quality/script_engine_v2_*"
       - "quality/script_generator_router_regression_test.py"
       - ".github/workflows/script_engine_v2_regression.yml"
@@ -36,10 +38,12 @@ jobs:
         run: |
           python -m py_compile \
             ci_script_v2_visual_goal_hotfix.py \
+            content/retention_structure.py \
             content/script_engine_v2.py \
             content/script_engine_v2_runner.py \
             content/script_engine_v2_validation.py \
             content/script_generator_router.py \
+            quality/retention_story_v2_production_counterexample_test.py \
             quality/script_engine_v2_regression_test.py \
             quality/script_engine_v2_opening_role_contract_regression_test.py \
             quality/script_engine_v2_failure_fixtures_test.py \
@@ -48,6 +52,9 @@ jobs:
             quality/script_engine_v2_run_32696711123_regression_test.py \
             quality/script_generator_router_regression_test.py \
             quality/canonical_subject_grounding_regression_test.py
+
+      - name: Retention Story V2 production counterexample
+        run: python -m quality.retention_story_v2_production_counterexample_test
 
       - name: Opening Role Contract regression
         run: python -m quality.script_engine_v2_opening_role_contract_regression_test

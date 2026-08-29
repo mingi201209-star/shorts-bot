@@ -6,7 +6,11 @@ failures in a machine-readable way so the runner can repair only those scenes.
 import re
 from typing import Any, Dict, List, Tuple
 
-from content.retention_structure import validate_density, validate_first5_progression
+from content.retention_structure import (
+    validate_density,
+    validate_first5_progression,
+    validate_new_information,
+)
 from quality.korean_speech_style import validate_korean_speech_text
 
 BAD_VISUAL_KEYWORDS = {
@@ -112,6 +116,8 @@ def validate_script_v2(script: Dict[str, Any], plan: Dict[str, Any]) -> Dict[str
                 "scene_index": _scene_index_from_reason(density_reason),
                 "reason": density_reason,
             })
+
+        failures.extend(validate_new_information(scenes, plan))
 
     deduped = []
     seen = set()
