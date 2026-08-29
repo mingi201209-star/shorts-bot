@@ -49,6 +49,8 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Compose established visual-contract production state
         run: |
+          python ci_visual_specificity_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
           python ci_visual_subject_anchor_contract_v1_hotfix.py
           python ci_visual_subject_anchor_contract_v2_hotfix.py
           python ci_visual_subject_anchor_fallback_inheritance_hotfix.py
