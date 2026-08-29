@@ -89,12 +89,16 @@ def production_shape_writer(item):
 
 
 def latest_production_shape_writer(writer_payload):
-    """Distill Run 32641375844 after candidate-opening normalization."""
+    """Distill Run 32641375844 with a Writer-valid non-duplicate consequence."""
     scenes = []
     for contract in writer_payload["scene_contracts"]:
         index = contract["index"]
+        role = contract["role"]
+        narration = MIDDLE_TEXTS[(index - 1) % len(MIDDLE_TEXTS)]
+        if role == "consequence":
+            narration = "유도항력은 비행 방향과 반대쪽으로 작용하는 항력의 일부입니다."
         scenes.append({
-            "narration": MIDDLE_TEXTS[(index - 1) % len(MIDDLE_TEXTS)],
+            "narration": narration,
             "visual_description": f"show winglet airflow mechanism stage {index}",
             "search_query": "윙렛 공기 흐름",
         })
