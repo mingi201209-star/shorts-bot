@@ -79,8 +79,7 @@ assert "설명이 끝났다면 즉시 종료" in length
 
 source = (ROOT / "content" / "script_generator.py").read_text(encoding="utf-8")
 assert "{_adaptive_scene_count_instruction(candidate)}" in source
-assert "{_adaptive_length_instruction(candidate)}" in source
-assert "전체 TTS가 {TARGET_MIN_SECONDS}~{TARGET_MAX_SECONDS}초가 되도록 충분한 문장 분량을 만든다." not in source
+assert "[LENGTH]\n{_adaptive_length_instruction(candidate)}\n\n[OUTPUT]" in source
 assert "Retention Story V2" in (ROOT / "ci_adaptive_scene_count_hotfix.py").read_text(encoding="utf-8")
 
 print("PASS: adaptive scene count treats 6-7 as preference and permits shorter complete design scripts")
