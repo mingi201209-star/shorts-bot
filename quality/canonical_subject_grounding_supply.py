@@ -6,6 +6,8 @@ Grounding Gate V1. The trust boundary is deliberately asymmetric:
 * Candidate-model fields are untrusted hints.
 * Only repo-owned or caller-injected trusted identity records may populate the
   private ``_trusted_grounding_evidence`` channel.
+* Optional repo-owned ``supported_claims`` travel through a separate private
+  ``_trusted_grounded_claims`` channel for downstream Writer claim planning.
 * A record is usable only when its documented physical-feature observation and
   context jointly match the Candidate text. The resolver never maps one
   appearance word directly to a technical entity.
@@ -130,6 +132,43 @@ def _trusted_gate_evidence(record: Dict[str, Any]) -> Dict[str, str]:
     }
 
 
+def _trusted_grounded_claims(record: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Project optional source-backed factual claims into a private channel.
+
+    The supplier does not infer claims from Candidate prose. Claims must already
+    exist on the trusted record with provenance and explicit paraphrase scope.
+    """
+    result: List[Dict[str, Any]] = []
+    seen = set()
+    for raw in record.get("supported_claims") or []:
+        if not isinstance(raw, dict):
+            continue
+        claim_id = _text(raw.get("claim_id"))
+        claim_type = _text(raw.get("claim_type"))
+        summary = _text(raw.get("evidence_summary"))
+        source = _text(raw.get("source")) or _text(record.get("source"))
+        detail = _text(raw.get("detail")) or _text(record.get("detail"))
+        scope = [
+            _text(value)
+            for value in raw.get("allowed_paraphrase_scope") or []
+            if _text(value)
+        ]
+        if not claim_id or claim_id in seen or not claim_type or not summary:
+            continue
+        if not source or not detail or not scope:
+            continue
+        seen.add(claim_id)
+        result.append({
+            "claim_id": claim_id,
+            "claim_type": claim_type,
+            "evidence_summary": summary,
+            "source": source,
+            "detail": detail,
+            "allowed_paraphrase_scope": scope,
+        })
+    return result
+
+
 def supply_trusted_subject_grounding(
     candidate: Dict[str, Any],
     *,
@@ -165,6 +204,7 @@ def supply_trusted_subject_grounding(
     canonical = _text(record.get("canonical_subject"))
     confidence = _confidence(record.get("identity_confidence"))
     evidence = _trusted_gate_evidence(record)
+    claims = _trusted_grounded_claims(record)
 
     result["subject_kind"] = _PHYSICAL_KIND
     result["canonical_subject"] = canonical
@@ -174,13 +214,15 @@ def supply_trusted_subject_grounding(
     # Gate validates the private channel below.
     result["grounding_evidence"] = [deepcopy(evidence)]
     result["_trusted_grounding_evidence"] = [deepcopy(evidence)]
+    if claims:
+        result["_trusted_grounded_claims"] = deepcopy(claims)
     return result
 
 
 # Repo-owned authoritative identity provenance. These are evidence records,
-# not surface-word mappings. Each record binds an official source statement to
-# complete physical observation/context descriptions; the generic resolver
-# above decides whether a Candidate actually matches that evidence.
+# not surface-word mappings. Each record binds official source statements to
+# complete physical observation/context descriptions. Optional supported_claims
+# are factual evidence records consumed only after identity grounding succeeds.
 PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
     {
         "record_type": "trusted_subject_identity",
@@ -200,8 +242,57 @@ PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
         ],
         "source": "https://www.nasa.gov/image-article/nasa-contribution-chevrons/",
         "detail": (
-            "NASA identifies chevrons as sawtooth patterns on the trailing edges "
-            "of jet engine nacelles and/or exhaust nozzles."
+            "NASA identifies chevrons as sawtooth patterns on jet-engine nacelle/nozzle "
+            "trailing edges and describes their noise-reduction function by changing how "
+            "the exhaust and surrounding flow mix."
         ),
+        "supported_claims": [
+            {
+                "claim_id": "flow_interface",
+                "claim_type": "mechanism_input",
+                "evidence_summary": (
+                    "엔진 뒤에서는 뜨거운 배기 흐름과 더 차가운 바깥쪽 흐름이 서로 만납니다."
+                ),
+                "allowed_paraphrase_scope": [
+                    "뜨거운 배기 흐름과 차가운 바깥 흐름이 만납니다.",
+                    "엔진 배기와 주변의 더 차가운 흐름이 만나는 경계입니다.",
+                    "hot exhaust flow meets the cooler surrounding flow",
+                ],
+            },
+            {
+                "claim_id": "chevron_flow_mixing",
+                "claim_type": "mechanism_change",
+                "evidence_summary": (
+                    "톱니 모양 셰브론은 배기 흐름과 주변 흐름이 섞이는 방식을 바꿉니다."
+                ),
+                "allowed_paraphrase_scope": [
+                    "톱니 가장자리는 두 흐름이 섞이는 방식을 바꿉니다.",
+                    "셰브론은 배기와 주변 공기의 혼합을 바꿉니다.",
+                    "chevrons change how the exhaust and surrounding flow mix",
+                ],
+            },
+            {
+                "claim_id": "mixing_transition",
+                "claim_type": "mechanism_effect",
+                "evidence_summary": (
+                    "셰브론 때문에 두 흐름의 경계가 더 점진적으로 섞이도록 전환됩니다."
+                ),
+                "allowed_paraphrase_scope": [
+                    "두 흐름의 경계가 더 점진적으로 섞입니다.",
+                    "배기와 주변 흐름이 한꺼번에 끊기지 않고 점진적으로 혼합됩니다.",
+                    "the two flows mix more gradually across the boundary",
+                ],
+            },
+            {
+                "claim_id": "noise_reduction",
+                "claim_type": "primary_result",
+                "evidence_summary": "이 혼합 변화의 대표적인 결과는 제트 엔진 소음 감소입니다.",
+                "allowed_paraphrase_scope": [
+                    "제트 소음을 줄입니다.",
+                    "엔진에서 나는 소음을 낮춥니다.",
+                    "the primary result is reduced jet-engine noise",
+                ],
+            },
+        ],
     },
 )
