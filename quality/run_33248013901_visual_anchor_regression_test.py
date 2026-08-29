@@ -1,9 +1,10 @@
-"""Run 33248013901 HUMAN visual-QA counterexamples.
+"""Run 33248013901 + 33249110048 HUMAN visual-QA counterexamples.
 
 The production Script/FACT/grounded keywords were correct, but retrieval accepted
-lexical false positives (Unreal Engine gas stove, clock mechanism 'engine') and
-explicit green-screen aircraft. Reuse the established V1 regression first, then
-exercise the stricter compound physical identity contract.
+lexical false positives and then Run 33249110048 proved specificity-ladder
+fallback queries could bypass the original Scene subject contract. Reuse the
+established V1 regression first, then exercise compound identity, chroma, and
+fallback inheritance.
 """
 import runpy
 
@@ -14,8 +15,6 @@ candidate = base["candidate"]
 strengthened = base["strengthened"]
 
 
-# Scene 3 LIVE query: 'jet' must preserve aviation domain, so a kitchen asset
-# tagged only by the renderer name 'Unreal Engine' cannot satisfy the contract.
 scene3_query = strengthened(
     "jet engine flow interface",
     narration="엔진 뒤에서는 뜨거운 배기 흐름과 더 차가운 바깥쪽 흐름이 서로 만납니다.",
@@ -31,8 +30,6 @@ assert vd.candidate_anchor_compatibility(gas_stove, scene3_query)["compatible"] 
 assert vd.choose_best_candidate([gas_stove], subject_filter_query=scene3_query) is None
 
 
-# Scene 4 LIVE query: chevron is a real component identity, not decorative text.
-# A clock mechanism containing the lexical tokens engine/engineering must fail.
 scene4_query = strengthened(
     "jet engine chevron flow mixing",
     narration="톱니 모양 셰브론은 배기 흐름과 주변 흐름이 섞이는 방식을 바꿉니다.",
@@ -48,8 +45,6 @@ assert vd.candidate_anchor_compatibility(clock, scene4_query)["compatible"] is F
 assert vd.choose_best_candidate([clock], subject_filter_query=scene4_query) is None
 
 
-# Opening LIVE failure: generic aircraft/engine footage is not enough when the
-# narration and visual goal explicitly name the tooth-like physical feature.
 opening_query = strengthened(
     "airflow detail stage 1",
     narration="비행기 엔진 뒤는 톱니처럼 생겼습니다.",
@@ -65,7 +60,6 @@ assert vd.candidate_anchor_compatibility(generic_aircraft, opening_query)["compa
 assert vd.choose_best_candidate([generic_aircraft], subject_filter_query=opening_query) is None
 
 
-# Explicit unkeyed chroma stock must never be treated as real-world evidence.
 scene5_query = strengthened(
     "jet engine noise reduction",
     narration="이 혼합 변화의 대표적인 결과는 제트 엔진 소음 감소입니다.",
@@ -80,8 +74,6 @@ assert tier >= 6, (tier, label)
 assert label == "EXPLICIT_CHROMA_STOCK_REJECTED", (tier, label)
 
 
-# A genuinely matching physical subject remains selectable; no threshold was
-# lowered and no extra retrieval/API budget is introduced.
 correct = candidate(
     99901,
     "aircraft jet engine nacelle nozzle chevron serrated exhaust flow mixing closeup",
@@ -89,4 +81,38 @@ correct = candidate(
 assert vd.candidate_anchor_compatibility(correct, scene4_query)["compatible"] is True
 assert vd.choose_best_candidate([correct], subject_filter_query=scene4_query) is not None
 
-print("RUN 33248013901 VISUAL ANCHOR REGRESSION: PASS")
+
+# Run 33249110048: re-establish the opening Scene contract exactly as production
+# does before entering that Scene's specificity ladder, then change only the
+# retrieval query wording. The original required anchors must stay authoritative.
+opening_query = strengthened(
+    "airflow detail stage 1",
+    narration="비행기 엔진 뒤는 톱니처럼 생겼습니다.",
+    goal="비행기 엔진 뒤 톱니 모양 배기구를 명확하게 보여준다.",
+)
+fallback_query = "airplane engine chevron detail"
+engine_only = candidate(99101, "engine turbine machinery detail")
+aircraft_engine = candidate(99102, "aircraft airplane aviation jet engine detail")
+full_subject = candidate(99103, "aircraft airplane jet engine nacelle nozzle chevron serrated detail")
+
+for partial, expected_match in ((engine_only, 1), (aircraft_engine, 2)):
+    compat = vd.candidate_anchor_compatibility(partial, opening_query)
+    assert compat["matched"] == expected_match and compat["total"] == 3, compat
+    tier, label = vd.general_scene_unknown_safe_tier(partial, fallback_query)
+    assert tier >= 5, (expected_match, tier, label)
+    assert label == "REQUIRED_SUBJECT_ANCHOR_INCOMPLETE", (expected_match, tier, label)
+
+compat = vd.candidate_anchor_compatibility(full_subject, opening_query)
+assert compat["matched"] == 3 and compat["total"] == 3, compat
+tier, label = vd.general_scene_unknown_safe_tier(full_subject, fallback_query)
+assert tier < 5, (tier, label)
+
+fallback_green = candidate(
+    99104,
+    "aircraft airplane jet engine nacelle nozzle chevron serrated green screen chroma key",
+)
+tier, label = vd.general_scene_unknown_safe_tier(fallback_green, fallback_query)
+assert tier >= 6, (tier, label)
+assert label == "EXPLICIT_CHROMA_STOCK_REJECTED", (tier, label)
+
+print("RUN 33248013901 + 33249110048 VISUAL ANCHOR REGRESSION: PASS")

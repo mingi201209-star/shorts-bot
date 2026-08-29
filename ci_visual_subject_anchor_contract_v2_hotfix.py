@@ -70,3 +70,7 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
     path.write_text(text, encoding="utf-8")
 
 print("✅ Visual Subject Anchor Contract V2 applied: compound aviation identity + explicit chroma fail-close")
+
+# Run 33249110048 showed that query-string equality was too narrow: the same
+# Scene contract must survive specificity-ladder fallback queries.
+import ci_visual_subject_anchor_fallback_inheritance_hotfix  # noqa: F401,E402

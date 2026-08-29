@@ -7,6 +7,7 @@ on:
       - "ci_visual_subject_anchor_contract_v1_hotfix.py"
       - "ci_visual_subject_anchor_contract_v1_completion_hotfix.py"
       - "ci_visual_subject_anchor_contract_v2_hotfix.py"
+      - "ci_visual_subject_anchor_fallback_inheritance_hotfix.py"
       - "ci_cross_process_video_dedupe_hotfix.py"
       - "quality/visual_subject_anchor_contract_v1_regression_test.py"
       - "quality/run_33248013901_visual_anchor_regression_test.py"
@@ -19,6 +20,7 @@ on:
       - "ci_visual_subject_anchor_contract_v1_hotfix.py"
       - "ci_visual_subject_anchor_contract_v1_completion_hotfix.py"
       - "ci_visual_subject_anchor_contract_v2_hotfix.py"
+      - "ci_visual_subject_anchor_fallback_inheritance_hotfix.py"
       - "ci_cross_process_video_dedupe_hotfix.py"
       - "quality/visual_subject_anchor_contract_v1_regression_test.py"
       - "quality/run_33248013901_visual_anchor_regression_test.py"
@@ -36,5 +38,5 @@ jobs:
           python-version: "3.11"
       - name: Install test dependencies
         run: pip install -r requirements.txt
-      - name: Run Visual Subject Anchor Contract V1 + Run 33248013901 regression
+      - name: Run Visual Subject Anchor Contract V1 + production counterexamples
         run: python quality/run_33248013901_visual_anchor_regression_test.py
