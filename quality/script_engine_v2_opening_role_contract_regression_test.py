@@ -61,7 +61,8 @@ def main():
     assert formal_normalized["core_question"] == formal_scene2["core_question"]
     assert formal_normalized["micro_narrative"]["core_question"] == formal_scene2["micro_narrative"]["core_question"]
 
-    # Non-physical/unsupported questions keep the existing fail-close behavior.
+    # Non-physical/unsupported question hooks must stay on their existing path:
+    # this physical-observation projection neither rewrites nor invents one.
     unsupported = {
         "topic": "사람들은 왜 이야기를 좋아할까",
         "core_question": "왜 사람들은 이야기를 좋아할까요?",
@@ -74,14 +75,10 @@ def main():
         "fact_check_focus": [],
         "visual_proof": [],
     }
+    unsupported_original = copy.deepcopy(unsupported)
     unsupported_normalized = router._observable_hook_from_candidate(unsupported)
-    assert unsupported_normalized["micro_narrative"]["hook"] == unsupported["micro_narrative"]["hook"]
-    try:
-        build_narrative_plan(unsupported_normalized)
-    except ValueError as exc:
-        assert "observable statement" in str(exc)
-    else:
-        raise AssertionError("unsupported non-physical question must remain fail-closed")
+    assert unsupported == unsupported_original
+    assert unsupported_normalized == unsupported_original
 
     print("PASS: Script V2 Opening Role Contract regression")
 
