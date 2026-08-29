@@ -35,12 +35,12 @@ jobs:
           git reset --hard HEAD
           git clean -fd
       - name: Canonical Subject Grounding regression
-        run: python quality/canonical_subject_grounding_regression_test.py
+        run: python -m quality.canonical_subject_grounding_regression_test
       - name: Candidate Grounded Recovery regression
-        run: python quality/candidate_grounded_recovery_regression_test.py
+        run: python -m quality.candidate_grounded_recovery_regression_test
       - name: FACT Critical regression
-        run: python quality/fact_critical_regeneration_test.py
+        run: python -m quality.fact_critical_regeneration_test
       - name: Script V2 regression
-        run: python quality/script_engine_v2_regression_test.py
+        run: python -m quality.script_engine_v2_regression_test
       - name: Visual Subject Anchor regression
-        run: python quality/visual_subject_anchor_contract_v1_regression_test.py
+        run: python -m quality.visual_subject_anchor_contract_v1_regression_test
