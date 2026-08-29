@@ -54,3 +54,8 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
     path.write_text(text, encoding="utf-8")
 
 print("✅ Visual Subject Anchor fallback inheritance applied: Scene contract survives specificity ladder")
+
+# Run 33250343057 showed the next boundary: subject-correct fallback assets can
+# still lose the owned grounded claim's explanatory meaning. Compose that
+# contract after #253 so subject/chroma enforcement remains authoritative.
+import ci_visual_claim_semantic_inheritance_hotfix  # noqa: F401,E402
