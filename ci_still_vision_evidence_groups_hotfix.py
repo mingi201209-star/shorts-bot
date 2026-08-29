@@ -118,8 +118,10 @@ def patch_hook_visual_dominance():
         raise RuntimeError("structured evidence keyword anchor mismatch")
     text = text.replace(anchor, replacement, 1)
 
-    anchor = "Observable action required: {str(action_required).lower()}\n\nIdentify the concrete subject explicitly promised by the Hook. Then score:\n"
-    replacement = "Observable action required: {str(action_required).lower()}\nRequired subject groups: {required_subject_groups_json}\n\nStructured subject-evidence contract:\n- visible_components is authoritative structured evidence. List only concrete components visibly identifiable in the supplied frames.\n- visible_subject_groups MUST contain every required subject group above as true/false. Set true only when that group is visibly identifiable.\n- For chevron only, allowed structured aliases are: chevron, chevrons, serrated edge, serrated nozzle, sawtooth trailing edge, 톱니, 셰브론.\n- Never treat wing, engine, blade, fan, or gear as chevron evidence.\n- Keep reason consistent with structured evidence; do not claim a required group is visible when its structured value is false.\n\nIdentify the concrete subject explicitly promised by the Hook. Then score:\n"
+    # Other visual hotfixes may add guidance between this line and the score
+    # rubric. Patch only the stable line so installer order cannot break us.
+    anchor = "Observable action required: {str(action_required).lower()}\n"
+    replacement = "Observable action required: {str(action_required).lower()}\nRequired subject groups: {required_subject_groups_json}\n\nStructured subject-evidence contract:\n- visible_components is authoritative structured evidence. List only concrete components visibly identifiable in the supplied frames.\n- visible_subject_groups MUST contain every required subject group above as true/false. Set true only when that group is visibly identifiable.\n- For chevron only, allowed structured aliases are: chevron, chevrons, serrated edge, serrated nozzle, sawtooth trailing edge, 톱니, 셰브론.\n- Never treat wing, engine, blade, fan, or gear as chevron evidence.\n- Keep reason consistent with structured evidence; do not claim a required group is visible when its structured value is false.\n"
     if text.count(anchor) != 1:
         raise RuntimeError("structured evidence prompt anchor mismatch")
     text = text.replace(anchor, replacement, 1)
