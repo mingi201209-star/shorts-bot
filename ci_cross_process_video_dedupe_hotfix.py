@@ -116,3 +116,4 @@ if "FINAL_VISUAL_SEMANTIC_QA_V1" in main_text:
     # Apply after all visual completion installers so the subject-anchor contract
     # is the final retrieval/semantic boundary in production composition.
     import ci_visual_subject_anchor_contract_v1_hotfix  # noqa: F401,E402
+    import ci_visual_subject_anchor_contract_v1_completion_hotfix  # noqa: F401,E402
