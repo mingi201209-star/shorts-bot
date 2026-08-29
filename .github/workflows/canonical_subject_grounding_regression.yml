@@ -1,0 +1,27 @@
+name: Canonical Subject Grounding Regression
+
+on:
+  pull_request:
+    paths:
+      - "quality/canonical_subject_grounding.py"
+      - "quality/canonical_subject_grounding_regression_test.py"
+      - "quality/judge.py"
+      - "main.py"
+      - "content/candidate_explorer.py"
+      - "ci_canonical_subject_grounding_hotfix.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/canonical_subject_grounding_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Focused Canonical Subject Grounding regression
+        run: python quality/canonical_subject_grounding_regression_test.py
