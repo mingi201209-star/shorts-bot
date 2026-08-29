@@ -15,19 +15,10 @@ if old_scene_instruction not in text and new_scene_instruction not in text:
     raise RuntimeError("adaptive scene-count prompt marker not found")
 text = text.replace(old_scene_instruction, new_scene_instruction, 1)
 
-# Earlier production hotfixes can rewrite the literal target-duration expression,
-# so replace this one Writer sentence by its stable semantic boundary rather than
-# depending on the pristine TARGET_MIN/TARGET_MAX text.
-duration_pattern = r"새 소재를 탐색하지 말고 확정 Winner를 [^\n]*,\n"
-duration_replacement = "새 소재를 탐색하지 말고 확정 Winner를 {_adaptive_duration_instruction(candidate)},\n"
-text, duration_count = re.subn(
-    duration_pattern,
-    duration_replacement,
-    text,
-    count=1,
-)
-if duration_count != 1 and duration_replacement not in text:
-    raise RuntimeError("adaptive duration prompt boundary not found")
+# Script production parity already owns the intro duration sentence. Keep that
+# composition boundary and override its helper below instead of rewriting prompt text.
+if "{_script_parity_duration_opening(candidate)}" not in text:
+    raise RuntimeError("script parity duration helper boundary not found")
 
 length_pattern = r"\[LENGTH\]\n.*?\n\n\[OUTPUT\]"
 length_replacement = "[LENGTH]\n{_adaptive_length_instruction(candidate)}\n\n[OUTPUT]"
@@ -132,6 +123,16 @@ def _adaptive_scene_count_instruction(candidate):
             "인접 Scene이 하나의 자연스러운 causal step이면 한 Scene에서 한 호흡으로 설명한다."
         )
     return f"{MIN_SCENES}~{MAX_SCENES} Scene의 Shorts로 발전시켜라."
+
+
+# Keep the existing production-parity prompt composition. Only change the design
+# branch of the helper; non-design topics retain the original behavior.
+_retention_v2_original_duration_opening = _script_parity_duration_opening
+
+def _script_parity_duration_opening(candidate):
+    if _adaptive_scene_count_is_design(candidate):
+        return f"새 소재를 탐색하지 말고 확정 Winner를 {_adaptive_duration_instruction(candidate)},"
+    return _retention_v2_original_duration_opening(candidate)
 
 
 def _retention_scene_role(scene):
