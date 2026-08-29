@@ -10,8 +10,14 @@ on:
       - "content/script_engine_v2_validation.py"
       - "content/script_generator_router.py"
       - "ci_script_v2_visual_goal_hotfix.py"
+      - "ci_writer_compliance_plan_hotfix.py"
+      - "ci_grounded_claim_plan_hotfix.py"
+      - "ci_grounded_causal_role_hotfix.py"
+      - "ci_cross_process_video_dedupe_hotfix.py"
       - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
       - "quality/retention_story_v2_production_counterexample_test.py"
+      - "quality/writer_compliance_plan_regression_test.py"
+      - "quality/grounded_causal_role_distinction_regression_test.py"
       - "quality/script_engine_v2_*"
       - "quality/script_generator_router_regression_test.py"
       - ".github/workflows/script_engine_v2_regression.yml"
@@ -38,6 +44,9 @@ jobs:
         run: |
           python -m py_compile \
             ci_script_v2_visual_goal_hotfix.py \
+            ci_writer_compliance_plan_hotfix.py \
+            ci_grounded_claim_plan_hotfix.py \
+            ci_grounded_causal_role_hotfix.py \
             content/retention_structure.py \
             content/script_engine_v2.py \
             content/script_engine_v2_runner.py \
@@ -51,7 +60,10 @@ jobs:
             quality/script_engine_v2_text_alias_regression_test.py \
             quality/script_engine_v2_run_32696711123_regression_test.py \
             quality/script_generator_router_regression_test.py \
-            quality/canonical_subject_grounding_regression_test.py
+            quality/canonical_subject_grounding_regression_test.py \
+            quality/writer_compliance_plan_regression_test.py \
+            quality/script_engine_v2_grounded_claim_plan_regression_test.py \
+            quality/grounded_causal_role_distinction_regression_test.py
 
       - name: Retention Story V2 production counterexample
         run: python -m quality.retention_story_v2_production_counterexample_test
@@ -88,3 +100,14 @@ jobs:
 
       - name: Canonical Subject Grounding regression
         run: python -m quality.canonical_subject_grounding_regression_test
+
+      # Run composition-mutating Writer regressions last so the established V2
+      # checks above continue to exercise the uncomposed base exactly as before.
+      - name: Writer Compliance Plan-First regression
+        run: python quality/writer_compliance_plan_regression_test.py
+
+      - name: Grounded Claim Plan regression
+        run: python quality/script_engine_v2_grounded_claim_plan_regression_test.py
+
+      - name: Run 33241229064 grounded causal-role counterexample
+        run: python quality/grounded_causal_role_distinction_regression_test.py
