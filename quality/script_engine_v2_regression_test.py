@@ -165,6 +165,11 @@ def main():
         assert anchored.startswith("aircraft jet engine chevron ")
         assert 4 <= len(anchored.split()) <= 7
 
+    # The focused Run 33239180275 counterexample is part of the existing Script V2
+    # regression surface, avoiding any new workflow or retry path.
+    from quality.writer_compliance_plan_regression_test import main as writer_plan_main
+    writer_plan_main()
+
     print("PASS: Script Engine V2 adaptive deterministic narrative plan")
 
 
