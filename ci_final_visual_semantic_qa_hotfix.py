@@ -118,6 +118,9 @@ if "STILL_IMAGE_MOTION_FALLBACK_V1" not in text:
         raise RuntimeError("still fallback final visual import anchor not found")
     text = text.replace(import_anchor, import_block, 1)
 
+    # Later production hotfixes can change the exact wording/spacing of the
+    # no-video RuntimeError. Anchor only on the stable control-flow line and
+    # the next numbered section so installer ordering cannot break startup.
     no_video_replacement = '''        # STILL_IMAGE_MOTION_FALLBACK_V1
         if not video_url:
             still_result = generate_still_motion_fallback(
@@ -127,6 +130,9 @@ if "STILL_IMAGE_MOTION_FALLBACK_V1" not in text:
                 trigger_reason="no_semantically_safe_stock",
             )
             if still_result:
+                # Reuse the existing generated-local-MP4 handoff installed by
+                # the bounded AI visual hotfix. Normal download/vertical paths
+                # remain untouched for all stock candidates.
                 video_url = vertical_video_path
                 set_last_final_visual_selection({
                     "accepted": True,
@@ -155,6 +161,8 @@ if "STILL_IMAGE_MOTION_FALLBACK_V1" not in text:
         "still fallback no-video block",
     )
 
+# The still-image fallback replaces the whole no-video-to-download interval.
+# Reinstall Scene lineage after that replacement so it cannot delete the call.
 if "FINAL_VISUAL_SCENE_RECORD_V1" not in text:
     record_needle = '''        # ====================================================
         # 4. 영상 다운로드
@@ -206,6 +214,8 @@ from quality.final_visual_semantic_qa import (
         reset_final_visual_semantic_report()
 
 ''' + production_needle + '''
+        # The exact clips selected for every rendered scene must pass before
+        # the MP4 can be treated as a successful daily production.
         validate_final_visual_semantic_qa(scenes)
 '''
     if production_needle not in text:
@@ -213,6 +223,8 @@ from quality.final_visual_semantic_qa import (
     text = text.replace(production_needle, production_replacement, 1)
 main.write_text(text, encoding="utf-8")
 
+# Keep generated-still verification aligned with the actual dominance verifier
+# contract after every other visual hotfix has finished mutating its modules.
 from ci_still_image_verifier_contract_hotfix import main as _patch_still_image_verifier_contract
 _patch_still_image_verifier_contract()
 
