@@ -34,7 +34,7 @@ def writer_response(item):
         elif role == "causal_clue":
             text = ""  # Run 32696711123: scene 3 text missing
         elif role.startswith("mechanism_") and idx == 4:
-            text = "이 변화는 날개 끝 공기의 흐름을 바꾼다."
+            text = "이 변화는 날개 끝 공기의 흐름을 조절한다."
         else:
             text = "날개 끝의 공기 흐름은 압력 차이와 연결됩니다."
         scenes.append({
@@ -61,8 +61,8 @@ def main():
     assert script["script_engine_v2_calls"] <= 3
     assert script["scenes"][2]["text"]
     assert script["scenes"][2]["text"].endswith(("니다.", "입니다."))
-    assert "바꾼다" not in script["scenes"][3]["text"]
-    assert script["scenes"][3]["text"].endswith("바꿉니다.")
+    assert "조절한다" not in script["scenes"][3]["text"]
+    assert script["scenes"][3]["text"].endswith("조절합니다.")
     assert script["scenes"][0]["text"] == "비행기 날개 끝이 위로 꺾여 있습니다."
     assert script["scenes"][-2]["text"].endswith("줄입니다.")
     assert script["scenes"][-1]["text"].endswith("됩니다.")
