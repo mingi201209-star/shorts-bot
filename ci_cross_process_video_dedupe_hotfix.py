@@ -117,3 +117,7 @@ if "FINAL_VISUAL_SEMANTIC_QA_V1" in main_text:
     # is the final retrieval/semantic boundary in production composition.
     import ci_visual_subject_anchor_contract_v1_hotfix  # noqa: F401,E402
     import ci_visual_subject_anchor_contract_v1_completion_hotfix  # noqa: F401,E402
+
+# Writer compliance is deliberately applied last in the existing production hotfix
+# chain so earlier Script V2 installers cannot overwrite the plan-first contract.
+import ci_writer_compliance_plan_hotfix  # noqa: F401,E402
