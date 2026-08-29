@@ -132,8 +132,10 @@ def patch_hook_visual_dominance():
         raise RuntimeError("structured evidence components prompt anchor mismatch")
     text = text.replace(anchor, replacement, 1)
 
+    # Preserve the existing JSON example line because #257 appends its
+    # explanatory-group field immediately after this stable anchor.
     anchor = '  "visible_components": ["aircraft", "wing"],\n'
-    replacement = '  "visible_components": ["concrete visible component"],\n  "visible_subject_groups": {visible_subject_groups_template},\n'
+    replacement = anchor + '  "visible_subject_groups": {visible_subject_groups_template},\n'
     if text.count(anchor) != 1:
         raise RuntimeError("structured evidence JSON anchor mismatch")
     text = text.replace(anchor, replacement, 1)
