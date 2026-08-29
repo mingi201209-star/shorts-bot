@@ -100,3 +100,73 @@ def subject_anchor_words(scene):
     if words & {"chevron", "chevrons", "serrated", "serration", "serrations"}:
         anchors.append("chevron")
     return anchors
+
+
+def trusted_grounding_present(scene):
+    """Require the existing post-Script canonical trusted-supply provenance."""
+    if not isinstance(scene, dict):
+        return False
+    supply = scene.get("_canonical_visual_supply") or {}
+    if not isinstance(supply, dict):
+        return False
+    canonical = str(supply.get("canonical_subject") or "").strip().lower()
+    source = str(supply.get("grounding_source") or "").strip()
+    if not canonical or not source:
+        return False
+    # Keep this fallback limited to the already-grounded jet-engine chevron
+    # identity. A generic engine or generic serration is not enough.
+    return (
+        "chevron" in canonical
+        and any(term in canonical for term in ("engine", "nacelle", "nozzle"))
+    )
+
+
+def _scene_text(scene):
+    return " ".join(
+        str((scene or {}).get(key) or "").strip().lower()
+        for key in ("text", "visual_goal", "keyword")
+    )
+
+
+def _leaks_primary_result(scene):
+    value = _scene_text(scene)
+    return any(
+        token in value
+        for token in (
+            "noise reduction", "reduce noise", "reduces noise", "quieter",
+            "소음 감소", "소음을 줄", "소음이 줄", "조용",
+            "fuel", "efficiency", "drag", "stability", "thrust", "performance",
+            "연료", "효율", "항력", "안정성", "추력", "성능",
+        )
+    )
+
+
+def chevron_flow_mixing_supported(scene):
+    """Strict eligibility for the Scene-4 deterministic mechanism visual.
+
+    Runtime Script scenes intentionally do not carry the private Grounded Claim
+    Plan object. Therefore the authoritative equivalent claim signature is the
+    deterministic grounded keyword (`jet engine chevron flow mixing`) plus the
+    trusted canonical supply profile attached after Script generation. If an
+    explicit owned_claim_id is present (fixtures/diagnostics), it must match.
+    """
+    if not isinstance(scene, dict):
+        return False
+    explicit_claim = str(scene.get("owned_claim_id") or "").strip()
+    if explicit_claim and explicit_claim != "chevron_flow_mixing":
+        return False
+    if not trusted_grounding_present(scene):
+        return False
+    if set(subject_anchor_words(scene)) != {"aircraft", "engine", "chevron"}:
+        return False
+    if set(required_explanatory_groups(scene)) != {"flow", "mixing"}:
+        return False
+    if _leaks_primary_result(scene):
+        return False
+    # The complete subject + relation nucleus is produced by the existing
+    # grounded-keyword contract from the owned trusted claim. Requiring both
+    # "chevron" and "mixing" prevents a broad flow mechanism from opting in.
+    words = _words(scene.get("keyword"))
+    if not ({"chevron", "flow", "mixing"} <= words):
+        return False
+    return True
