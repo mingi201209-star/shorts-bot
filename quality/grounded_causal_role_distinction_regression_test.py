@@ -82,7 +82,9 @@ def assert_run_332412_duplicate_still_fails_and_transition_passes():
     assert duplicate_validation["valid"] is False, duplicate_validation
     assert 5 in duplicate_validation["failed_scene_indexes"], duplicate_validation
 
-    good = _script("그 결과 두 흐름 사이의 급격한 속도 차가 더 점진적인 전환으로 바뀝니다.")
+    # Stay inside the exact #244 trusted paraphrase scope while proving that
+    # Scene 5 advances from the mixing action to a new downstream transition.
+    good = _script("그래서 두 흐름 사이의 급격한 경계가 더 점진적인 전환으로 바뀝니다.")
     good = engine.apply_locked_scenes(good, plan)
     good_validation = runner._combined_validation(good, plan)
     assert good_validation["valid"] is True, good_validation
