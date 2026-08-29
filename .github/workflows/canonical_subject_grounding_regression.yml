@@ -39,3 +39,25 @@ jobs:
             content/candidate_explorer.py \
             quality/judge.py \
             main.py
+      - name: Install Script V2 dependency
+        run: python -m pip install openai
+      - name: Apply established Script V2 base hotfix
+        run: python ci_script_v2_visual_goal_hotfix.py
+      - name: Script V2 deterministic regressions
+        run: |
+          python -m quality.script_engine_v2_regression_test
+          python -m quality.script_engine_v2_failure_fixtures_test
+          python -m quality.script_engine_v2_runner_regression_test
+          python -m quality.script_engine_v2_run_32696711123_regression_test
+          python -m quality.script_engine_v2_text_alias_regression_test
+          python -m quality.script_generator_router_regression_test
+          python - <<'PY'
+          from content.script_engine_v2 import MAX_SCRIPT_API_CALLS, MAX_LOCAL_REPAIR_CALLS
+          assert MAX_SCRIPT_API_CALLS == 3
+          assert MAX_LOCAL_REPAIR_CALLS == 2
+          print("SCRIPT V2 API CEILING: PASS")
+          PY
+      - name: Install Visual Subject Anchor test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Visual Subject Anchor Contract V1 regression
+        run: python quality/visual_subject_anchor_contract_v1_regression_test.py
