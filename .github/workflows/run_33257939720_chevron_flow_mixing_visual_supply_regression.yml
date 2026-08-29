@@ -6,6 +6,10 @@ on:
       - "video/grounded_explanatory_visual.py"
       - "video/visual_explanation.py"
       - "ci_grounded_explanatory_visual_supply_hotfix.py"
+      - "ci_still_vision_evidence_groups_hotfix.py"
+      - "ci_still_vision_evidence_trace_hotfix.py"
+      - "ci_final_visual_semantic_qa_hotfix.py"
+      - "quality/run_33259567582_still_vision_evidence_regression_test.py"
       - "quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py"
       - ".github/workflows/run_33257939720_chevron_flow_mixing_visual_supply_regression.yml"
 
