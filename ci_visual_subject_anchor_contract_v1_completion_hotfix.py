@@ -36,3 +36,7 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
     path.write_text(text, encoding="utf-8")
 
 print("✅ Visual Subject Anchor Contract V1 completion applied: partial required anchors fail closed")
+
+# The Run 33248013901 follow-up deliberately composes after V1 completion so
+# its stricter compound-identity/chroma rules become the final visual boundary.
+import ci_visual_subject_anchor_contract_v2_hotfix  # noqa: F401,E402
