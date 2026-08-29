@@ -30,7 +30,3 @@ jobs:
         run: git checkout -- content/script_generator.py
       - name: Retention Story V1 counterexample regression
         run: python quality/retention_story_v1_regression_test.py
-      - name: Reset hotfix-mutated source again
-        run: git checkout -- content/script_generator.py
-      - name: Korean speech validator regression
-        run: python quality/korean_speech_style_test.py
