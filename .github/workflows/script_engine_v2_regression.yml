@@ -46,7 +46,8 @@ jobs:
             quality/script_engine_v2_runner_regression_test.py \
             quality/script_engine_v2_text_alias_regression_test.py \
             quality/script_engine_v2_run_32696711123_regression_test.py \
-            quality/script_generator_router_regression_test.py
+            quality/script_generator_router_regression_test.py \
+            quality/canonical_subject_grounding_regression_test.py
 
       - name: Opening Role Contract regression
         run: python -m quality.script_engine_v2_opening_role_contract_regression_test
@@ -77,3 +78,6 @@ jobs:
           assert MAX_LOCAL_REPAIR_CALLS == 2
           print("PASS: writer 1 + local repair <= 2")
           PY
+
+      - name: Canonical Subject Grounding regression
+        run: python -m quality.canonical_subject_grounding_regression_test
