@@ -150,6 +150,7 @@ def main():
 
     # Keep the Run 33239832517 grounded-claim counterexample on the existing
     # Script Engine V2 regression surface; no workflow/bridge is added.
+    runpy.run_path("ci_grounded_claim_plan_hotfix.py", run_name="__main__")
     from quality.script_engine_v2_grounded_claim_plan_regression_test import main as grounded_claim_main
     grounded_claim_main()
 
