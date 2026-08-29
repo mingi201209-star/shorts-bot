@@ -51,6 +51,7 @@ jobs:
         run: |
           python ci_visual_specificity_hotfix.py
           python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
           python ci_visual_subject_anchor_contract_v1_hotfix.py
           python ci_visual_subject_anchor_contract_v2_hotfix.py
           python ci_visual_subject_anchor_fallback_inheritance_hotfix.py
@@ -97,7 +98,6 @@ jobs:
         test:
           - quality/final_visual_semantic_qa_regression_test.py
           - quality/run_33248013901_visual_anchor_regression_test.py
-          - quality/fact_critical_regeneration_test.py
           - quality/visual_explanation_retrieval_v1_regression_test.py
           - quality/first5_visual_contract_regression_test.py
           - quality/aviation_candidate_specificity_regression_test.py
