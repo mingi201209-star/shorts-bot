@@ -31,6 +31,7 @@ SCENE = {
 
 contract = still._canonical_still_contract(SCENE)
 prompt = still._prompt(SCENE).lower()
+source = (ROOT / "video/still_image_fallback.py").read_text(encoding="utf-8")
 
 # Run 33298087222 loss boundary: trusted metadata must now control composition,
 # rather than surviving only inside the stock search query.
@@ -87,12 +88,13 @@ assert "front fan intake dominant" not in generic_prompt
 # G. Trusted canonical rear/nozzle+chevron evidence deterministically activates
 # subject-proof composition with no extra generation/retry budget.
 assert still.STILL_IMAGE_MAX_PER_VIDEO == 2
-assert "n": 1  # documentary assertion: one image per existing generation call
+assert '"n": 1' in source
 assert prompt.count("rear or rear-quarter") == 1
 assert "nozzle" in prompt and "chevron" in prompt and "serrated" in prompt
 
 # Diagnostics must expose only a normalized prompt signature, not persist the raw
 # prompt. The trace helper is deterministic and does not make any external call.
 assert callable(still._trace_canonical_still)
+assert "final_prompt_signature" in source
 
 print("RUN 33298087222 SCENE 1 STILL SUBJECT-PROOF REGRESSION: PASS")
