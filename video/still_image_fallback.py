@@ -90,13 +90,101 @@ def _reuse_signatures(scene):
     return tuple(signatures)
 
 
+def _clean_terms(values):
+    terms = []
+    for value in values or []:
+        normalized = str(value or "").strip().lower().replace("-", " ")
+        for token in normalized.split():
+            if token and token not in terms:
+                terms.append(token)
+    return terms
+
+
+def _canonical_still_contract(scene):
+    """Build generation-only composition guidance from trusted canonical metadata."""
+    profile = (scene or {}).get("_canonical_visual_supply")
+    if not isinstance(profile, dict):
+        return {
+            "canonical_subject": "",
+            "trusted_visual_discriminators": [],
+            "required_viewpoint": "",
+            "subject_proof_priority": [],
+            "negative_composition_guards": [],
+        }
+
+    canonical_subject = str(profile.get("canonical_subject") or "").strip()
+    discriminators = _clean_terms(profile.get("visual_discriminators") or [])
+    canonical_terms = _clean_terms(profile.get("canonical_terms") or canonical_subject.split())
+    trusted_terms = set(canonical_terms + discriminators)
+
+    # Viewpoint is inferred only when trusted physical evidence identifies a
+    # rear/trailing-edge feature. This remains empty for generic subjects.
+    has_rear_feature = bool(
+        trusted_terms & {"rear", "trailing", "nozzle"}
+        and trusted_terms & {"chevron", "serrated", "sawtooth", "edge"}
+    )
+    required_viewpoint = "rear or rear-quarter close-up of the trailing edge" if has_rear_feature else ""
+
+    priority = []
+    for group in (
+        ("nozzle", "nacelle", "trailing", "edge"),
+        ("chevron", "serrated", "sawtooth"),
+        tuple(canonical_terms),
+    ):
+        for term in group:
+            if term in trusted_terms and term not in priority:
+                priority.append(term)
+
+    negative_guards = []
+    if priority:
+        negative_guards.extend([
+            "aircraft-wide shot",
+            "generic turbine close-up",
+            "unrelated wing detail",
+        ])
+    if has_rear_feature:
+        negative_guards.extend([
+            "front fan intake dominant",
+            "engine interior blades as primary subject",
+        ])
+
+    return {
+        "canonical_subject": canonical_subject,
+        "trusted_visual_discriminators": discriminators,
+        "required_viewpoint": required_viewpoint,
+        "subject_proof_priority": priority,
+        "negative_composition_guards": negative_guards,
+    }
+
+
 def _prompt(scene):
     narration = str(scene.get("text", "") or "").strip()
     visual_goal = str(scene.get("visual_goal", "") or "").strip()
     keyword = str(scene.get("keyword", "") or "").strip()
+    contract = _canonical_still_contract(scene)
+
+    proof = ""
+    canonical_subject = contract["canonical_subject"]
+    priority = contract["subject_proof_priority"]
+    viewpoint = contract["required_viewpoint"]
+    negative_guards = contract["negative_composition_guards"]
+
+    if canonical_subject and priority:
+        proof = (
+            f"Trusted canonical subject: {canonical_subject}. "
+            f"Subject-proof priority, highest first: {', '.join(priority)}. "
+            "The highest-priority externally visible component must occupy a large central portion of the portrait frame and be immediately identifiable on a phone screen. "
+            "Aircraft context may remain visible but must be secondary to the proof component. "
+        )
+        if viewpoint:
+            proof += f"Required viewpoint from trusted physical evidence: {viewpoint}. "
+        if negative_guards:
+            proof += f"Avoid these compositions: {', '.join(negative_guards)}. "
+
     return (
         "Create one accurate vertical educational still image for a Korean YouTube Short. "
-        f"Narration meaning: {narration}. Visual goal: {visual_goal}. Search concept: {keyword}. "
+        + proof
+        + f"Narration meaning: {narration}. Visual goal: {visual_goal}. Search concept: {keyword}. "
         "Show the exact physical subject named in the narration clearly and prominently. "
         "No text, captions, logos, diagrams with invented labels, unrelated decorative objects, or cross-domain metaphors. "
         "Do not invent hidden technical structure, measurements, or unsupported mechanisms. "
@@ -105,10 +193,33 @@ def _prompt(scene):
     )
 
 
+def _trace_canonical_still(scene, *, prompt=None, evidence=None, result="pending"):
+    contract = _canonical_still_contract(scene)
+    prompt_signature = (
+        hashlib.sha256(str(prompt).encode("utf-8")).hexdigest()[:16]
+        if prompt is not None
+        else "none"
+    )
+    evidence = evidence if isinstance(evidence, dict) else {}
+    visible_groups = evidence.get("visible_subject_groups") or {}
+    print(
+        "[CANONICAL_STILL_TRACE] "
+        f"scene={_scene_id(scene)} "
+        f"canonical_subject={contract['canonical_subject'] or 'none'} "
+        f"trusted_visual_discriminators={'+'.join(contract['trusted_visual_discriminators']) or 'none'} "
+        f"required_viewpoint={contract['required_viewpoint'] or 'none'} "
+        f"subject_proof_priority={'+'.join(contract['subject_proof_priority']) or 'none'} "
+        f"final_prompt_signature={prompt_signature} "
+        f"vision_structured_groups={visible_groups or 'none'} "
+        f"result={result}"
+    )
+
+
 def _generate_image(scene):
     if not OPENAI_KEY:
         raise RuntimeError("OPENAI_KEY is unavailable")
     prompt = _prompt(scene)
+    _trace_canonical_still(scene, prompt=prompt, result="generation_requested")
     response = requests.post(
         "https://api.openai.com/v1/images/generations",
         headers={"Authorization": f"Bearer {OPENAI_KEY}", "Content-Type": "application/json"},
@@ -279,6 +390,12 @@ def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reas
         image_path.write_bytes(image_bytes)
         _motion_clip(image_path, output_path, duration)
         verified, evidence = _verify_motion_clip(scene, output_path)
+        _trace_canonical_still(
+            scene,
+            prompt=prompt,
+            evidence=evidence,
+            result="verified" if verified else "rejected_by_vision",
+        )
         if not verified:
             print(
                 f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=rejected_by_vision "

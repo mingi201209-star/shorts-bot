@@ -1,0 +1,75 @@
+name: Run 33298087222 Scene1 Still Subject Proof Regression
+
+on:
+  pull_request:
+    paths:
+      - 'video/still_image_fallback.py'
+      - 'quality/run_33298087222_scene1_still_subject_proof_regression_test.py'
+      - '.github/workflows/run_33298087222_scene1_still_subject_proof_regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  focused-still:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python quality/run_33298087222_scene1_still_subject_proof_regression_test.py
+
+  still-and-vision-guards:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/still_image_budget_regression_test.py
+          - quality/still_image_verifier_contract_regression_test.py
+          - quality/run_33259567582_still_vision_evidence_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python ${{ matrix.test }}
+
+  visual-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/canonical_subject_grounding_supply_regression_test.py
+          - quality/run_33251901169_visual_supply_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
+          - quality/first5_visual_contract_regression_test.py
+          - quality/hook_visual_dominance_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python ${{ matrix.test }}
+
+  script-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python ci_script_v2_visual_goal_hotfix.py
+      - run: python -m quality.script_engine_v2_regression_test
