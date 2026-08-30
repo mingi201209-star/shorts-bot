@@ -170,6 +170,10 @@ def _keyword_contract_ok(value: Any) -> bool:
 
 
 _FORMAL_ENDING_REPAIRS = (
+    (r"돕는다(?=[.!?…]*$)", "돕습니다"),
+    (r"않는다(?=[.!?…]*$)", "않습니다"),
+    (r"보인다(?=[.!?…]*$)", "보입니다"),
+    (r"해준다(?=[.!?…]*$)", "해줍니다"),
     (r"하다(?=[.!?…]*$)", "합니다"),
     (r"줄어든다(?=[.!?…]*$)", "줄어듭니다"),
     (r"늘어난다(?=[.!?…]*$)", "늘어납니다"),
@@ -181,10 +185,10 @@ _FORMAL_ENDING_REPAIRS = (
 
 
 def _formalize_common_ending(text: Any) -> str:
-    # Keep the clean-checkout runner aligned with the existing production
-    # formal-ending corpus instead of maintaining a second, stale local subset.
-    from content.script_formal_endings import formalize_script_text
-    return formalize_script_text(text)
+    value = str(text or "").strip()
+    for pattern, replacement in _FORMAL_ENDING_REPAIRS:
+        value = re.sub(pattern, replacement, value)
+    return value
 
 
 def _deterministic_keyword(scene: Dict[str, Any], contract: Dict[str, Any], plan: Dict[str, Any], index: int) -> str:
