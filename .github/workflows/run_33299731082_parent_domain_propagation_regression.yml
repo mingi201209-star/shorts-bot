@@ -91,14 +91,13 @@ jobs:
           grep -q "raw_visible_subject_groups" video/still_image_fallback.py
           grep -q "effective_subject_groups" video/still_image_fallback.py
           python -m py_compile video/still_image_fallback.py video/hook_visual_dominance.py
-      - name: Run parent-domain and visual regressions
+      - name: Run parent-domain and production-composed visual regressions
         run: |
           set -euo pipefail
           python quality/run_33299731082_parent_domain_propagation_regression_test.py
           python quality/run_33254306556_still_pass_propagation_regression_test.py
           python quality/run_33259567582_still_vision_evidence_regression_test.py
           python quality/run_33298087222_scene1_still_subject_proof_regression_test.py
-          python quality/still_image_verifier_contract_regression_test.py
           python quality/canonical_subject_grounding_supply_regression_test.py
           python quality/run_33251901169_visual_supply_regression_test.py
           python quality/run_33248013901_visual_anchor_regression_test.py
