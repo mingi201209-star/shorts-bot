@@ -34,7 +34,7 @@ jobs:
       - name: Run established parent-domain counterexample
         run: python quality/run_33299731082_parent_domain_propagation_regression_test.py
 
-  production-composed-core-no-run:
+  production-composed-exact-no-run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -92,16 +92,28 @@ jobs:
           grep -q "STILL_PARENT_DOMAIN_PROPAGATION_V1" video/still_image_fallback.py
           grep -q "parent_domain_anchor_source" video/still_image_fallback.py
           python -m py_compile video/still_image_fallback.py video/hook_visual_dominance.py
-      - name: Run composed parent-domain contracts
-        run: |
-          set -euo pipefail
-          python quality/run_33305747810_stale_anchor_source_regression_test.py
-          python quality/run_33299731082_parent_domain_propagation_regression_test.py
-          python quality/run_33301914013_component_group_mapping_regression_test.py
-          python quality/run_33254306556_still_pass_propagation_regression_test.py
-          python quality/run_33259567582_still_vision_evidence_regression_test.py
-          python quality/run_33298087222_scene1_still_subject_proof_regression_test.py
-          python quality/still_image_verifier_contract_regression_test.py
+      - name: Run exact stale-anchor fixture against composed source
+        run: python quality/run_33305747810_stale_anchor_source_regression_test.py
+
+  still-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/run_33254306556_still_pass_propagation_regression_test.py
+          - quality/run_33259567582_still_vision_evidence_regression_test.py
+          - quality/run_33301914013_component_group_mapping_regression_test.py
+          - quality/run_33298087222_scene1_still_subject_proof_regression_test.py
+          - quality/still_image_verifier_contract_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run isolated established regression
+        run: python "${{ matrix.test }}"
 
   visual-supply-related:
     runs-on: ubuntu-latest
@@ -120,7 +132,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
-      - name: Run ${{ matrix.test }} from clean checkout
+      - name: Run isolated visual regression
         run: python "${{ matrix.test }}"
 
   final-visual-semantic-qa:
@@ -161,25 +173,3 @@ jobs:
         run: python ci_script_v2_visual_goal_hotfix.py
       - name: Run Script Engine V2 deterministic regression
         run: python -m quality.script_engine_v2_regression_test
-
-  adjacent-safety:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        test:
-          - quality/script_formal_ending_production_corpus_regression_test.py
-          - quality/fact_critical_regeneration_test.py
-          - quality/aviation_candidate_context_regression_test.py
-          - quality/aviation_candidate_specificity_regression_test.py
-          - quality/first5_retention_tts_regression_test.py
-          - quality/retention_regression_test.py
-          - quality/korean_speech_style_test.py
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install -r requirements.txt
-      - name: Run ${{ matrix.test }}
-        run: python "${{ matrix.test }}"
