@@ -141,6 +141,31 @@ def _leaks_primary_result(scene):
     )
 
 
+def _noise_result_has_forbidden_expansion(scene):
+    value = _scene_text(scene)
+    if any(
+        token in value
+        for token in (
+            "fuel", "efficiency", "drag", "stability", "thrust", "performance",
+            "연료", "효율", "항력", "안정성", "추력", "성능",
+        )
+    ):
+        return True
+    if re.search(r"\b\d+(?:\.\d+)?\s*d\s*b\b", value, flags=re.IGNORECASE):
+        return True
+    # Scene 5 may refer back to "this mixing change" as a bridge, but it must
+    # not re-own or re-explain the Scene-4 mechanism itself.
+    return any(
+        token in value
+        for token in (
+            "flow mixing mechanism", "mixing mechanism", "chevron flow mixing",
+            "exhaust flow and surrounding flow mix", "exhaust and ambient flow mix",
+            "배기 흐름과 주변 흐름이 섞", "배기 흐름과 바깥 흐름이 섞",
+            "셰브론은 흐름을 섞", "셰브론이 흐름을 섞",
+        )
+    )
+
+
 def chevron_flow_mixing_supported(scene):
     """Strict eligibility for the Scene-4 deterministic mechanism visual.
 
@@ -168,5 +193,44 @@ def chevron_flow_mixing_supported(scene):
     # "chevron" and "mixing" prevents a broad flow mechanism from opting in.
     words = _words(scene.get("keyword"))
     if not ({"chevron", "flow", "mixing"} <= words):
+        return False
+    return True
+
+
+def noise_reduction_result_supported(scene):
+    """Strict eligibility for the Scene-5 deterministic primary-result visual.
+
+    This is intentionally result-only. It requires trusted jet-engine chevron
+    grounding, the complete `noise + reduction` relation nucleus, and either the
+    explicit Grounded Claim ownership/causal role or the exact runtime payoff
+    equivalent produced by the locked five-scene plan. It never promotes a
+    generic engine/noise visual and never introduces a new mechanism claim.
+    """
+    if not isinstance(scene, dict):
+        return False
+
+    explicit_claim = str(scene.get("owned_claim_id") or "").strip()
+    if explicit_claim and explicit_claim != "noise_reduction":
+        return False
+
+    causal_role = str(scene.get("causal_role") or "").strip()
+    structural_role = str(scene.get("role") or "").strip().lower()
+    if causal_role:
+        if causal_role != "primary_result":
+            return False
+    elif structural_role not in {"payoff", "result", "primary_result"}:
+        return False
+
+    if not trusted_grounding_present(scene):
+        return False
+    if not {"aircraft", "engine"}.issubset(set(subject_anchor_words(scene))):
+        return False
+    if set(required_explanatory_groups(scene)) != {"noise", "reduction"}:
+        return False
+
+    words = _words(scene.get("keyword"))
+    if not ({"jet", "engine", "noise", "reduction"} <= words):
+        return False
+    if _noise_result_has_forbidden_expansion(scene):
         return False
     return True
