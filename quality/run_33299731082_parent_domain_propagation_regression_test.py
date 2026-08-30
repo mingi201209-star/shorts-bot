@@ -157,7 +157,9 @@ assert verify(SCENE, case)[0] is False
 # No generation prompt/budget/API contract is modified by this regression fix.
 parent_source = (ROOT / "ci_still_parent_domain_propagation_hotfix.py").read_text(encoding="utf-8")
 assert "STILL_IMAGE_MAX_PER_VIDEO" not in parent_source
-assert "evaluate_hook_subject_dominance(candidate, scene)" not in parent_source
-assert "reason_claims_missing_structured_group" in parent_source
+assert "requests." not in parent_source
+assert "OPENAI" not in parent_source
+assert "raw_visible_subject_groups" in parent_source
+assert "effective_subject_groups" in parent_source
 
 print("RUN 33299731082 PARENT DOMAIN PROPAGATION REGRESSION: PASS")
