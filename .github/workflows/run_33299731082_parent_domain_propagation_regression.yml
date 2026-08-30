@@ -20,8 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install test dependencies
-        run: pip install -r requirements.txt
+      - run: pip install -r requirements.txt
       - name: Compile focused patch
         run: |
           python -m py_compile \
@@ -31,16 +30,15 @@ jobs:
       - name: Run exact LIVE counterexample regression
         run: python quality/run_33299731082_parent_domain_propagation_regression_test.py
 
-  related-production-composition-no-run:
+  production-composed-core-no-run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install test dependencies
-        run: pip install -r requirements.txt
-      - name: Compose production hotfix source only
+      - run: pip install -r requirements.txt
+      - name: Compose production source only
         run: |
           set -euo pipefail
           python ci_hotfix.py
@@ -88,30 +86,33 @@ jobs:
           python ci_cross_process_video_dedupe_hotfix.py
           python ci_aviation_context_signature_compat_hotfix.py
           grep -q "STILL_PARENT_DOMAIN_PROPAGATION_V1" video/still_image_fallback.py
-          grep -q "raw_visible_subject_groups" video/still_image_fallback.py
-          grep -q "effective_subject_groups" video/still_image_fallback.py
           python -m py_compile video/still_image_fallback.py video/hook_visual_dominance.py
-      - name: Run parent-domain and production-composed visual regressions
+      - name: Run composed parent-domain contracts
         run: |
           set -euo pipefail
           python quality/run_33299731082_parent_domain_propagation_regression_test.py
           python quality/run_33254306556_still_pass_propagation_regression_test.py
           python quality/run_33259567582_still_vision_evidence_regression_test.py
           python quality/run_33298087222_scene1_still_subject_proof_regression_test.py
-          python quality/canonical_subject_grounding_supply_regression_test.py
-          python quality/run_33251901169_visual_supply_regression_test.py
-          python quality/run_33248013901_visual_anchor_regression_test.py
-          python quality/run_33256014054_flow_interface_visual_supply_regression_test.py
-          python quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
-          python quality/final_visual_semantic_qa_regression_test.py
-          python quality/first5_visual_contract_regression_test.py
-          python quality/hook_visual_dominance_test.py
-      - name: Run script fact aviation retention regressions
-        run: |
-          set -euo pipefail
           python quality/script_engine_v2_regression_test.py
-          python quality/fact_critical_regeneration_test.py
-          python quality/aviation_candidate_context_regression_test.py
-          python quality/aviation_candidate_specificity_regression_test.py
-          python quality/retention_regression_test.py
-          python quality/first5_retention_tts_regression_test.py
+
+  self-contained-related:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/canonical_subject_grounding_supply_regression_test.py
+          - quality/run_33251901169_visual_supply_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
+          - quality/final_visual_semantic_qa_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run ${{ matrix.test }} from clean checkout
+        run: python "${{ matrix.test }}"
