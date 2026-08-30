@@ -118,8 +118,7 @@ def _draw_concept_panel(frame, plan, progress):
     draw.line(strong, fill=(245, 245, 245, 235), width=10)
     draw.line(weak, fill=(185, 185, 185, 230), width=8)
     draw.text((630, 245), "소음 출력", font=small, fill=(255, 255, 255, 230))
-    draw.text((630, 360), "감소", font=small, fill=(255, 255, 255, 230))
-    draw.text((630, 500), "정량값 없이 크기만 비교", font=small, fill=(220, 220, 220, 205))
+    draw.text((630, 445), "감소", font=small, fill=(255, 255, 255, 230))
     return frame
 '''
 
