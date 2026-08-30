@@ -112,6 +112,30 @@ def main():
         raise RuntimeError("parent-domain stale anchor read boundary mismatch")
     section = section.replace(stale_anchor_read, authoritative_anchor_read, 1)
 
+    # #259 says structured subject evidence is authoritative. Its existing
+    # helper returned True for explicit True, but explicit False fell through to
+    # loose component-word aliases. Run 33305747810 then treated the `jet` token
+    # inside `jet engine` as legacy aircraft evidence and skipped the trusted
+    # parent-domain branch. Preserve an explicit structured False; use legacy
+    # aliases only when that group is absent from structured evidence.
+    visible_fallback = '''    def _visible(anchor):
+        groups = result.get("visible_subject_groups") or {}
+        if isinstance(groups, dict) and bool(groups.get(anchor, False)):
+            return True
+        aliases = set(_anchor_aliases(anchor)) | {anchor}
+        return bool(visible_words & aliases)
+'''
+    visible_authority = '''    def _visible(anchor):
+        groups = result.get("visible_subject_groups") or {}
+        if isinstance(groups, dict) and anchor in groups:
+            return bool(groups.get(anchor, False))
+        aliases = set(_anchor_aliases(anchor)) | {anchor}
+        return bool(visible_words & aliases)
+'''
+    if section.count(visible_fallback) != 1:
+        raise RuntimeError("parent-domain structured visibility authority boundary mismatch")
+    section = section.replace(visible_fallback, visible_authority, 1)
+
     # Run 33299731082: #259 rejected schema disagreement before the existing
     # #256 trusted parent-domain branch could resolve aircraft as the parent
     # domain of a verified jet-engine chevron close-up. Preserve the raw
