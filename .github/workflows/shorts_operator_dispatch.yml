@@ -32,8 +32,11 @@ jobs:
           python - <<'PY'
           import json
           import os
-          import shlex
+          import sys
           from pathlib import Path
+
+          sys.path.insert(0, ".github/scripts")
+          from operator_dispatch_inputs import normalize_dispatch_input
 
           body = os.environ["BODY"].strip()
           policy = json.loads(
@@ -76,9 +79,10 @@ jobs:
 
           normalized = {}
           for key, value in inputs.items():
-              if not isinstance(value, (str, int, float, bool)) and value is not None:
-                  raise SystemExit(f"Input {key} must be a scalar value.")
-              normalized[key] = "" if value is None else str(value)
+              try:
+                  normalized[key] = normalize_dispatch_input(value)
+              except ValueError as exc:
+                  raise SystemExit(f"Input {key} must be a scalar value.") from exc
 
           output = Path(os.environ["GITHUB_OUTPUT"])
           with output.open("a", encoding="utf-8") as handle:
