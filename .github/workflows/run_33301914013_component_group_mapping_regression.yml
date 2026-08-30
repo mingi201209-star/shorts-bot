@@ -65,5 +65,6 @@ jobs:
         run: |
           python ci_final_render_content_integrity_hotfix.py
           python ci_final_visual_semantic_qa_hotfix.py
+          python ci_cross_process_video_dedupe_hotfix.py
       - name: Run Final Visual Semantic QA regression
         run: python quality/final_visual_semantic_qa_regression_test.py
