@@ -66,6 +66,9 @@ jobs:
           python ci_video_provider_hotfix.py
           python ci_visual_specificity_hotfix.py
           python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
           python ci_final_render_content_integrity_hotfix.py
           python ci_final_visual_semantic_qa_hotfix.py
           python ci_cross_process_video_dedupe_hotfix.py
