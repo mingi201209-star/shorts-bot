@@ -87,7 +87,7 @@ jobs:
         run: |
           python quality/final_visual_semantic_qa_regression_test.py
           python quality/visual_diversity_preflight_regression_test.py
-          python quality/visual_quality_v1_regression_test.py
+          python -m quality.visual_quality_regression_test
 
   script-fact-retention:
     runs-on: ubuntu-latest
@@ -108,7 +108,8 @@ jobs:
           python quality/fact_critical_regeneration_test.py
           python quality/first5_visual_contract_regression_test.py
           python quality/first5_retention_tts_regression_test.py
-          python quality/korean_speech_style_regression_test.py
+          python quality/korean_speech_style_test.py
+          python quality/korean_speech_style_rewrite_test.py
 
   aviation-and-hook:
     runs-on: ubuntu-latest
@@ -125,8 +126,8 @@ jobs:
           python quality/aviation_context_signature_compat_regression_test.py
       - name: Hook deterministic regression
         run: |
-          python quality/hook_experiment_regression_test.py
-          python quality/hook_visual_dominance_regression_test.py
+          python quality/hook_experiment_test.py
+          python quality/hook_visual_dominance_test.py
 
   production-composition-no-run:
     runs-on: ubuntu-latest
