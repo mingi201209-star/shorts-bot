@@ -1,27 +1,18 @@
 """Run 33299731082 trusted parent-domain propagation regression.
 
-No image, Vision, or other API call is made. The fixture reproduces the LIVE
-structured-evidence handoff after Vision parsing and verifies that the existing
-#256 trusted parent-domain contract runs before final schema acceptance.
+No image, Vision, network, or production call is made. This fixture isolates the
+still-verifier boundary after #259 structured parsing and verifies that the
+existing #256 trusted parent-domain branch runs before final consistency.
 """
 from copy import deepcopy
 from importlib import reload
 from pathlib import Path
+from types import ModuleType
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
-
-# Reproduce the production visual-contract composition needed by the still
-# verifier. These installers only patch local source files; they do not run
-# production or make external API calls.
-import ci_visual_specificity_hotfix  # noqa: F401,E402
-import ci_query_semantic_integrity_hotfix  # noqa: F401,E402
-import ci_concrete_visual_evidence_hotfix  # noqa: F401,E402
-import ci_general_scene_visual_parity_hotfix  # noqa: F401,E402
-import ci_visual_subject_anchor_contract_v1_hotfix  # noqa: F401,E402
-import ci_visual_subject_anchor_contract_v1_completion_hotfix  # noqa: F401,E402
 
 from ci_still_image_verifier_contract_hotfix import main as install_verifier  # noqa: E402
 from ci_still_vision_evidence_groups_hotfix import main as install_groups  # noqa: E402
@@ -57,8 +48,6 @@ LIVE = {
     "visible_subject_groups": {"aircraft": False, "engine": True, "chevron": True},
     "visible_components": ["engine", "chevron"],
     "schema_parser_consistency": False,
-    # Exact structured disagreement resolved only when the existing #256 branch
-    # proves aircraft as the trusted parent domain of the jet-engine chevron.
     "evidence_inconsistencies": [
         "structured_group_component_disagree:aircraft:group=true:component=false"
     ],
@@ -68,13 +57,37 @@ LIVE = {
 }
 
 
+def _fixture_downloader_module():
+    """Supply the exact anchor contract already established upstream by #253-#255.
+
+    Their own regressions validate query extraction/fallback behavior. This test
+    starts at the documented verifier handoff so failures identify only the
+    parent-domain propagation boundary.
+    """
+    module = ModuleType("video.video_downloader")
+    aliases = {
+        "aircraft": {"aircraft", "airplane", "plane", "aviation", "jet"},
+        "engine": {"engine", "turbofan", "nacelle", "nozzle"},
+        "chevron": {"chevron", "chevrons", "serrated"},
+    }
+    module._anchor_aliases = lambda anchor: aliases.get(anchor, {anchor})
+    module.extract_query_anchors = lambda query: ["aircraft", "engine", "chevron"]
+    return module
+
+
 def verify(scene, result):
-    original = dominance.evaluate_hook_subject_dominance
+    original_eval = dominance.evaluate_hook_subject_dominance
+    original_module = sys.modules.get("video.video_downloader")
     dominance.evaluate_hook_subject_dominance = lambda candidate, supplied_scene: deepcopy(result)
+    sys.modules["video.video_downloader"] = _fixture_downloader_module()
     try:
         return still._verify_motion_clip(deepcopy(scene), "fixture.mp4")
     finally:
-        dominance.evaluate_hook_subject_dominance = original
+        dominance.evaluate_hook_subject_dominance = original_eval
+        if original_module is None:
+            sys.modules.pop("video.video_downloader", None)
+        else:
+            sys.modules["video.video_downloader"] = original_module
 
 
 # A. Exact Run 33299731082 positive fixture.
@@ -155,7 +168,7 @@ case["schema_parser_consistency"] = True
 case["evidence_inconsistencies"] = []
 assert verify(scene, case)[0] is False
 
-# Unrelated structured inconsistencies are never globally forgiven.
+# Any unrelated structured inconsistency remains fail-closed.
 case = deepcopy(LIVE)
 case["evidence_inconsistencies"].append(
     "structured_group_component_disagree:chevron:group=true:component=false"
