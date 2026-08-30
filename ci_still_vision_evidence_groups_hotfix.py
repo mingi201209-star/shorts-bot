@@ -183,10 +183,11 @@ def patch_still_verifier():
         raise RuntimeError("structured evidence verifier result anchor mismatch")
     text = text.replace(anchor, replacement, 1)
 
-    anchor = '''    def _visible(anchor):\n        groups = result.get("visible_subject_groups") or {}\n        if isinstance(groups, dict) and bool(groups.get(anchor, False)):\n            return True\n        aliases = set(_anchor_aliases(anchor)) | {anchor}\n        return bool(visible_words & aliases)\n'''
-    replacement = anchor
+    anchor = '''    def _visible(anchor):\n        aliases = set(_anchor_aliases(anchor)) | {anchor}\n        return bool(visible_words & aliases)\n'''
+    replacement = '''    def _visible(anchor):\n        groups = result.get("visible_subject_groups") or {}\n        if isinstance(groups, dict) and bool(groups.get(anchor, False)):\n            return True\n        aliases = set(_anchor_aliases(anchor)) | {anchor}\n        return bool(visible_words & aliases)\n'''
     if text.count(anchor) != 1:
         raise RuntimeError("structured evidence _visible anchor mismatch")
+    text = text.replace(anchor, replacement, 1)
 
     anchor = '''    if parent_domain_satisfied:\n        result["parent_domain_satisfied"] = list(parent_domain_satisfied)\n    return True, result\n'''
     replacement = '''    if parent_domain_satisfied:\n        result["parent_domain_satisfied"] = list(parent_domain_satisfied)\n\n    required_groups = list(result.get("required_subject_groups") or anchors)\n    visible_groups = result.get("visible_subject_groups") or {}\n    missing_groups = [group for group in required_groups if not _visible(group)]\n    if parent_domain_satisfied:\n        missing_groups = [group for group in missing_groups if group not in parent_domain_satisfied]\n    accepted = not bool(missing_groups)\n    print(\n        "[VISION_EVIDENCE_TRACE] "\n        f"pass={bool(result.get('pass', False))} "\n        f"required_subject_groups={'+'.join(required_groups) or 'none'} "\n        f"visible_subject_groups={visible_groups} "\n        f"visible_components={'+'.join(str(v) for v in result.get('visible_components', []) or []) or 'none'} "\n        f"parent_domain_satisfied={'+'.join(result.get('parent_domain_satisfied', []) or []) or 'none'} "\n        f"missing={'+'.join(missing_groups) or 'none'} "\n        f"schema_parser_consistency={bool(result.get('schema_parser_consistency', True))} "\n        f"result={'ACCEPT' if accepted else 'REJECT'} "\n        f"reason={str(result.get('reason') or '')[:240]}"\n    )\n    return accepted, result\n'''
