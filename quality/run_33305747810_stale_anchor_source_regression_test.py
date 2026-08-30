@@ -9,6 +9,7 @@ from copy import deepcopy
 from importlib import reload
 from pathlib import Path
 from types import ModuleType
+import inspect
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,7 +37,6 @@ SCENE = {
     "role": "phenomenon",
     "text": "비행기 엔진 뒤는 톱니처럼 생겼습니다.",
     "visual_goal": "톱니 모양의 엔진 구조",
-    # Exact stale semantic family observed in Run 33305747810.
     "keyword": STALE_KEYWORD,
     "_canonical_visual_supply": {
         "canonical_subject": "jet engine nacelle/nozzle chevrons",
@@ -63,7 +63,6 @@ LIVE = {
 
 
 def _anchors(query):
-    """Small deterministic model of the established visual-anchor parser."""
     words = set(str(query or "").lower().replace("-", " ").replace("/", " ").split())
     found = []
     if words & {"aircraft", "airplane", "aviation", "jet"}:
@@ -108,9 +107,12 @@ def verify(scene, result, *, contract=None):
             sys.modules["video.video_downloader"] = original_module
 
 
-# A. Exact Run 33305747810 counterexample: authoritative required groups win
-# over stale aircraft+wing keyword. Raw aircraft remains false; only effective
-# parent-domain evidence becomes true.
+# Keep this source trace in the deterministic regression so future installer
+# composition failures expose the exact effective verifier without network calls.
+print("[COMPOSED_STILL_VERIFIER_SOURCE]")
+print(inspect.getsource(still._verify_motion_clip))
+
+# A. Exact Run 33305747810 counterexample.
 ok, result = verify(SCENE, LIVE)
 assert ok is True
 assert result["parent_domain_anchor_source"] == "required_subject_groups"
@@ -132,9 +134,7 @@ case["schema_parser_consistency"] = True
 case["evidence_inconsistencies"] = []
 assert verify(SCENE, case)[0] is False
 
-# C. A contract that requires only aircraft+engine must not activate the
-# jet-engine-chevrons parent rule merely because the canonical subject mentions
-# a chevron.
+# C. Missing chevron requirement must not activate parent inference.
 case = deepcopy(LIVE)
 case["required_subject_groups"] = ["aircraft", "engine"]
 case["visible_subject_groups"] = {"aircraft": False, "engine": True}
@@ -158,8 +158,7 @@ case = deepcopy(LIVE)
 case["pass"] = False
 assert verify(SCENE, case)[0] is False
 
-# F. Legacy scenes with no authoritative groups/contract retain scene-keyword
-# parsing. This is deliberately a valid aircraft+wing legacy scene.
+# F. Legacy scenes without authoritative data retain keyword parsing.
 legacy_scene = deepcopy(SCENE)
 legacy_scene["keyword"] = "aircraft wing"
 legacy_scene.pop("_canonical_visual_supply")
@@ -178,15 +177,13 @@ ok, result = verify(legacy_scene, legacy)
 assert ok is True
 assert result["parent_domain_anchor_source"] == "legacy_scene_keyword"
 
-# G. Explicit conflict between authoritative groups and Scene keyword resolves
-# to the authoritative contract, never to the stale keyword.
+# G. Required groups override conflicting stale keyword.
 ok, result = verify(SCENE, LIVE)
 assert ok is True
 assert _anchors(STALE_KEYWORD) == ["aircraft", "wing"]
 assert result["parent_domain_anchor_source"] == "required_subject_groups"
 
-# Authority priority 2: if structured required groups are unavailable, use the
-# established visual subject contract before any keyword parsing.
+# Priority 2: visual subject contract.
 case = deepcopy(LIVE)
 case["required_subject_groups"] = []
 case["schema_parser_consistency"] = True
@@ -199,17 +196,13 @@ ok, result = verify(SCENE, case, contract=contract)
 assert ok is True
 assert result["parent_domain_anchor_source"] == "visual_subject_contract"
 
-# Authority priority 3: with no required groups/anchors, an authoritative
-# effective query is parsed before the legacy Scene keyword.
-contract = {
-    "required_anchors": [],
-    "effective_query": CANONICAL_QUERY,
-}
+# Priority 3: authoritative effective query.
+contract = {"required_anchors": [], "effective_query": CANONICAL_QUERY}
 ok, result = verify(SCENE, case, contract=contract)
 assert ok is True
 assert result["parent_domain_anchor_source"] == "effective_query"
 
-# H. #263 jet-engine component mapping remains intact and narrow.
+# H. #263 component mapping remains intact.
 payload = {
     "visible_components": ["jet engine", "chevron"],
     "visible_subject_groups": {"aircraft": False, "engine": False, "chevron": True},
@@ -222,7 +215,7 @@ assert normalized["visible_subject_groups"]["engine"] is True
 assert normalized["component_derived_subject_groups"]["engine"] is True
 assert normalized["visible_subject_groups"]["chevron"] is True
 
-# I. #259 structured evidence remains authority; reason-only chevron cannot pass.
+# I. #259 remains structured-authority; reason-only chevron fails.
 case = deepcopy(LIVE)
 case["visible_subject_groups"]["chevron"] = False
 case["visible_components"] = ["jet engine", "engine"]
@@ -231,8 +224,7 @@ case["evidence_inconsistencies"] = ["reason_claims_missing_structured_group:chev
 case["reason"] = "The chevron is clearly visible."
 assert verify(SCENE, case)[0] is False
 
-# J/K/L. The focused patch does not touch #261 prompt composition, #257
-# FLOW_INTERFACE, or #258 CHEVRON_FLOW_MIXING contracts, nor any budgets/APIs.
+# J/K/L. No adjacent contracts/budgets touched.
 source = (ROOT / "ci_still_parent_domain_propagation_hotfix.py").read_text(encoding="utf-8")
 assert "required_viewpoint" not in source
 assert "subject_proof_priority" not in source
