@@ -5,10 +5,16 @@ ROOT = Path(__file__).resolve().parent
 MARKER = "# STILL_VISION_EVIDENCE_TRACE_V1"
 
 
+def _patch_parent_domain():
+    from ci_still_parent_domain_propagation_hotfix import main as patch_parent_domain
+    patch_parent_domain()
+
+
 def main():
     path = ROOT / "video/still_image_fallback.py"
     text = path.read_text(encoding="utf-8")
     if MARKER in text:
+        _patch_parent_domain()
         return
     if "STILL_VISION_EVIDENCE_GROUPS_V1" not in text:
         raise RuntimeError("Vision evidence trace requires structured evidence groups")
@@ -55,6 +61,7 @@ def main():
     # return. Do not add a duplicate success log here.
     text = text[:function_start] + section + text[function_end:]
     path.write_text(text, encoding="utf-8")
+    _patch_parent_domain()
     print("✅ Vision evidence trace records structured accept/reject decisions")
 
 
