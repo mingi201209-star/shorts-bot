@@ -94,9 +94,8 @@ jobs:
           python quality/run_33254306556_still_pass_propagation_regression_test.py
           python quality/run_33259567582_still_vision_evidence_regression_test.py
           python quality/run_33298087222_scene1_still_subject_proof_regression_test.py
-          python quality/script_engine_v2_regression_test.py
 
-  self-contained-related:
+  visual-supply-related:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -107,7 +106,6 @@ jobs:
           - quality/run_33248013901_visual_anchor_regression_test.py
           - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
           - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
-          - quality/final_visual_semantic_qa_regression_test.py
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -116,3 +114,42 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Run ${{ matrix.test }} from clean checkout
         run: python "${{ matrix.test }}"
+
+  final-visual-semantic-qa:
+    runs-on: ubuntu-latest
+    env:
+      AI_VISUAL_FALLBACK_ENABLED: "false"
+      AI_MAX_GENERATIONS_PER_VIDEO: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Apply established final visual QA composition
+        run: |
+          python ci_video_provider_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+      - name: Run Final Visual Semantic QA regression
+        run: python quality/final_visual_semantic_qa_regression_test.py
+
+  script-engine-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install established V2 dependency
+        run: python -m pip install openai
+      - name: Apply established V2 base hotfix
+        run: python ci_script_v2_visual_goal_hotfix.py
+      - name: Run Script Engine V2 deterministic regression
+        run: python -m quality.script_engine_v2_regression_test
