@@ -43,7 +43,6 @@ jobs:
           - quality/run_33248013901_visual_anchor_regression_test.py
           - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
           - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
-          - quality/final_visual_semantic_qa_regression_test.py
           - quality/first5_visual_contract_regression_test.py
     steps:
       - uses: actions/checkout@v4
@@ -53,3 +52,16 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Run ${{ matrix.test }} from clean checkout
         run: python "${{ matrix.test }}"
+
+  final-visual-semantic-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Install production Final Visual Semantic QA
+        run: python ci_final_visual_semantic_qa_hotfix.py
+      - name: Run Final Visual Semantic QA regression
+        run: python quality/final_visual_semantic_qa_regression_test.py
