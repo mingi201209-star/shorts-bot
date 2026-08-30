@@ -17,6 +17,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
       - name: Compile focused patch
         run: |
           python -m py_compile \
@@ -49,6 +51,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
       - name: Run ${{ matrix.test }}
         run: python "${{ matrix.test }}"
 
@@ -69,6 +73,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
       - name: Run ${{ matrix.test }}
         run: python "${{ matrix.test }}"
 
@@ -79,6 +85,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
       - name: Compose still verifier hotfix chain without production
         run: |
           python ci_still_image_verifier_contract_hotfix.py
