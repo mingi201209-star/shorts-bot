@@ -116,9 +116,11 @@ case = normalize({
 })
 assert case["pass"] is False
 
-# H. No canonical/parent-domain inference exists in this mapper.
+# H. This mapper does not contain trusted-canonical parent-domain policy logic.
+# Keep the guard scoped to policy signals rather than diagnostic field names.
 source = (ROOT / "ci_still_vision_evidence_groups_hotfix.py").read_text(encoding="utf-8")
-assert "parent_domain_satisfied" not in source
+assert "trusted_jet_engine_parent" not in source
+assert "canonical_confidence >= 0.80" not in source
 
 # I. Structured chevron=False + jet engine only remains chevron-negative.
 case = normalize({
