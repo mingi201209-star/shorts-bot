@@ -78,7 +78,11 @@ def main():
     required_groups = list(result.get("required_subject_groups") or anchors)
     raw_visible_groups = dict(result.get("raw_visible_subject_groups") or result.get("visible_subject_groups") or {})
     effective_subject_groups = {
-        group: bool(raw_visible_groups.get(group, False))
+        group: (
+            bool(raw_visible_groups[group])
+            if group in raw_visible_groups
+            else bool(_visible(group))
+        )
         for group in required_groups
     }
     for group in parent_domain_satisfied:
