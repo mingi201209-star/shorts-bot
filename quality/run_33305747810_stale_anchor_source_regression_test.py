@@ -9,7 +9,6 @@ from copy import deepcopy
 from importlib import reload
 from pathlib import Path
 from types import ModuleType
-import inspect
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -107,11 +106,6 @@ def verify(scene, result, *, contract=None):
             sys.modules["video.video_downloader"] = original_module
 
 
-# Keep this source trace in the deterministic regression so future installer
-# composition failures expose the exact effective verifier without network calls.
-print("[COMPOSED_STILL_VERIFIER_SOURCE]")
-print(inspect.getsource(still._verify_motion_clip))
-
 # A. Exact Run 33305747810 counterexample.
 ok, result = verify(SCENE, LIVE)
 assert ok is True
@@ -183,24 +177,38 @@ assert ok is True
 assert _anchors(STALE_KEYWORD) == ["aircraft", "wing"]
 assert result["parent_domain_anchor_source"] == "required_subject_groups"
 
-# Priority 2: visual subject contract.
+# Priority 2: a Scene-matching visual subject contract is authoritative.
 case = deepcopy(LIVE)
 case["required_subject_groups"] = []
 case["schema_parser_consistency"] = True
 case["evidence_inconsistencies"] = []
 contract = {
     "required_anchors": ["aircraft", "engine", "chevron"],
+    "original_query": STALE_KEYWORD,
     "effective_query": "aircraft engine chevron wing mechanism stage 1",
 }
 ok, result = verify(SCENE, case, contract=contract)
 assert ok is True
 assert result["parent_domain_anchor_source"] == "visual_subject_contract"
 
-# Priority 3: authoritative effective query.
-contract = {"required_anchors": [], "effective_query": CANONICAL_QUERY}
+# Priority 3: a Scene-matching authoritative effective query is next.
+contract = {
+    "required_anchors": [],
+    "original_query": STALE_KEYWORD,
+    "effective_query": CANONICAL_QUERY,
+}
 ok, result = verify(SCENE, case, contract=contract)
 assert ok is True
 assert result["parent_domain_anchor_source"] == "effective_query"
+
+# A stale contract belonging to another Scene must not override this Scene.
+stale_contract = {
+    "required_anchors": ["engine"],
+    "original_query": "jet engine flow interface",
+    "effective_query": "jet engine flow interface",
+}
+ok, result = verify(SCENE, case, contract=stale_contract)
+assert result["parent_domain_anchor_source"] == "legacy_scene_keyword"
 
 # H. #263 component mapping remains intact.
 payload = {
