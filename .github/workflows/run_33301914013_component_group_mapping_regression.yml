@@ -1,0 +1,71 @@
+name: Run 33301914013 Component Group Mapping Regression
+
+on:
+  pull_request:
+    paths:
+      - "ci_still_vision_evidence_groups_hotfix.py"
+      - "quality/run_33301914013_component_group_mapping_regression_test.py"
+      - ".github/workflows/run_33301914013_component_group_mapping_regression.yml"
+  workflow_dispatch:
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Compile focused mapping patch
+        run: |
+          python -m py_compile \
+            ci_still_vision_evidence_groups_hotfix.py \
+            quality/run_33301914013_component_group_mapping_regression_test.py
+      - name: Run exact Run 33301914013 mapping counterexample
+        run: python quality/run_33301914013_component_group_mapping_regression_test.py
+
+  established-visual-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/run_33299731082_parent_domain_propagation_regression_test.py
+          - quality/run_33259567582_still_vision_evidence_regression_test.py
+          - quality/run_33298087222_scene1_still_subject_proof_regression_test.py
+          - quality/run_33254306556_still_pass_propagation_regression_test.py
+          - quality/canonical_subject_grounding_supply_regression_test.py
+          - quality/run_33251901169_visual_supply_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
+          - quality/final_visual_semantic_qa_regression_test.py
+          - quality/first5_visual_contract_regression_test.py
+          - quality/script_engine_v2_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run ${{ matrix.test }} from clean checkout
+        run: python "${{ matrix.test }}"
+
+  established-safety-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: FACT Critical
+        run: python quality/fact_critical_regression_test.py
+      - name: Aviation specificity
+        run: python quality/aviation_specificity_projection_regression_test.py
+      - name: Korean speech style
+        run: python quality/korean_speech_style_regression_test.py
