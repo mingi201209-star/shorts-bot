@@ -173,3 +173,15 @@ jobs:
         run: python ci_script_v2_visual_goal_hotfix.py
       - name: Run Script Engine V2 deterministic regression
         run: python -m quality.script_engine_v2_regression_test
+
+  formal-ending-264:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run official #264 formal-ending regressions
+        run: |
+          python quality/script_v2_gunggeum_formal_ending_regression_test.py
+          python quality/script_v2_general_formal_ending_regression_test.py
