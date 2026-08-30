@@ -23,41 +23,48 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - name: Run 33298087222 subject-proof prompt regression
-        run: python quality/run_33298087222_scene1_still_subject_proof_regression_test.py
-      - name: Preserve still budget
-        run: python quality/still_image_budget_regression_test.py
-      - name: Preserve strict still verifier
-        run: python quality/still_image_verifier_contract_regression_test.py
-      - name: Preserve structured Vision evidence groups
-        run: python quality/run_33259567582_still_vision_evidence_regression_test.py
+      - run: python quality/run_33298087222_scene1_still_subject_proof_regression_test.py
+
+  still-and-vision-guards:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/still_image_budget_regression_test.py
+          - quality/still_image_verifier_contract_regression_test.py
+          - quality/run_33259567582_still_vision_evidence_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python ${{ matrix.test }}
 
   visual-contracts:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/canonical_subject_grounding_supply_regression_test.py
+          - quality/run_33251901169_visual_supply_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
+          - quality/final_visual_semantic_qa_regression_test.py
+          - quality/first5_visual_contract_regression_test.py
+          - quality/hook_visual_dominance_test.py
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - name: Canonical subject grounding supply
-        run: python quality/canonical_subject_grounding_supply_regression_test.py
-      - name: Canonical opening visual supply #255
-        run: python quality/run_33251901169_visual_supply_regression_test.py
-      - name: Visual Subject Anchor contract
-        run: python quality/run_33248013901_visual_anchor_regression_test.py
-      - name: Flow interface supply #254 #257
-        run: python quality/run_33256014054_flow_interface_visual_supply_regression_test.py
-      - name: Chevron flow mixing supply #258
-        run: python quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
-      - name: Final Visual Semantic QA
-        run: python quality/final_visual_semantic_qa_regression_test.py
-      - name: First5 Visual Contract
-        run: python quality/first5_visual_contract_regression_test.py
-      - name: Hook Visual Dominance
-        run: python quality/hook_visual_dominance_test.py
+      - run: python ${{ matrix.test }}
 
-  script-fact-context:
+  script-v2:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -65,17 +72,25 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - name: Script Engine V2
-        run: python quality/script_engine_v2_regression_test.py
-      - name: FACT Critical
-        run: python quality/fact_critical_regeneration_test.py
-      - name: Aviation context
-        run: python quality/aviation_candidate_context_regression_test.py
-      - name: Aviation specificity
-        run: python quality/aviation_candidate_specificity_regression_test.py
-      - name: Retention
-        run: python quality/retention_regression_test.py
-      - name: Retention TTS
-        run: python quality/first5_retention_tts_regression_test.py
-      - name: Korean Speech Style
-        run: python quality/korean_speech_style_test.py
+      - run: python ci_script_v2_visual_goal_hotfix.py
+      - run: python -m quality.script_engine_v2_regression_test
+
+  fact-context-retention:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/fact_critical_regeneration_test.py
+          - quality/aviation_candidate_context_regression_test.py
+          - quality/aviation_candidate_specificity_regression_test.py
+          - quality/retention_regression_test.py
+          - quality/first5_retention_tts_regression_test.py
+          - quality/korean_speech_style_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python ${{ matrix.test }}
