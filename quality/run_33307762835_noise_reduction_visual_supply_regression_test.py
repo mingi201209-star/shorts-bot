@@ -6,11 +6,17 @@ trusted primary-result claim may use deterministic NOISE_REDUCTION_RESULT.
 """
 from copy import deepcopy
 from pathlib import Path
+import runpy
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
+
+# Start from the same pristine subject-anchor composition used by #258 so this
+# focused fixture exercises the real installer order rather than relying on
+# already-mutated source files.
+runpy.run_path(str(ROOT / "quality/run_33248013901_visual_anchor_regression_test.py"))
 
 import ci_canonical_visual_supply_contract_hotfix as canonical_supply  # noqa: E402
 canonical_supply.main()
