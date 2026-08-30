@@ -39,7 +39,7 @@ def main():
     # Authority order:
     #   1) structured verifier required_subject_groups
     #   2) current visual subject contract required_anchors
-    #   3) authoritative effective/canonical visual query
+    #   3) current authoritative effective visual query
     #   4) legacy scene["keyword"] fallback
     required_subject_groups = [
         str(group or "").strip().lower()
@@ -68,37 +68,17 @@ def main():
             anchors = list(dict.fromkeys(contract_required))
             parent_domain_anchor_source = "visual_subject_contract"
         else:
-            authoritative_queries = []
+            # Only an actually stored visual-contract query is authoritative.
+            # Do not synthesize a replacement from canonical identity metadata:
+            # that metadata can identify a jet-engine chevron without carrying
+            # the required aircraft parent anchor, and legacy scenes must retain
+            # their established scene-keyword fallback behavior.
             effective_query = str(visual_subject_contract.get("effective_query") or "").strip()
             if effective_query:
-                authoritative_queries.append(effective_query)
-
-            profile = scene.get("_canonical_visual_supply") if isinstance(scene, dict) else None
-            profile = profile if isinstance(profile, dict) else {}
-            canonical_query_parts = []
-            canonical_subject = str(profile.get("canonical_subject") or "").strip()
-            if canonical_subject:
-                canonical_query_parts.append(canonical_subject)
-            canonical_query_parts.extend(
-                str(value or "").strip()
-                for value in (profile.get("canonical_terms") or [])
-                if str(value or "").strip()
-            )
-            canonical_query_parts.extend(
-                str(value or "").strip()
-                for value in (profile.get("visual_discriminators") or [])
-                if str(value or "").strip()
-            )
-            canonical_query = " ".join(canonical_query_parts).strip()
-            if canonical_query:
-                authoritative_queries.append(canonical_query)
-
-            for authoritative_query in authoritative_queries:
-                parsed = list(extract_query_anchors(authoritative_query))
+                parsed = list(extract_query_anchors(effective_query))
                 if parsed:
                     anchors = parsed
                     parent_domain_anchor_source = "effective_query"
-                    break
 
     if not anchors:
         anchors = extract_query_anchors(str(scene.get("keyword", "") or ""))
