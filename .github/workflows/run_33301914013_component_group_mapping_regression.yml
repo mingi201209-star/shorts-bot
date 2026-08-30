@@ -51,6 +51,9 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
+      - name: Apply canonical Script Engine V2 prerequisite
+        if: matrix.test == 'quality/script_engine_v2_regression_test.py'
+        run: python ci_script_v2_visual_goal_hotfix.py
       - name: Run ${{ matrix.test }} from clean checkout
         run: python "${{ matrix.test }}"
 
