@@ -25,6 +25,93 @@ def main():
         function_end = len(text)
     section = text[function_start:function_end]
 
+    # Run 33305747810: the existing #256 branch reparsed scene["keyword"] even
+    # after the visual pipeline had established a stronger authoritative subject
+    # contract. Resolve only the anchor authority. The parent-domain policy,
+    # 3/3 requirement, structured evidence rules, and Vision thresholds remain
+    # unchanged. Legacy scenes without authoritative contract data still use the
+    # original scene-keyword behavior.
+    stale_anchor_read = '''    anchors = extract_query_anchors(str(scene.get("keyword", "") or ""))
+
+    # STILL_IMAGE_PASS_PROPAGATION_V1
+'''
+    authoritative_anchor_read = '''    # STILL_PARENT_DOMAIN_PROPAGATION_V1
+    # Authority order:
+    #   1) structured verifier required_subject_groups
+    #   2) current visual subject contract required_anchors
+    #   3) authoritative effective/canonical visual query
+    #   4) legacy scene["keyword"] fallback
+    required_subject_groups = [
+        str(group or "").strip().lower()
+        for group in (result.get("required_subject_groups") or [])
+        if str(group or "").strip()
+    ]
+    anchors = []
+    parent_domain_anchor_source = "legacy_scene_keyword"
+
+    if required_subject_groups:
+        anchors = list(dict.fromkeys(required_subject_groups))
+        parent_domain_anchor_source = "required_subject_groups"
+    else:
+        try:
+            from video.video_downloader import get_current_visual_subject_anchor_contract
+            visual_subject_contract = get_current_visual_subject_anchor_contract() or {}
+        except (ImportError, AttributeError, TypeError):
+            visual_subject_contract = {}
+
+        contract_required = [
+            str(group or "").strip().lower()
+            for group in (visual_subject_contract.get("required_anchors") or [])
+            if str(group or "").strip()
+        ]
+        if contract_required:
+            anchors = list(dict.fromkeys(contract_required))
+            parent_domain_anchor_source = "visual_subject_contract"
+        else:
+            authoritative_queries = []
+            effective_query = str(visual_subject_contract.get("effective_query") or "").strip()
+            if effective_query:
+                authoritative_queries.append(effective_query)
+
+            profile = scene.get("_canonical_visual_supply") if isinstance(scene, dict) else None
+            profile = profile if isinstance(profile, dict) else {}
+            canonical_query_parts = []
+            canonical_subject = str(profile.get("canonical_subject") or "").strip()
+            if canonical_subject:
+                canonical_query_parts.append(canonical_subject)
+            canonical_query_parts.extend(
+                str(value or "").strip()
+                for value in (profile.get("canonical_terms") or [])
+                if str(value or "").strip()
+            )
+            canonical_query_parts.extend(
+                str(value or "").strip()
+                for value in (profile.get("visual_discriminators") or [])
+                if str(value or "").strip()
+            )
+            canonical_query = " ".join(canonical_query_parts).strip()
+            if canonical_query:
+                authoritative_queries.append(canonical_query)
+
+            for authoritative_query in authoritative_queries:
+                parsed = list(extract_query_anchors(authoritative_query))
+                if parsed:
+                    anchors = parsed
+                    parent_domain_anchor_source = "effective_query"
+                    break
+
+    if not anchors:
+        anchors = extract_query_anchors(str(scene.get("keyword", "") or ""))
+        parent_domain_anchor_source = "legacy_scene_keyword"
+
+    result["parent_domain_anchor_source"] = parent_domain_anchor_source
+
+    # STILL_IMAGE_PASS_PROPAGATION_V1
+'''
+    if section.count(stale_anchor_read) != 1:
+        raise RuntimeError("parent-domain stale anchor read boundary mismatch")
+    section = section.replace(stale_anchor_read, authoritative_anchor_read, 1)
+
     # Run 33299731082: #259 rejected schema disagreement before the existing
     # #256 trusted parent-domain branch could resolve aircraft as the parent
     # domain of a verified jet-engine chevron close-up. Preserve the raw
@@ -37,8 +124,7 @@ def main():
         _vision_evidence_trace("REJECT", missing)
         return False, result
 '''
-    deferred_consistency = '''    # STILL_PARENT_DOMAIN_PROPAGATION_V1
-    raw_schema_parser_consistency = bool(result.get("schema_parser_consistency", True))
+    deferred_consistency = '''    raw_schema_parser_consistency = bool(result.get("schema_parser_consistency", True))
     raw_evidence_inconsistencies = list(result.get("evidence_inconsistencies") or [])
     raw_visible_subject_groups = dict(result.get("visible_subject_groups") or {})
     result["raw_schema_parser_consistency"] = raw_schema_parser_consistency
@@ -125,6 +211,7 @@ def main():
         f"required_subject_groups={'+'.join(required_groups) or 'none'} "
         f"raw_visible_subject_groups={raw_visible_groups} "
         f"visible_components={'+'.join(str(v) for v in result.get('visible_components', []) or []) or 'none'} "
+        f"parent_domain_anchor_source={str(result.get('parent_domain_anchor_source') or 'legacy_scene_keyword')} "
         f"parent_domain_satisfied={'+'.join(result.get('parent_domain_satisfied', []) or []) or 'none'} "
         f"effective_subject_groups={effective_subject_groups} "
         f"missing={'+'.join(missing_groups) or 'none'} "
@@ -140,7 +227,7 @@ def main():
 
     text = text[:function_start] + section + text[function_end:]
     path.write_text(text, encoding="utf-8")
-    print("✅ Trusted still parent-domain propagation applied after structured Vision parsing")
+    print("✅ Trusted still parent-domain propagation applied with authoritative anchor source")
 
 
 if __name__ == "__main__":
