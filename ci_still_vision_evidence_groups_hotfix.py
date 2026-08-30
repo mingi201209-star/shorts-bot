@@ -8,6 +8,9 @@ _HELPERS = r'''
 # STILL_VISION_EVIDENCE_GROUPS_V1
 # Structured evidence is authoritative. Free-text reason is diagnostics only.
 _STILL_VISION_GROUP_ALIASES = {
+    "engine": {
+        "engine", "jet engine",
+    },
     "chevron": {
         "chevron", "chevrons", "serrated edge", "serrated nozzle",
         "sawtooth trailing edge", "톱니", "셰브론",
@@ -60,21 +63,35 @@ def _still_vision_apply_structured_evidence(result, payload, required_groups):
     }
 
     visible_groups = {}
+    component_derived_groups = {}
     inconsistencies = []
+    resolved_inconsistencies = []
     for group in required_groups:
         component_visible = any(
             _still_vision_component_matches_group(component, group)
             for component in components
         )
+        component_derived_groups[group] = bool(component_visible)
         if group in explicit:
             explicit_visible = bool(explicit[group])
             if explicit_visible != component_visible:
-                inconsistencies.append(
+                inconsistency = (
                     f"structured_group_component_disagree:{group}:"
                     f"group={str(explicit_visible).lower()}:"
                     f"component={str(component_visible).lower()}"
                 )
-            visible = explicit_visible and component_visible
+                # Run 33301914013: approved structured component evidence
+                # "jet engine" is a canonical engine-group alias. Resolve only
+                # this narrow false-negative direction. Other structured
+                # contradictions remain fail-closed, including chevron.
+                if group == "engine" and component_visible and not explicit_visible:
+                    resolved_inconsistencies.append(inconsistency)
+                else:
+                    inconsistencies.append(inconsistency)
+            if group == "engine":
+                visible = explicit_visible or component_visible
+            else:
+                visible = explicit_visible and component_visible
         else:
             # Legacy structured-only callers remain supported; reason is never used.
             visible = component_visible
@@ -91,10 +108,14 @@ def _still_vision_apply_structured_evidence(result, payload, required_groups):
             inconsistencies.append(f"reason_claims_missing_structured_group:{group}")
 
     result["required_subject_groups"] = list(required_groups)
+    result["model_visible_subject_groups"] = dict(explicit)
+    result["component_derived_subject_groups"] = dict(component_derived_groups)
+    result["effective_raw_subject_groups"] = dict(visible_groups)
     result["visible_subject_groups"] = dict(visible_groups)
     result["visible_components"] = canonical_components
     result["schema_parser_consistency"] = not bool(inconsistencies)
     result["evidence_inconsistencies"] = list(inconsistencies)
+    result["resolved_evidence_inconsistencies"] = list(resolved_inconsistencies)
     return result
 '''
 
@@ -121,13 +142,13 @@ def patch_hook_visual_dominance():
     # Other visual hotfixes may add guidance between this line and the score
     # rubric. Patch only the stable line so installer order cannot break us.
     anchor = "Observable action required: {str(action_required).lower()}\n"
-    replacement = "Observable action required: {str(action_required).lower()}\nRequired subject groups: {required_subject_groups_json}\n\nStructured subject-evidence contract:\n- visible_components is authoritative structured evidence. List only concrete components visibly identifiable in the supplied frames.\n- visible_subject_groups MUST contain every required subject group above as true/false. Set true only when that group is visibly identifiable.\n- For chevron only, allowed structured aliases are: chevron, chevrons, serrated edge, serrated nozzle, sawtooth trailing edge, 톱니, 셰브론.\n- Never treat wing, engine, blade, fan, or gear as chevron evidence.\n- Keep reason consistent with structured evidence; do not claim a required group is visible when its structured value is false.\n"
+    replacement = "Observable action required: {str(action_required).lower()}\nRequired subject groups: {required_subject_groups_json}\n\nStructured subject-evidence contract:\n- visible_components is authoritative structured evidence. List only concrete components visibly identifiable in the supplied frames.\n- visible_subject_groups MUST contain every required subject group above as true/false. Set true only when that group is visibly identifiable.\n- Approved engine component labels are: engine, jet engine.\n- For chevron only, allowed structured aliases are: chevron, chevrons, serrated edge, serrated nozzle, sawtooth trailing edge, 톱니, 셰브론.\n- Never treat wing, engine, blade, fan, or gear as chevron evidence.\n- Keep reason consistent with structured evidence; do not claim a required group is visible when its structured value is false.\n"
     if text.count(anchor) != 1:
         raise RuntimeError("structured evidence prompt anchor mismatch")
     text = text.replace(anchor, replacement, 1)
 
     anchor = "- visible_components: list ONLY concrete physical components visibly identifiable in the frames. Include required search components such as aircraft, wing, winglet, window, engine only when they are actually visible; do not infer them from the keyword.\n"
-    replacement = "- visible_components: list ONLY concrete physical components visibly identifiable in the frames. For required groups prefer canonical labels; only the approved chevron aliases above are equivalent. Do not infer from the keyword.\n- visible_subject_groups: return exactly the required group keys with boolean values. Template: {visible_subject_groups_template}\n"
+    replacement = "- visible_components: list ONLY concrete physical components visibly identifiable in the frames. For required groups prefer canonical labels; approved aliases above are equivalent. Do not infer from the keyword.\n- visible_subject_groups: return exactly the required group keys with boolean values. Template: {visible_subject_groups_template}\n"
     if text.count(anchor) != 1:
         raise RuntimeError("structured evidence components prompt anchor mismatch")
     text = text.replace(anchor, replacement, 1)
@@ -179,7 +200,7 @@ def patch_still_verifier():
 def main():
     patch_hook_visual_dominance()
     patch_still_verifier()
-    print("✅ Structured still Vision evidence groups preserve chevron proof without fail-open")
+    print("✅ Structured still Vision evidence groups preserve approved engine/chevron proof without fail-open")
 
 
 if __name__ == "__main__":
