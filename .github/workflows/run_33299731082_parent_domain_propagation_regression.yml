@@ -9,6 +9,9 @@ on:
       - ".github/workflows/run_33299731082_parent_domain_propagation_regression.yml"
   workflow_dispatch:
 
+env:
+  PYTHONPATH: .
+
 jobs:
   focused:
     runs-on: ubuntu-latest
