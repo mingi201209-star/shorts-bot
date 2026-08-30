@@ -13,8 +13,16 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-# Reproduce the production composition order. The trace installer now applies
-# the focused parent-domain propagation patch as its final step.
+# Reproduce the production visual-contract composition needed by the still
+# verifier. These installers only patch local source files; they do not run
+# production or make external API calls.
+import ci_visual_specificity_hotfix  # noqa: F401,E402
+import ci_query_semantic_integrity_hotfix  # noqa: F401,E402
+import ci_concrete_visual_evidence_hotfix  # noqa: F401,E402
+import ci_general_scene_visual_parity_hotfix  # noqa: F401,E402
+import ci_visual_subject_anchor_contract_v1_hotfix  # noqa: F401,E402
+import ci_visual_subject_anchor_contract_v1_completion_hotfix  # noqa: F401,E402
+
 from ci_still_image_verifier_contract_hotfix import main as install_verifier  # noqa: E402
 from ci_still_vision_evidence_groups_hotfix import main as install_groups  # noqa: E402
 from ci_still_vision_evidence_trace_hotfix import main as install_trace  # noqa: E402
@@ -49,8 +57,8 @@ LIVE = {
     "visible_subject_groups": {"aircraft": False, "engine": True, "chevron": True},
     "visible_components": ["engine", "chevron"],
     "schema_parser_consistency": False,
-    # This is the raw disagreement that #259 creates when the model marks the
-    # parent group true but does not list the whole aircraft as a component.
+    # Exact structured disagreement resolved only when the existing #256 branch
+    # proves aircraft as the trusted parent domain of the jet-engine chevron.
     "evidence_inconsistencies": [
         "structured_group_component_disagree:aircraft:group=true:component=false"
     ],
@@ -154,8 +162,13 @@ case["evidence_inconsistencies"].append(
 )
 assert verify(SCENE, case)[0] is False
 
-# No generation prompt/budget/API contract is modified by this regression fix.
+# I. #261 generation subject-proof contract is not modified by this fix.
 parent_source = (ROOT / "ci_still_parent_domain_propagation_hotfix.py").read_text(encoding="utf-8")
+assert "required_viewpoint" not in parent_source
+assert "subject_proof_priority" not in parent_source
+assert "final_prompt_signature" not in parent_source
+
+# No generation budget/API/retry contract is modified by this regression fix.
 assert "STILL_IMAGE_MAX_PER_VIDEO" not in parent_source
 assert "requests." not in parent_source
 assert "OPENAI" not in parent_source
