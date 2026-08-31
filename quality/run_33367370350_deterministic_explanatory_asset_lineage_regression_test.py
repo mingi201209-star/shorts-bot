@@ -139,7 +139,7 @@ def assert_same_asset_repeat_detected(scene, result, label):
     assert check["pass"] is False, (label, check)
     high = [g for g in check["repetition_groups"] if g.get("severity") == "high"]
     assert len(high) == 1, (label, check)
-    assert high[0]["asset_id"] == result["source_asset_id"], (label, high)
+    assert high[0]["asset_id"] == result["source_asset_id"].lower(), (label, high)
     assert high[0]["hard_repeat_count"] == 3, (label, high)
 
 
