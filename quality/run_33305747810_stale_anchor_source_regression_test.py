@@ -58,6 +58,19 @@ LIVE = {
     "reason": "The chevron structure of the jet engine is clearly visible and dominant in the frames.",
     "obvious_generation_artifact": False,
     "factual_visual_contradiction": False,
+    # This fixture's positive case isolates stale-anchor authority, not viewpoint
+    # classification. Make the new trusted rear-view precondition explicit so the
+    # parent-domain assertions continue testing exactly their original boundary.
+    "viewpoint_structure_required": True,
+    "required_viewpoint": "rear or rear-quarter close-up of the trailing edge",
+    "viewpoint_structure_schema_valid": True,
+    "viewpoint_structure_pass": True,
+    "viewpoint_structure_evidence": {
+        "rear_nozzle_or_trailing_edge_identifiable": True,
+        "chevron_attached_to_rear_nozzle_or_trailing_edge": True,
+        "front_intake_or_fan_side_dominant": False,
+        "mobile_structure_identifiable": True,
+    },
 }
 
 
