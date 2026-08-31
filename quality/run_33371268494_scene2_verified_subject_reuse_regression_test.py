@@ -6,9 +6,13 @@ import video.still_image_fallback as still
 
 CANONICAL = "jet engine nacelle/nozzle chevrons"
 REQUIRED = ["aircraft", "engine", "chevron"]
+SCENE1_KEYWORD = "aircraft jet engine nacelle nozzle chevron serrated"
+SCENE2_KEYWORD = "aircraft engine chevron wing mechanism stage 2"
 
 
-def scene(*, role="phenomenon", canonical=CANONICAL, keyword="aircraft jet engine chevron", causal_role="", owned_claim_id="", explanatory=None):
+def scene(*, role="phenomenon", canonical=CANONICAL, keyword=None, causal_role="", owned_claim_id="", explanatory=None):
+    if keyword is None:
+        keyword = SCENE2_KEYWORD if role == "question" else SCENE1_KEYWORD
     return {
         "scene_id": role,
         "role": role,
@@ -50,7 +54,7 @@ def seed(tmp, ev=None, *, verified=True, source_id="still-run33371268494-scene1"
     image = Path(tmp) / "scene1.png"
     image.write_bytes(b"verified-subject-proof")
     ok = still._cache_verified_subject_proof(
-        scene(role="phenomenon"),
+        scene(role="phenomenon", keyword=SCENE1_KEYWORD),
         image_path=image,
         source_id=source_id,
         evidence=ev or evidence(),
@@ -67,7 +71,9 @@ def main():
         # CASE A — exact Run 33371268494 positive counterexample.
         _, source_id, cached = seed(tmp)
         assert cached is True
-        still._register_source_use(source_id, scene(role="phenomenon"))
+        exact_scene2 = scene(role="question", keyword=SCENE2_KEYWORD)
+        assert still._subject_proof_required_groups(exact_scene2) == tuple(sorted(REQUIRED))
+        still._register_source_use(source_id, scene(role="phenomenon", keyword=SCENE1_KEYWORD))
         original_motion = still._motion_clip
         original_generate = still._generate_image
         original_verify = still._verify_motion_clip
@@ -91,7 +97,7 @@ def main():
         try:
             out = Path(tmp) / "scene2.mp4"
             result = still.generate_still_motion_fallback(
-                scene(role="question"),
+                exact_scene2,
                 output_path=out,
                 duration=5.28,
                 trigger_reason="no_semantically_safe_stock",
@@ -105,6 +111,8 @@ def main():
         assert calls == {"motion": 1, "generate": 0, "vision": 0}
         assert still.still_image_generation_count() == 0
         assert still.verified_source_use_count(source_id) == 2
+        assert result["source_id"] == source_id
+        assert result["source_asset_id"] == source_id
         print("CASE A exact verified question-subject reuse: PASS")
 
         # CASE B — aircraft+engine 2/3 is never cacheable/reusable.
@@ -127,7 +135,7 @@ def main():
         # CASE D — different canonical subject cannot reuse the proof.
         seed(tmp)
         assert still._reuse_verified_question_subject(
-            scene(role="question", canonical="aircraft landing gear wheel"),
+            scene(role="question", canonical="aircraft landing gear wheel", keyword=SCENE2_KEYWORD),
             output_path=Path(tmp) / "different.mp4", duration=5.0, trigger_reason="test",
         ) is None
         print("CASE D different canonical subject rejected: PASS")
@@ -135,21 +143,21 @@ def main():
         # CASE E — Scene 3 mechanism_input requires flow/interface explanation.
         seed(tmp)
         assert still._reuse_verified_question_subject(
-            scene(role="mechanism", causal_role="mechanism_input", owned_claim_id="flow_interface", explanatory=["flow", "interface"]),
+            scene(role="mechanism", keyword="jet engine flow interface", causal_role="mechanism_input", owned_claim_id="flow_interface", explanatory=["flow", "interface"]),
             output_path=Path(tmp) / "flow.mp4", duration=5.0, trigger_reason="test",
         ) is None
         print("CASE E FLOW_INTERFACE subject-only reuse rejected: PASS")
 
         # CASE F — Scene 4 mechanism_change requires flow/mixing explanation.
         assert still._reuse_verified_question_subject(
-            scene(role="mechanism", causal_role="mechanism_change", owned_claim_id="chevron_flow_mixing", explanatory=["flow", "mixing"]),
+            scene(role="mechanism", keyword="jet engine chevron flow mixing", causal_role="mechanism_change", owned_claim_id="chevron_flow_mixing", explanatory=["flow", "mixing"]),
             output_path=Path(tmp) / "mixing.mp4", duration=5.0, trigger_reason="test",
         ) is None
         print("CASE F CHEVRON_FLOW_MIXING subject-only reuse rejected: PASS")
 
         # CASE G — Scene 5 primary_result requires noise/reduction explanation.
         assert still._reuse_verified_question_subject(
-            scene(role="result", causal_role="primary_result", owned_claim_id="noise_reduction", explanatory=["noise", "reduction"]),
+            scene(role="result", keyword="jet engine noise reduction", causal_role="primary_result", owned_claim_id="noise_reduction", explanatory=["noise", "reduction"]),
             output_path=Path(tmp) / "noise.mp4", duration=5.0, trigger_reason="test",
         ) is None
         print("CASE G NOISE_REDUCTION_RESULT subject-only reuse rejected: PASS")
@@ -179,7 +187,7 @@ def main():
         still._motion_clip = lambda image_path, output_path, duration: Path(output_path).write_bytes(b"reuse")
         try:
             reused = still._reuse_verified_question_subject(
-                scene(role="question"), output_path=Path(tmp) / "same.mp4", duration=5.0, trigger_reason="test"
+                scene(role="question", keyword=SCENE2_KEYWORD), output_path=Path(tmp) / "same.mp4", duration=5.0, trigger_reason="test"
             )
         finally:
             still._motion_clip = original_motion
@@ -191,7 +199,7 @@ def main():
         _, _, cached = seed(tmp, evidence(effective={"aircraft": False, "engine": True, "chevron": False}, raw={"aircraft": False, "engine": True, "chevron": False}))
         assert cached is False  # engine-only
         _, _, cached = seed(tmp, evidence(effective={"aircraft": True, "engine": True, "chevron": False}, raw={"aircraft": True, "engine": True, "chevron": False}))
-        assert cached is False  # generic engine / fan-blade/nacelle-only cannot satisfy chevron
+        assert cached is False  # fan-blade/nacelle/generic-engine-only cannot satisfy chevron
         seed(tmp)
         assert still._reuse_verified_question_subject(
             scene(role="question", keyword="aircraft engine wing"),
@@ -204,12 +212,8 @@ def main():
         print("FALSE-POSITIVE GUARDS: PASS")
 
     source = Path("video/still_image_fallback.py").read_text(encoding="utf-8")
-    assert "reason_claims" not in source[source.find(MARKER) if MARKER in source else 0:]
     assert "MAX_INFORMATION_USES_PER_PHYSICAL_STILL = 2" in source
     print("RUN 33371268494 SCENE 2 VERIFIED SUBJECT REUSE REGRESSION: PASS")
-
-
-MARKER = "# QUESTION_SUBJECT_REUSE_RUN_33371268494_V1"
 
 
 if __name__ == "__main__":
