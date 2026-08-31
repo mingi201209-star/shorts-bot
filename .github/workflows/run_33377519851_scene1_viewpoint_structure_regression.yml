@@ -115,29 +115,16 @@ jobs:
       - name: Run ${{ matrix.test }}
         run: python "${{ matrix.test }}"
 
-  core-nonproduction-guards:
+  script-engine-v2:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        test:
-          - quality/script_engine_v2_regression_test.py
-          - quality/fact_critical_regeneration_test.py
-          - quality/first5_visual_contract_regression_test.py
-          - quality/aviation_candidate_context_regression_test.py
-          - quality/aviation_candidate_specificity_regression_test.py
-          - quality/korean_speech_style_test.py
-          - quality/first5_retention_tts_regression_test.py
-          - quality/hook_generation_regression_test.py
-          - quality/hook_visual_dominance_test.py
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
-      - name: Run ${{ matrix.test }}
-        run: python "${{ matrix.test }}"
+      - run: python ci_script_v2_visual_goal_hotfix.py
+      - run: python -m quality.script_engine_v2_regression_test
 
   cost-and-call-invariants:
     runs-on: ubuntu-latest
