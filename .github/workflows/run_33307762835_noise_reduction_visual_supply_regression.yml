@@ -1,0 +1,212 @@
+name: Run 33307762835 Noise Reduction Visual Supply Regression
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "video/grounded_explanatory_visual.py"
+      - "ci_noise_reduction_result_visual_hotfix.py"
+      - "ci_cross_process_video_dedupe_hotfix.py"
+      - "quality/run_33307762835_noise_reduction_visual_supply_regression_test.py"
+      - ".github/workflows/run_33307762835_noise_reduction_visual_supply_regression.yml"
+  workflow_dispatch:
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  focused:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Compile focused Scene 5 supply patch
+        run: |
+          python -m py_compile \
+            video/grounded_explanatory_visual.py \
+            ci_noise_reduction_result_visual_hotfix.py \
+            ci_cross_process_video_dedupe_hotfix.py \
+            quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
+      - name: Run exact Run 33307762835 Scene 5 counterexamples
+        run: python quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
+
+  established-visual-supply:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
+          - quality/run_33251901169_visual_supply_regression_test.py
+          - quality/canonical_subject_grounding_supply_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run established visual supply regression
+        run: python "${{ matrix.test }}"
+
+  established-still-and-parent-domain:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/run_33305747810_stale_anchor_source_regression_test.py
+          - quality/run_33299731082_parent_domain_propagation_regression_test.py
+          - quality/run_33301914013_component_group_mapping_regression_test.py
+          - quality/run_33259567582_still_vision_evidence_regression_test.py
+          - quality/run_33298087222_scene1_still_subject_proof_regression_test.py
+          - quality/still_image_verifier_contract_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run established still/authority regression
+        run: python "${{ matrix.test }}"
+
+  final-visual-semantic:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Install established final semantic QA composition
+        run: |
+          python ci_video_provider_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+      - name: Run Final Visual Semantic QA regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: |
+          python quality/final_visual_semantic_qa_regression_test.py
+          python quality/still_image_motion_fallback_regression_test.py
+
+  formal-ending-isolated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run observed and general formal-ending regressions from pristine source
+        run: |
+          python quality/script_v2_gunggeum_formal_ending_regression_test.py
+          git reset --hard HEAD
+          python quality/script_v2_general_formal_ending_regression_test.py
+
+  production-composition-no-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Compose production source only
+        run: |
+          set -euo pipefail
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          python ci_video_provider_hotfix.py
+          python ci_topic_input_hotfix.py
+          python ci_aviation_candidate_context_hotfix.py
+          python ci_aviation_candidate_specificity_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          python ci_aviation_specificity_output_repair_hotfix.py
+          python ci_aviation_specificity_projection_hotfix.py
+          python ci_candidate_grounded_recovery_hotfix.py
+          python ci_growth_candidate_shadow_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_curiosity_retention_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_design_causality_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_hook_production_parity_hotfix.py
+          python ci_hook_fallback_quality_floor_hotfix.py
+          python ci_ai_visual_fallback_hotfix.py
+          python ci_ai_visual_mechanism_fallback_hotfix.py
+          python ci_problem_solution_narrative_hotfix.py
+          python ci_causal_information_progression_hotfix.py
+          python ci_retention_structure_experiment_hotfix.py
+          python ci_subscriber_conversion_hotfix.py
+          python ci_script_production_parity_hotfix.py
+          python ci_script_production_parity_bridge_hotfix.py
+          python ci_adaptive_scene_count_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_script_validation_recovery_hotfix.py
+          python ci_script_v2_visual_goal_hotfix.py
+          python ci_script_v2_gunggeum_formal_ending_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+          python ci_cross_process_video_dedupe_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          grep -q "NOISE_REDUCTION_RESULT_VISUAL_V1" video/visual_explanation.py
+          grep -q "GROUNDED_EXPLANATORY_VISUAL_SUPPLY_V1" video/visual_explanation.py
+          grep -q "STILL_PARENT_DOMAIN_PROPAGATION_V1" video/still_image_fallback.py
+          python -m py_compile \
+            video/grounded_explanatory_visual.py \
+            video/visual_explanation.py \
+            video/still_image_fallback.py
+      - name: Verify Scene 5 contract survives final production composition
+        run: |
+          python - <<'PY'
+          from video.grounded_explanatory_visual import noise_reduction_result_supported
+          from video.visual_explanation import plan_explanation, annotation_fact_safe
+          from video.still_image_fallback import STILL_IMAGE_MAX_PER_VIDEO
+
+          scene = {
+              "scene_id": 5,
+              "role": "payoff",
+              "text": "이 혼합 변화의 대표적인 결과는 제트 엔진 소음 감소입니다.",
+              "visual_goal": "소음 감소의 효과",
+              "keyword": "jet engine noise reduction",
+              "_canonical_visual_supply": {
+                  "canonical_subject": "jet engine nacelle/nozzle chevrons",
+                  "identity_confidence": 0.98,
+                  "visual_discriminators": ["nacelle", "nozzle", "chevron", "serrated"],
+                  "grounding_source": "run-33307762835-composition-fixture",
+              },
+          }
+          assert STILL_IMAGE_MAX_PER_VIDEO == 2
+          assert noise_reduction_result_supported(scene) is True
+          plan = plan_explanation(scene)
+          assert plan and plan.get("template") == "NOISE_REDUCTION_RESULT", plan
+          assert plan.get("owned_claim_id") == "noise_reduction", plan
+          assert plan.get("causal_role") == "primary_result", plan
+          assert plan.get("required_subject_anchors") == ["aircraft", "engine"], plan
+          assert plan.get("required_explanatory_groups") == ["noise", "reduction"], plan
+          assert "chevron_flow_mixing" in plan.get("forbidden_claim_ids", []), plan
+          assert annotation_fact_safe(scene, plan) is True
+          print("PASS: Scene 5 NOISE_REDUCTION_RESULT survives final production composition")
+          PY

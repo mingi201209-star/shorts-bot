@@ -121,6 +121,10 @@ if "FINAL_VISUAL_SEMANTIC_QA_V1" in main_text:
     # already-grounded explanatory nucleus into still/Vision/explanation supply.
     import ci_grounded_explanatory_visual_supply_hotfix as _grounded_explanatory_supply  # noqa: E402
     _grounded_explanatory_supply.main()
+    # Run 33307762835: add only the missing deterministic Scene-5 primary-result
+    # template after #257/#258 are fully composed. No production call is made here.
+    import ci_noise_reduction_result_visual_hotfix as _noise_reduction_result_supply  # noqa: E402
+    _noise_reduction_result_supply.main()
 
 # Writer compliance is deliberately applied last in the existing production hotfix
 # chain so earlier Script V2 installers cannot overwrite the plan-first contract.
