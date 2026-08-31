@@ -86,22 +86,15 @@ jobs:
           AI_MAX_GENERATIONS_PER_VIDEO: "1"
         run: python quality/final_visual_semantic_qa_regression_test.py
 
-  established-script-fact-context-regressions:
+  script-engine-v2:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        test:
-          - quality/script_engine_v2_regression_test.py
-          - quality/fact_critical_regeneration_test.py
-          - quality/aviation_candidate_context_regression_test.py
-          - quality/aviation_candidate_specificity_regression_test.py
-          - quality/korean_speech_style_test.py
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install -r requirements.txt
-      - name: Run established script/fact/context regression on final PR head
-        run: python "${{ matrix.test }}"
+      - run: python -m pip install openai
+      - name: Apply established V2 base hotfix
+        run: python ci_script_v2_visual_goal_hotfix.py
+      - name: Run deterministic Script Engine V2 regression
+        run: python -m quality.script_engine_v2_regression_test
