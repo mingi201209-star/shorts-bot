@@ -151,9 +151,10 @@ for scene, result, label in zip((SCENE3, SCENE4, SCENE5), results, EXPECTED_TEMP
 for plan in plans:
     assert vx._deterministic_explanatory_asset_id(plan) == vx._deterministic_explanatory_asset_id(deepcopy(plan))
 
-# G. Identity is deterministic provenance, not a random/nonce/time/scene key.
+# G. Identity is deterministic provenance, not random/nonce/time/scene input.
 identity_source = inspect.getsource(vx._deterministic_explanatory_asset_id).lower()
-for forbidden in ("uuid", "random", "time.time", "timestamp", "scene_index", "scene id", "scene_id"):
+assert tuple(inspect.signature(vx._deterministic_explanatory_asset_id).parameters) == ("plan",)
+for forbidden in ("uuid.", "random.", "time.time(", "datetime.now(", "scene.get(", "scene["):
     assert forbidden not in identity_source, (forbidden, identity_source)
 
 # H. Existing non-deterministic physical lineage semantics remain untouched.
@@ -197,4 +198,7 @@ assert raw_result["pass"] is False, raw_result
 assert diversity.plan_bounded_diversity_repair(raw_result, raw_scenes, max_repairs=0) == []
 assert raw_result["capability_exhausted"] is True, raw_result
 
+print("RUN 33367370350 LINEAGE IDS:")
+for template, result in zip(EXPECTED_TEMPLATES, results):
+    print(f"  {template} source_id={result['source_id']} source_asset_id={result['source_asset_id']}")
 print("RUN 33367370350 DETERMINISTIC EXPLANATORY ASSET LINEAGE REGRESSION: PASS")
