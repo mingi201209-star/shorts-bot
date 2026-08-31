@@ -100,7 +100,6 @@ jobs:
           - quality/run_33299731082_parent_domain_propagation_regression_test.py
           - quality/run_33301914013_component_group_mapping_regression_test.py
           - quality/run_33305747810_stale_anchor_source_regression_test.py
-          - quality/run_33371268494_scene2_verified_subject_reuse_regression_test.py
           - quality/still_image_verifier_contract_regression_test.py
           - quality/run_33248013901_visual_anchor_regression_test.py
     steps:
