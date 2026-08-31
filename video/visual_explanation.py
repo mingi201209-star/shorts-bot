@@ -24,6 +24,7 @@ MAX_EXPLANATION_TRANSFORMS_PER_VIDEO = int(
 
 _TRANSFORM_COUNT = 0
 _INFORMATION_SIGNATURES: set[tuple[str, str]] = set()
+_DETERMINISTIC_EXPLANATORY_RENDER_VERSION = "visual-explanation-render-v1"
 
 
 def reset_visual_explanation_budget():
@@ -213,6 +214,38 @@ def _cached_verified_asset(scene):
     return None, None
 
 
+def _deterministic_explanatory_asset_id(plan):
+    """Stable identity for the deterministic rendered explanatory asset.
+
+    This is deliberately based only on render provenance. It excludes scene
+    index, output path, timestamps, UUIDs and other per-call nonce data so an
+    actually reused deterministic render keeps the same physical identity.
+    """
+    template = str((plan or {}).get("template") or "").strip().upper()
+    stable_fields = (
+        _DETERMINISTIC_EXPLANATORY_RENDER_VERSION,
+        template,
+        str((plan or {}).get("subject") or "").strip(),
+        str((plan or {}).get("action") or "").strip(),
+        str((plan or {}).get("label") or "").strip(),
+        ",".join(sorted(str(x).strip() for x in ((plan or {}).get("required_explanatory_groups") or []) if str(x).strip())),
+        ",".join(sorted(str(x).strip() for x in ((plan or {}).get("required_subject_anchors") or []) if str(x).strip())),
+        str((plan or {}).get("owned_claim_id") or "").strip(),
+        str((plan or {}).get("causal_role") or "").strip(),
+        str((plan or {}).get("canonical_subject_continuity") or "").strip(),
+        ",".join(sorted(str(x).strip() for x in ((plan or {}).get("forbidden_claim_ids") or []) if str(x).strip())),
+    )
+    digest = hashlib.sha256("\x1f".join(stable_fields).encode("utf-8")).hexdigest()[:16]
+    return f"deterministic-explanatory:{template}:{digest}"
+
+
+def _explanatory_asset_id(source_id, plan):
+    # A verified cached still remains the underlying physical asset. Only the
+    # deterministic 2D branch needs a provenance identity derived from its
+    # actual render plan instead of the old renderer-family constant.
+    return str(source_id) if source_id else _deterministic_explanatory_asset_id(plan)
+
+
 def generate_visual_explanation_fallback(scene, *, output_path, duration, trigger_reason="semantic_scarcity"):
     global _TRANSFORM_COUNT
     plan = plan_explanation(scene)
@@ -225,7 +258,7 @@ def generate_visual_explanation_fallback(scene, *, output_path, duration, trigge
 
     image_path, source_id = _cached_verified_asset(scene)
     source_type = "annotated_verified_still" if image_path else "explanatory_2d"
-    asset_id = source_id or "deterministic-winglet-template-v1"
+    asset_id = _explanatory_asset_id(source_id, plan)
     information_signature = (asset_id, str(plan["template"]))
     if information_signature in _INFORMATION_SIGNATURES:
         print(f"[VisualExplanation] status=information_repeat_rejected source={asset_id} template={plan['template']}")
