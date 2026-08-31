@@ -1,0 +1,152 @@
+name: Run 33367370350 Deterministic Explanatory Asset Lineage Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "video/visual_explanation.py"
+      - "quality/run_33367370350_deterministic_explanatory_asset_lineage_regression_test.py"
+      - ".github/workflows/run_33367370350_deterministic_explanatory_asset_lineage_regression.yml"
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  exact-counterexample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Compile lineage implementation and exact fixture
+        run: python -m py_compile video/visual_explanation.py quality/run_33367370350_deterministic_explanatory_asset_lineage_regression_test.py
+      - name: Run exact Run 33367370350 lineage counterexamples
+        run: python quality/run_33367370350_deterministic_explanatory_asset_lineage_regression_test.py
+      - name: Guard unchanged diversity policy and zero-call contract
+        run: |
+          grep -n 'HARD_REPEAT_COUNT = 3' quality/visual_diversity_preflight.py
+          grep -n 'capability_exhausted' quality/visual_diversity_preflight.py
+          grep -n 'additional_llm_calls.*0' video/visual_explanation.py
+          grep -n 'additional_vision_calls.*0' video/visual_explanation.py
+          git diff --check
+
+  established-visual-regressions:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/visual_diversity_preflight_regression_test.py
+          - quality/visual_explanation_retrieval_v1_regression_test.py
+          - quality/visual_explanation_retrieval_v1_contract_test.py
+          - quality/visual_quality_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
+          - quality/run_33251901169_visual_supply_regression_test.py
+          - quality/canonical_subject_grounding_supply_regression_test.py
+          - quality/first5_visual_contract_regression_test.py
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
+          - quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run established visual regression on final PR head
+        run: python "${{ matrix.test }}"
+
+  final-visual-semantic-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Install established semantic QA composition
+        run: |
+          python ci_video_provider_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+      - name: Run Final Visual Semantic QA regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: python quality/final_visual_semantic_qa_regression_test.py
+
+  established-script-fact-context-regressions:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/script_engine_v2_regression_test.py
+          - quality/fact_critical_regeneration_test.py
+          - quality/aviation_candidate_context_regression_test.py
+          - quality/aviation_candidate_specificity_regression_test.py
+          - quality/korean_speech_style_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run established script/fact/context regression on final PR head
+        run: python "${{ matrix.test }}"
+
+  hook-generation-compatibility:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python ci_hook_generation_hotfix.py
+      - run: python quality/hook_generation_regression_test.py
+
+  hook-experiment-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python ci_hook_generation_hotfix.py
+      - run: python ci_hook_pool_guard_hotfix.py
+      - run: python quality/hook_experiment_test.py
+
+  hook-visual-dominance-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python quality/hook_visual_dominance_test.py
+
+  retention-hook-frame-tts-speed:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python ci_retention_hotfix.py
+      - run: python ci_first5_retention_tts_hotfix.py
+      - run: python quality/first5_retention_tts_regression_test.py
