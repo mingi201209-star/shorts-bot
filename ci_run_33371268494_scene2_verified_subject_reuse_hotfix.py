@@ -12,14 +12,22 @@ _HELPERS = r'''
 # that asks about that exact same trusted canonical subject. Mechanism/result
 # scenes still require their own explanatory evidence.
 def _subject_proof_required_groups(scene):
-    from video.video_downloader import extract_query_anchors
+    # Use the exact resolver that structured still-Vision verification uses.
+    # This prevents reuse from silently interpreting a Scene contract differently
+    # from the verifier that produced the trusted proof.
+    try:
+        from video.hook_visual_dominance import _still_vision_required_subject_groups
+        groups = list(_still_vision_required_subject_groups(scene) or [])
+    except (ImportError, AttributeError):
+        from video.video_downloader import extract_query_anchors
+        groups = list(extract_query_anchors(str((scene or {}).get("keyword") or "")) or [])
 
-    groups = [
+    normalized = [
         str(group or "").strip().lower()
-        for group in extract_query_anchors(str((scene or {}).get("keyword") or ""))
+        for group in groups
         if str(group or "").strip()
     ]
-    return tuple(sorted(dict.fromkeys(groups)))
+    return tuple(sorted(dict.fromkeys(normalized)))
 
 
 def _subject_proof_identity(scene, required_groups=None):
