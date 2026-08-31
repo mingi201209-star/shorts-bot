@@ -54,6 +54,19 @@ LIVE = {
     "reason": "The chevron structure of the jet engine is clearly visible, large, and dominant in the frame.",
     "obvious_generation_artifact": False,
     "factual_visual_contradiction": False,
+    # The parent-domain fixture is a positive physical still. #269 adds a
+    # separate authoritative viewpoint boundary, so make that precondition
+    # explicit while keeping the raw/effective subject assertions unchanged.
+    "viewpoint_structure_required": True,
+    "required_viewpoint": "rear or rear-quarter close-up of the trailing edge",
+    "viewpoint_structure_schema_valid": True,
+    "viewpoint_structure_pass": True,
+    "viewpoint_structure_evidence": {
+        "rear_nozzle_or_trailing_edge_identifiable": True,
+        "chevron_attached_to_rear_nozzle_or_trailing_edge": True,
+        "front_intake_or_fan_side_dominant": False,
+        "mobile_structure_identifiable": True,
+    },
 }
 
 
