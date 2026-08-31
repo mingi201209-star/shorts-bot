@@ -8,6 +8,8 @@ on:
       - "ci_run_33377519851_scene1_viewpoint_structure_hotfix.py"
       - "ci_still_vision_evidence_trace_hotfix.py"
       - "quality/run_33377519851_scene1_viewpoint_structure_regression_test.py"
+      - "quality/run_33299731082_parent_domain_propagation_regression_test.py"
+      - "quality/run_33305747810_stale_anchor_source_regression_test.py"
       - ".github/workflows/run_33377519851_scene1_viewpoint_structure_regression.yml"
   workflow_dispatch:
 
@@ -82,25 +84,74 @@ jobs:
             video/still_image_fallback.py video/hook_visual_dominance.py
       - name: Run exact Run 33377519851 counterexample
         run: python quality/run_33377519851_scene1_viewpoint_structure_regression_test.py
-      - name: Run final-composition visual contract suite
+      - name: Re-run #268 verified subject reuse on final composition
+        run: python quality/run_33371268494_scene2_verified_subject_reuse_regression_test.py
+
+  established-subject-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/run_33251901169_visual_supply_regression_test.py
+          - quality/run_33254306556_still_pass_propagation_regression_test.py
+          - quality/run_33259567582_still_vision_evidence_regression_test.py
+          - quality/run_33298087222_scene1_still_subject_proof_regression_test.py
+          - quality/run_33299731082_parent_domain_propagation_regression_test.py
+          - quality/run_33301914013_component_group_mapping_regression_test.py
+          - quality/run_33305747810_stale_anchor_source_regression_test.py
+          - quality/run_33371268494_scene2_verified_subject_reuse_regression_test.py
+          - quality/still_image_verifier_contract_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run ${{ matrix.test }} on fresh checkout
+        run: python "${{ matrix.test }}"
+
+  explanatory-and-diversity-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
+          - quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
+          - quality/run_33367370350_deterministic_explanatory_asset_lineage_regression_test.py
+          - quality/visual_diversity_preflight_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run ${{ matrix.test }} on fresh checkout
+        run: python "${{ matrix.test }}"
+
+  final-visual-semantic-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Apply established Final Visual QA composition
         run: |
-          set -euo pipefail
-          python quality/run_33251901169_visual_supply_regression_test.py
-          python quality/run_33254306556_still_pass_propagation_regression_test.py
-          python quality/run_33259567582_still_vision_evidence_regression_test.py
-          python quality/run_33298087222_scene1_still_subject_proof_regression_test.py
-          python quality/run_33299731082_parent_domain_propagation_regression_test.py
-          python quality/run_33301914013_component_group_mapping_regression_test.py
-          python quality/run_33305747810_stale_anchor_source_regression_test.py
-          python quality/run_33371268494_scene2_verified_subject_reuse_regression_test.py
-          python quality/run_33256014054_flow_interface_visual_supply_regression_test.py
-          python quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
-          python quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
-          python quality/run_33367370350_deterministic_explanatory_asset_lineage_regression_test.py
-          python quality/still_image_verifier_contract_regression_test.py
-          python quality/run_33248013901_visual_anchor_regression_test.py
-          python quality/final_visual_semantic_qa_regression_test.py
-          python quality/visual_diversity_preflight_regression_test.py
+          python ci_video_provider_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+      - run: python quality/final_visual_semantic_qa_regression_test.py
 
   script-engine-v2:
     runs-on: ubuntu-latest
