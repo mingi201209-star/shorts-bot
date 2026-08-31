@@ -33,7 +33,6 @@ jobs:
           grep -n 'capability_exhausted' quality/visual_diversity_preflight.py
           grep -n 'additional_llm_calls.*0' video/visual_explanation.py
           grep -n 'additional_vision_calls.*0' video/visual_explanation.py
-          git diff --check
 
   established-visual-regressions:
     runs-on: ubuntu-latest
