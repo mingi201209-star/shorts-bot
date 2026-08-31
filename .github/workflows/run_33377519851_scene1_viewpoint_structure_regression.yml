@@ -1,0 +1,164 @@
+name: Run 33377519851 Scene1 Viewpoint Structure Regression
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ci_run_33377519851_scene1_viewpoint_structure_hotfix.py"
+      - "ci_still_vision_evidence_trace_hotfix.py"
+      - "quality/run_33377519851_scene1_viewpoint_structure_regression_test.py"
+      - ".github/workflows/run_33377519851_scene1_viewpoint_structure_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  exact-production-composition-no-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Compose production source only
+        run: |
+          set -euo pipefail
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          python ci_video_provider_hotfix.py
+          python ci_topic_input_hotfix.py
+          python ci_aviation_candidate_context_hotfix.py
+          python ci_aviation_candidate_specificity_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          python ci_aviation_specificity_output_repair_hotfix.py
+          python ci_aviation_specificity_projection_hotfix.py
+          python ci_candidate_grounded_recovery_hotfix.py
+          python ci_growth_candidate_shadow_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_curiosity_retention_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_design_causality_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_hook_production_parity_hotfix.py
+          python ci_hook_fallback_quality_floor_hotfix.py
+          python ci_ai_visual_fallback_hotfix.py
+          python ci_ai_visual_mechanism_fallback_hotfix.py
+          python ci_problem_solution_narrative_hotfix.py
+          python ci_causal_information_progression_hotfix.py
+          python ci_retention_structure_experiment_hotfix.py
+          python ci_subscriber_conversion_hotfix.py
+          python ci_script_production_parity_hotfix.py
+          python ci_script_production_parity_bridge_hotfix.py
+          python ci_adaptive_scene_count_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_script_validation_recovery_hotfix.py
+          python ci_script_v2_visual_goal_hotfix.py
+          python ci_script_v2_gunggeum_formal_ending_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+          python ci_cross_process_video_dedupe_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          grep -q "QUESTION_SUBJECT_REUSE_RUN_33371268494_V1" video/still_image_fallback.py
+          grep -q "RUN_33377519851_SCENE1_VIEWPOINT_STRUCTURE_V1" video/still_image_fallback.py
+          grep -q "RUN_33377519851_SCENE1_VIEWPOINT_STRUCTURE_V1" video/hook_visual_dominance.py
+          python -m py_compile \
+            ci_run_33377519851_scene1_viewpoint_structure_hotfix.py \
+            ci_still_vision_evidence_trace_hotfix.py \
+            video/still_image_fallback.py video/hook_visual_dominance.py
+      - name: Run exact Run 33377519851 counterexample
+        run: python quality/run_33377519851_scene1_viewpoint_structure_regression_test.py
+      - name: Re-run #268 verified reuse regression on final composition
+        run: python quality/run_33371268494_scene2_verified_subject_reuse_regression_test.py
+
+  established-visual-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/run_33251901169_visual_supply_regression_test.py
+          - quality/run_33254306556_still_pass_propagation_regression_test.py
+          - quality/run_33259567582_still_vision_evidence_regression_test.py
+          - quality/run_33298087222_scene1_still_subject_proof_regression_test.py
+          - quality/run_33299731082_parent_domain_propagation_regression_test.py
+          - quality/run_33301914013_component_group_mapping_regression_test.py
+          - quality/run_33305747810_stale_anchor_source_regression_test.py
+          - quality/still_image_verifier_contract_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
+          - quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
+          - quality/run_33367370350_deterministic_explanatory_asset_lineage_regression_test.py
+          - quality/final_visual_semantic_qa_regression_test.py
+          - quality/visual_diversity_preflight_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run ${{ matrix.test }}
+        run: python "${{ matrix.test }}"
+
+  core-nonproduction-guards:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/script_engine_v2_regression_test.py
+          - quality/fact_critical_regeneration_test.py
+          - quality/first5_visual_contract_regression_test.py
+          - quality/aviation_candidate_context_regression_test.py
+          - quality/aviation_candidate_specificity_regression_test.py
+          - quality/korean_speech_style_test.py
+          - quality/first5_retention_tts_regression_test.py
+          - quality/hook_generation_regression_test.py
+          - quality/hook_visual_dominance_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run ${{ matrix.test }}
+        run: python "${{ matrix.test }}"
+
+  cost-and-call-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Static invariants
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          source = Path("ci_run_33377519851_scene1_viewpoint_structure_hotfix.py").read_text(encoding="utf-8")
+          still = Path("video/still_image_fallback.py").read_text(encoding="utf-8")
+          assert re.search(r'STILL_IMAGE_MAX_PER_VIDEO\s*=\s*int\(os\.environ\.get\("STILL_IMAGE_MAX_PER_VIDEO",\s*"2"\)\)', still)
+          forbidden = ["authorize_call(", "client.images.generate(", "chat.completions.create(", "responses.create("]
+          for token in forbidden:
+              assert token not in source, token
+          assert "MAX_RETRIES" not in source
+          assert "V3_MAX_API_CALLS" not in source
+          assert "V3_MAX_COST_USD" not in source
+          print("VIEWPOINT COST/CALL INVARIANTS: PASS")
+          PY
