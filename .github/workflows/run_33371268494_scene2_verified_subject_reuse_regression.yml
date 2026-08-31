@@ -94,8 +94,8 @@ jobs:
           - quality/run_33301914013_component_group_mapping_regression_test.py
           - quality/run_33305747810_stale_anchor_source_regression_test.py
           - quality/still_image_verifier_contract_regression_test.py
-          - quality/canonical_visual_supply_contract_regression_test.py
-          - quality/visual_subject_anchor_regression_test.py
+          - quality/run_33251901169_visual_supply_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
           - quality/first5_visual_contract_regression_test.py
           - quality/hook_visual_dominance_test.py
     steps:
