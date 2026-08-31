@@ -10,11 +10,17 @@ def _patch_parent_domain():
     patch_parent_domain()
 
 
+def _patch_question_subject_reuse():
+    from ci_run_33371268494_scene2_verified_subject_reuse_hotfix import main as patch_question_subject_reuse
+    patch_question_subject_reuse()
+
+
 def main():
     path = ROOT / "video/still_image_fallback.py"
     text = path.read_text(encoding="utf-8")
     if MARKER in text:
         _patch_parent_domain()
+        _patch_question_subject_reuse()
         return
     if "STILL_VISION_EVIDENCE_GROUPS_V1" not in text:
         raise RuntimeError("Vision evidence trace requires structured evidence groups")
@@ -62,6 +68,7 @@ def main():
     text = text[:function_start] + section + text[function_end:]
     path.write_text(text, encoding="utf-8")
     _patch_parent_domain()
+    _patch_question_subject_reuse()
     print("✅ Vision evidence trace records structured accept/reject decisions")
 
 
