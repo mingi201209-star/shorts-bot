@@ -1,82 +1,102 @@
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parent
 MARKER = "# RUN_33377519851_SCENE1_VIEWPOINT_STRUCTURE_V1"
 
+
 _HOOK_HELPERS = r'''
+
+# RUN_33377519851_SCENE1_VIEWPOINT_STRUCTURE_V1
+# Run 33377519851 HUMAN QA: the trusted canonical still contract already required
+# a rear/rear-quarter nozzle trailing-edge view, but the same-call Vision schema
+# proved only subject groups. Promote that trusted physical requirement into
+# structured evidence without adding another model call.
+_VIEWPOINT_OPENING_ROLES = {"phenomenon", "hook", "opening", "observation"}
+_VIEWPOINT_REAR_TERMS = {"rear", "trailing", "nozzle"}
+_VIEWPOINT_EDGE_TERMS = {"chevron", "serrated", "sawtooth", "edge"}
+_VIEWPOINT_EVIDENCE_KEYS = (
+    "rear_nozzle_or_trailing_edge_identifiable",
+    "chevron_attached_to_rear_nozzle_or_trailing_edge",
+    "front_intake_or_fan_side_dominant",
+    "mobile_structure_identifiable",
+)
+
+
+def _viewpoint_norm(value):
+    return str(value or "").strip().lower().replace("-", " ").replace("_", " ")
 
 
 def _still_viewpoint_structure_requirement(scene):
-    """Return strict rear-view structure proof only for trusted canonical chevrons."""
-    try:
-        from video.still_image_fallback import _canonical_still_contract
-        contract = _canonical_still_contract(scene)
-    except Exception:
-        contract = {}
-    viewpoint = str((contract or {}).get("required_viewpoint") or "").strip().lower()
-    priority = {
-        str(value or "").strip().lower()
-        for value in ((contract or {}).get("subject_proof_priority") or [])
-        if str(value or "").strip()
+    scene = scene if isinstance(scene, dict) else {}
+    roles = {
+        _viewpoint_norm(scene.get("role")),
+        _viewpoint_norm(scene.get("scene_role")),
+        _viewpoint_norm(scene.get("causal_role")),
     }
-    required = bool(
-        viewpoint
-        and ("rear" in viewpoint or "trailing" in viewpoint)
-        and (priority & {"chevron", "serrated", "sawtooth"})
-        and (priority & {"nozzle", "nacelle", "trailing", "edge"})
-    )
+    if not (roles & _VIEWPOINT_OPENING_ROLES):
+        return {}
+
+    profile = scene.get("_canonical_visual_supply")
+    if not isinstance(profile, dict):
+        return {}
+    trusted_terms = {
+        _viewpoint_norm(value)
+        for value in (
+            list(profile.get("canonical_terms") or [])
+            + list(profile.get("visual_discriminators") or [])
+        )
+        if _viewpoint_norm(value)
+    }
+    if not (trusted_terms & _VIEWPOINT_REAR_TERMS):
+        return {}
+    if not (trusted_terms & _VIEWPOINT_EDGE_TERMS):
+        return {}
+
     return {
-        "required": required,
-        "required_viewpoint": viewpoint if required else "",
+        "required": True,
+        "required_viewpoint": "rear or rear-quarter close-up of the trailing edge",
+        "trusted_terms": sorted(trusted_terms),
     }
 
 
 def _still_viewpoint_structure_apply(result, payload, scene):
-    normalized = dict(result or {})
+    result = result if isinstance(result, dict) else {}
+    payload = payload if isinstance(payload, dict) else {}
     requirement = _still_viewpoint_structure_requirement(scene)
+    required = bool(requirement.get("required"))
     raw = payload.get("viewpoint_structure_evidence")
-    if not isinstance(raw, dict):
-        raw = {}
-    evidence = {
-        "rear_nozzle_or_trailing_edge_identifiable": bool(
-            raw.get("rear_nozzle_or_trailing_edge_identifiable", False)
-        ),
-        "chevron_attached_to_rear_nozzle_or_trailing_edge": bool(
-            raw.get("chevron_attached_to_rear_nozzle_or_trailing_edge", False)
-        ),
-        "front_intake_or_fan_side_dominant": bool(
-            raw.get("front_intake_or_fan_side_dominant", False)
-        ),
-        "mobile_structure_identifiable": bool(
-            raw.get("mobile_structure_identifiable", False)
-        ),
-    }
-    normalized["viewpoint_structure_evidence"] = evidence
-    normalized["viewpoint_structure_required"] = bool(requirement.get("required"))
-    normalized["required_viewpoint"] = requirement.get("required_viewpoint", "")
-    if requirement.get("required"):
+    raw = raw if isinstance(raw, dict) else {}
+
+    evidence = {}
+    types_valid = True
+    for key in _VIEWPOINT_EVIDENCE_KEYS:
+        value = raw.get(key, False)
+        if key in raw and not isinstance(value, bool):
+            types_valid = False
+        evidence[key] = value if isinstance(value, bool) else False
+
+    viewpoint_pass = True
+    if required:
         viewpoint_pass = bool(
-            evidence["rear_nozzle_or_trailing_edge_identifiable"]
+            types_valid
+            and evidence["rear_nozzle_or_trailing_edge_identifiable"]
             and evidence["chevron_attached_to_rear_nozzle_or_trailing_edge"]
             and not evidence["front_intake_or_fan_side_dominant"]
             and evidence["mobile_structure_identifiable"]
         )
-        normalized["viewpoint_structure_pass"] = viewpoint_pass
-        if not viewpoint_pass:
-            normalized["subject_visibility"] = min(
-                float(normalized.get("subject_visibility", 0) or 0), 5.0
-            )
-            normalized["visual_state"] = "FALSE"
-            normalized["reason"] = (
-                "trusted canonical rear-view structure proof missing: "
-                f"rear={evidence['rear_nozzle_or_trailing_edge_identifiable']} "
-                f"owned_edge={evidence['chevron_attached_to_rear_nozzle_or_trailing_edge']} "
-                f"front_dominant={evidence['front_intake_or_fan_side_dominant']} "
-                f"mobile={evidence['mobile_structure_identifiable']}"
-            )
-    else:
-        normalized["viewpoint_structure_pass"] = True
-    return normalized
+
+    result["viewpoint_structure_required"] = required
+    result["required_viewpoint"] = str(requirement.get("required_viewpoint") or "")
+    result["viewpoint_structure_evidence"] = dict(evidence)
+    result["viewpoint_structure_schema_valid"] = bool(types_valid)
+    result["viewpoint_structure_pass"] = bool(viewpoint_pass)
+    if required and not types_valid:
+        result["schema_parser_consistency"] = False
+        inconsistencies = list(result.get("evidence_inconsistencies") or [])
+        inconsistencies.append("viewpoint_structure_non_boolean_evidence")
+        result["evidence_inconsistencies"] = inconsistencies
+    return result
 '''
 
 
@@ -110,9 +130,8 @@ def patch_hook_visual_dominance():
     text = _replace_once(text, prompt_anchor, prompt_replacement, "viewpoint prompt contract")
 
     json_anchor = '  "visible_subject_groups": {visible_subject_groups_template},\n'
-    # This block is inserted inside an existing f-string. Literal JSON braces must
-    # therefore be doubled; otherwise Python interprets the object body as an
-    # f-string format specifier and raises ValueError before the Vision call.
+    # This block is inserted inside an existing f-string, so literal JSON braces
+    # must be doubled to survive f-string evaluation as ordinary braces.
     json_replacement = json_anchor + '''  "viewpoint_structure_evidence": {{\n    "rear_nozzle_or_trailing_edge_identifiable": false,\n    "chevron_attached_to_rear_nozzle_or_trailing_edge": false,\n    "front_intake_or_fan_side_dominant": false,\n    "mobile_structure_identifiable": false\n  }},\n'''
     text = _replace_once(text, json_anchor, json_replacement, "viewpoint JSON schema")
 
