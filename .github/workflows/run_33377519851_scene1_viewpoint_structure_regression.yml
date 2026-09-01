@@ -8,6 +8,7 @@ on:
       - "ci_run_33377519851_scene1_viewpoint_structure_hotfix.py"
       - "ci_still_vision_evidence_trace_hotfix.py"
       - "quality/run_33377519851_scene1_viewpoint_structure_regression_test.py"
+      - "quality/run_33506951642_valueerror_probe.py"
       - "quality/run_33299731082_parent_domain_propagation_regression_test.py"
       - "quality/run_33305747810_stale_anchor_source_regression_test.py"
       - ".github/workflows/run_33377519851_scene1_viewpoint_structure_regression.yml"
@@ -82,6 +83,8 @@ jobs:
             ci_run_33377519851_scene1_viewpoint_structure_hotfix.py \
             ci_still_vision_evidence_trace_hotfix.py \
             video/still_image_fallback.py video/hook_visual_dominance.py
+      - name: Run exact Run 33506951642 ValueError counterexample
+        run: python quality/run_33506951642_valueerror_probe.py
       - name: Run exact Run 33377519851 counterexample
         run: python quality/run_33377519851_scene1_viewpoint_structure_regression_test.py
       - name: Re-run #268 verified subject reuse on final composition
