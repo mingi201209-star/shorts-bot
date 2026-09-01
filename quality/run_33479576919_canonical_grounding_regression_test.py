@@ -6,6 +6,10 @@ import sys
 from pathlib import Path
 
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 CANONICAL = "jet engine nacelle/nozzle chevrons"
 
 
@@ -39,9 +43,6 @@ def main() -> None:
     _compose_production_path()
     importlib.invalidate_caches()
 
-    # Run 33479576919 exact fixed-topic counterexample: the fixed topic is
-    # already the repo-owned canonical identity. It must retain the record's
-    # authoritative provenance without another model/retry call.
     exact = _supply({
         "topic": CANONICAL,
         "core_question": "Why are they shaped that way?",
@@ -49,15 +50,12 @@ def main() -> None:
     assert _grounded(exact)
     assert exact["canonical_subject"] != "UNKNOWN"
 
-    # Existing successful Korean physical observation remains grounded.
     korean = _supply({
         "topic": "비행기 엔진 뒤쪽은 왜 톱니처럼 생겼을까",
         "core_question": "비행기 엔진 뒤쪽의 톱니 모양은 왜 그렇게 설계되었을까요?",
     })
     assert _grounded(korean)
 
-    # False-positive guards: exact canonical authority is narrow. Generic or
-    # cross-domain engine text must not manufacture the chevron identity.
     for topic in (
         "engine",
         "Unreal Engine",
@@ -69,7 +67,6 @@ def main() -> None:
     ):
         assert not _grounded(_supply({"topic": topic}))
 
-    # Candidate-authored/free-text trust claims are not authoritative.
     fake = _supply({
         "topic": "engine",
         "canonical_subject": CANONICAL,
@@ -79,7 +76,6 @@ def main() -> None:
     })
     assert not fake.get("_trusted_grounding_evidence")
 
-    # Non-physical topics stay non-physical and are never promoted.
     nonphysical = _supply({
         "topic": "왜 소음 감소가 중요한가",
         "subject_kind": "non_physical_concept",
@@ -87,7 +83,6 @@ def main() -> None:
     assert nonphysical.get("subject_kind") == "non_physical_concept"
     assert not nonphysical.get("_trusted_grounding_evidence")
 
-    # Candidate Gate success alone is not grounding evidence.
     gate_only = _supply({"topic": "engine", "candidate_gate_status": "PASS"})
     assert not _grounded(gate_only)
 
