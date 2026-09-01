@@ -78,9 +78,11 @@ def main():
         original_generate = still._generate_image
         original_verify = still._verify_motion_clip
         calls = {"motion": 0, "generate": 0, "vision": 0}
+        presentations = []
 
-        def fake_motion(image_path, output_path, duration):
+        def fake_motion(image_path, output_path, duration, presentation=None):
             calls["motion"] += 1
+            presentations.append(dict(presentation or {}))
             Path(output_path).write_bytes(Path(image_path).read_bytes())
 
         def forbidden_generate(*args, **kwargs):
@@ -113,6 +115,9 @@ def main():
         assert still.verified_source_use_count(source_id) == 2
         assert result["source_id"] == source_id
         assert result["source_asset_id"] == source_id
+        if hasattr(still, "_verified_question_presentation"):
+            assert presentations and presentations[0]["presentation_id"] == "QUESTION_FEATURE_INSPECTION_CENTER_V1"
+            assert result["presentation_id"] == "QUESTION_FEATURE_INSPECTION_CENTER_V1"
         print("CASE A exact verified question-subject reuse: PASS")
 
         # CASE B — aircraft+engine 2/3 is never cacheable/reusable.
@@ -184,7 +189,7 @@ def main():
         assert cached_record["source_id"] == source_id
         assert cached_record["source_asset_id"] == source_id
         original_motion = still._motion_clip
-        still._motion_clip = lambda image_path, output_path, duration: Path(output_path).write_bytes(b"reuse")
+        still._motion_clip = lambda image_path, output_path, duration, presentation=None: Path(output_path).write_bytes(b"reuse")
         try:
             reused = still._reuse_verified_question_subject(
                 scene(role="question", keyword=SCENE2_KEYWORD), output_path=Path(tmp) / "same.mp4", duration=5.0, trigger_reason="test"

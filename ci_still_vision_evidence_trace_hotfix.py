@@ -15,6 +15,11 @@ def _patch_question_subject_reuse():
     patch_question_subject_reuse()
 
 
+def _patch_early_verified_asset_presentation():
+    from ci_early_verified_asset_presentation_hotfix import main as patch_early_presentation
+    patch_early_presentation()
+
+
 def _patch_viewpoint_structure_proof():
     from ci_run_33377519851_scene1_viewpoint_structure_hotfix import main as patch_viewpoint_structure
     patch_viewpoint_structure()
@@ -26,6 +31,7 @@ def main():
     if MARKER in text:
         _patch_parent_domain()
         _patch_question_subject_reuse()
+        _patch_early_verified_asset_presentation()
         _patch_viewpoint_structure_proof()
         return
     if "STILL_VISION_EVIDENCE_GROUPS_V1" not in text:
@@ -75,6 +81,7 @@ def main():
     path.write_text(text, encoding="utf-8")
     _patch_parent_domain()
     _patch_question_subject_reuse()
+    _patch_early_verified_asset_presentation()
     _patch_viewpoint_structure_proof()
     print("✅ Vision evidence trace records structured accept/reject decisions")
 
