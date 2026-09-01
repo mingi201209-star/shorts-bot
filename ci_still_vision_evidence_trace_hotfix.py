@@ -20,6 +20,11 @@ def _patch_viewpoint_structure_proof():
     patch_viewpoint_structure()
 
 
+def _patch_still_generation_response():
+    from ci_run_33506951642_still_generation_response_hotfix import main as patch_still_generation_response
+    patch_still_generation_response()
+
+
 def main():
     path = ROOT / "video/still_image_fallback.py"
     text = path.read_text(encoding="utf-8")
@@ -27,6 +32,7 @@ def main():
         _patch_parent_domain()
         _patch_question_subject_reuse()
         _patch_viewpoint_structure_proof()
+        _patch_still_generation_response()
         return
     if "STILL_VISION_EVIDENCE_GROUPS_V1" not in text:
         raise RuntimeError("Vision evidence trace requires structured evidence groups")
@@ -40,7 +46,10 @@ def main():
     section = text[function_start:function_end]
 
     eval_anchor = '''    result = evaluate_hook_subject_dominance(candidate, scene)\n    # STILL_VISION_EVIDENCE_GROUPS_V1\n'''
-    eval_replacement = '''    result = evaluate_hook_subject_dominance(candidate, scene)\n\n    # STILL_VISION_EVIDENCE_TRACE_V1\n    def _vision_evidence_trace(decision, missing=None):\n        required = list(result.get("required_subject_groups") or [])\n        visible_groups = result.get("visible_subject_groups") or {}\n        visible_components = list(result.get("visible_components") or [])\n        parent_domain = list(result.get("parent_domain_satisfied") or [])\n        missing = list(missing or [])\n        print(\n            "[VISION_EVIDENCE_TRACE] "\n            f"pass={bool(result.get('pass', False))} "\n            f"required_subject_groups={'+'.join(required) or 'none'} "\n            f"visible_subject_groups={visible_groups} "\n            f"visible_components={'+'.join(str(value) for value in visible_components) or 'none'} "\n            f"parent_domain_satisfied={'+'.join(parent_domain) or 'none'} "\n            f"missing={'+'.join(missing) or 'none'} "\n            f"schema_parser_consistency={bool(result.get('schema_parser_consistency', True))} "\n            f"result={decision} "\n            f"reason={str(result.get('reason') or '')[:240]}"\n        )\n\n    # STILL_VISION_EVIDENCE_GROUPS_V1\n'''
+    eval_replacement = '''    result = evaluate_hook_subject_dominance(candidate, scene)\n\n    # STILL_VISION_EVIDENCE_TRACE_V1\n    def _vision_evidence_trace(decision, missing=None):\n        required = list(result.get("required_subject_groups") or [])\n        visible_groups = result.get("visible_subject_groups") or {}\n        visible_components = list(result.get("visible_components") or [])\n        parent_domain = list(result.get("parent_domain_satisfied") or [])\n        missing = list(missing or [])\n        print(\n            "[VISION_EVIDENCE_TRACE] "\n            f"pass={bool(result.get('pass', False))} "\n            f"required_subject_groups={'+'.join(required) or 'none'} "\n            f"visible_subject_groups={visible_groups} "\n            f"visible_components={'+'.join(str(value) for value in visible_components) or 'none'} "\n            f"parent_domain_satisfied={'+'.join(parent_domain) or []) or 'none'} "\n            f"missing={'+'.join(missing) or 'none'} "\n            f"schema_parser_consistency={bool(result.get('schema_parser_consistency', True))} "\n            f"result={decision} "\n            f"reason={str(result.get('reason') or '')[:240]}"\n        )\n\n    # STILL_VISION_EVIDENCE_GROUPS_V1\n'''
+    # Keep the production source byte-for-byte equivalent to the previous
+    # installer except for the new response-handoff wiring below.
+    eval_replacement = eval_replacement.replace("{'+'.join(parent_domain) or []) or 'none'}", "{'+'.join(parent_domain) or 'none'}")
     if section.count(eval_anchor) != 1:
         raise RuntimeError("Vision evidence trace eval anchor mismatch")
     section = section.replace(eval_anchor, eval_replacement, 1)
@@ -76,6 +85,7 @@ def main():
     _patch_parent_domain()
     _patch_question_subject_reuse()
     _patch_viewpoint_structure_proof()
+    _patch_still_generation_response()
     print("✅ Vision evidence trace records structured accept/reject decisions")
 
 
