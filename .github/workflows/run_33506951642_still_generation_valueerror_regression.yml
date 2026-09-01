@@ -1,0 +1,29 @@
+name: Run 33506951642 Still Generation ValueError Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_run_33506951642_still_generation_response_hotfix.py'
+      - 'ci_still_vision_evidence_trace_hotfix.py'
+      - 'quality/run_33506951642_still_generation_valueerror_regression_test.py'
+      - '.github/workflows/run_33506951642_still_generation_valueerror_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  exact-counterexample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install regression dependencies
+        run: pip install -r requirements.txt
+      - name: Reproduce and fix Run 33506951642 response handoff
+        run: python quality/run_33506951642_still_generation_valueerror_regression_test.py
+      - name: Compile focused files
+        run: |
+          python -m py_compile \
+            ci_run_33506951642_still_generation_response_hotfix.py \
+            ci_still_vision_evidence_trace_hotfix.py \
+            quality/run_33506951642_still_generation_valueerror_regression_test.py
