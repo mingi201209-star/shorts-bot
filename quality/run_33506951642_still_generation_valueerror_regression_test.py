@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import importlib
 import os
 import sys
@@ -19,7 +20,8 @@ SCENE = {
     "causal_role": "phenomenon",
     "_canonical_visual_supply": {
         "canonical_subject": "jet engine nacelle/nozzle chevrons",
-        "canonical_terms": ["jet", "engine", "nacelle", "nozzle", "chevrons"],
+        # Production trace priority was nozzle+nacelle+chevron+serrated+jet+engine.
+        "canonical_terms": ["jet", "engine"],
         "visual_discriminators": ["nacelle", "nozzle", "chevron", "serrated"],
     },
 }
@@ -46,12 +48,24 @@ def _reload_still_module():
     return importlib.import_module("video.still_image_fallback")
 
 
+def test_production_scene_fixture():
+    still = _reload_still_module()
+    prompt = still._prompt(SCENE)
+    contract = still._canonical_still_contract(SCENE)
+    assert contract["canonical_subject"] == "jet engine nacelle/nozzle chevrons"
+    assert contract["required_viewpoint"] == "rear or rear-quarter close-up of the trailing edge"
+    assert contract["subject_proof_priority"] == [
+        "nozzle", "nacelle", "chevron", "serrated", "jet", "engine"
+    ]
+    # Run 33506951642 diagnostics recorded this exact production-composed prompt signature.
+    assert hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16] == "7ad26d89be578cff"
+
+
 def test_before_fix_exact_valueerror_shape():
-    # Run 33506951642 preserved only type(exc).__name__ == ValueError. The
-    # production source has exactly one viable ValueError boundary after the
-    # generation_requested trace and before any Vision-call authorization for
-    # the observed float duration: Python's str -> base64 handoff when the
-    # response contains non-ASCII image payload text.
+    # Production preserved only type(exc).__name__ == ValueError. The exact
+    # message was lost by the old broad catch. At the narrowed response handoff,
+    # Python's legacy str -> base64 path produces the preserved class for
+    # non-ASCII image payload text.
     try:
         base64.b64decode("é")
     except ValueError as exc:
@@ -117,6 +131,8 @@ def test_after_fix_valid_base64_is_unchanged():
 
 
 def test_production_composition_wires_fix_after_visual_contracts():
+    still_source = (ROOT / "video/still_image_fallback.py").read_text(encoding="utf-8")
+    assert "RUN_33506951642_STILL_GENERATION_RESPONSE_V1" in still_source
     trace_source = (ROOT / "ci_still_vision_evidence_trace_hotfix.py").read_text(encoding="utf-8")
     assert "_patch_still_generation_response()" in trace_source
     final_qa = (ROOT / "ci_final_visual_semantic_qa_hotfix.py").read_text(encoding="utf-8")
@@ -141,6 +157,7 @@ def test_quality_and_budget_contracts_unchanged():
 
 if __name__ == "__main__":
     tests = [
+        test_production_scene_fixture,
         test_before_fix_exact_valueerror_shape,
         test_after_fix_fail_closed_with_diagnostic_message,
         test_after_fix_uses_existing_url_without_new_generation_call,
