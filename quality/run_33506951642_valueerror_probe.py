@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import hashlib
-import traceback
-from pathlib import Path
-
+from video import hook_visual_dominance as dominance
 from video import still_image_fallback as still
 
 
@@ -19,38 +16,50 @@ SCENE = {
         "visual_discriminators": ["nacelle", "nozzle", "chevron", "serrated"],
     },
 }
-DURATION = 6.86
+
+
+class PromptBuilt(Exception):
+    pass
 
 
 def main() -> None:
-    print("RUN_33506951642_PROBE_INPUT", repr(SCENE))
-    print("RUN_33506951642_PROBE_DURATION", repr(DURATION), type(DURATION).__name__)
-    print("RUN_33506951642_PROMPT", still._prompt(SCENE))
-    print("RUN_33506951642_CONTRACT", still._canonical_still_contract(SCENE))
+    contract = still._canonical_still_contract(SCENE)
+    assert contract["required_viewpoint"] == "rear or rear-quarter close-up of the trailing edge"
 
+    original_extract = dominance._extract_vertical_frames
+    original_authorize = dominance.authorize_api_call
     try:
-        image_bytes, prompt = still._generate_image(SCENE)
-        print("PROBE_STAGE generation PASS", type(image_bytes).__name__, len(image_bytes))
-        digest = hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:16]
-        temp_dir = Path("workspace/temp")
-        temp_dir.mkdir(parents=True, exist_ok=True)
-        image_path = temp_dir / f"run33506951642_probe_{digest}.png"
-        image_path.write_bytes(image_bytes)
-        print("PROBE_STAGE image_write PASS", image_path, image_path.stat().st_size)
+        # The Run 33506951642 crash happened while evaluating the Vision prompt,
+        # before API authorization. A synthetic frame path is enough to exercise
+        # that exact f-string construction without any network/API call.
+        dominance._extract_vertical_frames = lambda _url: ["synthetic-frame.jpg"]
 
-        output_path = temp_dir / "run33506951642_probe.mp4"
-        still._motion_clip(image_path, output_path, DURATION)
-        print("PROBE_STAGE motion_clip PASS", output_path, output_path.stat().st_size)
+        def stop_after_prompt(*_args, **_kwargs):
+            raise PromptBuilt("prompt constructed without ValueError")
 
-        verified, evidence = still._verify_motion_clip(SCENE, output_path)
-        print("PROBE_STAGE validator PASS", verified, repr(evidence))
-    except Exception as exc:
-        print("PROBE_EXCEPTION_TYPE", type(exc).__name__)
-        print("PROBE_EXCEPTION_MESSAGE", str(exc))
-        print("PROBE_TRACEBACK_BEGIN")
-        traceback.print_exc()
-        print("PROBE_TRACEBACK_END")
-        raise
+        dominance.authorize_api_call = stop_after_prompt
+        candidate = {
+            "id": "run33506951642-regression",
+            "source_id": "run33506951642-regression",
+            "provider": "openai_image",
+            "source_type": "ai_generated_still_motion",
+            "url": "synthetic-run33506951642.mp4",
+            "duration": 6.86,
+            "width": 1080,
+            "height": 1920,
+            "search_position": 0,
+        }
+        try:
+            dominance.evaluate_hook_subject_dominance(candidate, SCENE)
+        except PromptBuilt:
+            pass
+        else:
+            raise AssertionError("expected prompt construction sentinel")
+    finally:
+        dominance._extract_vertical_frames = original_extract
+        dominance.authorize_api_call = original_authorize
+
+    print("RUN_33506951642_VALUEERROR_REGRESSION_PASS")
 
 
 if __name__ == "__main__":
