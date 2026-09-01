@@ -3,6 +3,8 @@ from pathlib import Path
 
 MARKER = "# CANONICAL_SUBJECT_GROUNDING_SUPPLY_V1"
 EXPLORER_PATH = Path("content/candidate_explorer.py")
+SUPPLY_PATH = Path("quality/canonical_subject_grounding_supply.py")
+EXACT_CANONICAL_MARKER = "# RUN_33479576919_EXACT_CANONICAL_IDENTITY"
 
 
 PATCH = r'''
@@ -45,7 +47,19 @@ def validate_explorer_output(data):
 '''
 
 
+def _install_exact_canonical_identity_match():
+    text = SUPPLY_PATH.read_text(encoding="utf-8")
+    if EXACT_CANONICAL_MARKER in text:
+        return
+    old = '''    feature_match = any(\n        _overlap_ratio(candidate_text, _text(description)) >= 0.60\n        for description in feature_descriptions\n        if _text(description)\n    )\n'''
+    new = '''    # RUN_33479576919_EXACT_CANONICAL_IDENTITY\n    # A fixed topic may already be the repo-owned canonical physical identity.\n    # Exact canonical identity is stronger than surface-description overlap and\n    # still inherits only this record's authoritative provenance.\n    canonical = _normalize(record.get("canonical_subject"))\n    if canonical and canonical in candidate_text:\n        return True\n\n    feature_match = any(\n        _overlap_ratio(candidate_text, _text(description)) >= 0.60\n        for description in feature_descriptions\n        if _text(description)\n    )\n'''
+    if old not in text:
+        raise RuntimeError("canonical grounding supply match boundary changed")
+    SUPPLY_PATH.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+
 def main():
+    _install_exact_canonical_identity_match()
     text = EXPLORER_PATH.read_text(encoding="utf-8")
     if MARKER in text:
         print("✅ Canonical Subject Grounding Supply already applied")
