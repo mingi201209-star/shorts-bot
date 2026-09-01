@@ -19,6 +19,24 @@ jobs:
           python-version: '3.11'
       - name: Install regression dependencies
         run: pip install -r requirements.txt
+      - name: Compose exact production hotfix chain without running production
+        run: |
+          python - <<'PY'
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          text = Path('.github/workflows/main.yml').read_text(encoding='utf-8')
+          block = text.split('      - name: Apply production hotfixes\n', 1)[1]
+          block = block.split('          grep -n ', 1)[0]
+          scripts = re.findall(r'^          python (ci_[^\s]+\.py)\s*$', block, re.MULTILINE)
+          if not scripts:
+              raise SystemExit('production hotfix chain not found')
+          for script in scripts:
+              print(f'[PRODUCTION_COMPOSE] {script}', flush=True)
+              subprocess.run([sys.executable, script], check=True)
+          PY
       - name: Reproduce and fix Run 33506951642 response handoff
         run: python quality/run_33506951642_still_generation_valueerror_regression_test.py
       - name: Compile focused files
