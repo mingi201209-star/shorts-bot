@@ -27,7 +27,7 @@ def main() -> None:
     assert contract["required_viewpoint"] == "rear or rear-quarter close-up of the trailing edge"
 
     original_extract = dominance._extract_vertical_frames
-    original_authorize = dominance.authorize_api_call
+    original_authorize = dominance.authorize_call
     try:
         # The Run 33506951642 crash happened while evaluating the Vision prompt,
         # before API authorization. A synthetic frame path is enough to exercise
@@ -37,7 +37,7 @@ def main() -> None:
         def stop_after_prompt(*_args, **_kwargs):
             raise PromptBuilt("prompt constructed without ValueError")
 
-        dominance.authorize_api_call = stop_after_prompt
+        dominance.authorize_call = stop_after_prompt
         candidate = {
             "id": "run33506951642-regression",
             "source_id": "run33506951642-regression",
@@ -57,7 +57,7 @@ def main() -> None:
             raise AssertionError("expected prompt construction sentinel")
     finally:
         dominance._extract_vertical_frames = original_extract
-        dominance.authorize_api_call = original_authorize
+        dominance.authorize_call = original_authorize
 
     print("RUN_33506951642_VALUEERROR_REGRESSION_PASS")
 
