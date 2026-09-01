@@ -130,7 +130,9 @@ def patch_hook_visual_dominance():
     text = _replace_once(text, prompt_anchor, prompt_replacement, "viewpoint prompt contract")
 
     json_anchor = '  "visible_subject_groups": {visible_subject_groups_template},\n'
-    json_replacement = json_anchor + '''  "viewpoint_structure_evidence": {\n    "rear_nozzle_or_trailing_edge_identifiable": false,\n    "chevron_attached_to_rear_nozzle_or_trailing_edge": false,\n    "front_intake_or_fan_side_dominant": false,\n    "mobile_structure_identifiable": false\n  },\n'''
+    # This block is inserted inside an existing f-string, so literal JSON braces
+    # must be doubled to survive f-string evaluation as ordinary braces.
+    json_replacement = json_anchor + '''  "viewpoint_structure_evidence": {{\n    "rear_nozzle_or_trailing_edge_identifiable": false,\n    "chevron_attached_to_rear_nozzle_or_trailing_edge": false,\n    "front_intake_or_fan_side_dominant": false,\n    "mobile_structure_identifiable": false\n  }},\n'''
     text = _replace_once(text, json_anchor, json_replacement, "viewpoint JSON schema")
 
     result_anchor = '''    result = _still_vision_apply_structured_evidence(\n        result, payload, required_subject_groups\n    )\n    result["frame_times"] = list(HOOK_EARLY_FRAME_TIMES)\n'''
