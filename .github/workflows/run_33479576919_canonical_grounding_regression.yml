@@ -1,0 +1,20 @@
+name: Run 33479576919 Canonical Grounding Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_canonical_subject_grounding_supply_hotfix.py'
+      - 'quality/run_33479576919_canonical_grounding_regression_test.py'
+      - '.github/workflows/run_33479576919_canonical_grounding_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  exact-counterexample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run exact production-composition counterexample
+        run: python quality/run_33479576919_canonical_grounding_regression_test.py
