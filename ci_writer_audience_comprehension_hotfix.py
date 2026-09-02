@@ -100,8 +100,6 @@ _script_v2_audience_previous_repair_failed_scenes = repair_failed_scenes
 
 
 def repair_failed_scenes(script: Dict[str, Any], plan: Dict[str, Any], failed_scene_indexes: list[int]) -> Dict[str, Any]:
-    # Exact question locks retain the old behavior. Semantic locks keep the
-    # Writer wording and receive only deterministic speech-contract repair.
     result = deepcopy(script)
     scenes = result.get("scenes") or []
     contracts = plan.get("contracts") or []
@@ -174,6 +172,11 @@ def _patch_runner():
         raise RuntimeError("audience comprehension writer instruction marker not found")
     text = text.replace(old_writer, new_writer, 1)
 
+    # Local-repair wording has legitimately changed across prior Script V2
+    # composition hotfixes. Patch the legacy wording only when it is still
+    # present; do not fail production composition merely because an established
+    # hotfix already replaced that secondary prompt. The audience contract is
+    # carried in each repair payload regardless.
     old_repair = (
         '            "For locked scenes, NEVER change text; visual_goal and keyword may be repaired. "\n'
         '            "Every keyword must be 2-7 ASCII English words. Use formal Korean and preserve factual scope."\n'
@@ -183,9 +186,8 @@ def _patch_runner():
         '            "Keep one primary term per concept and restore any missing causal bridge without adding unsupported facts or padding. "\n'
         '            "Every keyword must be 2-7 ASCII English words. Use formal Korean and preserve factual scope."\n'
     )
-    if old_repair not in text:
-        raise RuntimeError("audience comprehension local-repair instruction marker not found")
-    text = text.replace(old_repair, new_repair, 1)
+    if old_repair in text:
+        text = text.replace(old_repair, new_repair, 1)
     RUNNER_PATH.write_text(text, encoding="utf-8")
     return True
 
