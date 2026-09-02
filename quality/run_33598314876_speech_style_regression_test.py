@@ -84,12 +84,15 @@ def main() -> None:
     for token in ("제트 엔진", "노즐", "치프론"):
         assert token in normalized
 
-    # Production composition invariants: #264 still routes Script V2 repair
-    # through this shared deterministic corpus, with no call/retry expansion.
+    # Production composition invariants: #264 still installs the shared
+    # deterministic corpus for locked/unlocked Script V2 paths, with no
+    # call/retry expansion.
     hotfix_source = Path("ci_script_v2_gunggeum_formal_ending_hotfix.py").read_text(encoding="utf-8")
     engine_source = Path("content/script_engine_v2.py").read_text(encoding="utf-8")
     assert "from content.script_formal_endings import formalize_script_text" in hotfix_source
-    assert "formalize_script_text(repaired)" in hotfix_source
+    assert "return formalize_script_text(text)" in hotfix_source
+    assert "from content.script_formal_endings import formalize_declarative_text" in hotfix_source
+    assert "return formalize_declarative_text(value)" in hotfix_source
     assert "MAX_SCRIPT_API_CALLS = 3" in engine_source
     assert "MAX_LOCAL_REPAIR_CALLS = 2" in engine_source
 
