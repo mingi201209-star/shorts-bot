@@ -1,0 +1,38 @@
+name: Run 33618913580 Writer Audience Comprehension Regression
+
+on:
+  pull_request:
+    paths:
+      - "ci_writer_audience_comprehension_hotfix.py"
+      - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
+      - "quality/run_33618913580_writer_audience_comprehension_regression_test.py"
+      - ".github/workflows/run_33618913580_writer_audience_comprehension_regression.yml"
+      - "content/script_engine_v2.py"
+      - "content/script_engine_v2_runner.py"
+  workflow_dispatch:
+
+jobs:
+  exact-counterexample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile focused patch
+        run: |
+          python -m py_compile ci_writer_audience_comprehension_hotfix.py ci_script_v2_gunggeum_formal_ending_hotfix.py quality/run_33618913580_writer_audience_comprehension_regression_test.py
+      - name: Run Run 33618913580 audience counterexample
+        run: python -m quality.run_33618913580_writer_audience_comprehension_regression_test
+      - name: Preserve speech-style contracts
+        run: |
+          python -m quality.script_v2_gunggeum_formal_ending_regression_test
+          python -m quality.script_v2_general_formal_ending_regression_test
+          python -m quality.run_33598314876_speech_style_regression_test
+      - name: Cost and retry invariants
+        run: |
+          grep -n "MAX_SCRIPT_API_CALLS = 3" content/script_engine_v2.py
+          grep -n "MAX_LOCAL_REPAIR_CALLS = 2" content/script_engine_v2.py
+          ! grep -q "authorize_call(" ci_writer_audience_comprehension_hotfix.py
+          ! grep -q "openai\." ci_writer_audience_comprehension_hotfix.py
+          ! grep -q "TTS_RATE\|AI_MAX_GENERATIONS\|V3_MAX_COST_USD" ci_writer_audience_comprehension_hotfix.py
