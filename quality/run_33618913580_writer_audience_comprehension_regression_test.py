@@ -16,9 +16,9 @@ OLD_SCRIPT = [
 GOOD_SCRIPT = [
     "비행기 엔진 뒤를 보면 톱니처럼 뾰족한 부분이 있습니다. 이 부분을 치프론이라고 합니다.",
     "그런데 왜 제트 엔진의 노즐에 치프론이 추가되었을까요?",
-    "엔진 뒤의 뜨거운 배기와 바깥의 더 차가운 공기는 속도와 상태가 달라, 맞닿는 경계에서 흐름 변화가 크게 생길 수 있습니다.",
-    "치프론은 그 경계를 여러 지점에서 맞물리게 해 두 흐름이 더 점진적으로 섞이도록 돕습니다.",
-    "이렇게 배기와 주변 공기의 급격한 차이를 완화하는 방향으로 섞이면서, 대표적인 결과로 제트 엔진 소음이 줄어듭니다.",
+    "엔진 뒤에서는 뜨거운 배기 흐름과 더 차가운 바깥쪽 흐름이 만납니다. 이 경계가 중요한 이유는 바로 이곳의 혼합이 치프론이 바꾸는 대상이기 때문입니다.",
+    "치프론은 그 경계에서 배기 흐름과 주변 흐름이 섞이는 방식을 바꿉니다. 즉 앞 장면의 두 흐름이 만나는 구간에 장치가 작용합니다.",
+    "그리고 이 혼합 방식의 변화는 제트 엔진 소음 감소라는 결과로 이어집니다. 그래서 앞의 흐름 변화와 마지막 소음 감소가 하나의 인과 흐름으로 연결됩니다.",
 ]
 
 
@@ -36,7 +36,7 @@ def _candidate():
         "fact_check_focus": [
             "hot exhaust and cooler ambient flow meet behind the engine",
             "chevrons alter exhaust and ambient-flow mixing",
-            "the design can reduce jet-engine noise",
+            "the mixing change is linked to jet-engine noise reduction",
         ],
         "visual_proof": ["rear nozzle", "serrated chevron edge", "flow interface"],
     }
@@ -49,10 +49,8 @@ def _scene(text, goal, keyword):
 def main():
     # Production composition entry point. No API calls are made.
     runpy.run_path("ci_script_v2_gunggeum_formal_ending_hotfix.py", run_name="__main__")
-    for name in ("content.script_engine_v2", "content.script_engine_v2_runner"):
-        sys.modules.pop(name, None)
+    sys.modules.pop("content.script_engine_v2", None)
     engine = importlib.import_module("content.script_engine_v2")
-    runner = importlib.import_module("content.script_engine_v2_runner")
 
     # Keep this regression independent of Retention Story V2 policy. We test
     # only the Writer boundary that consumes an already-decided five-scene plan.
@@ -106,11 +104,11 @@ def main():
     assert all("셰브론" not in scene["text"] for scene in applied["scenes"])
     assert sum("치프론" in scene["text"] for scene in applied["scenes"]) >= 3
 
-    # CLAIM != EXPLANATION: the good fixture contains explicit relationships,
-    # not three one-clause labels copied from the failed production.
-    assert "경계" in applied["scenes"][2]["text"] and "흐름" in applied["scenes"][2]["text"]
-    assert "점진적으로" in applied["scenes"][3]["text"] and "섞" in applied["scenes"][3]["text"]
-    assert "급격한 차이" in applied["scenes"][4]["text"] and "소음" in applied["scenes"][4]["text"]
+    # CLAIM != EXPLANATION: the good fixture adds only bridges already supported
+    # by the three supplied facts; it does not invent a finer-grained mechanism.
+    assert "경계가 중요한 이유" in applied["scenes"][2]["text"]
+    assert "앞 장면" in applied["scenes"][3]["text"] and "섞이는 방식" in applied["scenes"][3]["text"]
+    assert "인과 흐름" in applied["scenes"][4]["text"] and "소음 감소" in applied["scenes"][4]["text"]
     assert OLD_SCRIPT[2] != applied["scenes"][2]["text"]
     assert OLD_SCRIPT[3] != applied["scenes"][3]["text"]
     assert OLD_SCRIPT[4] != applied["scenes"][4]["text"]
@@ -132,9 +130,7 @@ def main():
     # Duration gaming / cost / retry guards. This fix changes Writer guidance,
     # not timing, scene holds, TTS rate, call count, or cost ceilings.
     hotfix = Path("ci_writer_audience_comprehension_hotfix.py").read_text(encoding="utf-8")
-    assert "40" not in payload["audience_comprehension"]
-    assert "45" not in payload["audience_comprehension"]
-    assert "50" not in payload["audience_comprehension"]
+    assert plan["audience_comprehension"]["fixed_duration_target"] is False
     assert engine.MAX_SCRIPT_API_CALLS == 3
     assert engine.MAX_LOCAL_REPAIR_CALLS == 2
     for forbidden in (
@@ -144,7 +140,7 @@ def main():
         assert forbidden not in hotfix
 
     # FACT-safety guidance forbids inventing detail and does not hardcode the
-    # tempting unsupported claims from the human QA notes.
+    # tempting unsupported mechanisms from the Human QA discussion.
     for unsafe in ("큰 소용돌이를 작은", "저주파", "고주파", "fuel efficiency", "thrust improvement"):
         assert unsafe not in hotfix
 
