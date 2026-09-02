@@ -51,6 +51,27 @@ _DECLARATIVE_ENDING_REPAIRS = (
     (r"사실(?=[.!…]*$)", "사실입니다"),
 )
 
+# Narrow narration-only conversion for terminal visual-attention requests.
+# These forms are not made acceptable to the validator; they are rewritten
+# before validation into an explanatory observation without inventing a
+# mechanism/performance claim. Quoted dialogue remains protected below.
+_NARRATION_ATTENTION_REPAIRS = (
+    (
+        re.compile(
+            r"^(?P<object>.+?(?:을|를))\s*(?:한번\s*)?"
+            r"(?:주목해\s*보세요|봐\s*보세요|봐\s*주세요|보세요)(?=[.!…]*$)"
+        ),
+        r"\g<object> 확인할 수 있습니다",
+    ),
+    (
+        re.compile(
+            r"^(?P<object>.+?(?:을|를))\s*"
+            r"(?:주목|확인|관찰)\s*해\s*주세요(?=[.!…]*$)"
+        ),
+        r"\g<object> 확인할 수 있습니다",
+    ),
+)
+
 # Existing production question contract. This is deliberately separate from
 # declarative generalization so V1 does not invent a new question grammar path.
 _QUESTION_ENDING_REPAIRS = (
@@ -79,6 +100,16 @@ def formalize_existing_question_ending(text: Any) -> str:
     return value
 
 
+def _formalize_narration_attention_request(value: str) -> str:
+    """Convert a narrow terminal visual-attention request into narration."""
+    for pattern, replacement in _NARRATION_ATTENTION_REPAIRS:
+        converted, count = pattern.subn(replacement, value)
+        if count:
+            punctuation = "." if value.endswith(".") else ""
+            return converted.rstrip(".!…") + punctuation
+    return value
+
+
 def formalize_declarative_sentence(text: Any) -> str:
     """Normalize one terminal declarative sentence, preserving risky text verbatim."""
     stripped = str(text or "").strip()
@@ -90,6 +121,11 @@ def formalize_declarative_sentence(text: Any) -> str:
         return stripped
     if stripped.endswith(("]", "}", ">")):
         return stripped
+
+    attention_formalized = _formalize_narration_attention_request(stripped)
+    if attention_formalized != stripped:
+        return attention_formalized
+
     for pattern, replacement in _DECLARATIVE_ENDING_REPAIRS:
         converted, count = re.subn(pattern, replacement, stripped)
         if count:
