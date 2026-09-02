@@ -3,9 +3,11 @@ name: Script V2 Formal Ending Regression
 on:
   pull_request:
     paths:
+      - "content/script_formal_endings.py"
       - "ci_script_v2_gunggeum_formal_ending_hotfix.py"
       - "quality/script_v2_gunggeum_formal_ending_regression_test.py"
       - "quality/script_v2_general_formal_ending_regression_test.py"
+      - "quality/run_33598314876_speech_style_regression_test.py"
       - ".github/workflows/script-v2-gunggeum-formal-ending-regression.yml"
       - ".github/workflows/main.yml"
   workflow_dispatch:
@@ -22,5 +24,6 @@ jobs:
           python-version: "3.11"
       - name: Run focused regression
         run: |
+          python quality/run_33598314876_speech_style_regression_test.py
           python quality/script_v2_gunggeum_formal_ending_regression_test.py
           python quality/script_v2_general_formal_ending_regression_test.py
