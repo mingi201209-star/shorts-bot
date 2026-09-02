@@ -203,3 +203,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+    from ci_writer_audience_comprehension_hotfix import main as _patch_writer_audience_comprehension
+    _patch_writer_audience_comprehension()
