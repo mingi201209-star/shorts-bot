@@ -92,7 +92,7 @@ def main():
     }
     applied = engine.apply_locked_scenes(generated, plan)
     assert applied["scenes"][0]["text"] == GOOD_SCRIPT[0]
-    assert applied["scenes"][1]["text"] == "그런데 왜 제트 엔진의 노즐에 치프론이 추가되었을까요?"
+    assert applied["scenes"][1]["text"] == contracts[1]["locked_text"]
     assert applied["scenes"][3]["text"] == GOOD_SCRIPT[3]
     assert applied["scenes"][4]["text"] == GOOD_SCRIPT[4]
 
