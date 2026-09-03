@@ -184,10 +184,13 @@ jobs:
           python ci_aviation_context_signature_compat_hotfix.py
           grep -q "QUESTION_SUBJECT_REUSE_RUN_33371268494_V1" video/still_image_fallback.py
           grep -q "RUN_33377519851_SCENE1_VIEWPOINT_STRUCTURE_V1" video/hook_visual_dominance.py
+          grep -q "EARLY_VERIFIED_ASSET_PRESENTATION_V1" video/still_image_fallback.py
       - name: "#268 exact verified subject reuse regression"
         run: python quality/run_33371268494_scene2_verified_subject_reuse_regression_test.py
       - name: "#269 exact viewpoint structure regression"
         run: python quality/run_33377519851_scene1_viewpoint_structure_regression_test.py
+      - name: "#273 presentation differentiation regression"
+        run: python quality/early_verified_asset_presentation_repetition_regression_test.py
 
   established-visual-contracts:
     runs-on: ubuntu-latest
@@ -197,7 +200,6 @@ jobs:
         test:
           - quality/run_33479576919_canonical_grounding_regression_test.py
           - quality/run_33506951642_valueerror_probe.py
-          - quality/early_verified_asset_presentation_repetition_regression_test.py
           - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
           - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
           - quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
@@ -211,14 +213,44 @@ jobs:
       - name: Run ${{ matrix.test }}
         run: python "${{ matrix.test }}"
 
+  script-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install openai
+      - name: Apply established Script V2 base
+        run: python ci_script_v2_visual_goal_hotfix.py
+      - name: Run Script V2 regression
+        run: python -m quality.script_engine_v2_regression_test
+
+  fact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Apply established FACT chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+      - name: Run FACT regression
+        env:
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+        run: python quality/fact_critical_regeneration_test.py
+
   core-quality-contracts:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         command:
-          - "python -m quality.script_engine_v2_regression_test"
-          - "python quality/fact_critical_regression_test.py"
           - "python quality/first5_visual_contract_regression_test.py"
           - "python -m quality.retention_structure_experiment_regression_test"
           - "python quality/hook_visual_dominance_test.py"
