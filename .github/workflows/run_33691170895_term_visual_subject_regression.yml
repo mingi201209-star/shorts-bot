@@ -127,7 +127,7 @@ jobs:
           grep -q "EARLY_VERIFIED_ASSET_PRESENTATION_V1" video/still_image_fallback.py
           python -m py_compile content/script_engine_v2_runner.py video/video_downloader.py video/video_engine.py
 
-  verified-subject-reuse:
+  installed-early-visual-contracts:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -135,7 +135,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install -r requirements.txt
-      - name: Compose established subject-reuse contract
+      - name: Compose established early visual contracts
         run: |
           set -euo pipefail
           python ci_hotfix.py
@@ -183,8 +183,11 @@ jobs:
           python ci_cross_process_video_dedupe_hotfix.py
           python ci_aviation_context_signature_compat_hotfix.py
           grep -q "QUESTION_SUBJECT_REUSE_RUN_33371268494_V1" video/still_image_fallback.py
+          grep -q "RUN_33377519851_SCENE1_VIEWPOINT_STRUCTURE_V1" video/hook_visual_dominance.py
       - name: "#268 exact verified subject reuse regression"
         run: python quality/run_33371268494_scene2_verified_subject_reuse_regression_test.py
+      - name: "#269 exact viewpoint structure regression"
+        run: python quality/run_33377519851_scene1_viewpoint_structure_regression_test.py
 
   established-visual-contracts:
     runs-on: ubuntu-latest
@@ -192,7 +195,6 @@ jobs:
       fail-fast: false
       matrix:
         test:
-          - quality/run_33377519851_scene1_viewpoint_structure_regression_test.py
           - quality/run_33479576919_canonical_grounding_regression_test.py
           - quality/run_33506951642_valueerror_probe.py
           - quality/early_verified_asset_presentation_repetition_regression_test.py
