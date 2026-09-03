@@ -197,8 +197,14 @@ def main():
     runner_changed = _patch_runner()
     if not engine_changed and not runner_changed:
         print("✅ Script V2 audience comprehension guidance already installed")
-        return
-    print("✅ Script V2 audience comprehension guidance installed")
+    else:
+        print("✅ Script V2 audience comprehension guidance installed")
+
+    # The Run 33691170895 guard is a later, narrower composition layer. Calling
+    # it here preserves the established #275 semantics while ensuring production
+    # receives the term/visual guard without changing workflow dispatch behavior.
+    from ci_run_33691170895_term_visual_subject_hotfix import main as _patch_run_33691170895
+    _patch_run_33691170895()
 
 
 if __name__ == "__main__":
