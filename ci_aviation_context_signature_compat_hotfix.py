@@ -123,9 +123,13 @@ def _patch_script_engine_router():
 
 
 def _reapply_final_script_v2_contracts():
-    # This compatibility installer is intentionally re-run at the very end of
-    # production composition. Reapply #275 and its narrower Run 33691170895
-    # child layer here so later Final Visual installers cannot shadow them.
+    # This installer runs once early and once after Final Visual composition.
+    # Reapply #275 + Run336911 only on the final pass so later installers retain
+    # their expected source markers during the initial composition phase.
+    main_source = MAIN_PATH.read_text(encoding="utf-8")
+    if "FINAL_VISUAL_SEMANTIC_QA_V1" not in main_source:
+        print("⏭️ Final Script V2 audience/subject reapply deferred until Final Visual composition")
+        return
     from ci_writer_audience_comprehension_hotfix import main as patch_audience
     patch_audience()
 
