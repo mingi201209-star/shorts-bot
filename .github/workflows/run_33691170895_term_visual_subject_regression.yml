@@ -66,7 +66,7 @@ jobs:
           python -m quality.script_v2_general_formal_ending_regression_test
           python -m quality.run_33598314876_speech_style_regression_test
 
-  established-contracts:
+  production-composition:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -125,25 +125,50 @@ jobs:
           grep -q "RUN_33691170895_DISCRIMINATIVE_SUBJECT_GUARD_V1" video/video_downloader.py
           grep -q "QUESTION_SUBJECT_REUSE_RUN_33371268494_V1" video/still_image_fallback.py
           grep -q "EARLY_VERIFIED_ASSET_PRESENTATION_V1" video/still_image_fallback.py
-      - name: #268 #269 #270 #272 #273
-        run: |
-          python quality/run_33371268494_scene2_verified_subject_reuse_regression_test.py
-          python quality/run_33377519851_scene1_viewpoint_structure_regression_test.py
-          python quality/run_33479576919_canonical_grounding_regression_test.py
-          python quality/run_33506951642_valueerror_probe.py
-          python quality/early_verified_asset_presentation_repetition_regression_test.py
-      - name: #257 #258 #266 #267 visual semantics and lineage
-        run: |
-          python quality/run_33256014054_flow_interface_visual_supply_regression_test.py
-          python quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
-          python quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
-          python quality/run_33367370350_deterministic_explanatory_asset_lineage_regression_test.py
-      - name: Script FACT First5 Retention Hook Diversity Final QA
-        run: |
-          python -m quality.script_engine_v2_regression_test
-          python quality/fact_critical_regression_test.py
-          python quality/first5_visual_contract_regression_test.py
-          python -m quality.retention_structure_experiment_regression_test
-          python quality/hook_visual_dominance_test.py
-          python quality/visual_diversity_preflight_regression_test.py
-          python quality/final_visual_semantic_qa_regression_test.py
+          python -m py_compile content/script_engine_v2_runner.py video/video_downloader.py video/video_engine.py
+
+  established-visual-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/run_33371268494_scene2_verified_subject_reuse_regression_test.py
+          - quality/run_33377519851_scene1_viewpoint_structure_regression_test.py
+          - quality/run_33479576919_canonical_grounding_regression_test.py
+          - quality/run_33506951642_valueerror_probe.py
+          - quality/early_verified_asset_presentation_repetition_regression_test.py
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
+          - quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
+          - quality/run_33367370350_deterministic_explanatory_asset_lineage_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run ${{ matrix.test }}
+        run: python "${{ matrix.test }}"
+
+  core-quality-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        command:
+          - "python -m quality.script_engine_v2_regression_test"
+          - "python quality/fact_critical_regression_test.py"
+          - "python quality/first5_visual_contract_regression_test.py"
+          - "python -m quality.retention_structure_experiment_regression_test"
+          - "python quality/hook_visual_dominance_test.py"
+          - "python quality/visual_diversity_preflight_regression_test.py"
+          - "python quality/final_visual_semantic_qa_regression_test.py"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run contract
+        run: ${{ matrix.command }}
