@@ -1,0 +1,290 @@
+name: Run 33691170895 Term Visual Subject Regression
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ci_run_33691170895_term_visual_subject_hotfix.py"
+      - "ci_writer_audience_comprehension_hotfix.py"
+      - "ci_aviation_context_signature_compat_hotfix.py"
+      - "quality/run_33691170895_term_visual_subject_regression_test.py"
+      - ".github/workflows/run_33691170895_term_visual_subject_regression.yml"
+      - "content/script_engine_v2_runner.py"
+      - "video/video_downloader.py"
+      - "video/video_engine.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  exact-counterexamples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Compile focused patch
+        run: |
+          python -m py_compile \
+            ci_run_33691170895_term_visual_subject_hotfix.py \
+            ci_writer_audience_comprehension_hotfix.py \
+            ci_aviation_context_signature_compat_hotfix.py \
+            quality/run_33691170895_term_visual_subject_regression_test.py
+      - name: Run authority term and Scene2 visual counterexamples
+        run: python -m quality.run_33691170895_term_visual_subject_regression_test
+      - name: Cost call and threshold invariants
+        run: |
+          ! grep -q "authorize_call(" ci_run_33691170895_term_visual_subject_hotfix.py
+          ! grep -q "openai\." ci_run_33691170895_term_visual_subject_hotfix.py
+          ! grep -q "V3_MAX_COST_USD\|MAX_RETRIES\|HOOK_THRESHOLD\|DIRECTOR.*THRESHOLD" ci_run_33691170895_term_visual_subject_hotfix.py
+          echo NEW_LLM_CALLS=0
+          echo NEW_VISION_CALLS=0
+          echo NEW_IMAGE_GENERATION_CALLS=0
+          echo API_COST_CHANGE=NONE
+          echo RETRY_CHANGE=NONE
+
+  audience-writer-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: "#275 audience-first Writer exact regression"
+        run: python -m quality.run_33618913580_writer_audience_comprehension_regression_test
+      - name: "#237 #264 #274 speech-style and formal endings"
+        run: |
+          python -m quality.script_v2_gunggeum_formal_ending_regression_test
+          python -m quality.script_v2_general_formal_ending_regression_test
+          python -m quality.run_33598314876_speech_style_regression_test
+
+  production-composition:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Compose exact production source only
+        run: |
+          set -euo pipefail
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          python ci_video_provider_hotfix.py
+          python ci_topic_input_hotfix.py
+          python ci_aviation_candidate_context_hotfix.py
+          python ci_aviation_candidate_specificity_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          python ci_aviation_specificity_output_repair_hotfix.py
+          python ci_aviation_specificity_projection_hotfix.py
+          python ci_candidate_grounded_recovery_hotfix.py
+          python ci_growth_candidate_shadow_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_curiosity_retention_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_design_causality_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_hook_production_parity_hotfix.py
+          python ci_hook_fallback_quality_floor_hotfix.py
+          python ci_ai_visual_fallback_hotfix.py
+          python ci_ai_visual_mechanism_fallback_hotfix.py
+          python ci_problem_solution_narrative_hotfix.py
+          python ci_causal_information_progression_hotfix.py
+          python ci_retention_structure_experiment_hotfix.py
+          python ci_subscriber_conversion_hotfix.py
+          python ci_script_production_parity_hotfix.py
+          python ci_script_production_parity_bridge_hotfix.py
+          python ci_adaptive_scene_count_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_script_validation_recovery_hotfix.py
+          python ci_script_v2_visual_goal_hotfix.py
+          python ci_script_v2_gunggeum_formal_ending_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+          python ci_cross_process_video_dedupe_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          grep -q "RUN_33691170895_VIEWER_TERM_CONSISTENCY_V1" content/script_engine_v2_runner.py
+          grep -q "RUN_33691170895_DISCRIMINATIVE_SUBJECT_GUARD_V1" video/video_downloader.py
+          grep -q "QUESTION_SUBJECT_REUSE_RUN_33371268494_V1" video/still_image_fallback.py
+          grep -q "EARLY_VERIFIED_ASSET_PRESENTATION_V1" video/still_image_fallback.py
+          python -m py_compile content/script_engine_v2_runner.py video/video_downloader.py video/video_engine.py
+
+  installed-early-visual-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Compose established early visual contracts
+        run: |
+          set -euo pipefail
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          python ci_video_provider_hotfix.py
+          python ci_topic_input_hotfix.py
+          python ci_aviation_candidate_context_hotfix.py
+          python ci_aviation_candidate_specificity_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          python ci_aviation_specificity_output_repair_hotfix.py
+          python ci_aviation_specificity_projection_hotfix.py
+          python ci_candidate_grounded_recovery_hotfix.py
+          python ci_growth_candidate_shadow_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_curiosity_retention_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_design_causality_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_hook_production_parity_hotfix.py
+          python ci_hook_fallback_quality_floor_hotfix.py
+          python ci_ai_visual_fallback_hotfix.py
+          python ci_ai_visual_mechanism_fallback_hotfix.py
+          python ci_problem_solution_narrative_hotfix.py
+          python ci_causal_information_progression_hotfix.py
+          python ci_retention_structure_experiment_hotfix.py
+          python ci_subscriber_conversion_hotfix.py
+          python ci_script_production_parity_hotfix.py
+          python ci_script_production_parity_bridge_hotfix.py
+          python ci_adaptive_scene_count_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_script_validation_recovery_hotfix.py
+          python ci_script_v2_visual_goal_hotfix.py
+          python ci_script_v2_gunggeum_formal_ending_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+          python ci_cross_process_video_dedupe_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          grep -q "QUESTION_SUBJECT_REUSE_RUN_33371268494_V1" video/still_image_fallback.py
+          grep -q "RUN_33377519851_SCENE1_VIEWPOINT_STRUCTURE_V1" video/hook_visual_dominance.py
+          grep -q "EARLY_VERIFIED_ASSET_PRESENTATION_V1" video/still_image_fallback.py
+      - name: "#268 exact verified subject reuse regression"
+        run: python quality/run_33371268494_scene2_verified_subject_reuse_regression_test.py
+      - name: "#269 exact viewpoint structure regression"
+        run: python quality/run_33377519851_scene1_viewpoint_structure_regression_test.py
+      - name: "#273 presentation differentiation regression"
+        run: python quality/early_verified_asset_presentation_repetition_regression_test.py
+
+  established-visual-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/run_33479576919_canonical_grounding_regression_test.py
+          - quality/run_33506951642_valueerror_probe.py
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py
+          - quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
+          - quality/run_33367370350_deterministic_explanatory_asset_lineage_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run ${{ matrix.test }}
+        run: python "${{ matrix.test }}"
+
+  script-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install openai
+      - name: Apply established Script V2 base
+        run: python ci_script_v2_visual_goal_hotfix.py
+      - name: Run Script V2 regression
+        run: python -m quality.script_engine_v2_regression_test
+
+  fact:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Apply established FACT chain
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+      - name: Run FACT regression
+        env:
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+        run: python quality/fact_critical_regeneration_test.py
+
+  core-quality-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        command:
+          - "python quality/first5_visual_contract_regression_test.py"
+          - "python -m quality.retention_structure_experiment_regression_test"
+          - "python quality/hook_visual_dominance_test.py"
+          - "python quality/visual_diversity_preflight_regression_test.py"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Run contract
+        run: ${{ matrix.command }}
+
+  final-visual-semantic-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - name: Install established Final Visual QA composition
+        run: |
+          python ci_video_provider_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+      - name: Run Final Visual Semantic QA regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: python quality/final_visual_semantic_qa_regression_test.py

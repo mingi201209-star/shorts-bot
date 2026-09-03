@@ -197,8 +197,13 @@ def main():
     runner_changed = _patch_runner()
     if not engine_changed and not runner_changed:
         print("✅ Script V2 audience comprehension guidance already installed")
-        return
-    print("✅ Script V2 audience comprehension guidance installed")
+    else:
+        print("✅ Script V2 audience comprehension guidance installed")
+
+    # Compose the narrower Run 33691170895 guard independently; #275 itself is
+    # unchanged and remains authoritative for audience-comprehension semantics.
+    from ci_run_33691170895_term_visual_subject_hotfix import main as _patch_run_33691170895
+    _patch_run_33691170895()
 
 
 if __name__ == "__main__":

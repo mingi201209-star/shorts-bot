@@ -122,6 +122,18 @@ def _patch_script_engine_router():
     print("✅ Script Engine V2 router connected to production main")
 
 
+def _reapply_final_run_336911_guard():
+    # This compatibility installer runs once early and once after Final Visual
+    # composition. Reapply only this PR's narrow guard on the final pass; #275
+    # itself stays unchanged and is regression-tested independently.
+    main_source = MAIN_PATH.read_text(encoding="utf-8")
+    if "FINAL_VISUAL_SEMANTIC_QA_V1" not in main_source:
+        print("⏭️ Run 33691170895 guard reapply deferred until Final Visual composition")
+        return
+    from ci_run_33691170895_term_visual_subject_hotfix import main as patch_run_33691170895
+    patch_run_33691170895()
+
+
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
 
@@ -139,11 +151,6 @@ def main():
     )
 
     if "# CANDIDATE_SUPPLY_RECOVERY_V1" in text:
-        # The supply wrapper is appended only after the original Explorer has
-        # already received this compatibility patch earlier in production.
-        # It forwards fixed_topic + fixed_topic_gate_feedback itself, so trying
-        # to find build_execution_context inside the wrapper would be a false
-        # marker failure during the final compatibility re-apply.
         print("✅ Candidate supply wrapper preserves aviation context; direct re-forward skipped")
     else:
         text = _ensure_forwarded_keyword(
@@ -156,6 +163,7 @@ def main():
     _patch_automatic_gate_feedback()
     _apply_final_script_scene_recovery_if_ready()
     _patch_script_engine_router()
+    _reapply_final_run_336911_guard()
     print("✅ Aviation fixed-topic + automatic gate-feedback compatibility applied")
 
 
