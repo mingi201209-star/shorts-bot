@@ -9,9 +9,14 @@ TERM_MARKER = "# RUN_33691170895_VIEWER_TERM_CONSISTENCY_V1"
 VISUAL_MARKER = "# RUN_33691170895_DISCRIMINATIVE_SUBJECT_GUARD_V1"
 
 
-def _append_once(text, marker, block):
-    if marker in text:
-        return text, False
+def _append_if_missing_or_shadowed(text, marker, block, function_names):
+    marker_pos = text.rfind(marker)
+    if marker_pos >= 0:
+        tail = text[marker_pos:]
+        # Each installed layer defines its target wrapper exactly once. A second
+        # later definition means a subsequent production layer shadowed it.
+        if all(tail.count(f"\ndef {name}(") <= 1 for name in function_names):
+            return text, False
     return text.rstrip() + "\n\n" + block.strip() + "\n", True
 
 
@@ -65,7 +70,6 @@ def _run_33691170895_normalize_viewer_terms(script, plan):
             if pos >= 0:
                 occurrences.append((scene_index, pos, term))
                 distinct.add(term)
-    # No rewrite is needed unless the same canonical concept actually diverged.
     if len(distinct) < 2 or not occurrences:
         return script
 
@@ -98,7 +102,12 @@ def _normalize_script_contracts_without_api(script, plan):
     result = _run_33691170895_previous_contract_normalization(script, plan)
     return _run_33691170895_normalize_viewer_terms(result, plan)
 '''
-    text, changed = _append_once(text, TERM_MARKER, block)
+    text, changed = _append_if_missing_or_shadowed(
+        text,
+        TERM_MARKER,
+        block,
+        ("_normalize_script_contracts_without_api",),
+    )
     if changed:
         RUNNER_PATH.write_text(text, encoding="utf-8")
     return changed
@@ -159,9 +168,6 @@ def _run_33691170895_definitive_visible_components(candidate):
             if str(item).strip()
         )
 
-    # Reuse already-attached structured verifier evidence only when it carries
-    # an explicit trusted/verified/pass signal. Generic provider fields such as
-    # title/tags/metadata_text are intentionally excluded.
     for field in ("vision_evidence", "visual_evidence", "verified_evidence", "subject_evidence"):
         evidence = candidate.get(field)
         if not isinstance(evidence, dict):
@@ -263,14 +269,16 @@ def fetch_video(query_or_scene):
     finally:
         _RUN_33691170895_ACTIVE_SCENE = previous
 '''
-    text, changed = _append_once(text, VISUAL_MARKER, block)
+    text, changed = _append_if_missing_or_shadowed(
+        text,
+        VISUAL_MARKER,
+        block,
+        ("choose_best_candidate", "fetch_video"),
+    )
     if changed:
         DOWNLOADER_PATH.write_text(text, encoding="utf-8")
 
     engine = ENGINE_PATH.read_text(encoding="utf-8")
-    # Existing create_scene interface stays intact; only pass its already-present
-    # scene dict into fetch_video so candidate acceptance can inspect canonical
-    # subject evidence. String callers elsewhere remain backward compatible.
     patched, count = re.subn(r"fetch_video\(\s*keyword\s*\)", "fetch_video(item)", engine)
     if count:
         ENGINE_PATH.write_text(patched, encoding="utf-8")
