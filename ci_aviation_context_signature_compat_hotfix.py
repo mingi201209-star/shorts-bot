@@ -122,16 +122,16 @@ def _patch_script_engine_router():
     print("✅ Script Engine V2 router connected to production main")
 
 
-def _reapply_final_script_v2_contracts():
-    # This installer runs once early and once after Final Visual composition.
-    # Reapply #275 + Run336911 only on the final pass so later installers retain
-    # their expected source markers during the initial composition phase.
+def _reapply_final_run_336911_guard():
+    # This compatibility installer runs once early and once after Final Visual
+    # composition. Reapply only this PR's narrow guard on the final pass; #275
+    # itself stays unchanged and is regression-tested independently.
     main_source = MAIN_PATH.read_text(encoding="utf-8")
     if "FINAL_VISUAL_SEMANTIC_QA_V1" not in main_source:
-        print("⏭️ Final Script V2 audience/subject reapply deferred until Final Visual composition")
+        print("⏭️ Run 33691170895 guard reapply deferred until Final Visual composition")
         return
-    from ci_writer_audience_comprehension_hotfix import main as patch_audience
-    patch_audience()
+    from ci_run_33691170895_term_visual_subject_hotfix import main as patch_run_33691170895
+    patch_run_33691170895()
 
 
 def main():
@@ -163,7 +163,7 @@ def main():
     _patch_automatic_gate_feedback()
     _apply_final_script_scene_recovery_if_ready()
     _patch_script_engine_router()
-    _reapply_final_script_v2_contracts()
+    _reapply_final_run_336911_guard()
     print("✅ Aviation fixed-topic + automatic gate-feedback compatibility applied")
 
 
