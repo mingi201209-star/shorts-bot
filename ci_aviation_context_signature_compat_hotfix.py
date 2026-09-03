@@ -122,6 +122,14 @@ def _patch_script_engine_router():
     print("✅ Script Engine V2 router connected to production main")
 
 
+def _reapply_final_script_v2_contracts():
+    # This compatibility installer is intentionally re-run at the very end of
+    # production composition. Reapply #275 and its narrower Run 33691170895
+    # child layer here so later Final Visual installers cannot shadow them.
+    from ci_writer_audience_comprehension_hotfix import main as patch_audience
+    patch_audience()
+
+
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
 
@@ -139,11 +147,6 @@ def main():
     )
 
     if "# CANDIDATE_SUPPLY_RECOVERY_V1" in text:
-        # The supply wrapper is appended only after the original Explorer has
-        # already received this compatibility patch earlier in production.
-        # It forwards fixed_topic + fixed_topic_gate_feedback itself, so trying
-        # to find build_execution_context inside the wrapper would be a false
-        # marker failure during the final compatibility re-apply.
         print("✅ Candidate supply wrapper preserves aviation context; direct re-forward skipped")
     else:
         text = _ensure_forwarded_keyword(
@@ -156,6 +159,7 @@ def main():
     _patch_automatic_gate_feedback()
     _apply_final_script_scene_recovery_if_ready()
     _patch_script_engine_router()
+    _reapply_final_script_v2_contracts()
     print("✅ Aviation fixed-topic + automatic gate-feedback compatibility applied")
 
 
