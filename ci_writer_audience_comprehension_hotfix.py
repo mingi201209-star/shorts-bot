@@ -6,28 +6,9 @@ MARKER = "# SCRIPT_V2_AUDIENCE_COMPREHENSION_V1"
 RUNNER_MARKER = "# SCRIPT_V2_AUDIENCE_WRITER_GUIDANCE_V1"
 
 
-def _audience_engine_layer_is_active(text: str) -> bool:
-    marker_pos = text.rfind(MARKER)
-    if marker_pos < 0:
-        return False
-    tail = text[marker_pos:]
-    # The #275 block defines each wrapper exactly once. A second later
-    # definition means a subsequent production-composition layer shadowed it.
-    for name in (
-        "build_narrative_plan",
-        "apply_locked_scenes",
-        "writer_payload",
-        "repair_failed_scenes",
-        "local_repair_payload",
-    ):
-        if tail.count(f"\ndef {name}(") > 1:
-            return False
-    return True
-
-
 def _patch_engine():
     text = ENGINE_PATH.read_text(encoding="utf-8")
-    if _audience_engine_layer_is_active(text):
+    if MARKER in text:
         return False
 
     block = r'''
@@ -191,6 +172,11 @@ def _patch_runner():
         raise RuntimeError("audience comprehension writer instruction marker not found")
     text = text.replace(old_writer, new_writer, 1)
 
+    # Local-repair wording has legitimately changed across prior Script V2
+    # composition hotfixes. Patch the legacy wording only when it is still
+    # present; do not fail production composition merely because an established
+    # hotfix already replaced that secondary prompt. The audience contract is
+    # carried in each repair payload regardless.
     old_repair = (
         '            "For locked scenes, NEVER change text; visual_goal and keyword may be repaired. "\n'
         '            "Every keyword must be 2-7 ASCII English words. Use formal Korean and preserve factual scope."\n'
@@ -214,6 +200,8 @@ def main():
     else:
         print("✅ Script V2 audience comprehension guidance installed")
 
+    # Compose the narrower Run 33691170895 guard independently; #275 itself is
+    # unchanged and remains authoritative for audience-comprehension semantics.
     from ci_run_33691170895_term_visual_subject_hotfix import main as _patch_run_33691170895
     _patch_run_33691170895()
 
