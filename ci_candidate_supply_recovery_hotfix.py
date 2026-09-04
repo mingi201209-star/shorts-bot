@@ -118,8 +118,7 @@ sanity check from the system prompt unchanged. For aviation scope, the scoped
 supply-precedence block above controls editorial self-withholding: return
 SELECTED when at least one grounded, structurally complete Candidate survives
 supply hard gates, and let the unchanged independent Candidate Gate decide
-broad/generic/predictable editorial quality. Return REGENERATE only after the
-silent breadth search still yields no Candidate permitted by the applicable
+broad/generic/predictable editorial quality. Return REGENERATE only after the silent breadth search still yields no Candidate permitted by the applicable
 supply contract. Return one JSON object only.
 """
 
