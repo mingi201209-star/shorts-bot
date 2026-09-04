@@ -121,6 +121,41 @@ for item in (
     assert item in explorer, item
 assert "candidate_count_before_filter=" not in explorer
 
+# Run 33887547463 authority counterexample: broad category-level aviation input
+# must first be instantiated into concrete, observable seeds in the SAME Explorer
+# call. No extra model call, Gate relaxation, or retry increase is allowed.
+observable_marker = "[AVIATION OBSERVABLE SEED SUPPLY CONTRACT — RUN 33887547463]"
+assert observable_marker in explorer
+for item in (
+    "broad direction is an exploration axis, never the Candidate itself",
+    "observable_object_or_feature",
+    "specific_observation",
+    "viewer_question",
+    "candidate_mechanism_or_constraint",
+    "direct_result",
+    "visual_proof_target",
+    "instantiate several materially distinct concrete observable seeds",
+    "Do not evaluate the broad direction itself as a Candidate",
+    "no additional API call",
+):
+    assert item in explorer, item
+
+# Recovery must recognize semantic supply-exhaustion reasons observed in the
+# authority run, while a pure editorial weakness must NOT spend the 1/1 recovery.
+for item in (
+    "후보 공급 부족",
+    "구체적인 후보 부족",
+    "구체적인 후보가 부족",
+    "구조·사실성 hard gate",
+    "candidate supply shortage",
+    "concrete candidate shortage",
+):
+    assert item in supply_recovery.lower(), item
+assert "예상 가능한 결론이라 약함" not in supply_recovery
+assert "_candidate_supply_reason_is_zero_usable" in supply_recovery
+assert "CANDIDATE SUPPLY RECOVERY (1/1)" in supply_recovery
+assert "[AVIATION OBSERVABLE SEED RECOVERY — RUN 33887547463]" in supply_recovery
+
 assert explorer.index("if fixed_topic:") < explorer.index("SHORTS_CANDIDATE_SCOPE")
 assert "winner.topic은 반드시 아래 문자열과" in explorer
 assert "result[\"runner_up\"] = None" in explorer
@@ -148,4 +183,4 @@ assert '"MAX_TOPIC_REGENERATIONS = 6"' in production_hotfix
 assert 'V3_MAX_API_CALLS: "60"' in workflow
 assert 'V3_MAX_COST_USD: "0.05"' in workflow
 
-print("PASS: Run 33883590214 aviation system/user authority conflict removed without Gate relaxation")
+print("PASS: Run 33887547463 broad aviation direction now instantiates observable supply seeds without Gate/cap changes")
