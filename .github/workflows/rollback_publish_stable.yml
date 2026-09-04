@@ -1,0 +1,75 @@
+name: Rollback Publish Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_sha:
+        description: "Previously validated stable SHA to restore"
+        required: true
+        type: string
+      approval:
+        description: "STABLE-ROLLBACK:<sha>"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate explicit rollback
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+          APPROVAL: ${{ inputs.approval }}
+        run: |
+          set -euo pipefail
+          test "${#TARGET_SHA}" -eq 40
+          case "$TARGET_SHA" in *[!0-9a-fA-F]*) exit 1;; esac
+          if [ "$APPROVAL" != "STABLE-ROLLBACK:$TARGET_SHA" ]; then
+            echo "Rollback approval mismatch"
+            exit 1
+          fi
+          previous="$(gh api "repos/$REPO/commits/publish-stable" --jq .sha)"
+          gh api "repos/$REPO/commits/$TARGET_SHA" >/dev/null
+          echo "previous_sha=$previous" >> "$GITHUB_OUTPUT"
+          echo "PREVIOUS_STABLE_SHA=$previous"
+          echo "ROLLBACK_TARGET_SHA=$TARGET_SHA"
+
+      - name: Restore stable pointer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          set -euo pipefail
+          gh api --method PATCH "repos/$REPO/git/refs/heads/publish-stable" -f sha="$TARGET_SHA" -F force=true >/dev/null
+          actual="$(gh api "repos/$REPO/commits/publish-stable" --jq .sha)"
+          test "$actual" = "$TARGET_SHA"
+          echo "PUBLISH_STABLE_SHA=$actual"
+          echo "ROLLED_BACK_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+      - name: Write rollback manifest
+        env:
+          PREVIOUS_SHA: ${{ steps.validate.outputs.previous_sha }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          cat > stable_rollback_manifest.json <<EOF
+          {
+            "action": "ROLLBACK",
+            "previous_stable_sha": "$PREVIOUS_SHA",
+            "new_stable_sha": "$TARGET_SHA",
+            "rolled_back_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Preserve rollback manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: stable-rollback-${{ github.run_id }}
+          path: stable_rollback_manifest.json
+          retention-days: 90

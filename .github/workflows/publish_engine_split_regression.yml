@@ -1,0 +1,52 @@
+name: Development Publish Engine Split Regression
+
+on:
+  push:
+    branches:
+      - "feat/**"
+      - "fix/**"
+    paths:
+      - ".github/workflows/development_engine.yml"
+      - ".github/workflows/publish_engine.yml"
+      - ".github/workflows/promote_publish_stable.yml"
+      - ".github/workflows/rollback_publish_stable.yml"
+      - ".github/workflows/main.yml"
+      - "quality/publish_engine_split_regression_test.py"
+      - "ops/publish_stable_bootstrap.json"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/development_engine.yml"
+      - ".github/workflows/publish_engine.yml"
+      - ".github/workflows/promote_publish_stable.yml"
+      - ".github/workflows/rollback_publish_stable.yml"
+      - ".github/workflows/main.yml"
+      - "quality/publish_engine_split_regression_test.py"
+      - "ops/publish_stable_bootstrap.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile regression
+        run: python -m py_compile quality/publish_engine_split_regression_test.py
+      - name: Verify development/publish isolation contract
+        run: python quality/publish_engine_split_regression_test.py
+      - name: Verify initial stable pointer exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          stable_sha="$(gh api "repos/$REPO/commits/publish-stable" --jq .sha)"
+          test "${#stable_sha}" -eq 40
+          echo "PUBLISH_STABLE_SHA=$stable_sha"

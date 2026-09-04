@@ -1,0 +1,61 @@
+name: Development Engine
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Optional fixed development-validation topic"
+        required: false
+        default: ""
+        type: string
+      candidate_scope:
+        description: "Optional candidate scope"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: development-engine-controller
+  cancel-in-progress: false
+
+jobs:
+  dispatch-development:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve latest main
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          main_sha="$(gh api "repos/$REPO/commits/main" --jq .sha)"
+          echo "main_sha=$main_sha" >> "$GITHUB_OUTPUT"
+          echo "ENGINE_MODE=DEVELOPMENT"
+          echo "DEVELOPMENT_REF=main"
+          echo "DEVELOPMENT_SHA=$main_sha"
+
+      - name: Dispatch exact-main development production
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MAIN_SHA: ${{ steps.resolve.outputs.main_sha }}
+          TOPIC: ${{ inputs.topic }}
+          CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
+        run: |
+          set -euo pipefail
+          echo "ENGINE_MODE=DEVELOPMENT"
+          echo "EXPECTED_SHA=$MAIN_SHA"
+          gh workflow run main.yml \
+            --repo "$REPO" \
+            --ref main \
+            -f topic="$TOPIC" \
+            -f candidate_scope="$CANDIDATE_SCOPE" \
+            -f expected_sha="$MAIN_SHA" \
+            -f youtube_upload=false \
+            -f youtube_privacy=private
+          echo "Development dispatch submitted for exact main $MAIN_SHA"

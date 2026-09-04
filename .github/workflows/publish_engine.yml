@@ -1,0 +1,183 @@
+name: Publish Stable Engine
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Optional fixed publish topic"
+        required: false
+        default: ""
+        type: string
+      candidate_scope:
+        description: "Optional candidate scope"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: publish-stable-engine
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Resolve stable production pointer
+        id: stable
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          STABLE_REF: publish-stable
+        run: |
+          set -euo pipefail
+          stable_sha="$(gh api "repos/$REPO/commits/$STABLE_REF" --jq .sha)"
+          test "${#stable_sha}" -eq 40
+          case "$stable_sha" in *[!0-9a-fA-F]*) exit 1;; esac
+          echo "stable_sha=$stable_sha" >> "$GITHUB_OUTPUT"
+          echo "ENGINE_MODE=PUBLISH"
+          echo "STABLE_REF=$STABLE_REF"
+          echo "STABLE_SHA=$stable_sha"
+
+      - name: Verify stable workflow is self-contained
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          STABLE_SHA: ${{ steps.stable.outputs.stable_sha }}
+        run: |
+          set -euo pipefail
+          raw_url="https://raw.githubusercontent.com/$REPO/$STABLE_SHA/.github/workflows/main.yml"
+          workflow="$(curl -fsSL "$raw_url")"
+          printf '%s\n' "$workflow" | grep -F 'inputs.expected_sha || github.sha' >/dev/null
+          printf '%s\n' "$workflow" | grep -F 'python ci_final_visual_semantic_qa_hotfix.py' >/dev/null
+          printf '%s\n' "$workflow" | grep -F 'python -m diagnostics.runner' >/dev/null
+          printf '%s\n' "$workflow" | grep -F 'final_visual_semantic_qa.json' >/dev/null
+          printf '%s\n' "$workflow" | grep -F 'final_director_qa.json' >/dev/null
+          echo "Stable engine workflow contract verified at $STABLE_SHA"
+
+      - name: Dispatch stable engine
+        id: child
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          STABLE_REF: publish-stable
+          STABLE_SHA: ${{ steps.stable.outputs.stable_sha }}
+          TOPIC: ${{ inputs.topic }}
+          CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
+        run: |
+          set -euo pipefail
+          before="$(gh run list --repo "$REPO" --workflow main.yml --branch "$STABLE_REF" --event workflow_dispatch --limit 20 --json databaseId --jq '.[].databaseId')"
+          gh workflow run main.yml \
+            --repo "$REPO" \
+            --ref "$STABLE_REF" \
+            -f topic="$TOPIC" \
+            -f candidate_scope="$CANDIDATE_SCOPE" \
+            -f expected_sha="" \
+            -f youtube_upload=false \
+            -f youtube_privacy=private
+
+          child_id=""
+          for _ in $(seq 1 60); do
+            candidate="$(gh run list \
+              --repo "$REPO" \
+              --workflow main.yml \
+              --branch "$STABLE_REF" \
+              --event workflow_dispatch \
+              --limit 20 \
+              --json databaseId,headSha \
+              --jq ".[] | select(.headSha == \"$STABLE_SHA\") | .databaseId" \
+              | head -1)"
+            if [ -n "$candidate" ] && ! printf '%s\n' "$before" | grep -qx "$candidate"; then
+              child_id="$candidate"
+              break
+            fi
+            sleep 2
+          done
+          if [ -z "$child_id" ]; then
+            echo "Could not identify stable child run"
+            exit 1
+          fi
+          child_sha="$(gh run view "$child_id" --repo "$REPO" --json headSha --jq .headSha)"
+          if [ "$child_sha" != "$STABLE_SHA" ]; then
+            echo "Stable dispatch mismatch: child=$child_sha stable=$STABLE_SHA"
+            exit 1
+          fi
+          echo "child_run_id=$child_id" >> "$GITHUB_OUTPUT"
+          echo "ENGINE_MODE=PUBLISH"
+          echo "STABLE_SHA=$STABLE_SHA"
+          echo "CHECKOUT_SHA=$child_sha"
+          echo "STABLE_SHA_MATCH=YES"
+          echo "CHILD_RUN_ID=$child_id"
+
+      - name: Wait for stable engine
+        id: wait
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          CHILD_RUN_ID: ${{ steps.child.outputs.child_run_id }}
+        run: |
+          set +e
+          gh run watch "$CHILD_RUN_ID" --repo "$REPO" --exit-status
+          rc=$?
+          conclusion="$(gh run view "$CHILD_RUN_ID" --repo "$REPO" --json conclusion --jq .conclusion)"
+          echo "child_rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "child_conclusion=$conclusion" >> "$GITHUB_OUTPUT"
+          echo "PUBLISH_CHILD_CONCLUSION=$conclusion"
+          exit 0
+
+      - name: Collect stable engine artifacts and manifest
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          STABLE_SHA: ${{ steps.stable.outputs.stable_sha }}
+          CHILD_RUN_ID: ${{ steps.child.outputs.child_run_id }}
+          CHILD_CONCLUSION: ${{ steps.wait.outputs.child_conclusion }}
+        run: |
+          set -euo pipefail
+          mkdir -p publish-artifact/verified publish-artifact/diagnostics
+          if [ -n "${CHILD_RUN_ID:-}" ]; then
+            gh run download "$CHILD_RUN_ID" --repo "$REPO" --pattern 'verified-shorts-*' --dir publish-artifact/verified || true
+            gh run download "$CHILD_RUN_ID" --repo "$REPO" --pattern 'production-diagnostics-*' --dir publish-artifact/diagnostics || true
+          fi
+          captured_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > publish-artifact/publish_engine_manifest.json <<EOF
+          {
+            "engine_mode": "PUBLISH",
+            "stable_ref": "publish-stable",
+            "stable_sha": "$STABLE_SHA",
+            "checkout_sha": "$STABLE_SHA",
+            "stable_sha_match": true,
+            "source_child_run": "${CHILD_RUN_ID:-UNKNOWN}",
+            "child_conclusion": "${CHILD_CONCLUSION:-UNKNOWN}",
+            "captured_at": "$captured_at"
+          }
+          EOF
+          echo "ENGINE_MODE=PUBLISH"
+          echo "STABLE_SHA=$STABLE_SHA"
+          echo "CHECKOUT_SHA=$STABLE_SHA"
+          echo "STABLE_SHA_MATCH=YES"
+
+      - name: Preserve publish artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-shorts-${{ github.run_id }}-${{ steps.stable.outputs.stable_sha }}
+          path: publish-artifact
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Fail if stable engine failed
+        if: ${{ steps.wait.outputs.child_conclusion != 'success' }}
+        env:
+          CHILD_RUN_ID: ${{ steps.child.outputs.child_run_id }}
+          CHILD_CONCLUSION: ${{ steps.wait.outputs.child_conclusion }}
+        run: |
+          echo "PUBLISH_FAILURE_SCOPE=STABLE_ENGINE_OR_RUNTIME"
+          echo "SOURCE_CHILD_RUN=$CHILD_RUN_ID"
+          echo "SOURCE_CHILD_CONCLUSION=$CHILD_CONCLUSION"
+          echo "Use preserved production diagnostics to distinguish stable-code/QA failures from external transient/provider failures."
+          exit 1

@@ -1,0 +1,9 @@
+{
+  "stable_ref": "publish-stable",
+  "initial_stable_sha": "026e33ee4d3cdbeeea77e3ee40154414393d796b",
+  "source_production_run": 33871645717,
+  "source_run_conclusion": "success",
+  "human_qa": "UPLOAD_READY=YES",
+  "engine_mode": "PUBLISH",
+  "note": "The branch ref is the live stable pointer. This file records only the bootstrap baseline and must not be treated as the mutable pointer."
+}
