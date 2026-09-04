@@ -127,7 +127,7 @@ REGENERATE는 usable grounded Candidate가 0개인 경우, 또는 남은 모든 
 
 후보 비교와 Winner 선택에서는 기존 scoring/shortlist/novelty 신호를 강한 후보의 순위를 정하는 데 사용하라.
 단, aviation 공급 모드에서는 위 [AVIATION SUPPLY PRECEDENCE — RUN 33878093224]에 따라 편집적 broad/generic/predictable 판단만으로 공급을 0으로 만들지 마라.
-구조·사실성 Hard Gate와 downstream Candidate Gate 기준은 낮추지 마라.
+Gate 기준을 낮추지 마라. 구조·사실성 Hard Gate와 downstream Candidate Gate 기준은 그대로 유지한다.
 """
 
     return f"""
