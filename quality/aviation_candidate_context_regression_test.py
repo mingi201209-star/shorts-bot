@@ -95,9 +95,7 @@ for item in (
 ):
     assert item in explorer, item
 
-# A: editorially weak but grounded/structural aviation supply survives to Gate.
 assert "return SELECTED with the strongest surviving Candidate" in explorer
-# B/C: factual/grounding and aviation-scope failures remain fail-closed.
 for item in (
     "fabricated or unsupported causal claim",
     "grounding/evidence insufficient",
@@ -105,16 +103,12 @@ for item in (
     "visual-proof requirement failure",
 ):
     assert item in explorer, item
-# D: malformed schema remains host-side invalid; no schema relaxation is installed.
 assert "Candidate Explorer status는" in explorer
-assert "winner.visual_proof" in explorer
-# E: independent Candidate Gate is untouched and remains capable of REGENERATE.
+assert '"visual_proof"' in explorer
 assert "def evaluate_candidate" in candidate_gate
 assert '"REGENERATE"' in candidate_gate
-# F: bounded recovery stays exactly 1/1 and uses the same system prompt object.
 assert "CANDIDATE SUPPLY RECOVERY (1/1)" in supply_recovery
 assert '"content": CANDIDATE_EXPLORER_PROMPT' in supply_recovery
-# G: non-aviation semantics are explicitly preserved by the new system contract.
 assert "For non-aviation scopes, keep Sections 7 and 12 unchanged" in explorer
 
 for item in (
