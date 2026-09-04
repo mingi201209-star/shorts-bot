@@ -1,0 +1,97 @@
+name: Promote Publish Stable
+
+on:
+  workflow_dispatch:
+    inputs:
+      new_sha:
+        description: "Exact DEVELOPMENT SHA to promote"
+        required: true
+        type: string
+      source_production_run:
+        description: "Successful DEVELOPMENT production run used for HUMAN QA"
+        required: true
+        type: string
+      approval:
+        description: "STABLE-PROMOTE:<sha>:<run_id>"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate explicit stable promotion
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NEW_SHA: ${{ inputs.new_sha }}
+          SOURCE_RUN: ${{ inputs.source_production_run }}
+          APPROVAL: ${{ inputs.approval }}
+        run: |
+          set -euo pipefail
+          test "${#NEW_SHA}" -eq 40
+          case "$NEW_SHA" in *[!0-9a-fA-F]*) exit 1;; esac
+          expected="STABLE-PROMOTE:$NEW_SHA:$SOURCE_RUN"
+          if [ "$APPROVAL" != "$expected" ]; then
+            echo "Promotion approval mismatch"
+            exit 1
+          fi
+          previous="$(gh api "repos/$REPO/commits/publish-stable" --jq .sha)"
+          run_sha="$(gh api "repos/$REPO/actions/runs/$SOURCE_RUN" --jq .head_sha)"
+          run_conclusion="$(gh api "repos/$REPO/actions/runs/$SOURCE_RUN" --jq .conclusion)"
+          run_event="$(gh api "repos/$REPO/actions/runs/$SOURCE_RUN" --jq .event)"
+          if [ "$run_sha" != "$NEW_SHA" ]; then
+            echo "Source production SHA mismatch: run=$run_sha requested=$NEW_SHA"
+            exit 1
+          fi
+          if [ "$run_conclusion" != "success" ] || [ "$run_event" != "workflow_dispatch" ]; then
+            echo "Source production must be successful workflow_dispatch"
+            exit 1
+          fi
+          gh api "repos/$REPO/commits/$NEW_SHA" >/dev/null
+          echo "previous_sha=$previous" >> "$GITHUB_OUTPUT"
+          echo "PREVIOUS_STABLE_SHA=$previous"
+          echo "NEW_STABLE_SHA=$NEW_SHA"
+          echo "SOURCE_PRODUCTION_RUN=$SOURCE_RUN"
+          echo "Promotion approval asserts HUMAN QA PASS for the exact source run."
+
+      - name: Move stable pointer explicitly
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          NEW_SHA: ${{ inputs.new_sha }}
+        run: |
+          set -euo pipefail
+          gh api --method PATCH "repos/$REPO/git/refs/heads/publish-stable" -f sha="$NEW_SHA" -F force=true >/dev/null
+          actual="$(gh api "repos/$REPO/commits/publish-stable" --jq .sha)"
+          test "$actual" = "$NEW_SHA"
+          echo "PROMOTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          echo "PUBLISH_STABLE_SHA=$actual"
+
+      - name: Write promotion manifest
+        env:
+          PREVIOUS_SHA: ${{ steps.validate.outputs.previous_sha }}
+          NEW_SHA: ${{ inputs.new_sha }}
+          SOURCE_RUN: ${{ inputs.source_production_run }}
+        run: |
+          cat > stable_promotion_manifest.json <<EOF
+          {
+            "action": "PROMOTE",
+            "previous_stable_sha": "$PREVIOUS_SHA",
+            "new_stable_sha": "$NEW_SHA",
+            "source_production_run": "$SOURCE_RUN",
+            "promoted_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          }
+          EOF
+
+      - name: Preserve promotion manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: stable-promotion-${{ github.run_id }}
+          path: stable_promotion_manifest.json
+          retention-days: 90
