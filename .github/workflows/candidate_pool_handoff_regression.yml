@@ -217,20 +217,46 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
       - name: Assert unchanged limits and no side-effect wiring
         run: |
           set -euo pipefail
-          grep -q 'MAX_TOPIC_REGENERATIONS = 6' main.py
-          grep -q 'V3_MAX_API_CALLS: "60"' .github/workflows/main.yml
-          grep -q 'V3_MAX_COST_USD: "0.05"' .github/workflows/main.yml
-          grep -q 'CANDIDATE SUPPLY RECOVERY (1/1)' ci_candidate_supply_recovery_hotfix.py
-          ! grep -q 'gh workflow run\|workflow_dispatch.*main.yml' ci_candidate_pool_handoff_hotfix.py quality/candidate_pool_handoff.py quality/candidate_pool_grounding_records.py
-          ! grep -q 'responses.create\|chat.completions\|images.generate\|vision_client' quality/candidate_pool_handoff.py quality/candidate_pool_grounding_records.py
-          echo THRESHOLDS_CHANGED=NO
-          echo MAX_TOPIC_REGENERATIONS=6
-          echo API_CAP=60
-          echo COST_CAP=0.05
-          echo SUPPLY_RECOVERY_BOUND=1
-          echo NEW_LLM_CALLS_IN_IMPLEMENTATION=0
-          echo NEW_VISION_CALLS_IN_IMPLEMENTATION=0
-          echo NEW_IMAGE_GENERATION_CALLS_IN_IMPLEMENTATION=0
+          python ci_hotfix.py
+          python - <<'PY'
+          from pathlib import Path
+
+          runtime_main = Path("main.py").read_text(encoding="utf-8")
+          workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
+          recovery = Path("ci_candidate_supply_recovery_hotfix.py").read_text(encoding="utf-8")
+          implementation = "\n".join(
+              Path(path).read_text(encoding="utf-8")
+              for path in (
+                  "ci_candidate_pool_handoff_hotfix.py",
+                  "quality/candidate_pool_handoff.py",
+                  "quality/candidate_pool_grounding_records.py",
+              )
+          )
+          assert "MAX_TOPIC_REGENERATIONS = 6" in runtime_main
+          assert 'V3_MAX_API_CALLS: "60"' in workflow
+          assert 'V3_MAX_COST_USD: "0.05"' in workflow
+          assert "CANDIDATE SUPPLY RECOVERY (1/1)" in recovery
+          assert "gh workflow run" not in implementation
+          assert "workflow_dispatch.*main.yml" not in implementation
+          for token in (
+              "responses.create(",
+              "chat.completions.create(",
+              "images.generate(",
+              "vision_client",
+          ):
+              assert token not in implementation, token
+          print("THRESHOLDS_CHANGED=NO")
+          print("MAX_TOPIC_REGENERATIONS=6")
+          print("API_CAP=60")
+          print("COST_CAP=0.05")
+          print("SUPPLY_RECOVERY_BOUND=1")
+          print("NEW_LLM_CALLS_IN_IMPLEMENTATION=0")
+          print("NEW_VISION_CALLS_IN_IMPLEMENTATION=0")
+          print("NEW_IMAGE_GENERATION_CALLS_IN_IMPLEMENTATION=0")
+          PY
