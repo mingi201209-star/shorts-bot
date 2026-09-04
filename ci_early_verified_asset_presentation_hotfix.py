@@ -116,8 +116,11 @@ _MOTION_FUNCTION = r'''def _motion_clip(image_path, output_path, duration, prese
         zoom_start = float(presentation["zoom_start"])
         zoom_max = float(presentation["zoom_max"])
         zoom_step = float(presentation["zoom_step"])
+        # zoompan emits one output frame per repeated still input (d=1). Use
+        # pzoom to carry the prior input-frame zoom; plain zoom resets here and
+        # makes the Scene-2 inspection presentation effectively static.
         zoom_expr = (
-            f"if(eq(on,1),{zoom_start:.4f},min(zoom+{zoom_step:.4f},{zoom_max:.4f}))"
+            f"if(eq(on,0),{zoom_start:.4f},min(max(zoom,pzoom)+{zoom_step:.4f},{zoom_max:.4f}))"
         )
     else:
         zoom_expr = "min(zoom+0.0007,1.08)"

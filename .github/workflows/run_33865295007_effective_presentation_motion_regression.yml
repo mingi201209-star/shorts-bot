@@ -1,0 +1,50 @@
+name: Run 33865295007 Effective Presentation Motion Regression
+
+on:
+  push:
+    branches:
+      - "fix/**"
+    paths:
+      - "ci_early_verified_asset_presentation_hotfix.py"
+      - "quality/run_33865295007_effective_presentation_motion_regression_test.py"
+      - ".github/workflows/run_33865295007_effective_presentation_motion_regression.yml"
+      - ".github/workflows/main.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ci_early_verified_asset_presentation_hotfix.py"
+      - "quality/run_33865295007_effective_presentation_motion_regression_test.py"
+      - ".github/workflows/run_33865295007_effective_presentation_motion_regression.yml"
+      - ".github/workflows/main.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  authority-counterexample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Reproduce authority presentation counterexample
+        run: python quality/run_33865295007_effective_presentation_motion_regression_test.py
+      - name: Assert no API or production side effects
+        run: |
+          ! grep -q "OPENAI_KEY\|PEXELS_API_KEY\|PIXABAY_API_KEY\|YOUTUBE" .github/workflows/run_33865295007_effective_presentation_motion_regression.yml
+          echo PRODUCTION_SIDE_EFFECTS=0
+          echo NEW_LLM_CALLS=0
+          echo NEW_VISION_CALLS=0
+          echo NEW_IMAGE_GENERATION_CALLS=0
