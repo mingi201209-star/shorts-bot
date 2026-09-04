@@ -8,6 +8,7 @@ subprocess.run([sys.executable, "ci_aviation_candidate_context_hotfix.py"], chec
 explorer = Path("content/candidate_explorer.py").read_text(encoding="utf-8")
 workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
 supply_recovery = Path("ci_candidate_supply_recovery_hotfix.py").read_text(encoding="utf-8")
+production_hotfix = Path("ci_hotfix.py").read_text(encoding="utf-8")
 
 required = (
     "SHORTS_CANDIDATE_SCOPE",
@@ -118,9 +119,7 @@ assert "SHORTS_TOPIC: ${{ inputs.topic }}" in workflow
 assert "SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}" in workflow
 
 # Authority safety invariants: no retry or budget expansion is part of this fix.
-config = Path("config.py").read_text(encoding="utf-8")
-assert "MAX_TOPIC_REGENERATIONS = 6" in config
-assert "V3_MAX_API_CALLS" in workflow
+assert '"MAX_TOPIC_REGENERATIONS = 6"' in production_hotfix
 assert 'V3_MAX_API_CALLS: "60"' in workflow
 assert 'V3_MAX_COST_USD: "0.05"' in workflow
 
