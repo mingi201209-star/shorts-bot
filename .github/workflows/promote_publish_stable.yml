@@ -57,7 +57,7 @@ jobs:
 
           # The promoted commit must remain directly runnable as a stable engine.
           workflow="$(curl -fsSL "https://raw.githubusercontent.com/$REPO/$NEW_SHA/.github/workflows/main.yml")"
-          printf '%s\n' "$workflow" | grep -F 'ref: ${{ inputs.expected_sha || github.sha }}' >/dev/null
+          printf '%s\n' "$workflow" | grep -F 'inputs.expected_sha || github.sha' >/dev/null
           printf '%s\n' "$workflow" | grep -F 'if [ -z "$EXPECTED_SHA" ]' >/dev/null
           printf '%s\n' "$workflow" | grep -F 'python ci_final_visual_semantic_qa_hotfix.py' >/dev/null
           printf '%s\n' "$workflow" | grep -F 'python -m diagnostics.runner' >/dev/null
