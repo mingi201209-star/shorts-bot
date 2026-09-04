@@ -126,11 +126,37 @@ def _assert_new_surface_has_zero_calls():
     assert all(token not in text for token in forbidden), "new external/model call found"
 
 
+def _assert_candidate_gate_boundary_api_free(result):
+    """Verify independent Gate wiring without invoking its LLM implementation."""
+    main_source = (ROOT / "main.py").read_text(encoding="utf-8")
+    assert "from content.candidate_gate import (\n    evaluate_candidate,\n)" in main_source
+    assert "winner_gate = (\n                evaluate_candidate(\n                    winner," in main_source
+    assert 'role="Winner"' in main_source
+
+    calls = []
+
+    def gate_stub(candidate, *, role):
+        calls.append((candidate, role))
+        reveal = str((candidate.get("micro_narrative") or {}).get("reveal", ""))
+        if reveal == "안전을 위해 이런 모양입니다.":
+            return {"status": "REGENERATE", "reason": "editorial weakness fixture"}
+        return {"status": "PASS"}
+
+    survivor = result["winner"]
+    gate_result = gate_stub(survivor, role="Winner")
+    assert calls == [(survivor, "Winner")], calls
+    assert gate_result["status"] == "PASS", gate_result
+
+    weak = _window_candidate(editorially_weak=True)
+    weak_gate_result = gate_stub(weak, role="Winner")
+    assert weak_gate_result["status"] == "REGENERATE", weak_gate_result
+    print("Candidate Gate boundary: PASS (source wiring + deterministic API-free stub)")
+
+
 def green() -> int:
     os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
 
     validate_explorer_output = _runtime_explorer_module().validate_explorer_output
-    from content.candidate_gate import evaluate_candidate as candidate_gate_evaluate
     from quality.canonical_subject_grounding import evaluate_candidate_subject_grounding
 
     mixed = _pool([
@@ -148,16 +174,16 @@ def green() -> int:
     assert diagnostics[1]["status"] == "SURVIVE", diagnostics
     assert diagnostics[2]["status"] == "SURVIVE", diagnostics
     assert result["winner"]["topic"] == "비행기 창문 가장자리의 둥근 모서리"
-    print("TEST B mixed pool: PASS (hard invalid rejected; factual + editorially weak supply survived)")
+    print("TEST A mixed pool: PASS (supplied=3, hard invalid rejected, survived=2)")
+    print("TEST B editorially weak factual candidate: PASS (supply survivor)")
 
-    weak_gate = candidate_gate_evaluate(_window_candidate(editorially_weak=True))
-    assert weak_gate.get("status") in {"PASS", "REGENERATE"}, weak_gate
-    print(f"Candidate Gate remains independent: {weak_gate.get('status')}")
+    _assert_candidate_gate_boundary_api_free(result)
+    print("TEST C grounded valid candidate reaches independent Candidate Gate boundary: PASS")
 
     all_bad = validate_explorer_output(_pool([_malformed_candidate(), _offscope_candidate()]))
     assert all_bad["status"] == "REGENERATE", all_bad
     assert "ALL_CANDIDATES_HARD_FAILED" in all_bad.get("reason", ""), all_bad
-    print("TEST C all hard invalid: PASS (fail-close)")
+    print("TEST D all hard invalid: PASS (fail-close)")
 
     window_only = validate_explorer_output(_pool([_window_candidate()]))
     window = window_only["winner"]
@@ -167,11 +193,11 @@ def green() -> int:
     assert window["canonical_subject"] != "UNKNOWN", window
     evidence = window.get("_trusted_grounding_evidence") or []
     assert evidence and "faa.gov" in evidence[0].get("source", ""), evidence
-    print("TEST D rounded-window trusted grounding: PASS")
+    print("TEST E rounded-window trusted grounding: PASS")
 
     malformed = validate_explorer_output(_pool([_malformed_candidate()]))
     assert malformed["status"] == "REGENERATE", malformed
-    print("TEST E malformed schema: PASS (fail-close)")
+    print("Malformed schema: PASS (fail-close)")
 
     os.environ["SHORTS_CANDIDATE_SCOPE"] = "urban"
     try:
