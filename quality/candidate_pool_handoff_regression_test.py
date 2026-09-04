@@ -9,7 +9,7 @@ RED authority:
 
 GREEN authority:
 - aviation Candidate Explorer may hand a bounded 1..3 pool to host;
-- host validates each candidate independently and grounds it deterministically;
+- host validates candidates independently and grounds them deterministically;
 - editorial weakness remains Candidate Gate authority;
 - all-hard-invalid stays fail-closed;
 - no new model/Vision/image-generation call is introduced.
@@ -23,6 +23,14 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _runtime_explorer_module():
+    # content.candidate_explorer is a safe wrapper package that intentionally loads
+    # content/candidate_explorer.py as _LEGACY. Production uses the same module.
+    import content.candidate_explorer as explorer_package
+
+    return explorer_package._LEGACY
 
 
 def _window_candidate(*, editorially_weak: bool = False):
@@ -49,8 +57,6 @@ def _window_candidate(*, editorially_weak: bool = False):
         "counterintuitive_result": "작은 모서리 형상이 응력 집중과 연결됩니다.",
         "tradeoff": "",
         "concrete_condition": "객실 가압으로 동체가 반복 하중을 받을 때",
-        # Deliberately unresolved model identity. Trusted evidence, not a forced
-        # UNKNOWN->physical fallback, must establish the subject.
         "subject_kind": "",
         "canonical_subject": "UNKNOWN",
         "subject_identity_confidence": 0.0,
@@ -66,6 +72,7 @@ def _offscope_candidate():
         core_question="왜 자동차 타이어에는 깊은 홈이 있을까?",
         specific_observation="타이어 표면의 홈",
         constraint="젖은 노면의 물 배출",
+        concrete_condition="젖은 도로에서 주행할 때",
     )
     candidate["micro_narrative"] = {
         "hook": "타이어 홈에는 물이 지나갑니다.",
@@ -88,9 +95,7 @@ def _pool(candidates):
 
 
 def legacy_red() -> int:
-    # Fresh checkout, before CI installers mutate candidate_explorer.py.
-    from content.candidate_explorer import validate_explorer_output
-
+    validate_explorer_output = _runtime_explorer_module().validate_explorer_output
     try:
         validate_explorer_output(_pool([_window_candidate()]))
     except ValueError as exc:
@@ -124,12 +129,10 @@ def _assert_new_surface_has_zero_calls():
 def green() -> int:
     os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
 
-    from content.candidate_explorer import validate_explorer_output
+    validate_explorer_output = _runtime_explorer_module().validate_explorer_output
     from content.candidate_gate import evaluate_candidate as candidate_gate_evaluate
     from quality.canonical_subject_grounding import evaluate_candidate_subject_grounding
 
-    # Installer must be live in this process after the workflow applies the
-    # aviation composition. This is the runtime boundary the authority run lacked.
     mixed = _pool([
         _malformed_candidate(),
         _window_candidate(editorially_weak=False),
@@ -147,8 +150,6 @@ def green() -> int:
     assert result["winner"]["topic"] == "비행기 창문 가장자리의 둥근 모서리"
     print("TEST B mixed pool: PASS (hard invalid rejected; factual + editorially weak supply survived)")
 
-    # Candidate Gate remains independent and may still editorially reject a weak
-    # supplied candidate. We only assert that host handoff does not bypass it.
     weak_gate = candidate_gate_evaluate(_window_candidate(editorially_weak=True))
     assert weak_gate.get("status") in {"PASS", "REGENERATE"}, weak_gate
     print(f"Candidate Gate remains independent: {weak_gate.get('status')}")
@@ -158,9 +159,6 @@ def green() -> int:
     assert "ALL_CANDIDATES_HARD_FAILED" in all_bad.get("reason", ""), all_bad
     print("TEST C all hard invalid: PASS (fail-close)")
 
-    # Run 33893139846 counterexample. Model identity is UNKNOWN; the existing
-    # deterministic trusted supplier must establish physical identity from a
-    # repo-owned FAA evidence record before the canonical gate passes.
     window_only = validate_explorer_output(_pool([_window_candidate()]))
     window = window_only["winner"]
     grounding = evaluate_candidate_subject_grounding(window)
@@ -175,7 +173,6 @@ def green() -> int:
     assert malformed["status"] == "REGENERATE", malformed
     print("TEST E malformed schema: PASS (fail-close)")
 
-    # Non-aviation behavior is legacy: CANDIDATE_POOL remains unsupported.
     os.environ["SHORTS_CANDIDATE_SCOPE"] = "urban"
     try:
         validate_explorer_output(_pool([_window_candidate()]))
@@ -186,7 +183,6 @@ def green() -> int:
     print("TEST F non-aviation compatibility: PASS")
     os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
 
-    # #282/#283 contracts are preserved in the composed Explorer source.
     explorer_source = (ROOT / "content/candidate_explorer.py").read_text(encoding="utf-8")
     assert "AVIATION_SYSTEM_AUTHORITY_SUPPLY_V1" in explorer_source
     assert "AVIATION OBSERVABLE SEED SUPPLY CONTRACT" in explorer_source
