@@ -135,7 +135,7 @@ for item in (
     "direct_result",
     "visual_proof_target",
     "instantiate several materially distinct concrete observable seeds",
-    "do not evaluate the broad direction itself as a Candidate",
+    "Do not evaluate the broad direction itself as a Candidate",
     "no additional API call",
 ):
     assert item in explorer, item
