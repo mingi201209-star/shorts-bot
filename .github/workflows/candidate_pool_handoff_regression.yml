@@ -33,11 +33,22 @@ jobs:
             exit 1
           fi
           echo "RED_BEFORE=legacy SELECTED-or-REGENERATE host contract rejects CANDIDATE_POOL"
-      - name: Apply aviation composition through Candidate Pool Handoff
+      - name: Apply exact production composition through Candidate Pool Handoff
         env:
           SHORTS_CANDIDATE_SCOPE: aviation
         run: |
           set -euo pipefail
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          python ci_video_provider_hotfix.py
+          python ci_topic_input_hotfix.py
           python ci_aviation_candidate_context_hotfix.py
           python ci_aviation_candidate_specificity_hotfix.py
           python ci_aviation_context_signature_compat_hotfix.py
@@ -66,19 +77,25 @@ jobs:
         env:
           SHORTS_CANDIDATE_SCOPE: aviation
         run: python quality/aviation_candidate_context_regression_test.py
+      - name: Reset fixture mutations
+        run: git reset --hard HEAD
       - name: Aviation Candidate Specificity
         env:
           SHORTS_CANDIDATE_SCOPE: aviation
         run: |
           python quality/aviation_candidate_specificity_regression_test.py
-          git checkout -- content/candidate_explorer.py
+          git reset --hard HEAD
           python quality/aviation_specificity_projection_regression_test.py
+      - name: Reset fixture mutations again
+        run: git reset --hard HEAD
       - name: Aviation Context Signature
         env:
           SHORTS_CANDIDATE_SCOPE: aviation
         run: |
           python quality/aviation_context_signature_compat_regression_test.py
           python quality/fixed_aviation_scope_contract_regression_test.py
+      - name: Fresh surface for Candidate Grounded Recovery
+        run: git reset --hard HEAD
       - name: Candidate Grounded Recovery and supply recovery bound
         env:
           SHORTS_CANDIDATE_SCOPE: aviation
@@ -88,17 +105,19 @@ jobs:
           python ci_candidate_grounded_recovery_hotfix.py
           python quality/candidate_grounded_recovery_regression_test.py
           python quality/candidate_supply_recovery_search_regression_test.py
+      - name: Fresh surface for Canonical Subject Grounding
+        run: git reset --hard HEAD
       - name: Canonical Subject Grounding and Supply
         run: |
-          git checkout -- content/candidate_explorer.py main.py quality/judge.py || true
           python -m quality.canonical_subject_grounding_supply_regression_test
           python -m quality.canonical_subject_grounding_regression_test
+      - name: Fresh surface for FACT Critical Recovery
+        run: git reset --hard HEAD
       - name: FACT Critical Recovery
         env:
           V3_MAX_API_CALLS: "60"
           V3_MAX_COST_USD: "0.05"
         run: |
-          git checkout -- main.py content/candidate_explorer.py config.py || true
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
           python ci_fact_critical_hotfix.py
