@@ -51,6 +51,24 @@ def main():
 그중 가능한 한 여러 개를 실제 Candidate record로 유지하여 기존 Gate가 비교하게 하라.
 모든 후보가 완벽할 필요는 없다. Gate가 경쟁시킬 수 있을 정도로 구체적이고 사실 기반이면 된다.
 
+[AVIATION OBSERVABLE SEED SUPPLY CONTRACT — RUN 33887547463]
+The broad direction is an exploration axis, never the Candidate itself.
+Before evaluating Candidate quality, instantiate several materially distinct concrete observable seeds inside the assigned aviation direction.
+Do not evaluate the broad direction itself as a Candidate.
+
+Each internal seed must bind all of these meanings before Hard Gate evaluation:
+- observable_object_or_feature: one real object, part, action, indication, movement, or visible change a viewer can point to
+- specific_observation: exactly what the passenger/viewer sees, hears, feels, or notices
+- viewer_question: a direct question about why that concrete observation exists, moves, changes, or is placed there
+- candidate_mechanism_or_constraint: at least one grounded physical mechanism, operational constraint, trade-off, or causal step that could explain it
+- direct_result: the immediate result of that mechanism/constraint, not a generic benefit label
+- visual_proof_target: the concrete subject/process the final Short could actually show
+
+Map those meanings into the existing Candidate JSON instead of inventing a parallel schema: topic/angle/core_question/micro_narrative, visual_proof, fact_check_focus, and the existing aviation specificity extension fields.
+A broad category name such as a cabin system, safety system, engine/intake area, flight performance, or pressure/air-conditioning domain may be a search axis only; narrow it to one concrete observable object/feature/action/change before Candidate evaluation.
+Do not hard-code or prefer any named answer or component. The concrete seeds must be discovered inside the current direction from grounded knowledge.
+This staged seed instantiation happens inside the existing Candidate Explorer call; it requires no additional API call.
+
 [SUPPLY SHORTAGE IS NOT A TERMINAL RESULT]
 위 최소 10개는 탐색 목표이지 SELECTED를 반환하기 위한 최소 통과 숫자가 아니다.
 grounded하고 구체적이며 필수 필드가 완성된 Candidate가 1개라도 남아 있다면 후보 수가 목표보다 적다는 이유만으로 REGENERATE를 반환하지 마라.
@@ -196,6 +214,36 @@ belong to the independent Candidate Gate for terminal editorial judgment.
 
 For non-aviation scopes, keep Sections 7 and 12 unchanged and preserve their
 existing terminal semantics.
+
+[AVIATION OBSERVABLE SEED SUPPLY CONTRACT — RUN 33887547463]
+For aviation supply, the assigned broad direction is an exploration axis, never
+the Candidate itself. Before applying Hard Gate or Final Sanity, instantiate
+several materially distinct concrete observable seeds inside that direction.
+Do not evaluate the broad direction itself as a Candidate.
+
+Each seed must bind these meanings before Candidate evaluation:
+- observable_object_or_feature
+- specific_observation
+- viewer_question
+- candidate_mechanism_or_constraint
+- direct_result
+- visual_proof_target
+
+A seed is eligible for supply only when its physical/observable subject is clear,
+its mechanism/constraint is grounded enough to state without invention, and its
+visual proof target is concrete. Map those meanings into the existing Candidate
+schema and aviation specificity fields; do not add a second output schema.
+Broad category labels may guide search but must be narrowed to one concrete
+object, feature, action, indication, movement, or visible change before Hard Gate.
+Do not hard-code any particular aircraft component or answer. This staged
+instantiation happens inside the current Candidate Explorer call and makes no
+additional API call.
+
+Apply the existing aviation editorial separation only after concrete seed
+instantiation: editorial weakness may rank surviving seeds but cannot erase an
+otherwise grounded/structurally valid seed. Fabrication, factual contradiction,
+grounding insufficiency, aviation-scope violation, missing visual proof, missing
+required structure, and malformed output remain terminal fail-close conditions.
 """
 
 # CANDIDATE_SUPPLY_OBSERVABILITY_V1
@@ -233,6 +281,7 @@ def validate_explorer_output(data):
     EXPLORER_PATH.write_text(text, encoding="utf-8")
     print("✅ aviation candidate supply/gate separation hotfix applied")
     print("✅ aviation Candidate system-authority supply contract + observability applied")
+    print("✅ Run 33887547463 aviation observable seed supply contract applied")
 
 
 if __name__ == "__main__":
