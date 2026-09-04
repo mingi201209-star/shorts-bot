@@ -139,8 +139,100 @@ Gate 기준을 낮추지 마라. 구조·사실성 Hard Gate와 downstream Candi
 '''
 
     text = replace_once(text, marker, replacement, "aviation execution context")
+
+    authority_marker = "AVIATION_SYSTEM_AUTHORITY_SUPPLY_V1"
+    if authority_marker not in text:
+        text += r'''
+
+# AVIATION_SYSTEM_AUTHORITY_SUPPLY_V1
+# Run 33883590214 proved that the aviation ranking-only instruction in the user
+# execution context could conflict with older terminal editorial rules in the
+# system prompt. Install the scope-aware precedence at the same SYSTEM authority.
+CANDIDATE_EXPLORER_PROMPT += """
+
+[AVIATION SYSTEM-AUTHORITY SUPPLY CONTRACT — RUN 33883590214]
+This block is part of the same SYSTEM-prompt authority as Sections 7 and 12.
+When the execution context declares SHORTS_CANDIDATE_SCOPE=aviation, this scoped
+contract overrides only contradictory editorial terminal semantics in those
+sections. It does not weaken structural, factual, grounding, scope, visual-proof,
+or schema requirements.
+
+AVIATION SUPPLY RESPONSIBILITY:
+Candidate Explorer is the grounded + structurally usable Candidate supplier.
+The independent Candidate Gate remains the editorial authority for final
+publish-worthiness.
+
+For aviation supply, the following are ranking/preference signals only and must
+not be the sole reason to return REGENERATE or reduce an otherwise grounded,
+structurally complete Candidate pool to zero:
+- PREDICTABLE PAYOFF
+- WEAK PAYOFF / SO WHAT?
+- GENERIC EXPLANATION / BROAD THEME or broad question
+- weak novelty
+- generic reveal when the Candidate still has a real grounded mechanism or
+  constraint that can be evaluated downstream
+
+If at least one Candidate remains grounded, structurally complete, inside the
+aviation scope, supported by a concrete visual proof, and valid under the output
+schema, return SELECTED with the strongest surviving Candidate even when it has
+one or more of the editorial weaknesses above. Those weaknesses may lower its
+rank; they do not by themselves erase supply. The independent Candidate Gate may
+then return REGENERATE for those same editorial weaknesses.
+
+Aviation structural/factual supply failures remain terminal. Continue to reject
+or return REGENERATE when no Candidate survives because of any of these:
+- fabricated or unsupported causal claim
+- placeholder or required structure missing
+- factual contradiction or grounding/evidence insufficient
+- canonical subject is unclear or unsupported
+- aviation scope violation
+- visual-proof requirement failure
+- malformed schema/output
+
+Final Sanity in aviation supply must apply the same separation: factual,
+structural, grounding, scope and visual-proof failures can be terminal; purely
+editorial broad/generic/predictable/weak-novelty findings are ranking signals and
+belong to the independent Candidate Gate for terminal editorial judgment.
+
+For non-aviation scopes, keep Sections 7 and 12 unchanged and preserve their
+existing terminal semantics.
+"""
+
+# CANDIDATE_SUPPLY_OBSERVABILITY_V1
+# Host-observable telemetry only. The model does not expose its internal seed or
+# discard counts, so never fabricate them. Log only the boundary and reason code
+# deterministically visible from the returned JSON.
+_aviation_supply_observability_previous_validate = validate_explorer_output
+
+
+def validate_explorer_output(data):
+    result = _aviation_supply_observability_previous_validate(data)
+    if (
+        os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower() == "aviation"
+        and isinstance(result, dict)
+        and str(result.get("status", "")).strip().upper() == "REGENERATE"
+    ):
+        reason = str(result.get("reason", "")).strip().lower()
+        if "usable grounded candidate" in reason and (
+            "0개" in reason or "zero" in reason or "없" in reason
+        ):
+            reason_code = "ZERO_USABLE_GROUNDED"
+            zero_stage = "model_output_pre_host_candidate_validation"
+        else:
+            reason_code = "MODEL_REGENERATE_OTHER"
+            zero_stage = "model_output_pre_host_candidate_validation"
+        print(
+            "[CANDIDATE_SUPPLY_DIAG] "
+            f"final_zero_stage={zero_stage} "
+            f"discard_reason_code={reason_code} "
+            "model_internal_candidate_counts=unavailable"
+        )
+    return result
+'''
+
     EXPLORER_PATH.write_text(text, encoding="utf-8")
     print("✅ aviation candidate supply/gate separation hotfix applied")
+    print("✅ aviation Candidate system-authority supply contract + observability applied")
 
 
 if __name__ == "__main__":
