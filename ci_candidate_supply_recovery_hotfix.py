@@ -58,6 +58,24 @@ def _build_candidate_supply_recovery_context(
         fixed_topic_gate_feedback=fixed_topic_gate_feedback,
     )
 
+    aviation_scope = (
+        os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower()
+        == "aviation"
+    )
+    aviation_precedence = ""
+    if aviation_scope:
+        aviation_precedence = """
+[AVIATION SUPPLY RECOVERY PRECEDENCE — RUN 33878093224]
+This recovery call is still a Candidate SUPPLY step, not the independent
+Candidate Gate. Preserve the aviation execution-context separation of
+responsibilities. BROAD / GENERIC QUESTION, GENERIC REVEAL, PREDICTABLE PAYOFF,
+weak payoff, or novelty concern alone must not make a grounded, structurally
+complete aviation Candidate disappear or turn the whole supply into zero.
+Use those editorial signals only to rank surviving supply candidates. Keep
+structural/factual hard gates fail-closed. The unchanged independent Candidate
+Gate remains authoritative for editorial PASS/REGENERATE.
+"""
+
     return base + f"""
 
 ============================================================
@@ -71,13 +89,13 @@ Original reason:
 {original_reason}
 
 This is the only supply-recovery opportunity for this generation run.
-Do NOT relax any Candidate Explorer hard gate, anti-cliche rule, anti-fabrication
-rule, final sanity rule, or fact-safety rule.
-
+Do NOT relax any Candidate Explorer structural/factual hard gate,
+anti-fabrication rule, or fact-safety rule.
+{aviation_precedence}
 Before deciding REGENERATE, silently explore at least 6 materially distinct
 concrete observations or mechanisms inside the assigned direction. Do not emit
-that scratch list. Evaluate each against the SAME hard gates. A weak first idea
-is not evidence that the direction has zero supply.
+that scratch list. Evaluate each against the SAME hard gates for structural/factual safety.
+A weak first idea is not evidence that the direction has zero supply.
 
 Prefer candidates whose observation, mechanism/constraint, direct result, and
 visual proof can all be named concretely from established knowledge. For
@@ -87,7 +105,7 @@ mechanism or constraint must carry the story.
 
 Search again for at least one concrete candidate that is:
 - a real, recognizable subject or observable detail,
-- driven by a specific non-obvious mechanism, purpose, constraint, or effect,
+- driven by a specific mechanism, purpose, constraint, or effect,
 - independently verifiable,
 - visually provable enough for a Short,
 - explainable within the normal target duration.
@@ -95,10 +113,13 @@ Search again for at least one concrete candidate that is:
 Do not invent hidden purposes, historical accidents, causal links, or numbers.
 If verification is required, put concrete claims in fact_check_focus.
 
-Run the SAME Candidate Explorer hard gates and final sanity check from the
-system prompt. Return SELECTED only if a candidate genuinely survives them.
-Return REGENERATE only after the silent breadth search above still yields no
-candidate that survives the existing gates. Return one JSON object only.
+For non-aviation scopes, run the normal Candidate Explorer hard gates and final
+sanity check from the system prompt unchanged. For aviation scope, the scoped
+supply-precedence block above controls editorial self-withholding: return
+SELECTED when at least one grounded, structurally complete Candidate survives
+supply hard gates, and let the unchanged independent Candidate Gate decide
+broad/generic/predictable editorial quality. Return REGENERATE only after the silent breadth search still yields no Candidate permitted by the applicable
+supply contract. Return one JSON object only.
 """
 
 

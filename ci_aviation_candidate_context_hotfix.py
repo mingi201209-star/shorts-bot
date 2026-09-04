@@ -54,11 +54,25 @@ def main():
 [SUPPLY SHORTAGE IS NOT A TERMINAL RESULT]
 위 최소 10개는 탐색 목표이지 SELECTED를 반환하기 위한 최소 통과 숫자가 아니다.
 grounded하고 구체적이며 필수 필드가 완성된 Candidate가 1개라도 남아 있다면 후보 수가 목표보다 적다는 이유만으로 REGENERATE를 반환하지 마라.
-그 경우 남아 있는 Candidate 중 기존 Hard Gate, scoring, shortlist, final sanity 기준을 통과한 가장 강한 하나를 Winner로 SELECTED하라.
+그 경우 구조·사실성 Hard Gate를 통과한 남은 Candidate 중 가장 강한 하나를 Winner로 SELECTED하라.
 독립적인 두 번째 후보가 없으면 runner_up은 null이어도 된다.
 REGENERATE는 usable grounded Candidate가 0개인 경우, 또는 남은 모든 후보가 구조·사실성 Hard Gate를 통과하지 못한 경우에만 사용하라.
 "후보 공급 부족", "후보 숫자 부족", "충분한 후보를 탐색하지 못함" 자체는 Candidate가 1개 이상 살아 있는 상황의 REGENERATE 이유가 될 수 없다.
 이 규칙은 Candidate Gate를 우회하지 않는다. SELECTED된 Winner는 기존 독립 Candidate Gate에서 똑같이 심사받고 약하면 그대로 탈락해야 한다.
+
+[AVIATION SUPPLY PRECEDENCE — RUN 33878093224]
+이 aviation 자동 공급 모드에서는 공급 단계와 독립 Candidate Gate의 책임을 섞지 마라.
+기존 Candidate Explorer의 편집적 final sanity와 novelty 판단은 후보 간 순위를 정하는 데만 사용한다.
+특히 다음 Candidate Gate 성격의 편집 판단만으로 grounded Candidate를 공급 단계에서 제거하지 마라:
+- BROAD / GENERIC QUESTION
+- GENERIC REVEAL
+- PREDICTABLE PAYOFF
+- weak payoff / novelty concern
+
+위 편집적 판단만으로 Candidate pool을 0개로 만들거나 REGENERATE를 반환하는 근거로 사용하지 마라.
+구조·사실성 Hard Gate는 그대로 fail-close한다. 즉 placeholder, 항공 범위 이탈, 실제 존재/인과가 의심되는 내용, 필수 구조 누락, visual proof 부재는 계속 제거한다.
+독립 Candidate Gate가 최종 편집성 PASS/REGENERATE authority다.
+이 scoped precedence는 뒤에 나오는 일반적인 final sanity 지시보다 우선한다.
 
 각 Candidate는 다음을 갖춰야 한다:
 1. 승객이 좌석/창문/객실/탑승/이륙/비행/착륙 과정에서 직접 보고·듣고·느낄 수 있는 단일 관찰 대상 또는 행동
@@ -111,8 +125,9 @@ REGENERATE는 usable grounded Candidate가 0개인 경우, 또는 남은 모든 
 
 위 항목은 방향 예시이며 특정 topic을 hard-code하는 목록이 아니다.
 
-후보 비교와 최종 Winner 선택에서는 기존 Candidate Explorer의 Hard Gate, scoring, shortlist, final sanity, novelty/중복 회피 기준을 그대로 적용하라.
-Gate 기준을 낮추지 마라. 이 변경의 목적은 Gate를 약하게 만드는 것이 아니라 Gate에 실제 선택지를 공급하는 것이다.
+후보 비교와 Winner 선택에서는 기존 scoring/shortlist/novelty 신호를 강한 후보의 순위를 정하는 데 사용하라.
+단, aviation 공급 모드에서는 위 [AVIATION SUPPLY PRECEDENCE — RUN 33878093224]에 따라 편집적 broad/generic/predictable 판단만으로 공급을 0으로 만들지 마라.
+Gate 기준을 낮추지 마라. 구조·사실성 Hard Gate와 downstream Candidate Gate 기준은 그대로 유지한다.
 """
 
     return f"""

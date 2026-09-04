@@ -7,6 +7,8 @@ subprocess.run([sys.executable, "ci_aviation_candidate_context_hotfix.py"], chec
 
 explorer = Path("content/candidate_explorer.py").read_text(encoding="utf-8")
 workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
+supply_recovery = Path("ci_candidate_supply_recovery_hotfix.py").read_text(encoding="utf-8")
+production_hotfix = Path("ci_hotfix.py").read_text(encoding="utf-8")
 
 required = (
     "SHORTS_CANDIDATE_SCOPE",
@@ -42,6 +44,47 @@ for item in (
 ):
     assert item in explorer, item
 
+# Authority Run 33878093224 showed the previous context contradicted the supply
+# separation contract later in the same prompt: after saying predictable / weak
+# payoff must reach the independent Candidate Gate, it re-required the Explorer's
+# editorial final-sanity/novelty filters as terminal selection gates. Six distinct
+# aviation directions then self-returned zero usable grounded supply. The aviation
+# scope must explicitly make editorial final-sanity criteria ranking-only at the
+# supply boundary while keeping structural/factual hard gates fail-closed.
+for item in (
+    "[AVIATION SUPPLY PRECEDENCE — RUN 33878093224]",
+    "편집적 final sanity와 novelty 판단은 후보 간 순위를 정하는 데만 사용",
+    "BROAD / GENERIC QUESTION",
+    "GENERIC REVEAL",
+    "PREDICTABLE PAYOFF",
+    "Candidate pool을 0개로 만들거나 REGENERATE를 반환하는 근거로 사용하지 마라",
+    "구조·사실성 Hard Gate는 그대로 fail-close",
+    "독립 Candidate Gate가 최종 편집성 PASS/REGENERATE authority",
+):
+    assert item in explorer, item
+
+# The old contradictory terminal instruction must no longer exist in aviation
+# supply context. It made the supply layer re-enforce the downstream Gate's job.
+assert (
+    "후보 비교와 최종 Winner 선택에서는 기존 Candidate Explorer의 Hard Gate, scoring, shortlist, final sanity, novelty/중복 회피 기준을 그대로 적용하라."
+    not in explorer
+)
+
+# The one bounded zero-supply recovery call must preserve the same aviation
+# separation instead of re-imposing the generic terminal final-sanity wording.
+for item in (
+    "[AVIATION SUPPLY RECOVERY PRECEDENCE — RUN 33878093224]",
+    "BROAD / GENERIC QUESTION, GENERIC REVEAL, PREDICTABLE PAYOFF",
+    "editorial signals only to rank surviving supply candidates",
+    "unchanged independent Candidate Gate",
+    "For non-aviation scopes, run the normal Candidate Explorer hard gates and final",
+):
+    assert item in supply_recovery, item
+assert (
+    "Run the SAME Candidate Explorer hard gates and final sanity check from the"
+    not in supply_recovery
+)
+
 # Hard structural / grounding exclusions remain explicit.
 for item in (
     "placeholder / 빈 필드 / 추상적인 시스템명만 있는 항목",
@@ -75,4 +118,9 @@ assert positions == sorted(positions)
 assert "SHORTS_TOPIC: ${{ inputs.topic }}" in workflow
 assert "SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}" in workflow
 
-print("PASS: aviation candidate supply shortage no longer becomes terminal by count alone")
+# Authority safety invariants: no retry or budget expansion is part of this fix.
+assert '"MAX_TOPIC_REGENERATIONS = 6"' in production_hotfix
+assert 'V3_MAX_API_CALLS: "60"' in workflow
+assert 'V3_MAX_COST_USD: "0.05"' in workflow
+
+print("PASS: Run 33878093224 aviation supply/editorial Gate separation is explicit and bounded")
