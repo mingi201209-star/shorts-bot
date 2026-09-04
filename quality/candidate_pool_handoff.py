@@ -17,6 +17,9 @@ from quality.canonical_subject_grounding import (
     normalize_candidate_subject_metadata,
 )
 from quality.canonical_subject_grounding_supply import supply_trusted_subject_grounding
+from quality.candidate_pool_grounding_records import (
+    CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS,
+)
 
 
 # Reuses the existing Candidate Explorer shortlist ceiling ("최대 3개").
@@ -87,6 +90,9 @@ def handoff_candidate_pool(
 
     survivors: List[Dict[str, Any]] = []
     diagnostics: List[Dict[str, Any]] = []
+    combined_trusted_records = tuple(trusted_records or ()) + tuple(
+        CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS
+    )
 
     for index, raw in enumerate(raw_pool, start=1):
         topic = str(raw.get("topic") or "").strip() if isinstance(raw, dict) else ""
@@ -114,7 +120,7 @@ def handoff_candidate_pool(
 
         grounded = supply_trusted_subject_grounding(
             validated,
-            trusted_records=tuple(trusted_records or ()),
+            trusted_records=combined_trusted_records,
         )
         grounding = evaluate_candidate_subject_grounding(grounded)
         if grounding.get("status") != "PASS":
