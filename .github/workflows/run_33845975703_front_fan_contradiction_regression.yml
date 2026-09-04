@@ -1,0 +1,24 @@
+name: Run 33845975703 Front Fan Contradiction Regression
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ci_run_33377519851_scene1_viewpoint_structure_hotfix.py"
+      - "quality/run_33845975703_front_fan_contradiction_regression_test.py"
+      - ".github/workflows/run_33845975703_front_fan_contradiction_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  authority-counterexample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run deterministic authority counterexample
+        run: python quality/run_33845975703_front_fan_contradiction_regression_test.py
