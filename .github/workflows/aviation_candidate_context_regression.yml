@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - agent/aviation-candidate-context
+      - fix/run-33883590214-candidate-system-authority
     paths:
       - "ci_aviation_candidate_context_hotfix.py"
       - "quality/aviation_candidate_context_regression_test.py"
