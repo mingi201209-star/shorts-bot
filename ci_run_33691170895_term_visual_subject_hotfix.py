@@ -20,6 +20,23 @@ def _append_if_missing_or_shadowed(text, marker, block, function_names):
     return text.rstrip() + "\n\n" + block.strip() + "\n", True
 
 
+def _uniquify_reapply_predecessors(text, marker, block, aliases):
+    """Keep each installed wrapper's predecessor capture immutable.
+
+    Re-applying a wrapper after later production layers must not overwrite the
+    module-global predecessor alias used by an earlier wrapper. Otherwise the
+    earlier wrapper can start pointing forward into the later chain and create
+    a cycle. First install keeps the historical symbol names; later installs get
+    deterministic install-specific aliases.
+    """
+    if marker not in text:
+        return block
+    install_index = text.count(marker) + 1
+    for alias in aliases:
+        block = block.replace(alias, f"{alias}_install_{install_index}")
+    return block
+
+
 def _patch_term_boundary():
     text = RUNNER_PATH.read_text(encoding="utf-8")
     block = r'''
@@ -102,6 +119,12 @@ def _normalize_script_contracts_without_api(script, plan):
     result = _run_33691170895_previous_contract_normalization(script, plan)
     return _run_33691170895_normalize_viewer_terms(result, plan)
 '''
+    block = _uniquify_reapply_predecessors(
+        text,
+        TERM_MARKER,
+        block,
+        ("_run_33691170895_previous_contract_normalization",),
+    )
     text, changed = _append_if_missing_or_shadowed(
         text,
         TERM_MARKER,
@@ -269,6 +292,15 @@ def fetch_video(query_or_scene):
     finally:
         _RUN_33691170895_ACTIVE_SCENE = previous
 '''
+    block = _uniquify_reapply_predecessors(
+        text,
+        VISUAL_MARKER,
+        block,
+        (
+            "_run_33691170895_previous_choose_best_candidate",
+            "_run_33691170895_previous_fetch_video",
+        ),
+    )
     text, changed = _append_if_missing_or_shadowed(
         text,
         VISUAL_MARKER,
