@@ -9,6 +9,7 @@ explorer = Path("content/candidate_explorer.py").read_text(encoding="utf-8")
 workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
 supply_recovery = Path("ci_candidate_supply_recovery_hotfix.py").read_text(encoding="utf-8")
 production_hotfix = Path("ci_hotfix.py").read_text(encoding="utf-8")
+candidate_gate = Path("content/candidate_gate.py").read_text(encoding="utf-8")
 
 required = (
     "SHORTS_CANDIDATE_SCOPE",
@@ -93,6 +94,59 @@ for item in (
 ):
     assert item in explorer, item
 
+# Run 33883590214: the #281 aviation separation lived only in user execution
+# context, while the same call's system prompt retained terminal editorial rules.
+# The correction must exist at SYSTEM authority and explicitly scope the override
+# to aviation supply only, after the legacy Final Sanity language it overrides.
+system_marker = "[AVIATION SYSTEM-AUTHORITY SUPPLY CONTRACT — RUN 33883590214]"
+assert system_marker in explorer
+assert explorer.index(system_marker) > explorer.index("12. FINAL SANITY CHECK")
+for item in (
+    "same SYSTEM-prompt authority",
+    "PREDICTABLE PAYOFF",
+    "WEAK PAYOFF / SO WHAT?",
+    "GENERIC EXPLANATION / BROAD THEME",
+    "weak novelty",
+    "ranking/preference signals only",
+    "must not be the sole reason to return REGENERATE",
+    "structural/factual supply failures remain terminal",
+    "independent Candidate Gate remains the editorial authority",
+    "For non-aviation scopes, keep Sections 7 and 12 unchanged",
+):
+    assert item in explorer, item
+
+# A: editorially weak but grounded/structural aviation supply survives to Gate.
+assert "return SELECTED with the strongest surviving Candidate" in explorer
+# B/C: factual/grounding and aviation-scope failures remain fail-closed.
+for item in (
+    "fabricated or unsupported causal claim",
+    "grounding/evidence insufficient",
+    "aviation scope violation",
+    "visual-proof requirement failure",
+):
+    assert item in explorer, item
+# D: malformed schema remains host-side invalid; no schema relaxation is installed.
+assert "Candidate Explorer status는" in explorer
+assert "winner.visual_proof" in explorer
+# E: independent Candidate Gate is untouched and remains capable of REGENERATE.
+assert "def evaluate_candidate" in candidate_gate
+assert '"REGENERATE"' in candidate_gate
+# F: bounded recovery stays exactly 1/1 and uses the same system prompt object.
+assert "CANDIDATE SUPPLY RECOVERY (1/1)" in supply_recovery
+assert '"content": CANDIDATE_EXPLORER_PROMPT' in supply_recovery
+# G: non-aviation semantics are explicitly preserved by the new system contract.
+assert "For non-aviation scopes, keep Sections 7 and 12 unchanged" in explorer
+
+# Deterministic host-side observability: do not fabricate model-internal counts.
+for item in (
+    "CANDIDATE_SUPPLY_OBSERVABILITY_V1",
+    "final_zero_stage=model_output_pre_host_candidate_validation",
+    "discard_reason_code=ZERO_USABLE_GROUNDED",
+    "model_internal_candidate_counts=unavailable",
+):
+    assert item in explorer, item
+assert "candidate_count_before_filter=" not in explorer
+
 # Fixed topic mode returns before the optional automatic run scope is read.
 assert explorer.index("if fixed_topic:") < explorer.index("SHORTS_CANDIDATE_SCOPE")
 assert "winner.topic은 반드시 아래 문자열과" in explorer
@@ -123,4 +177,4 @@ assert '"MAX_TOPIC_REGENERATIONS = 6"' in production_hotfix
 assert 'V3_MAX_API_CALLS: "60"' in workflow
 assert 'V3_MAX_COST_USD: "0.05"' in workflow
 
-print("PASS: Run 33878093224 aviation supply/editorial Gate separation is explicit and bounded")
+print("PASS: Run 33883590214 aviation system/user authority conflict removed without Gate relaxation")
