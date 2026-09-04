@@ -7,6 +7,7 @@ subprocess.run([sys.executable, "ci_aviation_candidate_context_hotfix.py"], chec
 
 explorer = Path("content/candidate_explorer.py").read_text(encoding="utf-8")
 workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
+supply_recovery = Path("ci_candidate_supply_recovery_hotfix.py").read_text(encoding="utf-8")
 
 required = (
     "SHORTS_CANDIDATE_SCOPE",
@@ -68,6 +69,21 @@ assert (
     not in explorer
 )
 
+# The one bounded zero-supply recovery call must preserve the same aviation
+# separation instead of re-imposing the generic terminal final-sanity wording.
+for item in (
+    "[AVIATION SUPPLY RECOVERY PRECEDENCE — RUN 33878093224]",
+    "BROAD / GENERIC QUESTION, GENERIC REVEAL, PREDICTABLE PAYOFF",
+    "editorial signals only to rank surviving supply candidates",
+    "unchanged independent Candidate Gate",
+    "For non-aviation scopes, run the normal Candidate Explorer hard gates and final",
+):
+    assert item in supply_recovery, item
+assert (
+    "Run the SAME Candidate Explorer hard gates and final sanity check from the"
+    not in supply_recovery
+)
+
 # Hard structural / grounding exclusions remain explicit.
 for item in (
     "placeholder / 빈 필드 / 추상적인 시스템명만 있는 항목",
@@ -101,4 +117,11 @@ assert positions == sorted(positions)
 assert "SHORTS_TOPIC: ${{ inputs.topic }}" in workflow
 assert "SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}" in workflow
 
-print("PASS: aviation candidate supply shortage no longer becomes terminal by count/editorial self-withholding")
+# Authority safety invariants: no retry or budget expansion is part of this fix.
+config = Path("config.py").read_text(encoding="utf-8")
+assert "MAX_TOPIC_REGENERATIONS = 6" in config
+assert "V3_MAX_API_CALLS" in workflow
+assert 'V3_MAX_API_CALLS: "60"' in workflow
+assert 'V3_MAX_COST_USD: "0.05"' in workflow
+
+print("PASS: Run 33878093224 aviation supply/editorial Gate separation is explicit and bounded")
