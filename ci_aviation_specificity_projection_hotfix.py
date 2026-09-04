@@ -172,3 +172,7 @@ Candidate Gate가 직접 읽는 topic, core_question, micro_narrative.reveal에�
 
 if __name__ == "__main__":
     main()
+    # Candidate Pool Handoff must be installed after specificity helpers/projection
+    # and before the existing bounded grounded/supply recovery composition.
+    # This import performs no model/Vision/image call.
+    import ci_candidate_pool_handoff_hotfix  # noqa: F401,E402
