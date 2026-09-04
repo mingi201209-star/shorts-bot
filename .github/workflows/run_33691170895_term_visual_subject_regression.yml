@@ -9,6 +9,7 @@ on:
       - "ci_writer_audience_comprehension_hotfix.py"
       - "ci_aviation_context_signature_compat_hotfix.py"
       - "quality/run_33691170895_term_visual_subject_regression_test.py"
+      - "quality/run_33759359725_wrapper_composition_regression_test.py"
       - ".github/workflows/run_33691170895_term_visual_subject_regression.yml"
       - "content/script_engine_v2_runner.py"
       - "video/video_downloader.py"
@@ -36,7 +37,8 @@ jobs:
             ci_run_33691170895_term_visual_subject_hotfix.py \
             ci_writer_audience_comprehension_hotfix.py \
             ci_aviation_context_signature_compat_hotfix.py \
-            quality/run_33691170895_term_visual_subject_regression_test.py
+            quality/run_33691170895_term_visual_subject_regression_test.py \
+            quality/run_33759359725_wrapper_composition_regression_test.py
       - name: Run authority term and Scene2 visual counterexamples
         run: python -m quality.run_33691170895_term_visual_subject_regression_test
       - name: Cost call and threshold invariants
@@ -125,7 +127,14 @@ jobs:
           grep -q "RUN_33691170895_DISCRIMINATIVE_SUBJECT_GUARD_V1" video/video_downloader.py
           grep -q "QUESTION_SUBJECT_REUSE_RUN_33371268494_V1" video/still_image_fallback.py
           grep -q "EARLY_VERIFIED_ASSET_PRESENTATION_V1" video/still_image_fallback.py
-          python -m py_compile content/script_engine_v2_runner.py video/video_downloader.py video/video_engine.py
+          python -m py_compile content/script_engine_v2_runner.py video/video_downloader.py video/video_engine.py quality/run_33759359725_wrapper_composition_regression_test.py
+      - name: Run authority wrapper composition counterexample
+        run: python quality/run_33759359725_wrapper_composition_regression_test.py
+      - name: Run Final Visual Semantic QA after exact composition
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: python quality/final_visual_semantic_qa_regression_test.py
 
   installed-early-visual-contracts:
     runs-on: ubuntu-latest
