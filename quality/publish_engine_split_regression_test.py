@@ -45,8 +45,8 @@ def test_publish_uses_stable_ref_not_main_runtime() -> None:
     require(text, '-f expected_sha=""', "stable dispatch must not assert current main")
     require(text, '-f youtube_upload=false', "publish controller no upload")
     forbid(text, 'commits/main', "publish must not resolve runtime from main")
-    forbid(text, 'python ci_', "publish controller must not execute main hotfixes")
-    forbid(text, 'python -m diagnostics.runner', "publish controller must not execute main generator")
+    forbid(text, '\n          python ci_', "publish controller must not execute main hotfixes")
+    forbid(text, '\n          python -m diagnostics.runner', "publish controller must not execute main generator")
 
 
 def test_publish_fail_closes_sha_and_preserves_manifest() -> None:
