@@ -1,0 +1,236 @@
+name: Candidate Pool Handoff Authority Regression
+
+on:
+  push:
+    branches:
+      - fix/candidate-pool-handoff
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+  AI_VISUAL_FALLBACK_ENABLED: "false"
+
+jobs:
+  authority-red-green:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Reproduce legacy RED before installing Candidate Pool Handoff
+        run: |
+          set -euo pipefail
+          if python quality/candidate_pool_handoff_regression_test.py --legacy-red; then
+            echo "RED fixture unexpectedly passed on legacy output architecture"
+            exit 1
+          fi
+          echo "RED_BEFORE=legacy SELECTED-or-REGENERATE host contract rejects CANDIDATE_POOL"
+      - name: Apply aviation composition through Candidate Pool Handoff
+        env:
+          SHORTS_CANDIDATE_SCOPE: aviation
+        run: |
+          set -euo pipefail
+          python ci_aviation_candidate_context_hotfix.py
+          python ci_aviation_candidate_specificity_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          python ci_aviation_specificity_output_repair_hotfix.py
+          python ci_aviation_specificity_projection_hotfix.py
+          python ci_candidate_grounded_recovery_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          grep -q "CANDIDATE_POOL_HANDOFF_V1" content/candidate_explorer.py
+          grep -q "AVIATION_SYSTEM_AUTHORITY_SUPPLY_V1" content/candidate_explorer.py
+          grep -q "AVIATION OBSERVABLE SEED SUPPLY CONTRACT" content/candidate_explorer.py
+      - name: Run authority GREEN A-H
+        env:
+          SHORTS_CANDIDATE_SCOPE: aviation
+        run: python quality/candidate_pool_handoff_regression_test.py
+
+  candidate-blast-radius:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Aviation Candidate Context
+        env:
+          SHORTS_CANDIDATE_SCOPE: aviation
+        run: python quality/aviation_candidate_context_regression_test.py
+      - name: Aviation Candidate Specificity
+        env:
+          SHORTS_CANDIDATE_SCOPE: aviation
+        run: |
+          python quality/aviation_candidate_specificity_regression_test.py
+          git checkout -- content/candidate_explorer.py
+          python quality/aviation_specificity_projection_regression_test.py
+      - name: Aviation Context Signature
+        env:
+          SHORTS_CANDIDATE_SCOPE: aviation
+        run: |
+          python quality/aviation_context_signature_compat_regression_test.py
+          python quality/fixed_aviation_scope_contract_regression_test.py
+      - name: Candidate Grounded Recovery and supply recovery bound
+        env:
+          SHORTS_CANDIDATE_SCOPE: aviation
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+        run: |
+          python ci_candidate_grounded_recovery_hotfix.py
+          python quality/candidate_grounded_recovery_regression_test.py
+          python quality/candidate_supply_recovery_search_regression_test.py
+      - name: Canonical Subject Grounding and Supply
+        run: |
+          git checkout -- content/candidate_explorer.py main.py quality/judge.py || true
+          python -m quality.canonical_subject_grounding_supply_regression_test
+          python -m quality.canonical_subject_grounding_regression_test
+      - name: FACT Critical Recovery
+        env:
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+        run: |
+          git checkout -- main.py content/candidate_explorer.py config.py || true
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          PYTHONPATH=. python quality/fact_critical_regeneration_test.py
+
+  downstream-blast-radius:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: First5 + Hook Generation + Retention + Korean Speech Style
+        run: |
+          set -euo pipefail
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          PYTHONPATH=. python quality/first5_visual_contract_regression_test.py
+          PYTHONPATH=. python quality/first5_retention_tts_regression_test.py
+          PYTHONPATH=. python quality/hook_experiment_test.py
+          PYTHONPATH=. python quality/hook_generation_regression_test.py
+          PYTHONPATH=. python quality/retention_regression_test.py
+          PYTHONPATH=. python quality/korean_speech_style_test.py
+          PYTHONPATH=. python quality/korean_speech_style_rewrite_test.py
+      - name: Hook Visual Dominance deterministic regression
+        run: PYTHONPATH=. python quality/hook_visual_dominance_test.py
+
+  hook-production-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Apply existing Hook production-probe composition
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_hook_structure_guidance_hotfix.py
+      - name: Run existing bounded real-LLM Hook production probe
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          V3_HOOK_MODEL: gpt-4o-mini
+          V3_MAX_API_CALLS: "8"
+          V3_MAX_COST_USD: "0.015"
+          HOOK_CANDIDATE_COUNT: "5"
+          HOOK_GENERATION_COUNT: "10"
+          HOOK_MAX_REGENERATIONS: "1"
+        run: |
+          set -o pipefail
+          PYTHONPATH=. python quality/hook_generation_probe.py 2>&1 | tee hook_generation_probe.log
+          grep -q "REAL LLM HOOK PRODUCTION-LIKE PROBE PASS" hook_generation_probe.log
+
+  hook-experiment-e2e-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Apply Hook E2E fixture composition
+        run: |
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_hook_e2e_contract_hotfix.py
+      - name: Hook OFF fixture E2E
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          ENABLE_HOOK_EXPERIMENT: "0"
+          V3_MAX_API_CALLS: "30"
+          V3_MAX_COST_USD: "0.03"
+        run: |
+          PYTHONPATH=. python quality/hook_e2e_fixture.py --mode off > hook_off.log 2>&1
+          grep -q "FIXTURE E2E COMPLETE | mode=off" hook_off.log
+          test -s final_shorts.mp4
+      - name: Hook ON fixture E2E
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          ENABLE_HOOK_EXPERIMENT: "1"
+          V3_MAX_API_CALLS: "35"
+          V3_MAX_COST_USD: "0.04"
+        run: |
+          PYTHONPATH=. python quality/hook_e2e_fixture.py --mode on > hook_on.log 2>&1
+          grep -q "FIXTURE E2E COMPLETE | mode=on" hook_on.log
+          grep -q "cumulative_scoring_pool_count=5" hook_on.log
+          test -s final_shorts.mp4
+
+  safety-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Assert unchanged limits and no side-effect wiring
+        run: |
+          set -euo pipefail
+          grep -q 'MAX_TOPIC_REGENERATIONS = 6' main.py
+          grep -q 'V3_MAX_API_CALLS: "60"' .github/workflows/main.yml
+          grep -q 'V3_MAX_COST_USD: "0.05"' .github/workflows/main.yml
+          grep -q 'CANDIDATE SUPPLY RECOVERY (1/1)' ci_candidate_supply_recovery_hotfix.py
+          ! grep -q 'gh workflow run\|workflow_dispatch.*main.yml' ci_candidate_pool_handoff_hotfix.py quality/candidate_pool_handoff.py quality/candidate_pool_grounding_records.py
+          ! grep -q 'responses.create\|chat.completions\|images.generate\|vision_client' quality/candidate_pool_handoff.py quality/candidate_pool_grounding_records.py
+          echo THRESHOLDS_CHANGED=NO
+          echo MAX_TOPIC_REGENERATIONS=6
+          echo API_CAP=60
+          echo COST_CAP=0.05
+          echo SUPPLY_RECOVERY_BOUND=1
+          echo NEW_LLM_CALLS_IN_IMPLEMENTATION=0
+          echo NEW_VISION_CALLS_IN_IMPLEMENTATION=0
+          echo NEW_IMAGE_GENERATION_CALLS_IN_IMPLEMENTATION=0
