@@ -154,6 +154,7 @@ for item in (
 assert "예상 가능한 결론이라 약함" not in supply_recovery
 assert "_candidate_supply_reason_is_zero_usable" in supply_recovery
 assert "CANDIDATE SUPPLY RECOVERY (1/1)" in supply_recovery
+assert "[AVIATION OBSERVABLE SEED RECOVERY — RUN 33887547463]" in supply_recovery
 
 assert explorer.index("if fixed_topic:") < explorer.index("SHORTS_CANDIDATE_SCOPE")
 assert "winner.topic은 반드시 아래 문자열과" in explorer
