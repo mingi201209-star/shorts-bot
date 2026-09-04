@@ -26,7 +26,27 @@ def _candidate_supply_reason_is_zero_usable(result):
 
     reason = str(result.get("reason", "")).strip().lower()
     normalized = " ".join(reason.split())
-    return (
+
+    # Run 33887547463 showed that the model can express the same supply
+    # exhaustion without the literal phrase "usable grounded candidate".
+    # Keep this deterministic and narrow: only explicit no-supply / all-hard-
+    # gate-failed semantics spend the single bounded recovery. Pure editorial
+    # weakness (predictable/generic/weak payoff) must not trigger recovery.
+    zero_supply_markers = (
+        "candidate supply shortage",
+        "concrete candidate shortage",
+        "zero usable candidate",
+        "zero usable grounded candidate",
+        "no usable candidate",
+        "no grounded candidate",
+        "후보 공급 부족",
+        "구체적인 후보 부족",
+        "구체적인 후보가 부족",
+    )
+    if any(marker in normalized for marker in zero_supply_markers):
+        return True
+
+    literal_zero = (
         "usable grounded candidate" in normalized
         and (
             "0개" in normalized
@@ -34,6 +54,18 @@ def _candidate_supply_reason_is_zero_usable(result):
             or "없" in normalized
         )
     )
+    if literal_zero:
+        return True
+
+    hard_gate_exhaustion = (
+        "구조·사실성 hard gate" in normalized
+        and "모든 후보" in normalized
+        and (
+            "통과하지 못" in normalized
+            or "실패" in normalized
+        )
+    )
+    return hard_gate_exhaustion
 
 
 def _reset_candidate_supply_recovery_for_tests():
@@ -74,6 +106,15 @@ complete aviation Candidate disappear or turn the whole supply into zero.
 Use those editorial signals only to rank surviving supply candidates. Keep
 structural/factual hard gates fail-closed. The unchanged independent Candidate
 Gate remains authoritative for editorial PASS/REGENERATE.
+
+[AVIATION OBSERVABLE SEED RECOVERY — RUN 33887547463]
+Stay inside the SAME assigned broad direction, but do not retry the broad
+category as a Candidate. First instantiate several materially distinct concrete
+observable seeds, each binding an observable object/feature, specific
+observation, direct viewer question, grounded mechanism/constraint, direct
+result, and visual proof target. Then apply the SAME structural/factual hard
+gates. This is the same observable-seed contract as primary aviation supply and
+adds no new call beyond this already-bounded recovery opportunity.
 """
 
     return base + f"""
