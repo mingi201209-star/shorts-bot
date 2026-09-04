@@ -94,7 +94,7 @@ anti-fabrication rule, or fact-safety rule.
 {aviation_precedence}
 Before deciding REGENERATE, silently explore at least 6 materially distinct
 concrete observations or mechanisms inside the assigned direction. Do not emit
-that scratch list. Evaluate each against the SAME structural/factual hard gates.
+that scratch list. Evaluate each against the SAME hard gates for structural/factual safety.
 A weak first idea is not evidence that the direction has zero supply.
 
 Prefer candidates whose observation, mechanism/constraint, direct result, and
