@@ -42,6 +42,32 @@ for item in (
 ):
     assert item in explorer, item
 
+# Authority Run 33878093224 showed the previous context contradicted the supply
+# separation contract later in the same prompt: after saying predictable / weak
+# payoff must reach the independent Candidate Gate, it re-required the Explorer's
+# editorial final-sanity/novelty filters as terminal selection gates. Six distinct
+# aviation directions then self-returned zero usable grounded supply. The aviation
+# scope must explicitly make editorial final-sanity criteria ranking-only at the
+# supply boundary while keeping structural/factual hard gates fail-closed.
+for item in (
+    "[AVIATION SUPPLY PRECEDENCE — RUN 33878093224]",
+    "편집적 final sanity와 novelty 판단은 후보 간 순위를 정하는 데만 사용",
+    "BROAD / GENERIC QUESTION",
+    "GENERIC REVEAL",
+    "PREDICTABLE PAYOFF",
+    "Candidate pool을 0개로 만들거나 REGENERATE를 반환하는 근거로 사용하지 마라",
+    "구조·사실성 Hard Gate는 그대로 fail-close",
+    "독립 Candidate Gate가 최종 편집성 PASS/REGENERATE authority",
+):
+    assert item in explorer, item
+
+# The old contradictory terminal instruction must no longer exist in aviation
+# supply context. It made the supply layer re-enforce the downstream Gate's job.
+assert (
+    "후보 비교와 최종 Winner 선택에서는 기존 Candidate Explorer의 Hard Gate, scoring, shortlist, final sanity, novelty/중복 회피 기준을 그대로 적용하라."
+    not in explorer
+)
+
 # Hard structural / grounding exclusions remain explicit.
 for item in (
     "placeholder / 빈 필드 / 추상적인 시스템명만 있는 항목",
@@ -75,4 +101,4 @@ assert positions == sorted(positions)
 assert "SHORTS_TOPIC: ${{ inputs.topic }}" in workflow
 assert "SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}" in workflow
 
-print("PASS: aviation candidate supply shortage no longer becomes terminal by count alone")
+print("PASS: aviation candidate supply shortage no longer becomes terminal by count/editorial self-withholding")
