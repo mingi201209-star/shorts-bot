@@ -1,10 +1,12 @@
-"""Run 33974152422 flap canonical-grounding production regression.
+"""Run 33974152422 / 33975163656 flap grounding production regression.
 
-The production counterexample reached the fixed-topic advisory path, then the
-pre-Writer Canonical Subject Grounding Gate blocked because the selected flap
-candidate remained UNKNOWN. This regression executes the real production
-Candidate installer ordering, then validates the fixed flap payload in a fresh
-Python process so module caching cannot hide the production trusted-record set.
+The first counterexample proved fixed-topic flap identity must survive to the
+pre-Writer Canonical Subject Grounding Gate. Run 33975163656 then passed that
+gate but stopped because the grounded Writer plan had only two distinct factual
+claims while the production contract requires at least three. This regression
+executes the real candidate installer ordering in a fresh process and proves the
+trusted flap record supplies three distinct, evidence-owned claims without
+leaking them to another aviation subject.
 """
 
 from pathlib import Path
@@ -15,6 +17,11 @@ import textwrap
 
 FIXED_FLAP_TOPIC = "비행기 날개 뒤쪽 플랩은 왜 이착륙 때 펼쳐질까"
 EXPECTED_CANONICAL = "aircraft trailing-edge flap"
+EXPECTED_CLAIM_IDS = {
+    "flap_trailing_edge_identity",
+    "flap_camber_lift_drag",
+    "flap_low_landing_speed_tradeoff",
+}
 
 
 def _apply_production_candidate_wiring():
@@ -39,7 +46,6 @@ def run():
     )
     assert supply_source.count("# FIXED_TOPIC_FLAP_CANONICAL_GROUNDING_V1") == 1
 
-    # Re-run the leaf installer to prove the production extension is idempotent.
     subprocess.run([sys.executable, "ci_flap_canonical_grounding_hotfix.py"], check=True)
     supply_source = Path("quality/canonical_subject_grounding_supply.py").read_text(
         encoding="utf-8"
@@ -74,10 +80,9 @@ def run():
                 "fact_check_focus": [
                     "플랩의 날개 뒤쪽 위치와 고양력 장치 역할",
                     "플랩 전개가 캠버와 양력 및 항력에 미치는 영향",
+                    "플랩 전개가 낮은 착륙 속도를 가능하게 하는 운용 목적",
                 ],
-                "visual_proof": [
-                    "항공기 날개 뒤쪽 플랩이 전개된 모습",
-                ],
+                "visual_proof": ["항공기 날개 뒤쪽 플랩이 전개된 모습"],
                 "selection_reason": "실제 눈에 보이는 플랩 전개를 물리적 날개 구조와 연결할 수 있음",
             }},
             "runner_up": None,
@@ -88,10 +93,15 @@ def run():
         assert winner["canonical_subject"] == {EXPECTED_CANONICAL!r}, winner
         assert winner["subject_kind"] == "physical_entity", winner
         assert winner["subject_identity_confidence"] >= 0.80, winner
-        assert winner.get("_trusted_grounding_evidence"), winner
+        claims = winner.get("_trusted_grounded_claims") or []
+        assert isinstance(claims, list), type(claims)
+        claim_ids = {{str(c.get("claim_id", "")) for c in claims if isinstance(c, dict)}}
+        expected = {EXPECTED_CLAIM_IDS!r}
+        assert expected.issubset(claim_ids), (claim_ids, claims)
+        assert len(claim_ids) >= 3, claim_ids
         gate = evaluate_candidate_subject_grounding(winner)
         assert gate["status"] == "PASS", gate
-        print("CASE B exact production flap topic reaches pre-Writer grounding as physical_entity: PASS")
+        print("CASE B exact flap topic reaches pre-Writer grounding with 3 distinct supported claims: PASS")
 
         unrelated = {{
             "topic": "비행기 착륙 장치 바퀴는 왜 착륙 전에 미리 돌지 않을까",
@@ -108,7 +118,14 @@ def run():
             trusted_records=PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS,
         )
         assert unrelated.get("canonical_subject", "UNKNOWN") != {EXPECTED_CANONICAL!r}, unrelated
-        print("CASE C unrelated aviation subject cannot inherit flap identity: PASS")
+        unrelated_claims = unrelated.get("_trusted_grounded_claims") or []
+        unrelated_ids = {{
+            str(c.get("claim_id", ""))
+            for c in unrelated_claims
+            if isinstance(c, dict)
+        }}
+        assert not ({EXPECTED_CLAIM_IDS!r} & unrelated_ids), unrelated
+        print("CASE C unrelated aviation subject cannot inherit flap identity or claims: PASS")
         '''
     )
     subprocess.run([sys.executable, "-c", fresh_process], check=True)
