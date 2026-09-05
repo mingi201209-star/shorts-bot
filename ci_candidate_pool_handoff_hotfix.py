@@ -15,6 +15,10 @@ PATCH = r'''
 from quality.candidate_pool_handoff import handoff_candidate_pool
 from quality.canonical_subject_grounding_supply import (
     PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS,
+    supply_trusted_subject_grounding,
+)
+from quality.candidate_pool_grounding_records import (
+    CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS,
 )
 
 _candidate_pool_previous_validate_explorer_output = validate_explorer_output
@@ -35,6 +39,40 @@ def _candidate_pool_host_hard_validate(candidate):
     return True, "host hard validation PASS"
 
 
+def _legacy_selected_supply_trusted_grounding(data):
+    """Give legacy SELECTED the same repo-owned grounding supply as pool handoff.
+
+    The legacy validator remains authoritative for schema/selection behavior. This
+    helper only enriches an already validated winner from independently owned
+    evidence. No model-authored evidence is promoted and no gate is relaxed.
+    """
+    result = _candidate_pool_previous_validate_explorer_output(data)
+    if not isinstance(result, dict):
+        return result
+    if str(result.get("status") or "").strip().upper() != "SELECTED":
+        return result
+    winner = result.get("winner")
+    if not isinstance(winner, dict):
+        return result
+
+    trusted_records = tuple(PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS) + tuple(
+        CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS
+    )
+    supplied = supply_trusted_subject_grounding(
+        winner,
+        trusted_records=trusted_records,
+    )
+    enriched = dict(result)
+    enriched["winner"] = supplied
+    if supplied.get("_trusted_grounding_evidence"):
+        print(
+            "[LEGACY_SELECTED_GROUNDING_SUPPLY] "
+            f"canonical_subject={supplied.get('canonical_subject', '')} "
+            f"claims={len(supplied.get('_trusted_grounded_claims') or [])}"
+        )
+    return enriched
+
+
 def validate_explorer_output(data):
     aviation_scope = (
         os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower()
@@ -45,7 +83,11 @@ def validate_explorer_output(data):
         if isinstance(data, dict)
         else ""
     )
-    if not aviation_scope or status != "CANDIDATE_POOL":
+    if not aviation_scope:
+        return _candidate_pool_previous_validate_explorer_output(data)
+    if status == "SELECTED":
+        return _legacy_selected_supply_trusted_grounding(data)
+    if status != "CANDIDATE_POOL":
         return _candidate_pool_previous_validate_explorer_output(data)
 
     result = handoff_candidate_pool(
