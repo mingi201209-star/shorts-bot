@@ -84,6 +84,9 @@ def main():
         helpers = r'''
 
 # RUN_33977099845_VERIFIED_STILL_RESCUE_V1
+_RUN_33977099845_PRESENTATION_ID = "VERIFIED_FLAP_FEATURE_INSPECTION_CENTER_V1"
+
+
 def _verified_flap_rescue_candidate(scene, signature):
     scene = scene if isinstance(scene, dict) else {}
     query = str(scene.get("keyword") or scene.get("visual_goal") or "").lower().replace("-", " ")
@@ -93,7 +96,7 @@ def _verified_flap_rescue_candidate(scene, signature):
 
 def _verified_budget_rescue_presentation():
     return {
-        "presentation_id": "VERIFIED_FLAP_FEATURE_INSPECTION_CENTER_V1",
+        "presentation_id": _RUN_33977099845_PRESENTATION_ID,
         "scene_role": "information",
         "visual_beat": "inspect_verified_flap_feature",
         "subject_focal_region": "verified_flap_center",
@@ -117,7 +120,8 @@ def _reuse_verified_budget_rescue(scene, *, output_path, duration, trigger_reaso
         if not source_id or source_id in seen_sources or not image_path.is_file():
             continue
         seen_sources.add(source_id)
-        if is_physical_asset_excluded(source_id):
+        exclude_fn = globals().get("is_physical_asset_excluded")
+        if callable(exclude_fn) and exclude_fn(source_id):
             continue
         if int(_VERIFIED_RESCUE_USE_COUNTS.get(source_id, 0)) >= 1:
             continue
@@ -144,9 +148,10 @@ def _reuse_verified_budget_rescue(scene, *, output_path, duration, trigger_reaso
         print(
             f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=reused_verified_budget_rescue "
             f"source_id={source_id} generation_count={_GENERATION_COUNT} "
-            f"source_uses={verified_source_use_count(source_id)} presentation={PRESENTATION_ID}"
+            f"source_uses={verified_source_use_count(source_id)} presentation={_RUN_33977099845_PRESENTATION_ID}"
         )
         return {
+            "path": str(output_path),
             "mode": "REUSED_VERIFIED_STILL_MOTION",
             "tier": 3,
             "visual_state": "TRUE",
@@ -155,9 +160,10 @@ def _reuse_verified_budget_rescue(scene, *, output_path, duration, trigger_reaso
             "provider": cached.get("provider", "openai_image"),
             "source_id": source_id,
             "source_asset_id": source_id,
-            "template_type": "VERIFIED_FLAP_FEATURE_INSPECTION_CENTER_V1",
-            "presentation_id": "VERIFIED_FLAP_FEATURE_INSPECTION_CENTER_V1",
+            "template_type": _RUN_33977099845_PRESENTATION_ID,
+            "presentation_id": _RUN_33977099845_PRESENTATION_ID,
             "presentation_identity": list(_still_presentation_identity(presentation)),
+            "visible_components": list((evidence or {}).get("visible_components", []) or []),
             "verification_evidence_reused": False,
             "current_scene_verification": dict(evidence or {}),
         }
@@ -192,23 +198,21 @@ def _reuse_verified_budget_rescue(scene, *, output_path, duration, trigger_reaso
     diversity = diversity_path.read_text(encoding="utf-8")
     diversity_marker = "# RUN_33977099845_VERIFIED_PRESENTATION_VARIANT_V1"
     if diversity_marker not in diversity:
-        variant_start = diversity.find("def _variant(item):")
+        variant_start = diversity.find("def _variant(")
         variant_end = diversity.find("\ndef ", variant_start + 1)
         if variant_start < 0 or variant_end < 0:
             raise RuntimeError("visual diversity variant function missing")
-        old_variant = diversity[variant_start:variant_end]
-        if "raw_physical_asset" not in old_variant:
+        variant_func = diversity[variant_start:variant_end]
+        if "raw_physical_asset" not in variant_func:
             raise RuntimeError("visual diversity raw variant contract missing")
-        new_variant = old_variant.replace(
-            "def _variant(item):\n",
-            '''def _variant(item):
-    # RUN_33977099845_VERIFIED_PRESENTATION_VARIANT_V1
+        header_end = diversity.find("\n", variant_start)
+        if header_end < 0 or header_end >= variant_end:
+            raise RuntimeError("visual diversity variant header missing")
+        variant_guard = '''    # RUN_33977099845_VERIFIED_PRESENTATION_VARIANT_V1
     if str(item.get("template_type") or "") == "VERIFIED_FLAP_FEATURE_INSPECTION_CENTER_V1":
         return "presentation:verified_flap_feature_inspection_center_v1"
-''',
-            1,
-        )
-        diversity = diversity[:variant_start] + new_variant + diversity[variant_end:]
+'''
+        diversity = diversity[:header_end + 1] + variant_guard + diversity[header_end + 1:]
         diversity_path.write_text(diversity.rstrip() + "\n\n" + diversity_marker + "\n", encoding="utf-8")
 
     print("✅ Run 33977099845 verified still budget rescue installed; generation budget unchanged")
