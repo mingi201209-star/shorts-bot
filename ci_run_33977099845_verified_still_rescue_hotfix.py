@@ -19,9 +19,6 @@ def main():
     still_path = ROOT / "video/still_image_fallback.py"
     still = still_path.read_text(encoding="utf-8")
     if MARKER not in still:
-        # Keep the established information-scene use cap. The rescue has its
-        # own one-shot counter and is reachable only after generation budget
-        # exhaustion, so normal reuse behavior remains unchanged.
         still = _replace_once(
             still,
             "_VERIFIED_SOURCE_USE_COUNTS = {}\n",
@@ -35,11 +32,6 @@ def main():
             "verified rescue reset",
         )
 
-        # Run 33977099845 Scene 5 queried aircraft+flap without the literal
-        # word wing. Generated flap stills from earlier scenes were cached as
-        # aircraft+wing, so the cache was never inspected. Map only the known
-        # flap/wing physical family; current-scene Vision verification remains
-        # authoritative for components, fact safety and semantics.
         reuse_start = still.find("def _reuse_signatures(scene):")
         reuse_end = still.find("\ndef ", reuse_start + 1)
         if reuse_start < 0 or reuse_end < 0:
@@ -62,9 +54,6 @@ def main():
 '''
         still = still[:reuse_start] + reuse_func + still[reuse_end:]
 
-        # Preserve the verification result which admitted the generated still
-        # to cache. Rescue does not trust this evidence blindly: the current
-        # Scene is verified again before reuse is accepted.
         cache_old = '''            _VERIFIED_STILL_CACHE[signature] = {
                 "image_path": str(image_path),
                 "provider": "openai_image",
@@ -80,9 +69,7 @@ def main():
 '''
         still = _replace_once(still, cache_old, cache_new, "verified still evidence cache")
 
-        insert_anchor = "\ndef generate_still_motion_fallback(scene, *, output_path, duration, trigger_reason):\n"
         helpers = r'''
-
 # RUN_33977099845_VERIFIED_STILL_RESCUE_V1
 _RUN_33977099845_PRESENTATION_ID = "VERIFIED_FLAP_FEATURE_INSPECTION_CENTER_V1"
 
@@ -168,15 +155,15 @@ def _reuse_verified_budget_rescue(scene, *, output_path, duration, trigger_reaso
             "current_scene_verification": dict(evidence or {}),
         }
     return None
-'''
-        if insert_anchor not in still:
-            raise RuntimeError("still fallback rescue insertion anchor missing")
-        still = still.replace(insert_anchor, helpers + insert_anchor, 1)
 
-        budget_anchor = '''    if _GENERATION_COUNT >= STILL_IMAGE_MAX_PER_VIDEO:
-        print(
-            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=budget_exhausted "
+
 '''
+        insert_pos = still.find("def generate_still_motion_fallback(")
+        if insert_pos < 0:
+            raise RuntimeError("still fallback rescue function boundary missing")
+        still = still[:insert_pos] + helpers + still[insert_pos:]
+
+        budget_guard = "    if _GENERATION_COUNT >= STILL_IMAGE_MAX_PER_VIDEO:\n"
         budget_replacement = '''    if _GENERATION_COUNT >= STILL_IMAGE_MAX_PER_VIDEO:
         rescued = _reuse_verified_budget_rescue(
             scene,
@@ -186,14 +173,10 @@ def _reuse_verified_budget_rescue(scene, *, output_path, duration, trigger_reaso
         )
         if rescued:
             return rescued
-        print(
-            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=budget_exhausted "
 '''
-        still = _replace_once(still, budget_anchor, budget_replacement, "budget rescue boundary")
+        still = _replace_once(still, budget_guard, budget_replacement, "budget rescue boundary")
         still_path.write_text(still.rstrip() + "\n\n" + MARKER + "\n", encoding="utf-8")
 
-    # Keep physical lineage truthful. Only the proven bounded presentation is
-    # a distinct diversity variant; source_asset_id/source_id stay unchanged.
     diversity_path = ROOT / "quality/visual_diversity_preflight.py"
     diversity = diversity_path.read_text(encoding="utf-8")
     diversity_marker = "# RUN_33977099845_VERIFIED_PRESENTATION_VARIANT_V1"
