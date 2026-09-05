@@ -13,7 +13,7 @@ PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS = (
         "record_type": "trusted_subject_identity",
         "subject_kind": "physical_entity",
         "canonical_subject": "aircraft trailing-edge flap",
-        "identity_confidence": 0.98,
+        "identity_confidence": 0.97,
         "feature_descriptions": [
             "flap attached to the trailing edge of an aircraft wing",
             "trailing-edge flap on an aircraft wing",
