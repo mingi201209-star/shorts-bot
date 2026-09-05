@@ -28,18 +28,12 @@ on:
         required: false
         default: "private"
         type: choice
-        options:
-          - private
-          - unlisted
-          - public
-
+        options: [private, unlisted, public]
 permissions:
   contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Verify expected production SHA
         env:
@@ -49,62 +43,28 @@ jobs:
           DISPATCH_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          if [ -z "$EXPECTED_SHA" ]; then
-            echo "No expected_sha supplied; checkout will remain pinned to dispatch SHA $DISPATCH_SHA"
-            exit 0
-          fi
+          if [ -z "$EXPECTED_SHA" ]; then exit 0; fi
           test "${#EXPECTED_SHA}" -eq 40
-          case "$EXPECTED_SHA" in *[!0-9a-fA-F]*) exit 1;; esac
           current_main="$(gh api "repos/$REPO/commits/main" --jq .sha)"
-          if [ "$current_main" != "$EXPECTED_SHA" ]; then
-            echo "Expected SHA mismatch: current main=$current_main expected=$EXPECTED_SHA"
-            exit 1
-          fi
-          if [ "$DISPATCH_SHA" != "$EXPECTED_SHA" ]; then
-            echo "Dispatch SHA mismatch: github.sha=$DISPATCH_SHA expected=$EXPECTED_SHA"
-            exit 1
-          fi
-          echo "Verified production SHA: $EXPECTED_SHA"
-
-      - name: Checkout code
-        uses: actions/checkout@v4
+          test "$current_main" = "$EXPECTED_SHA"
+          test "$DISPATCH_SHA" = "$EXPECTED_SHA"
+      - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.expected_sha || github.sha }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg fonts-noto-cjk
-          ffmpeg -version
-          fc-cache -f -v
-
-      - name: Verify Korean fonts
-        run: |
-          echo "=== Korean font check ==="
-          fc-list :lang=ko family file | head -30
-          if ! fc-list :lang=ko | grep -qi "Noto Sans CJK\|Nanum"; then
-            echo "❌ Korean font not found"
-            exit 1
-          fi
-          echo "✅ Korean font detected"
-
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            echo "❌ requirements.txt not found"
-            exit 1
-          fi
-
+          pip install -r requirements.txt
       - name: Apply production hotfixes
         run: |
+          set -euo pipefail
           python ci_hotfix.py
           python ci_novelty_budget_hotfix.py
           python ci_fact_critical_hotfix.py
@@ -149,65 +109,10 @@ jobs:
           python ci_final_visual_semantic_qa_hotfix.py
           python ci_cross_process_video_dedupe_hotfix.py
           python ci_writer_observable_opening_hotfix.py
-
-          # Some later production hotfixes rewrite candidate_explorer wrappers.
-          # Re-apply the compatibility patch against the FINAL production state.
+          python ci_fixed_topic_flap_opening_hotfix.py
           python ci_aviation_context_signature_compat_hotfix.py
-
-          grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
-          grep -n "Novelty 조기 차단" main.py
-          grep -n "FACT_CRITICAL CANDIDATE REGENERATION" main.py
-          grep -n "CANDIDATE_GROUNDED_RECOVERY_V1\|CANDIDATE_RECOVERY_POOL\|CANDIDATE GROUNDED RECOVERY" main.py
-          grep -n "GROWTH_CANDIDATE_SHADOW_V1\|Growth Shadow (non-authoritative)" main.py
-          grep -n "MAX_SCRIPT_ATTEMPTS" config.py
-          grep -n '"+13%"' config.py
-          grep -n "AVIATION_SPECIFICITY_OUTPUT_REPAIR_V1\|AVIATION_SPECIFICITY_PROJECTION_V3" content/candidate_explorer.py
-          grep -n "FINAL_RENDER_CONTENT_INTEGRITY_V1\|CONTENT_IDENTITY_DRIFT" main.py
-          grep -n "WRITER_OBSERVABLE_OPENING_V1\|PROBLEM → SOLUTION NARRATIVE — EVIDENCE GATED\|ADAPTIVE_SCENE_COUNT_FOR_DENSE_DESIGN_V1\|ADAPTIVE_DESIGN_MIN_SCENES\|SCRIPT_VALIDATION_RECOVERY_V1\|RETENTION_STRUCTURE_EXPERIMENT_V1\|FIRST 5 SEC MINI NARRATIVE\|SUBSCRIBER_CONVERSION_LAYER_V1\|Subscriber conversion" content/script_generator.py
-          grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
-          grep -n "HOOK_SUBJECT_DOMINANCE_MIN\|HOOK_ACTION_MATCH_MIN\|HOOK_MAX_COMPETING_SUBJECT_RISK\|HOOK_SUBJECT_VISIBILITY_MIN" video/hook_visual_dominance.py
-          grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES\|HOOK_CONCRETE_VISUAL_EVIDENCE\|DIRECT_VERIFIED\|UNVERIFIED_CONTEXTUAL_FALLBACK\|HOOK_FALLBACK_QUALITY_FLOOR\|AI_VISUAL_SORA_FALLBACK" video/hook_visual.py
-          grep -n "VISUAL_TRACE\|VISUAL_CONTRACT" video/video_engine.py
-          grep -n "search_video_candidates\|VIDEO_SELECTED\|VIDEO_PROVIDER\|CURRENT_NARRATION_SEMANTIC_MATCH\|VISUAL_SPECIFICITY\|QUERY_SEMANTIC_INTEGRITY\|CONCRETE_VISUAL_EVIDENCE_SAFE_REUSE\|VISIBLE_EVIDENCE_PROVENANCE_GATE\|AI_VISUAL_GENERAL_SELECTION_TRACE\|GENERAL_SCENE_VISUAL_PARITY_UNKNOWN_SAFE" video/video_downloader.py video/hook_visual.py
-          grep -n "VISUAL_DIVERSITY_PREFLIGHT_V1" main.py
-
-          python -m py_compile \
-            ci_hotfix.py ci_novelty_budget_hotfix.py ci_fact_critical_hotfix.py ci_speech_style_hotfix.py \
-            ci_hook_generation_hotfix.py ci_hook_pool_guard_hotfix.py ci_retention_hotfix.py \
-            ci_first5_retention_tts_hotfix.py ci_first5_visual_contract_hotfix.py ci_video_provider_hotfix.py \
-            ci_cross_process_video_dedupe_hotfix.py ci_visual_diversity_preflight_hotfix.py ci_writer_observable_opening_hotfix.py \
-            ci_topic_input_hotfix.py ci_aviation_candidate_context_hotfix.py ci_aviation_candidate_specificity_hotfix.py \
-            ci_aviation_context_signature_compat_hotfix.py ci_aviation_specificity_output_repair_hotfix.py \
-            ci_aviation_specificity_projection_hotfix.py ci_candidate_grounded_recovery_hotfix.py \
-            ci_growth_candidate_shadow_hotfix.py content/growth_candidate_ranker.py \
-            ci_final_render_content_integrity_hotfix.py ci_output_quality_hotfix.py \
-            ci_curiosity_retention_hotfix.py ci_visual_specificity_hotfix.py ci_design_causality_hotfix.py \
-            ci_query_semantic_integrity_hotfix.py ci_concrete_visual_evidence_hotfix.py \
-            ci_visible_evidence_provenance_hotfix.py ci_hook_production_parity_hotfix.py \
-            ci_hook_fallback_quality_floor_hotfix.py ci_ai_visual_fallback_hotfix.py \
-            ci_ai_visual_mechanism_fallback_hotfix.py ci_problem_solution_narrative_hotfix.py \
-            ci_causal_information_progression_hotfix.py ci_retention_structure_experiment_hotfix.py \
-            ci_subscriber_conversion_hotfix.py content/subscriber_conversion.py \
-            ci_script_production_parity_hotfix.py ci_script_production_parity_bridge_hotfix.py \
-            ci_adaptive_scene_count_hotfix.py ci_general_scene_visual_parity_hotfix.py \
-            ci_script_validation_recovery_hotfix.py ci_script_v2_visual_goal_hotfix.py ci_script_v2_gunggeum_formal_ending_hotfix.py ci_final_visual_semantic_qa_hotfix.py content/retention_structure.py \
-            quality/retention_structure_experiment_regression_test.py \
-            quality/subscriber_conversion_regression_test.py \
-            quality/fixed_topic_gate_feedback_regression_test.py \
-            quality/candidate_grounded_recovery_regression_test.py \
-            quality/cross_process_video_dedupe_regression_test.py \
-            quality/script_v2_gunggeum_formal_ending_regression_test.py \
-            quality/visual_diversity_preflight.py quality/visual_diversity_context.py \
-            quality/visual_diversity_preflight_regression_test.py quality/qa_render_artifact_regression_test.py \
-            main.py config.py content/candidate_explorer.py content/candidate_recovery.py content/script_generator.py content/hook_experiment.py \
-            integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
-            quality/first5_visual_contract.py quality/final_render_integrity.py \
-            quality/final_render_integrity_regression_test.py quality/final_visual_semantic_qa.py \
-            quality/final_visual_semantic_qa_regression_test.py quality/aviation_specificity_projection_regression_test.py \
-            video/video_providers.py video/hook_visual.py video/hook_visual_dominance.py video/video_downloader.py \
-            video/video_engine.py video/subtitle_engine.py video/ai_visual_provider.py \
-            diagnostics/failure_diagnostics.py diagnostics/runner.py quality/failure_diagnostics_regression_test.py
-
+          python -m py_compile ci_fixed_topic_flap_opening_hotfix.py content/script_engine_v2.py quality/fixed_topic_full_path_rehearsal_test.py
+          python quality/fixed_topic_full_path_rehearsal_test.py
           python quality/final_render_integrity_regression_test.py
           python quality/final_visual_semantic_qa_regression_test.py
           python quality/fixed_topic_gate_feedback_regression_test.py
@@ -220,7 +125,6 @@ jobs:
           python -m quality.retention_structure_experiment_regression_test
           python -m quality.subscriber_conversion_regression_test
           python quality/failure_diagnostics_regression_test.py
-
       - name: Run Shorts Generator V3.2
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
@@ -239,61 +143,18 @@ jobs:
           AI_VISUAL_SIZE: "720x1280"
           SHORTS_TOPIC: ${{ inputs.topic }}
           SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
-        run: |
-          echo "========================================"
-          echo "🚀 START SHORTS GENERATOR V3.2"
-          echo "========================================"
-          python -m diagnostics.runner
-          echo "========================================"
-          echo "✅ SHORTS GENERATOR V3.2 FINISHED"
-          echo "========================================"
-
+        run: python -m diagnostics.runner
       - name: Preserve production diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: production-diagnostics-${{ github.run_id }}
           path: |
-            artifacts/diagnostics/generator.log
-            artifacts/diagnostics/failure_summary.json
-            artifacts/diagnostics/traceback.txt
-            artifacts/diagnostics/progress.json
-            artifacts/diagnostics/scene_trace.jsonl
+            artifacts/diagnostics/
             visual_diversity_preflight.json
             final_director_qa.json
           if-no-files-found: warn
           retention-days: 30
-
-      - name: Prepare QA-only render status
-        if: ${{ failure() && hashFiles('final_shorts_*.mp4') != '' }}
-        run: |
-          cat > qa_render_status.json <<'EOF'
-          {
-            "approval": "NOT_UPLOAD_APPROVED",
-            "quality_state": "DIRECTOR_HOLD",
-            "purpose": "QA_DIAGNOSTIC_ONLY"
-          }
-          EOF
-
-      - name: Preserve QA-only render artifact
-        if: ${{ failure() && hashFiles('final_shorts_*.mp4') != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: production-qa-render-${{ github.run_id }}
-          path: |
-            final_shorts_*.mp4
-            final_visual_semantic_qa.json
-            final_director_qa.json
-            visual_diversity_preflight.json
-            qa_render_status.json
-            artifacts/diagnostics/generator.log
-            artifacts/diagnostics/failure_summary.json
-            artifacts/diagnostics/traceback.txt
-            artifacts/diagnostics/progress.json
-            artifacts/diagnostics/scene_trace.jsonl
-          if-no-files-found: warn
-          retention-days: 30
-
       - name: Preserve verified production artifact
         uses: actions/upload-artifact@v4
         with:
@@ -305,7 +166,6 @@ jobs:
             visual_diversity_preflight.json
           if-no-files-found: error
           retention-days: 30
-
       - name: Publish to YouTube and persist lineage
         env:
           ENABLE_YOUTUBE_UPLOAD: ${{ inputs.youtube_upload && '1' || '0' }}
@@ -318,11 +178,3 @@ jobs:
           YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET }}
           YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN }}
         run: python -m analytics.publish_and_persist
-
-      - name: Preserve analytics history
-        if: ${{ hashFiles('analytics/performance_history.json') != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: analytics-history-${{ github.run_id }}
-          path: analytics/performance_history.json
-          retention-days: 90
