@@ -62,20 +62,6 @@ def run():
             supply_trusted_subject_grounding,
         )
 
-        def collect_claims(value):
-            claims = []
-            if isinstance(value, dict):
-                direct = value.get("supported_claims") or []
-                if isinstance(direct, list):
-                    claims.extend(c for c in direct if isinstance(c, dict))
-                for nested in value.values():
-                    if isinstance(nested, (dict, list, tuple)):
-                        claims.extend(collect_claims(nested))
-            elif isinstance(value, (list, tuple)):
-                for item in value:
-                    claims.extend(collect_claims(item))
-            return claims
-
         validate_explorer_output = explorer_package._LEGACY.validate_explorer_output
         topic = {FIXED_FLAP_TOPIC!r}
         parsed = {{
@@ -107,8 +93,8 @@ def run():
         assert winner["canonical_subject"] == {EXPECTED_CANONICAL!r}, winner
         assert winner["subject_kind"] == "physical_entity", winner
         assert winner["subject_identity_confidence"] >= 0.80, winner
-        claims = collect_claims(winner.get("_trusted_grounding_evidence"))
-        claims.extend(collect_claims(winner.get("supported_claims")))
+        claims = winner.get("_trusted_grounded_claims") or []
+        assert isinstance(claims, list), type(claims)
         claim_ids = {{str(c.get("claim_id", "")) for c in claims if isinstance(c, dict)}}
         expected = {EXPECTED_CLAIM_IDS!r}
         assert expected.issubset(claim_ids), (claim_ids, claims)
@@ -132,10 +118,11 @@ def run():
             trusted_records=PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS,
         )
         assert unrelated.get("canonical_subject", "UNKNOWN") != {EXPECTED_CANONICAL!r}, unrelated
-        unrelated_claims = collect_claims(unrelated.get("_trusted_grounding_evidence"))
-        unrelated_claims.extend(collect_claims(unrelated.get("supported_claims")))
+        unrelated_claims = unrelated.get("_trusted_grounded_claims") or []
         unrelated_ids = {{
-            str(c.get("claim_id", "")) for c in unrelated_claims if isinstance(c, dict)
+            str(c.get("claim_id", ""))
+            for c in unrelated_claims
+            if isinstance(c, dict)
         }}
         assert not ({EXPECTED_CLAIM_IDS!r} & unrelated_ids), unrelated
         print("CASE C unrelated aviation subject cannot inherit flap identity or claims: PASS")
