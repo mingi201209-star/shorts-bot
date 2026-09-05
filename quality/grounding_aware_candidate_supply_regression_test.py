@@ -9,9 +9,6 @@ from pathlib import Path
 from quality.canonical_subject_grounding_supply import (
     PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS,
 )
-from quality.candidate_pool_grounding_records import (
-    CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS,
-)
 from quality.candidate_pool_handoff import handoff_candidate_pool
 from quality.grounding_aware_candidate_supply import (
     NO_GROUNDED_CANDIDATE_SUPPLY,
@@ -181,7 +178,7 @@ def main() -> int:
         encoding="utf-8"
     )
     assert "GROUNDING_AWARE_CANDIDATE_SUPPLY_V1" in installer
-    assert "_grounding_aware_previous_build_execution_context" in installer
+    assert 'CANDIDATE_EXPLORER_PROMPT += "\\n\\n" + grounding_capability_context()' in installer
     assert "no_grounded_candidate_supply_result" in installer
     assert "Candidate Gate" in installer
     forbidden_calls = (
@@ -197,7 +194,7 @@ def main() -> int:
         + installer
     ).lower()
     assert all(token not in surface for token in forbidden_calls)
-    print("TEST D quality/fact authority unchanged; new external calls=0: PASS")
+    print("TEST D system-authority capability + quality/fact authority unchanged; new calls=0: PASS")
 
     projection = (ROOT / "ci_aviation_specificity_projection_hotfix.py").read_text(
         encoding="utf-8"
