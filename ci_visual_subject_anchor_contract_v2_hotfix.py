@@ -29,6 +29,46 @@ if "chevron" not in _VISUAL_ANCHOR_ORDER:
         list(_VISUAL_ANCHOR_ORDER[:2]) + ["chevron"] + list(_VISUAL_ANCHOR_ORDER[2:])
     )
 
+# Run 33976145878 Human QA: the fixed flap production passed the generic
+# aircraft+wing contract even when the selected stock did not visibly establish
+# the trailing-edge flap itself. Treat flap as the concrete component named by
+# the narration. This strengthens identity only; no score/floor/retry/API policy
+# changes are introduced.
+_QUERY_ANCHOR_GROUPS["flap"] = {"flap", "flaps"}
+_CONCRETE_COMPONENT_ANCHORS.add("flap")
+_VISUAL_SOURCE_ANCHOR_ALIASES["flap"] = (
+    "플랩", "날개 플랩", "날개 뒤쪽 플랩", "후연 플랩",
+    "flap", "flaps", "wing flap", "wing flaps",
+    "trailing-edge flap", "trailing edge flap",
+)
+_VISUAL_ANCHOR_PREFERRED_TERM["flap"] = "flap"
+if "flap" not in _VISUAL_ANCHOR_ORDER:
+    _anchor_order = list(_VISUAL_ANCHOR_ORDER)
+    try:
+        _wing_index = _anchor_order.index("wing") + 1
+    except ValueError:
+        _wing_index = len(_anchor_order)
+    _anchor_order.insert(_wing_index, "flap")
+    _VISUAL_ANCHOR_ORDER = tuple(_anchor_order)
+
+# V1 intentionally preserves historical aircraft+wing exact behavior. When a
+# flap is explicitly present, extend that pair to the concrete third component
+# instead of allowing the V1 two-anchor compatibility shortcut to erase it.
+_visual_subject_anchor_v2_previous_extract_query_anchors = extract_query_anchors
+
+
+def extract_query_anchors(query):
+    anchors = list(_visual_subject_anchor_v2_previous_extract_query_anchors(query))
+    words = set(normalize_search_query(query).split())
+    flap_aliases = _QUERY_ANCHOR_GROUPS.get("flap", {"flap", "flaps"})
+    if words & flap_aliases and "flap" not in anchors:
+        if "wing" in anchors:
+            anchors = [anchor for anchor in anchors if anchor != "flap"]
+            anchors.append("flap")
+        else:
+            anchors.append("flap")
+    return _dedupe_words(anchors)[:3]
+
 
 def _candidate_text_for_visual_contract(candidate):
     if not isinstance(candidate, dict):
