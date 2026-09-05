@@ -41,35 +41,43 @@ else:
 
 # Run 33954034420 fails earlier than Writer JSON generation: the grounded
 # Script Engine V2 opening contract receives a factual/physical question-form
-# hook such as "왜 비행기 창문은 둥글게 설계되었을까?". The existing
-# converter already turns known question endings into an observable statement,
-# but its table covered formal ~까요 forms and missed common past-tense ~을까
-# variants. Extend only those deterministic ending mappings; do not infer a new
-# subject, mechanism, benefit, or factual claim.
+# hook such as "왜 비행기 창문은 둥글게 설계되었을까?". Extend the existing
+# deterministic repair table at the actual pre-Writer boundary. Production
+# composition may reorder/extend the table before this installer runs, so use
+# only the table declaration as the stable anchor instead of coupling to its
+# first row.
 ENGINE = Path("content/script_engine_v2.py")
 engine = ENGINE.read_text(encoding="utf-8")
 ENGINE_MARKER = "# PREWRITER_OBSERVABLE_OPENING_RUN_33954034420"
-anchor = '''_QUESTION_HOOK_REPAIRS = (
-    (r"있을까요$", "있습니다"),
-'''
-replacement = '''# PREWRITER_OBSERVABLE_OPENING_RUN_33954034420
-_QUESTION_HOOK_REPAIRS = (
-    (r"었을까$", "었습니다"),
-    (r"았을까$", "았습니다"),
-    (r"였을까$", "였습니다"),
-    (r"있을까$", "있습니다"),
-    (r"없을까$", "없습니다"),
-    (r"일까$", "입니다"),
-    (r"될까$", "됩니다"),
-    (r"할까$", "합니다"),
-    (r"있을까요$", "있습니다"),
-'''
+TABLE_ANCHOR = "_QUESTION_HOOK_REPAIRS = ("
+rows = (
+    '    (r"었을까$", "었습니다"),',
+    '    (r"았을까$", "았습니다"),',
+    '    (r"였을까$", "였습니다"),',
+    '    (r"있을까$", "있습니다"),',
+    '    (r"없을까$", "없습니다"),',
+    '    (r"일까$", "입니다"),',
+    '    (r"될까$", "됩니다"),',
+    '    (r"할까$", "합니다"),',
+)
 
-if ENGINE_MARKER in engine:
+if ENGINE_MARKER in engine and all(row in engine for row in rows):
     print("Pre-Writer Observable Opening Run 33954034420 already installed")
-elif anchor not in engine:
-    raise RuntimeError("pre-Writer observable opening question-repair marker mismatch")
+elif TABLE_ANCHOR not in engine:
+    raise RuntimeError("pre-Writer observable opening repair table declaration missing")
 else:
-    engine = engine.replace(anchor, replacement, 1)
-    ENGINE.write_text(engine, encoding="utf-8")
+    missing = [row for row in rows if row not in engine]
+    if missing:
+        payload = (
+            ENGINE_MARKER
+            + "\n"
+            + TABLE_ANCHOR
+            + "\n"
+            + "\n".join(missing)
+        )
+        engine = engine.replace(TABLE_ANCHOR, payload, 1)
+        ENGINE.write_text(engine, encoding="utf-8")
+    elif ENGINE_MARKER not in engine:
+        engine = engine.replace(TABLE_ANCHOR, ENGINE_MARKER + "\n" + TABLE_ANCHOR, 1)
+        ENGINE.write_text(engine, encoding="utf-8")
     print("Pre-Writer Observable Opening Run 33954034420 installed")
