@@ -39,11 +39,6 @@ else:
     print("Writer Observable Opening V1 installed")
 
 
-# Run 33954034420 fails earlier than Writer JSON generation: the grounded
-# Script Engine V2 opening contract receives a factual/physical question-form
-# hook such as "왜 비행기 창문은 둥글게 설계되었을까?". Production hotfix
-# composition may preserve the base question-repair table or may replace the
-# engine and later append _grounded_opening(). Support both final shapes.
 ENGINE = Path("content/script_engine_v2.py")
 engine = ENGINE.read_text(encoding="utf-8")
 ENGINE_MARKER = "# PREWRITER_OBSERVABLE_OPENING_RUN_33954034420"
@@ -106,9 +101,6 @@ elif grounded_anchor in engine:
 else:
     raise RuntimeError("pre-Writer observable opening final-composition marker mismatch")
 
-# Run 33971420031 proved #295's rehearsal-only flap installer was not part of
-# the actual production hotfix list. Keep the fix inside this already-invoked
-# production installer so rehearsal and runtime share the same authority.
 engine = ENGINE.read_text(encoding="utf-8")
 FLAP_MARKER = "# FIXED_TOPIC_FLAP_OBSERVABLE_OPENING_V2"
 if FLAP_MARKER in engine:
@@ -127,3 +119,10 @@ else:
     engine = engine.replace(flap_anchor, flap_replacement, 1)
     ENGINE.write_text(engine, encoding="utf-8")
     print("Fixed Topic Flap Observable Opening V2 installed through production writer hotfix")
+
+# This installer is already the final substantive production hotfix in main.yml.
+# Chain the verified-still rescue here so the live workflow receives the same
+# final-composition patch proven by the composition gate, without changing any
+# generation/quality budget or moving earlier visual installers.
+from ci_run_33977099845_verified_still_rescue_hotfix import main as _patch_verified_still_rescue
+_patch_verified_still_rescue()

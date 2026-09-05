@@ -8,9 +8,12 @@ on:
       - "ci_*.py"
       - "quality/run_33759359725_wrapper_composition_regression_test.py"
       - "quality/final_visual_semantic_qa_regression_test.py"
+      - "quality/run_33977099845_verified_still_rescue_regression_test.py"
       - ".github/workflows/production_hotfix_composition_gate.yml"
       - "video/video_downloader.py"
       - "video/video_engine.py"
+      - "video/still_image_fallback.py"
+      - "quality/visual_diversity_preflight.py"
       - "content/**"
       - "main.py"
       - "config.py"
@@ -21,9 +24,12 @@ on:
       - "ci_*.py"
       - "quality/run_33759359725_wrapper_composition_regression_test.py"
       - "quality/final_visual_semantic_qa_regression_test.py"
+      - "quality/run_33977099845_verified_still_rescue_regression_test.py"
       - ".github/workflows/production_hotfix_composition_gate.yml"
       - "video/video_downloader.py"
       - "video/video_engine.py"
+      - "video/still_image_fallback.py"
+      - "quality/visual_diversity_preflight.py"
       - "content/**"
       - "main.py"
       - "config.py"
@@ -93,6 +99,8 @@ jobs:
           python ci_script_v2_gunggeum_formal_ending_hotfix.py
           python ci_final_visual_semantic_qa_hotfix.py
           python ci_cross_process_video_dedupe_hotfix.py
+          python ci_writer_observable_opening_hotfix.py
+          python ci_run_33977099845_verified_still_rescue_hotfix.py
           python ci_aviation_context_signature_compat_hotfix.py
       - name: Compile composed production surface
         run: |
@@ -100,8 +108,13 @@ jobs:
             ci_run_33691170895_term_visual_subject_hotfix.py \
             ci_aviation_context_signature_compat_hotfix.py \
             ci_final_visual_semantic_qa_hotfix.py \
+            ci_writer_observable_opening_hotfix.py \
+            ci_run_33977099845_verified_still_rescue_hotfix.py \
             quality/run_33759359725_wrapper_composition_regression_test.py \
             quality/final_visual_semantic_qa_regression_test.py \
+            quality/run_33977099845_verified_still_rescue_regression_test.py \
+            quality/visual_diversity_preflight.py \
+            video/still_image_fallback.py \
             video/video_downloader.py \
             video/video_engine.py \
             content/script_engine_v2_runner.py
@@ -112,6 +125,10 @@ jobs:
           AI_VISUAL_FALLBACK_ENABLED: "false"
           AI_MAX_GENERATIONS_PER_VIDEO: "1"
         run: python quality/final_visual_semantic_qa_regression_test.py
+      - name: Run 33977099845 verified still rescue regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+        run: python quality/run_33977099845_verified_still_rescue_regression_test.py
       - name: Assert no production side effects
         run: |
           ! grep -q "workflow_dispatch.*main.yml" .github/workflows/production_hotfix_composition_gate.yml
