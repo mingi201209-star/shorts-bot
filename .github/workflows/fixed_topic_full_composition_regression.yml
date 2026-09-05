@@ -1,0 +1,35 @@
+name: Fixed Topic Full Composition Regression
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: ["fix/fixed-topic-full-rehearsal"]
+permissions:
+  contents: read
+env:
+  PYTHONPATH: .
+jobs:
+  composition:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Apply production opening composition
+        run: |
+          python ci_writer_observable_opening_hotfix.py
+          python ci_fixed_topic_full_rehearsal_hotfix.py
+      - name: Assert safety invariants
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          w = Path('.github/workflows/main.yml').read_text(encoding='utf-8')
+          e = Path('content/script_engine_v2.py').read_text(encoding='utf-8')
+          assert 'V3_MAX_API_CALLS: "60"' in w
+          assert 'V3_MAX_COST_USD: "0.05"' in w
+          assert 'MAX_SCRIPT_API_CALLS = 3' in e
+          print('THRESHOLDS_CHANGED=NO')
+          print('QUALITY_GATES_DISABLED=NO')
+          print('NEW_EXTERNAL_CALLS=0')
+          PY
