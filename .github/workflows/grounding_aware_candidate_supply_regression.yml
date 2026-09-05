@@ -23,6 +23,9 @@ on:
 permissions:
   contents: read
 
+env:
+  PYTHONPATH: .
+
 jobs:
   grounding-aware-supply:
     runs-on: ubuntu-latest
