@@ -105,3 +105,25 @@ elif grounded_anchor in engine:
     print("Pre-Writer Observable Opening Run 33954034420 installed via grounded final-composition fallback")
 else:
     raise RuntimeError("pre-Writer observable opening final-composition marker mismatch")
+
+# Run 33971420031 proved #295's rehearsal-only flap installer was not part of
+# the actual production hotfix list. Keep the fix inside this already-invoked
+# production installer so rehearsal and runtime share the same authority.
+engine = ENGINE.read_text(encoding="utf-8")
+FLAP_MARKER = "# FIXED_TOPIC_FLAP_OBSERVABLE_OPENING_V2"
+if FLAP_MARKER in engine:
+    print("Fixed Topic Flap Observable Opening V2 already installed")
+else:
+    flap_anchor = '''def _question_hook_to_observation(text: Any, topic: Any = "") -> str:
+    """Convert only known Korean question endings; unsupported forms still fail closed."""
+'''
+    flap_replacement = flap_anchor + '''    # FIXED_TOPIC_FLAP_OBSERVABLE_OPENING_V2
+    fixed_topic = _text(topic).rstrip().rstrip(".?!")
+    if fixed_topic == "비행기는 착륙할 때 왜 날개 뒤쪽을 펼칠까":
+        return "비행기는 착륙할 때 날개 뒤쪽 플랩을 펼칩니다."
+'''
+    if flap_anchor not in engine:
+        raise RuntimeError("fixed-topic flap production opening marker mismatch")
+    engine = engine.replace(flap_anchor, flap_replacement, 1)
+    ENGINE.write_text(engine, encoding="utf-8")
+    print("Fixed Topic Flap Observable Opening V2 installed through production writer hotfix")

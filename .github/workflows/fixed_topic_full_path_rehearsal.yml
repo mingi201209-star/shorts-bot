@@ -3,7 +3,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: ["fix/fixed-topic-full-rehearsal-v2"]
+    branches: ["fix/install-flap-opening-in-production"]
 permissions:
   contents: read
 env:
@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Compile
-        run: python -m py_compile ci_fixed_topic_flap_opening_hotfix.py quality/fixed_topic_full_path_rehearsal_test.py
+      - name: Compile production-parity rehearsal
+        run: python -m py_compile ci_writer_observable_opening_hotfix.py quality/fixed_topic_full_path_rehearsal_test.py
       - name: Run full deterministic rehearsal
         run: python quality/fixed_topic_full_path_rehearsal_test.py

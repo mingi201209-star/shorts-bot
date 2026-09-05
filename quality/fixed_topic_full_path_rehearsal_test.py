@@ -19,18 +19,20 @@ assert len({c.get("claim_id") for c in claims}) == 4
 assert all(c.get("source") and c.get("detail") and c.get("evidence_summary") and c.get("allowed_paraphrase_scope") for c in claims)
 print("FULL A grounding + four claims: PASS")
 
+# Critical parity rule: rehearsal may only install the opening fix through the
+# same installer that production main.yml actually invokes.
+workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
+assert "python ci_writer_observable_opening_hotfix.py" in workflow
+assert "python ci_fixed_topic_flap_opening_hotfix.py" not in workflow
 subprocess.run([sys.executable, "ci_writer_observable_opening_hotfix.py"], check=True)
-subprocess.run([sys.executable, "ci_fixed_topic_flap_opening_hotfix.py"], check=True)
 from content.script_engine_v2 import _question_hook_to_observation
 opening = _question_hook_to_observation(TOPIC, TOPIC)
 assert opening == "비행기는 착륙할 때 날개 뒤쪽 플랩을 펼칩니다.", opening
 assert "?" not in opening
 question = "그런데 왜 착륙할 때 플랩을 펼칠까요?"
 assert question.endswith("?")
-print("FULL B question topic -> observable Scene1 + question Scene2: PASS")
+print("FULL B production-parity installer -> observable Scene1 + question Scene2: PASS")
 
-# Use the exact production planner so provenance_present and deterministic ordering
-# are exercised instead of reconstructing a weaker test-only plan.
 candidate = {"_trusted_grounded_claims": claims}
 plan_claims = build_grounded_claim_plan(candidate)
 assert [c["claim_id"] for c in plan_claims] == EXPECTED, plan_claims
@@ -65,21 +67,18 @@ bad["scenes"][3] = {"text": good["scenes"][3]["text"] + " 그리고 연료 소�
 assert validate_grounded_claim_usage(bad, plan)
 print("FULL E unsupported expansion fail-close: PASS")
 
-workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
 engine = Path("content/script_engine_v2.py").read_text(encoding="utf-8")
 assert 'SHORTS_TOPIC: ${{ inputs.topic }}' in workflow
 assert 'V3_MAX_API_CALLS: "60"' in workflow
 assert 'V3_MAX_COST_USD: "0.05"' in workflow
 assert 'MAX_SCRIPT_API_CALLS = 3' in engine
-assert 'FIXED_TOPIC_FLAP_OBSERVABLE_OPENING_V1' in engine
+assert 'FIXED_TOPIC_FLAP_OBSERVABLE_OPENING_V2' in engine
 print("FULL F production wiring + caps + opening composition: PASS")
 
-# Visual preconditions that can be checked without Vision/assets.
 assert "플랩" in good["scenes"][0]["text"] and "착륙" in good["scenes"][0]["text"]
 assert all(any(t in s["text"] for t in ("플랩", "날개", "착륙")) for s in good["scenes"])
 print("FULL G visual subject/context vocabulary continuity: PASS")
 
-# Rehearsal itself may only spawn repo-local deterministic installers; no network/render/API calls.
 tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
 for node in ast.walk(tree):
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
