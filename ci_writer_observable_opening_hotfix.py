@@ -39,9 +39,11 @@ replacement = '''            generated = extract_json(
             )
 '''
 
-if marker not in text:
+if "# WRITER_OBSERVABLE_OPENING_V1" in text:
+    print("Writer Observable Opening V1 already installed")
+elif marker not in text:
     raise RuntimeError("writer observable opening marker mismatch")
-
-text = text.replace(marker, replacement, 1)
-PATH.write_text(text, encoding="utf-8")
-print("Writer Observable Opening V1 installed")
+else:
+    text = text.replace(marker, replacement, 1)
+    PATH.write_text(text, encoding="utf-8")
+    print("Writer Observable Opening V1 installed")
