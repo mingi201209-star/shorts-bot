@@ -41,11 +41,9 @@ else:
 
 # Run 33954034420 fails earlier than Writer JSON generation: the grounded
 # Script Engine V2 opening contract receives a factual/physical question-form
-# hook such as "왜 비행기 창문은 둥글게 설계되었을까?". The existing
-# converter already turns known question endings into an observable statement,
-# but its table covered formal ~까요 forms and missed common past-tense ~을까
-# variants. Extend only those deterministic ending mappings; do not infer a new
-# subject, mechanism, benefit, or factual claim.
+# hook such as "왜 비행기 창문은 둥글게 설계되었을까?". Production hotfix
+# composition may preserve the base question-repair table or may replace the
+# engine and later append _grounded_opening(). Support both final shapes.
 ENGINE = Path("content/script_engine_v2.py")
 engine = ENGINE.read_text(encoding="utf-8")
 ENGINE_MARKER = "# PREWRITER_OBSERVABLE_OPENING_RUN_33954034420"
@@ -65,11 +63,45 @@ _QUESTION_HOOK_REPAIRS = (
     (r"있을까요$", "있습니다"),
 '''
 
+grounded_anchor = '''    if "?" in hook or hook.endswith(("까요", "나요", "어요", "예요")):
+        hook = _question_hook_to_observation(hook, candidate.get("topic"))
+        if not hook:
+            raise ValueError("scene 1 hook must be an observable statement, not a question")
+'''
+grounded_replacement = '''    if "?" in hook or hook.endswith(("까요", "나요", "어요", "예요")):
+        original_hook = hook
+        hook = _question_hook_to_observation(hook, candidate.get("topic"))
+        if not hook:
+            value = re.sub(r"^(?:그런데\\s+)?왜\\s+", "", _text(original_hook)).rstrip().rstrip(".?!")
+            repairs = (
+                (r"었을까$", "었습니다"),
+                (r"았을까$", "았습니다"),
+                (r"였을까$", "였습니다"),
+                (r"있을까$", "있습니다"),
+                (r"없을까$", "없습니다"),
+                (r"일까$", "입니다"),
+                (r"될까$", "됩니다"),
+                (r"할까$", "합니다"),
+            )
+            for pattern, ending in repairs:
+                converted, count = re.subn(pattern, ending, value)
+                if count:
+                    hook = converted + "."
+                    break
+        if not hook:
+            raise ValueError("scene 1 hook must be an observable statement, not a question")
+'''
+
 if ENGINE_MARKER in engine:
     print("Pre-Writer Observable Opening Run 33954034420 already installed")
-elif anchor not in engine:
-    raise RuntimeError("pre-Writer observable opening question-repair marker mismatch")
-else:
+elif anchor in engine:
     engine = engine.replace(anchor, replacement, 1)
     ENGINE.write_text(engine, encoding="utf-8")
-    print("Pre-Writer Observable Opening Run 33954034420 installed")
+    print("Pre-Writer Observable Opening Run 33954034420 installed via base repair table")
+elif grounded_anchor in engine:
+    engine = engine.replace(grounded_anchor, grounded_replacement, 1)
+    engine += "\n# PREWRITER_OBSERVABLE_OPENING_RUN_33954034420\n"
+    ENGINE.write_text(engine, encoding="utf-8")
+    print("Pre-Writer Observable Opening Run 33954034420 installed via grounded final-composition fallback")
+else:
+    raise RuntimeError("pre-Writer observable opening final-composition marker mismatch")
