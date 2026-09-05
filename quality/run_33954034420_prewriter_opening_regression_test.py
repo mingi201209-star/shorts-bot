@@ -9,13 +9,19 @@ from __future__ import annotations
 
 from copy import deepcopy
 import importlib
+from pathlib import Path
 import runpy
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 # Install the same grounded Script Engine V2 layer that owns _grounded_opening,
 # then install the Run 33954034420 repair at the actual production boundary.
-runpy.run_path("ci_writer_compliance_plan_hotfix.py", run_name="__main__")
-runpy.run_path("ci_grounded_claim_plan_hotfix.py", run_name="__main__")
-runpy.run_path("ci_writer_observable_opening_hotfix.py", run_name="__main__")
+runpy.run_path(str(ROOT / "ci_writer_compliance_plan_hotfix.py"), run_name="__main__")
+runpy.run_path(str(ROOT / "ci_grounded_claim_plan_hotfix.py"), run_name="__main__")
+runpy.run_path(str(ROOT / "ci_writer_observable_opening_hotfix.py"), run_name="__main__")
 
 import content.script_engine_v2 as engine
 engine = importlib.reload(engine)
