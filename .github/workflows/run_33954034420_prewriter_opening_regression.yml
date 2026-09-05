@@ -1,0 +1,25 @@
+name: Run 33954034420 Prewriter Opening Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_writer_observable_opening_hotfix.py'
+      - 'quality/run_33954034420_prewriter_opening_regression_test.py'
+      - 'content/script_engine_v2.py'
+      - 'ci_grounded_claim_plan_hotfix.py'
+      - '.github/workflows/run_33954034420_prewriter_opening_regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run deterministic pre-Writer opening regression
+        run: python quality/run_33954034420_prewriter_opening_regression_test.py
