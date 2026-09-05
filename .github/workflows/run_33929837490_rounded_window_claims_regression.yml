@@ -56,3 +56,84 @@ jobs:
           print("MINIMUM_3_UNCHANGED=YES")
           print("NEW_LLM_CALLS=0")
           PY
+
+  production-hotfix-composition-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+      - name: Apply exact production hotfix composition
+        run: |
+          set -euo pipefail
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          python ci_video_provider_hotfix.py
+          python ci_topic_input_hotfix.py
+          python ci_aviation_candidate_context_hotfix.py
+          python ci_aviation_candidate_specificity_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          python ci_aviation_specificity_output_repair_hotfix.py
+          python ci_aviation_specificity_projection_hotfix.py
+          python ci_candidate_grounded_recovery_hotfix.py
+          python ci_growth_candidate_shadow_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_curiosity_retention_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_design_causality_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_hook_production_parity_hotfix.py
+          python ci_hook_fallback_quality_floor_hotfix.py
+          python ci_ai_visual_fallback_hotfix.py
+          python ci_ai_visual_mechanism_fallback_hotfix.py
+          python ci_problem_solution_narrative_hotfix.py
+          python ci_causal_information_progression_hotfix.py
+          python ci_retention_structure_experiment_hotfix.py
+          python ci_subscriber_conversion_hotfix.py
+          python ci_script_production_parity_hotfix.py
+          python ci_script_production_parity_bridge_hotfix.py
+          python ci_adaptive_scene_count_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_script_validation_recovery_hotfix.py
+          python ci_script_v2_visual_goal_hotfix.py
+          python ci_script_v2_gunggeum_formal_ending_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+          python ci_cross_process_video_dedupe_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+      - name: Compile composed production surface
+        run: |
+          python -m py_compile \
+            ci_run_33691170895_term_visual_subject_hotfix.py \
+            ci_aviation_context_signature_compat_hotfix.py \
+            ci_final_visual_semantic_qa_hotfix.py \
+            quality/run_33759359725_wrapper_composition_regression_test.py \
+            quality/final_visual_semantic_qa_regression_test.py \
+            video/video_downloader.py \
+            video/video_engine.py \
+            content/script_engine_v2_runner.py
+      - name: Run wrapper composition authority regression
+        run: python quality/run_33759359725_wrapper_composition_regression_test.py
+      - name: Run Final Visual Semantic QA regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+        run: python quality/final_visual_semantic_qa_regression_test.py
+      - name: Assert no production side effects
+        run: |
+          echo PRODUCTION_SIDE_EFFECTS=0
+          echo NEW_LLM_CALLS=0
+          echo NEW_VISION_CALLS=0
+          echo NEW_IMAGE_GENERATION_CALLS=0
