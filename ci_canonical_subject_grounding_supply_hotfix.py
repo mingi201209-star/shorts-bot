@@ -72,3 +72,9 @@ def main():
 
 
 main()
+
+# Run-specific extension: add only the FAA-backed physical identity needed by
+# the fixed flap topic. The Gate, confidence floor, and fail-close behavior are
+# unchanged. This rewrites the supply module before the next production process
+# imports candidate_explorer and its trusted record tuple.
+import ci_flap_canonical_grounding_hotfix
