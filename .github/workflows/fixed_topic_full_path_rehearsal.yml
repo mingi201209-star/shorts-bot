@@ -1,0 +1,34 @@
+name: Fixed Topic Full Path Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "quality/fixed_topic_full_path_rehearsal_test.py"
+      - "quality/candidate_pool_grounding_records.py"
+      - "content/grounded_claim_plan.py"
+      - "content/script_engine_v2.py"
+      - "ci_writer_observable_opening_hotfix.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/fixed_topic_full_path_rehearsal.yml"
+  push:
+    branches: ["fix/fixed-topic-full-rehearsal"]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  full-rehearsal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile deterministic full rehearsal
+        run: python -m py_compile quality/fixed_topic_full_path_rehearsal_test.py content/grounded_claim_plan.py
+      - name: Run fixed-topic full path rehearsal
+        run: python quality/fixed_topic_full_path_rehearsal_test.py
