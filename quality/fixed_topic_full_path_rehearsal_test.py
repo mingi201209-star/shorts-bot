@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from content.grounded_claim_plan import validate_grounded_claim_usage
+from content.grounded_claim_plan import build_grounded_claim_plan, validate_grounded_claim_usage
 from quality.candidate_pool_grounding_records import CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS
 
 TOPIC = "비행기는 착륙할 때 왜 날개 뒤쪽을 펼칠까?"
@@ -16,7 +16,7 @@ assert record.get("subject_kind") == "physical_entity"
 assert float(record.get("identity_confidence") or 0) >= 0.9
 assert [c.get("claim_id") for c in claims] == EXPECTED
 assert len({c.get("claim_id") for c in claims}) == 4
-assert all(c.get("source") and c.get("evidence_summary") and c.get("allowed_paraphrase_scope") for c in claims)
+assert all(c.get("source") and c.get("detail") and c.get("evidence_summary") and c.get("allowed_paraphrase_scope") for c in claims)
 print("FULL A grounding + four claims: PASS")
 
 subprocess.run([sys.executable, "ci_writer_observable_opening_hotfix.py"], check=True)
@@ -29,12 +29,24 @@ question = "그런데 왜 착륙할 때 플랩을 펼칠까요?"
 assert question.endswith("?")
 print("FULL B question topic -> observable Scene1 + question Scene2: PASS")
 
-plan_claims = []
-for scene, c in enumerate(claims, start=3):
-    plan_claims.append({**c, "owner_scene": scene})
-plan = {"grounded_claim_plan": plan_claims, "contracts": [{"index": 1, "owned_claim_id": ""}, {"index": 2, "owned_claim_id": ""}] + [{"index": c["owner_scene"], "owned_claim_id": c["claim_id"]} for c in plan_claims]}
-assert [c["owner_scene"] for c in plan_claims] == [3,4,5,6]
-print("FULL C unique claim ownership: PASS")
+# Use the exact production planner so provenance_present and deterministic ordering
+# are exercised instead of reconstructing a weaker test-only plan.
+candidate = {"_trusted_grounded_claims": claims}
+plan_claims = build_grounded_claim_plan(candidate)
+assert [c["claim_id"] for c in plan_claims] == EXPECTED, plan_claims
+assert [c["owner_scene"] for c in plan_claims] == [3, 4, 5, 6], plan_claims
+assert all(c.get("provenance_present") is True for c in plan_claims)
+plan = {
+    "grounded_claim_plan": plan_claims,
+    "contracts": [
+        {"index": 1, "owned_claim_id": ""},
+        {"index": 2, "owned_claim_id": ""},
+    ] + [
+        {"index": c["owner_scene"], "owned_claim_id": c["claim_id"]}
+        for c in plan_claims
+    ],
+}
+print("FULL C production claim planner + provenance + unique ownership: PASS")
 
 good = {"scenes": [
  {"text": opening},
@@ -74,7 +86,9 @@ for node in ast.walk(tree):
         assert node.func.id not in {"OpenAI", "create_voice", "render_final_video"}
     if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute):
         root = node.func.value
-        while isinstance(root, ast.Attribute): root = root.value
-        if isinstance(root, ast.Name): assert root.id not in {"requests", "httpx"}
+        while isinstance(root, ast.Attribute):
+            root = root.value
+        if isinstance(root, ast.Name):
+            assert root.id not in {"requests", "httpx"}
 print("FULL H API/network/render-free: PASS")
 print("FIXED_TOPIC_FULL_PATH_REHEARSAL=PASS")
