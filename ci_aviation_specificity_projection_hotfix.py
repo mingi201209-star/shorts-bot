@@ -174,5 +174,6 @@ if __name__ == "__main__":
     main()
     # Candidate Pool Handoff must be installed after specificity helpers/projection
     # and before the existing bounded grounded/supply recovery composition.
-    # This import performs no model/Vision/image call.
+    # These imports perform no model/Vision/image call.
     import ci_candidate_pool_handoff_hotfix  # noqa: F401,E402
+    import ci_grounding_aware_candidate_supply_hotfix  # noqa: F401,E402

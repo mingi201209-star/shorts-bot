@@ -150,7 +150,11 @@ def main():
         text, "explore_candidates", "fixed_topic_gate_feedback", '""'
     )
 
-    if "# CANDIDATE_SUPPLY_RECOVERY_V1" in text:
+    preserves_context_wrapper = (
+        "# CANDIDATE_SUPPLY_RECOVERY_V1" in text
+        or "# GROUNDING_AWARE_CANDIDATE_SUPPLY_V1" in text
+    )
+    if preserves_context_wrapper:
         print("✅ Candidate supply wrapper preserves aviation context; direct re-forward skipped")
     else:
         text = _ensure_forwarded_keyword(
