@@ -1,5 +1,6 @@
 from pathlib import Path
 
+# Post-Writer safety net retained from #287.
 PATH = Path("content/script_generator.py")
 text = PATH.read_text(encoding="utf-8")
 
@@ -36,3 +37,39 @@ else:
     text = text.replace(marker, marker + insertion, 1)
     PATH.write_text(text, encoding="utf-8")
     print("Writer Observable Opening V1 installed")
+
+
+# Run 33954034420 fails earlier than Writer JSON generation: the grounded
+# Script Engine V2 opening contract receives a factual/physical question-form
+# hook such as "왜 비행기 창문은 둥글게 설계되었을까?". The existing
+# converter already turns known question endings into an observable statement,
+# but its table covered formal ~까요 forms and missed common past-tense ~을까
+# variants. Extend only those deterministic ending mappings; do not infer a new
+# subject, mechanism, benefit, or factual claim.
+ENGINE = Path("content/script_engine_v2.py")
+engine = ENGINE.read_text(encoding="utf-8")
+ENGINE_MARKER = "# PREWRITER_OBSERVABLE_OPENING_RUN_33954034420"
+anchor = '''_QUESTION_HOOK_REPAIRS = (
+    (r"있을까요$", "있습니다"),
+'''
+replacement = '''# PREWRITER_OBSERVABLE_OPENING_RUN_33954034420
+_QUESTION_HOOK_REPAIRS = (
+    (r"었을까$", "었습니다"),
+    (r"았을까$", "았습니다"),
+    (r"였을까$", "였습니다"),
+    (r"있을까$", "있습니다"),
+    (r"없을까$", "없습니다"),
+    (r"일까$", "입니다"),
+    (r"될까$", "됩니다"),
+    (r"할까$", "합니다"),
+    (r"있을까요$", "있습니다"),
+'''
+
+if ENGINE_MARKER in engine:
+    print("Pre-Writer Observable Opening Run 33954034420 already installed")
+elif anchor not in engine:
+    raise RuntimeError("pre-Writer observable opening question-repair marker mismatch")
+else:
+    engine = engine.replace(anchor, replacement, 1)
+    ENGINE.write_text(engine, encoding="utf-8")
+    print("Pre-Writer Observable Opening Run 33954034420 installed")
