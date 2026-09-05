@@ -1,0 +1,22 @@
+name: Fixed Topic Full Path Rehearsal
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: ["fix/fixed-topic-full-rehearsal-v2"]
+permissions:
+  contents: read
+env:
+  PYTHONPATH: .
+jobs:
+  rehearsal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile
+        run: python -m py_compile ci_fixed_topic_flap_opening_hotfix.py quality/fixed_topic_full_path_rehearsal_test.py
+      - name: Run full deterministic rehearsal
+        run: python quality/fixed_topic_full_path_rehearsal_test.py
