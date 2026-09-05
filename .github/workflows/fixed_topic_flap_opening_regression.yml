@@ -1,0 +1,24 @@
+name: Fixed Topic Flap Opening Regression
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "ci_fixed_topic_flap_opening_hotfix.py"
+      - "quality/fixed_topic_flap_opening_regression_test.py"
+      - "content/script_engine_v2.py"
+      - ".github/workflows/fixed_topic_flap_opening_regression.yml"
+  push:
+    branches: ["fix/fixed-topic-full-rehearsal"]
+permissions:
+  contents: read
+env:
+  PYTHONPATH: .
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python quality/fixed_topic_flap_opening_regression_test.py
