@@ -1,0 +1,118 @@
+name: Run 33506951642 Still Generation ValueError Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_run_33506951642_still_generation_response_hotfix.py'
+      - 'ci_still_vision_evidence_trace_hotfix.py'
+      - 'quality/run_33506951642_still_generation_valueerror_regression_test.py'
+      - '.github/workflows/run_33506951642_still_generation_valueerror_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  exact-counterexample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install regression dependencies
+        run: pip install -r requirements.txt
+      - name: Compose exact production hotfix chain without running production
+        run: |
+          python - <<'PY'
+          import re
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          text = Path('.github/workflows/main.yml').read_text(encoding='utf-8')
+          block = text.split('      - name: Apply production hotfixes\n', 1)[1]
+          block = block.split('          grep -n ', 1)[0]
+          scripts = re.findall(r'^          python (ci_[^\s]+\.py)\s*$', block, re.MULTILINE)
+          if not scripts:
+              raise SystemExit('production hotfix chain not found')
+          for script in scripts:
+              print(f'[PRODUCTION_COMPOSE] {script}', flush=True)
+              subprocess.run([sys.executable, script], check=True)
+          PY
+      - name: Reproduce and fix Run 33506951642 response handoff
+        run: python quality/run_33506951642_still_generation_valueerror_regression_test.py
+      - name: Compile focused files
+        run: |
+          python -m py_compile \
+            ci_run_33506951642_still_generation_response_hotfix.py \
+            ci_still_vision_evidence_trace_hotfix.py \
+            quality/run_33506951642_still_generation_valueerror_regression_test.py
+
+  canonical-grounding-270:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run #270 exact grounding regression from pristine source
+        run: python quality/run_33479576919_canonical_grounding_regression_test.py
+
+  established-visual-contracts:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        test:
+          - quality/run_33256014054_flow_interface_visual_supply_regression_test.py
+          - quality/run_33307762835_noise_reduction_visual_supply_regression_test.py
+          - quality/run_33367370350_deterministic_explanatory_asset_lineage_regression_test.py
+          - quality/run_33248013901_visual_anchor_regression_test.py
+          - quality/visual_subject_anchor_contract_v1_regression_test.py
+          - quality/visual_diversity_preflight_regression_test.py
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Run established visual regression on final PR head
+        run: python "${{ matrix.test }}"
+
+  final-visual-semantic-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - name: Install official final visual semantic QA composition
+        run: |
+          python ci_video_provider_hotfix.py
+          python ci_final_render_content_integrity_hotfix.py
+          python ci_output_quality_hotfix.py
+          python ci_visual_specificity_hotfix.py
+          python ci_query_semantic_integrity_hotfix.py
+          python ci_concrete_visual_evidence_hotfix.py
+          python ci_visible_evidence_provenance_hotfix.py
+          python ci_general_scene_visual_parity_hotfix.py
+          python ci_final_visual_semantic_qa_hotfix.py
+      - name: Run official final visual semantic QA regression
+        env:
+          AI_VISUAL_FALLBACK_ENABLED: 'false'
+          AI_MAX_GENERATIONS_PER_VIDEO: '1'
+        run: |
+          python quality/final_visual_semantic_qa_regression_test.py
+          python quality/still_image_motion_fallback_regression_test.py
+
+  script-engine-v2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install openai
+      - name: Apply official Script Engine V2 base hotfix
+        run: python ci_script_v2_visual_goal_hotfix.py
+      - name: Run deterministic Script Engine V2 regression
+        run: python -m quality.script_engine_v2_regression_test
