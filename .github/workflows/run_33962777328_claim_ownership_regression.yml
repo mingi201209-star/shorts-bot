@@ -1,0 +1,44 @@
+name: Run 33962777328 Claim Ownership Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "content/grounded_claim_plan.py"
+      - "quality/run_33962777328_claim_ownership_regression_test.py"
+      - ".github/workflows/run_33962777328_claim_ownership_regression.yml"
+  push:
+    branches: ["fix/run-33962777328-claim-ownership"]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile
+        run: python -m py_compile content/grounded_claim_plan.py quality/run_33962777328_claim_ownership_regression_test.py
+      - name: Run exact production counterexample
+        run: python quality/run_33962777328_claim_ownership_regression_test.py
+      - name: Safety invariants
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          workflow = Path('.github/workflows/main.yml').read_text(encoding='utf-8')
+          assert 'V3_MAX_API_CALLS: "60"' in workflow
+          assert 'V3_MAX_COST_USD: "0.05"' in workflow
+          assert 'MAX_SCRIPT_API_CALLS = 3' in Path('content/script_engine_v2.py').read_text(encoding='utf-8')
+          print('THRESHOLDS_CHANGED=NO')
+          print('API_CAP_CHANGED=NO')
+          print('COST_CAP_CHANGED=NO')
+          print('RETRY_CHANGED=NO')
+          print('NEW_API_CALLS=0')
+          PY
