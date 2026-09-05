@@ -6,15 +6,8 @@ text = PATH.read_text(encoding="utf-8")
 marker = '''            generated = extract_json(
                 content
             )
-
-            valid, reason = validate_script(
-                generated
-            )
 '''
-replacement = '''            generated = extract_json(
-                content
-            )
-
+insertion = '''
             # WRITER_OBSERVABLE_OPENING_V1
             # Production requires Scene 1 to be an observable statement. Keep
             # the Writer's grounded subject/visual fields intact and only
@@ -33,17 +26,13 @@ replacement = '''            generated = extract_json(
                 if question_form and locked_hook and not locked_question:
                     scenes[0]["text"] = locked_hook
                     print("[WRITER_OBSERVABLE_OPENING_V1] restored candidate-owned declarative hook")
-
-            valid, reason = validate_script(
-                generated
-            )
 '''
 
 if "# WRITER_OBSERVABLE_OPENING_V1" in text:
     print("Writer Observable Opening V1 already installed")
 elif marker not in text:
-    raise RuntimeError("writer observable opening marker mismatch")
+    raise RuntimeError("writer observable opening extraction marker mismatch")
 else:
-    text = text.replace(marker, replacement, 1)
+    text = text.replace(marker, marker + insertion, 1)
     PATH.write_text(text, encoding="utf-8")
     print("Writer Observable Opening V1 installed")
