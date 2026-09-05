@@ -1,0 +1,58 @@
+name: Run 33929837490 Rounded Window Grounded Claims
+
+on:
+  push:
+    branches:
+      - fix/run-33929837490-rounded-window-claims
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+  AI_VISUAL_FALLBACK_ENABLED: "false"
+
+jobs:
+  rounded-window-grounded-claims:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Authority rounded-window claim regression
+        run: python quality/run_33929837490_rounded_window_claims_regression_test.py
+      - name: Existing Grounded Claim Plan regression
+        run: python quality/script_engine_v2_grounded_claim_plan_regression_test.py
+      - name: Canonical Subject Grounding Supply regression
+        run: python -m quality.canonical_subject_grounding_supply_regression_test
+      - name: Assert minimum-3 and API ceilings unchanged
+        run: |
+          set -euo pipefail
+          grep -q 'grounded claim plan requires at least 3 distinct supported factual claims' ci_grounded_claim_plan_hotfix.py
+          grep -q 'MAX_SCRIPT_API_CALLS == 3' quality/script_engine_v2_grounded_claim_plan_regression_test.py
+          grep -q 'MAX_LOCAL_REPAIR_CALLS == 2' quality/script_engine_v2_grounded_claim_plan_regression_test.py
+          python - <<'PY'
+          from pathlib import Path
+          implementation = "\n".join(
+              Path(path).read_text(encoding="utf-8")
+              for path in (
+                  "quality/candidate_pool_grounding_records.py",
+                  "quality/run_33929837490_rounded_window_claims_regression_test.py",
+              )
+          )
+          for token in (
+              "responses.create(",
+              "chat.completions.create(",
+              "images.generate(",
+              "gh workflow run",
+          ):
+              assert token not in implementation, token
+          print("MINIMUM_3_UNCHANGED=YES")
+          print("NEW_LLM_CALLS=0")
+          PY
