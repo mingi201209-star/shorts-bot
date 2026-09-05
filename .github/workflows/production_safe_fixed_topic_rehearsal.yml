@@ -1,0 +1,46 @@
+name: Production Safe Fixed Topic Rehearsal
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "quality/production_safe_topic_pool.py"
+      - "quality/production_safe_rehearsal_test.py"
+      - "quality/candidate_pool_grounding_records.py"
+      - "content/grounded_claim_plan.py"
+      - "ci_topic_input_hotfix.py"
+      - ".github/workflows/main.yml"
+      - ".github/workflows/production_safe_fixed_topic_rehearsal.yml"
+  push:
+    branches: ["fix/production-safe-fixed-topic-rehearsal"]
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  rehearsal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile deterministic rehearsal
+        run: python -m py_compile quality/production_safe_topic_pool.py quality/production_safe_rehearsal_test.py content/grounded_claim_plan.py
+      - name: Run production-safe rehearsal
+        run: python quality/production_safe_rehearsal_test.py
+      - name: Safety invariants
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          workflow = Path('.github/workflows/main.yml').read_text(encoding='utf-8')
+          assert 'V3_MAX_API_CALLS: "60"' in workflow
+          assert 'V3_MAX_COST_USD: "0.05"' in workflow
+          assert 'MAX_SCRIPT_API_CALLS = 3' in Path('content/script_engine_v2.py').read_text(encoding='utf-8')
+          print('THRESHOLDS_CHANGED=NO')
+          print('QUALITY_GATES_DISABLED=NO')
+          print('NEW_API_CALLS=0')
+          PY
