@@ -5,7 +5,9 @@ on:
     paths:
       - "quality/canonical_subject_grounding_supply.py"
       - "quality/canonical_subject_grounding_supply_regression_test.py"
+      - "quality/flap_canonical_grounding_production_regression_test.py"
       - "ci_canonical_subject_grounding_supply_hotfix.py"
+      - "ci_flap_canonical_grounding_hotfix.py"
       - "ci_candidate_supply_recovery_hotfix.py"
       - "ci_candidate_grounded_recovery_hotfix.py"
       - "ci_aviation_candidate_context_hotfix.py"
@@ -31,6 +33,12 @@ jobs:
       - name: Production-path Grounding Supply regression
         run: python -m quality.canonical_subject_grounding_supply_regression_test
       - name: Restore checkout after runtime installer regression
+        run: |
+          git reset --hard HEAD
+          git clean -fd
+      - name: Run 33974152422 flap grounding counterexample
+        run: python -m quality.flap_canonical_grounding_production_regression_test
+      - name: Restore checkout after flap grounding regression
         run: |
           git reset --hard HEAD
           git clean -fd
