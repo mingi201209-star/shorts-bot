@@ -1,4 +1,5 @@
 """API-free rehearsal for the production-safe fixed-topic path."""
+import ast
 from pathlib import Path
 
 from content.grounded_claim_plan import validate_grounded_claim_usage
@@ -48,7 +49,7 @@ assert any("unplanned factual claim" in item["reason"] for item in failures), fa
 print("REHEARSAL D unsupported factual expansion fail-close: PASS")
 
 # Production composition/safety invariants: fixed topic exists already, automatic mode remains available,
-# and this rehearsal introduces no network/model call or threshold relaxation.
+# and this rehearsal introduces no threshold relaxation.
 workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
 topic_hotfix = Path("ci_topic_input_hotfix.py").read_text(encoding="utf-8")
 script_engine = Path("content/script_engine_v2.py").read_text(encoding="utf-8")
@@ -60,9 +61,22 @@ assert 'forced_topic = os.environ.get(' in topic_hotfix
 assert 'MAX_SCRIPT_API_CALLS = 3' in script_engine
 print("REHEARSAL E fixed-topic wiring + automatic dev path + caps unchanged: PASS")
 
-# Keep the rehearsal deterministic and API-free by construction.
-source = Path(__file__).read_text(encoding="utf-8")
-for forbidden in ("OpenAI(", "requests.", "httpx.", "create_voice(", "render_final_video("):
-    assert forbidden not in source, forbidden
+# Keep this rehearsal deterministic/API-free. Inspect executable call sites rather than raw
+# source substrings, so the guard cannot match its own forbidden-name declarations.
+tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+forbidden_call_names = {"OpenAI", "create_voice", "render_final_video"}
+forbidden_call_roots = {"requests", "httpx"}
+for node in ast.walk(tree):
+    if not isinstance(node, ast.Call):
+        continue
+    func = node.func
+    if isinstance(func, ast.Name):
+        assert func.id not in forbidden_call_names, f"forbidden API/render call: {func.id}"
+    elif isinstance(func, ast.Attribute):
+        root = func.value
+        while isinstance(root, ast.Attribute):
+            root = root.value
+        if isinstance(root, ast.Name):
+            assert root.id not in forbidden_call_roots, f"forbidden network call root: {root.id}"
 print("REHEARSAL F API-free deterministic boundary: PASS")
 print("PRODUCTION_SAFE_FIXED_TOPIC_REHEARSAL=PASS")
