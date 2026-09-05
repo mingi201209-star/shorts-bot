@@ -58,6 +58,12 @@ def _unsupported_run_candidate():
         constraint="활주로 운항 표시",
         counterintuitive_result="표시 위치마다 의미가 다르다",
         concrete_condition="항공기가 활주로를 사용할 때",
+        # Match Run 33960845940: model supplied a concrete physical identity,
+        # but the host had no repo-owned trusted evidence for that identity.
+        subject_kind="physical_entity",
+        canonical_subject="airport runway white markings",
+        subject_identity_confidence=0.9,
+        grounding_evidence=[],
     )
     candidate["micro_narrative"] = {
         "hook": "활주로에는 흰 선이 반복된다.",
