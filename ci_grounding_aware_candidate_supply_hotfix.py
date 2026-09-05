@@ -20,7 +20,16 @@ from quality.grounding_aware_candidate_supply import (
 _grounding_aware_previous_explore_candidates = explore_candidates
 
 
-def explore_candidates(*args, **kwargs):
+def explore_candidates(
+    topic_info,
+    *,
+    recent_topics=None,
+    recent_content=None,
+    rejected_topics=None,
+    fixed_topic=None,
+    fixed_topic_gate_feedback="",
+    model=MODEL,
+):
     if os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower() == "aviation":
         empty = no_grounded_candidate_supply_result()
         if empty is not None:
@@ -29,7 +38,15 @@ def explore_candidates(*args, **kwargs):
                 "status=NO_GROUNDED_CANDIDATE_SUPPLY capabilities=0 api_calls=0"
             )
             return empty
-    return _grounding_aware_previous_explore_candidates(*args, **kwargs)
+    return _grounding_aware_previous_explore_candidates(
+        topic_info,
+        recent_topics=recent_topics,
+        recent_content=recent_content,
+        rejected_topics=rejected_topics,
+        fixed_topic=fixed_topic,
+        fixed_topic_gate_feedback=fixed_topic_gate_feedback,
+        model=model,
+    )
 
 
 # The capability list is derived at install/runtime import from the exact same
