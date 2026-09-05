@@ -148,6 +148,7 @@ jobs:
           python ci_script_v2_gunggeum_formal_ending_hotfix.py
           python ci_final_visual_semantic_qa_hotfix.py
           python ci_cross_process_video_dedupe_hotfix.py
+          python ci_writer_observable_opening_hotfix.py
 
           # Some later production hotfixes rewrite candidate_explorer wrappers.
           # Re-apply the compatibility patch against the FINAL production state.
@@ -162,7 +163,7 @@ jobs:
           grep -n '"+13%"' config.py
           grep -n "AVIATION_SPECIFICITY_OUTPUT_REPAIR_V1\|AVIATION_SPECIFICITY_PROJECTION_V3" content/candidate_explorer.py
           grep -n "FINAL_RENDER_CONTENT_INTEGRITY_V1\|CONTENT_IDENTITY_DRIFT" main.py
-          grep -n "PROBLEM → SOLUTION NARRATIVE — EVIDENCE GATED\|ADAPTIVE_SCENE_COUNT_FOR_DENSE_DESIGN_V1\|ADAPTIVE_DESIGN_MIN_SCENES\|SCRIPT_VALIDATION_RECOVERY_V1\|RETENTION_STRUCTURE_EXPERIMENT_V1\|FIRST 5 SEC MINI NARRATIVE\|SUBSCRIBER_CONVERSION_LAYER_V1\|Subscriber conversion" content/script_generator.py
+          grep -n "WRITER_OBSERVABLE_OPENING_V1\|PROBLEM → SOLUTION NARRATIVE — EVIDENCE GATED\|ADAPTIVE_SCENE_COUNT_FOR_DENSE_DESIGN_V1\|ADAPTIVE_DESIGN_MIN_SCENES\|SCRIPT_VALIDATION_RECOVERY_V1\|RETENTION_STRUCTURE_EXPERIMENT_V1\|FIRST 5 SEC MINI NARRATIVE\|SUBSCRIBER_CONVERSION_LAYER_V1\|Subscriber conversion" content/script_generator.py
           grep -n "subtitle_start=0.000s\|exact_tts_text=true" video/subtitle_engine.py
           grep -n "HOOK_SUBJECT_DOMINANCE_MIN\|HOOK_ACTION_MATCH_MIN\|HOOK_MAX_COMPETING_SUBJECT_RISK\|HOOK_SUBJECT_VISIBILITY_MIN" video/hook_visual_dominance.py
           grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES\|HOOK_CONCRETE_VISUAL_EVIDENCE\|DIRECT_VERIFIED\|UNVERIFIED_CONTEXTUAL_FALLBACK\|HOOK_FALLBACK_QUALITY_FLOOR\|AI_VISUAL_SORA_FALLBACK" video/hook_visual.py
@@ -174,7 +175,7 @@ jobs:
             ci_hotfix.py ci_novelty_budget_hotfix.py ci_fact_critical_hotfix.py ci_speech_style_hotfix.py \
             ci_hook_generation_hotfix.py ci_hook_pool_guard_hotfix.py ci_retention_hotfix.py \
             ci_first5_retention_tts_hotfix.py ci_first5_visual_contract_hotfix.py ci_video_provider_hotfix.py \
-            ci_cross_process_video_dedupe_hotfix.py ci_visual_diversity_preflight_hotfix.py \
+            ci_cross_process_video_dedupe_hotfix.py ci_visual_diversity_preflight_hotfix.py ci_writer_observable_opening_hotfix.py \
             ci_topic_input_hotfix.py ci_aviation_candidate_context_hotfix.py ci_aviation_candidate_specificity_hotfix.py \
             ci_aviation_context_signature_compat_hotfix.py ci_aviation_specificity_output_repair_hotfix.py \
             ci_aviation_specificity_projection_hotfix.py ci_candidate_grounded_recovery_hotfix.py \
