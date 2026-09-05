@@ -9,24 +9,15 @@ PATCH = r'''
 
 # GROUNDING_AWARE_CANDIDATE_SUPPLY_V1
 # Authority: production Run 33960845940 supplied 20 aviation candidates across
-# seven attempts; host canonical grounding rejected every one.  Expose the exact
+# seven attempts; host canonical grounding rejected every one. Expose the exact
 # repo-owned grounding capability to the existing Explorer call without relaxing
 # host validation or adding a model/network call.
 from quality.grounding_aware_candidate_supply import (
     grounding_capability_context,
-    grounding_candidate_capabilities,
     no_grounded_candidate_supply_result,
 )
 
-_grounding_aware_previous_build_execution_context = build_execution_context
 _grounding_aware_previous_explore_candidates = explore_candidates
-
-
-def build_execution_context(*args, **kwargs):
-    context = _grounding_aware_previous_build_execution_context(*args, **kwargs)
-    if os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower() != "aviation":
-        return context
-    return context.rstrip() + "\n\n" + grounding_capability_context() + "\n"
 
 
 def explore_candidates(*args, **kwargs):
@@ -41,12 +32,18 @@ def explore_candidates(*args, **kwargs):
     return _grounding_aware_previous_explore_candidates(*args, **kwargs)
 
 
+# The capability list is derived at install/runtime import from the exact same
+# repo-owned registries used by host validation. Keep it at SYSTEM authority so
+# primary Explorer and the existing bounded recovery call inherit one contract
+# without wrapping build_execution_context (which later compatibility installers
+# inspect structurally).
+CANDIDATE_EXPLORER_PROMPT += "\n\n" + grounding_capability_context() + "\n"
 CANDIDATE_EXPLORER_PROMPT += """
 
 ============================================================
 16. GROUNDING-AWARE AVIATION SUPPLY — RUN 33960845940
 ============================================================
-For aviation automatic supply, the execution context contains a compact
+For aviation automatic supply, the SYSTEM prompt contains a compact
 [GROUNDING-AWARE CANDIDATE SUPPLY] capability list derived from the exact
 repo-owned trusted grounding registries used by host validation.
 
