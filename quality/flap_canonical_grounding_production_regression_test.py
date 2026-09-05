@@ -49,13 +49,14 @@ def run():
 
     fresh_process = textwrap.dedent(
         f'''\
-        from content.candidate_explorer import validate_explorer_output
+        import content.candidate_explorer as explorer_package
         from quality.canonical_subject_grounding import evaluate_candidate_subject_grounding
         from quality.canonical_subject_grounding_supply import (
             PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS,
             supply_trusted_subject_grounding,
         )
 
+        validate_explorer_output = explorer_package._LEGACY.validate_explorer_output
         topic = {FIXED_FLAP_TOPIC!r}
         parsed = {{
             "status": "SELECTED",
