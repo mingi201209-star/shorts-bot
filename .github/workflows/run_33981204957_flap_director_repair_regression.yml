@@ -1,0 +1,24 @@
+name: Run 33981204957 Flap Director Repair Regression
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Apply prerequisite verified-still rescue
+        run: python ci_run_33977099845_verified_still_rescue_hotfix.py
+      - name: Run counterexample regression
+        run: python quality/run_33981204957_flap_director_repair_regression_test.py
