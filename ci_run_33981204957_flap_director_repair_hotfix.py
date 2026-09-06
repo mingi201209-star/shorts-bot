@@ -25,6 +25,20 @@ def _run_33981204957_flap_subject(scene):
 def plan_explanation(scene):
     value = _text(scene).replace("-", " ")
     if _run_33981204957_flap_subject(scene):
+        # Run 34006225743 exposed an overlap: the identity scene contains the
+        # phrase "고양력 장치", so generic lift matching must not steal an
+        # explicitly identity-tagged trailing-edge scene from the identity
+        # plan. Keep the existing mechanism precedence for all scenes that do
+        # not carry the explicit identity discriminator.
+        if "identity" in value:
+            return {
+                "scene_role": "mechanism",
+                "subject": "flap",
+                "action": "trailing_edge_identity",
+                "template": "FLAP_TRAILING_EDGE_IDENTITY",
+                "label": "날개 뒤쪽의 플랩",
+                "source_priority": ("explanatory_2d",),
+            }
         if any(token in value for token in ("camber", "lift", "drag", "캠버", "양력", "항력")):
             return {
                 "scene_role": "mechanism",
@@ -34,7 +48,7 @@ def plan_explanation(scene):
                 "label": "플랩 전개와 날개 형상",
                 "source_priority": ("explanatory_2d",),
             }
-        if any(token in value for token in ("trailing edge", "identity", "뒤쪽", "후연")):
+        if any(token in value for token in ("trailing edge", "뒤쪽", "후연")):
             return {
                 "scene_role": "mechanism",
                 "subject": "flap",
