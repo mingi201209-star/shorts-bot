@@ -6,6 +6,11 @@ same physical still. Its selective repair re-entered Scene 3 with the unchanged
 2/2 still-generation budget and the existing Visual Explanation layer failed
 closed as unsupported_or_fact_unsafe.
 
+Run 34006225743 then proved the Scene 3 deterministic FLAP_CAMBER repair works,
+but the live Scene 4 identity payload also contains the Korean high-lift phrase
+"고양력 장치". That generic lift token must not override the explicit identity
+signal and incorrectly select the already-used FLAP_CAMBER asset.
+
 This regression proves the repair can obtain genuinely distinct deterministic
 2D flap assets without changing Director thresholds, still budgets, normal
 source-use caps, or physical lineage.
@@ -32,12 +37,14 @@ SCENE3 = {
     "visual_goal": "aircraft trailing-edge flap camber lift drag",
 }
 
+# Exact live payload family from Run 34006225743. The text intentionally
+# includes "고양력" while keyword carries explicit identity semantics.
 SCENE4 = {
     "scene_id": "4",
     "role": "reveal",
-    "text": "그 장치는 날개 뒤쪽의 플랩입니다.",
+    "text": "플랩은 항공기 날개 뒤쪽에 붙는 고양력 장치입니다.",
     "keyword": "aircraft wing flap trailing-edge trailing edge identity",
-    "visual_goal": "aircraft wing trailing edge flap identity",
+    "visual_goal": "플랩의 위치와 기능 설명",
 }
 
 
