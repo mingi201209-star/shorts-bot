@@ -126,3 +126,9 @@ else:
 # generation/quality budget or moving earlier visual installers.
 from ci_run_33977099845_verified_still_rescue_hotfix import main as _patch_verified_still_rescue
 _patch_verified_still_rescue()
+
+# Run 33981204957 exposed the next independent bottleneck after the verified
+# still rescue succeeded: Director repetition repair had no bounded flap
+# explanatory fallback once the unchanged 2/2 still budget was exhausted.
+from ci_run_33981204957_flap_director_repair_hotfix import main as _patch_flap_director_repair
+_patch_flap_director_repair()
