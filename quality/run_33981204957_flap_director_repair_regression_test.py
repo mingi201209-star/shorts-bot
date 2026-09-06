@@ -13,8 +13,13 @@ source-use caps, or physical lineage.
 from __future__ import annotations
 
 import importlib
+import sys
 import tempfile
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from ci_run_33981204957_flap_director_repair_hotfix import main as install_hotfix
 
