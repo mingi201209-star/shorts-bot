@@ -1,0 +1,28 @@
+name: Visual Explanation Contract V2.1 Shadow Regression
+
+on:
+  pull_request:
+    paths:
+      - 'quality/visual_explanation_contract_v2.py'
+      - 'quality/visual_explanation_contract_v2.schema.json'
+      - 'quality/visual_state_registry.py'
+      - 'quality/visual_state_observation.py'
+      - 'quality/visual_state_evidence.py'
+      - 'quality/visual_contrast_evaluator.py'
+      - 'quality/visual_explanation_shadow.py'
+      - 'quality/visual_explanation_contract_v2_regression_test.py'
+      - '.github/workflows/visual_explanation_contract_v2_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile V2.1 shadow modules
+        run: python -m py_compile quality/visual_explanation_contract_v2.py quality/visual_state_registry.py quality/visual_state_observation.py quality/visual_state_evidence.py quality/visual_contrast_evaluator.py quality/visual_explanation_shadow.py
+      - name: Run V2.1 shadow regression
+        run: python -m unittest -v quality.visual_explanation_contract_v2_regression_test
