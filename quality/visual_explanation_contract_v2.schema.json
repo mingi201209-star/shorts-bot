@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://shorts-bot/quality/visual_explanation_contract_v2.1.schema.json",
+  "title": "VisualExplanationContractV2_1",
+  "type": "object",
+  "required": ["version", "scene_id", "mode", "claims", "comparison_segments", "relations"],
+  "additionalProperties": false,
+  "properties": {
+    "version": {"const": "visual_explanation_contract_v2.1"},
+    "scene_id": {"type": "integer", "minimum": 0},
+    "mode": {"const": "shadow"},
+    "claims": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/claim"}},
+    "comparison_segments": {"type": "array", "items": {"$ref": "#/definitions/comparison_segment"}},
+    "relations": {"type": "array", "items": {"$ref": "#/definitions/relation"}}
+  },
+  "definitions": {
+    "visibility": {
+      "type": "object",
+      "required": ["level", "requirements"],
+      "additionalProperties": false,
+      "properties": {
+        "level": {"const": "CLEAR"},
+        "requirements": {
+          "type": "object",
+          "required": ["not_occluded", "distinguishable_state", "sufficient_scale_for_mobile"],
+          "additionalProperties": false,
+          "properties": {
+            "not_occluded": {"type": "boolean"},
+            "distinguishable_state": {"const": true},
+            "sufficient_scale_for_mobile": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "required": ["id", "subject", "context", "state", "required", "visibility"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9_]+$"},
+        "subject": {"type": "string", "minLength": 1},
+        "context": {"type": "string", "minLength": 1},
+        "state": {"type": "string", "minLength": 1},
+        "required": {"type": "boolean"},
+        "visibility": {"$ref": "#/definitions/visibility"}
+      }
+    },
+    "split_binding": {
+      "type": "object",
+      "required": ["claim_id", "slot"],
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {"type": "string"},
+        "slot": {"enum": ["LEFT", "RIGHT"]}
+      }
+    },
+    "sequential_binding": {
+      "type": "object",
+      "required": ["claim_id", "sequence_index", "start_sec", "end_sec"],
+      "additionalProperties": false,
+      "properties": {
+        "claim_id": {"type": "string"},
+        "sequence_index": {"type": "integer", "minimum": 0, "maximum": 1},
+        "start_sec": {"type": "number", "minimum": 0},
+        "end_sec": {"type": "number", "minimum": 0}
+      }
+    },
+    "comparison_segment": {
+      "type": "object",
+      "required": ["id", "presentation", "start_sec", "end_sec", "bindings"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9_-]+$"},
+        "presentation": {"enum": ["SPLIT_SCREEN", "SEQUENTIAL"]},
+        "start_sec": {"type": "number", "minimum": 0},
+        "end_sec": {"type": "number", "minimum": 0},
+        "bindings": {"type": "array", "minItems": 2, "maxItems": 2}
+      },
+      "allOf": [
+        {"if": {"properties": {"presentation": {"const": "SPLIT_SCREEN"}}}, "then": {"properties": {"bindings": {"items": {"$ref": "#/definitions/split_binding"}}}}},
+        {"if": {"properties": {"presentation": {"const": "SEQUENTIAL"}}}, "then": {"properties": {"bindings": {"items": {"$ref": "#/definitions/sequential_binding"}}}}}
+      ]
+    },
+    "relation": {
+      "type": "object",
+      "required": ["id", "type", "members", "comparison_segment_id", "required"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9_-]+$"},
+        "type": {"const": "CONTRAST"},
+        "members": {"type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": {"type": "string"}},
+        "comparison_segment_id": {"type": "string"},
+        "required": {"type": "boolean"}
+      }
+    }
+  }
+}
