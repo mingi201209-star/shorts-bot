@@ -1,0 +1,23 @@
+name: Prewriter Grounding Resupply Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_prewriter_grounding_resupply_hotfix.py'
+      - 'ci_canonical_subject_grounding_supply_hotfix.py'
+      - 'quality/prewriter_grounding_resupply_regression_test.py'
+      - '.github/workflows/prewriter_grounding_resupply_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile hotfix and regression
+        run: python -m py_compile ci_prewriter_grounding_resupply_hotfix.py quality/prewriter_grounding_resupply_regression_test.py
+      - name: Run production-chain regression
+        run: python quality/prewriter_grounding_resupply_regression_test.py
