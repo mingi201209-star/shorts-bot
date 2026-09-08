@@ -78,3 +78,8 @@ main()
 # unchanged. This rewrites the supply module before the next production process
 # imports candidate_explorer and its trusted record tuple.
 import ci_flap_canonical_grounding_hotfix
+
+# Candidate retries can replace the validated winner object after Explorer
+# supply has already run. Re-supply the same repo-owned provenance immediately
+# before the existing pre-Writer fail-close gate.
+import ci_prewriter_grounding_resupply_hotfix
