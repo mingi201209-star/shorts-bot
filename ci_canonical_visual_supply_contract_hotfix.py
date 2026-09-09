@@ -11,10 +11,10 @@ def patch_grounding_supply():
     if MARKER in text:
         return
 
-    record_anchor = '''        "identity_confidence": 0.98,\n        "feature_descriptions": [\n'''
-    record_replacement = '''        "identity_confidence": 0.98,\n        # CANONICAL_VISUAL_SUPPLY_CONTRACT_V1\n        # Evidence-owned visible discriminators only. These are not model hints\n        # and do not encode an aircraft model or a topic-specific stock source.\n        "visual_discriminators": ["nacelle", "nozzle", "chevron", "serrated"],\n        "feature_descriptions": [\n'''
+    record_anchor = '''        "canonical_subject": "jet engine nacelle/nozzle chevrons",\n        "identity_confidence": 0.98,\n        "feature_descriptions": [\n'''
+    record_replacement = '''        "canonical_subject": "jet engine nacelle/nozzle chevrons",\n        "identity_confidence": 0.98,\n        # CANONICAL_VISUAL_SUPPLY_CONTRACT_V1\n        # Evidence-owned visible discriminators only. These are not model hints\n        # and do not encode an aircraft model or a topic-specific stock source.\n        "visual_discriminators": ["nacelle", "nozzle", "chevron", "serrated"],\n        "feature_descriptions": [\n'''
     if text.count(record_anchor) != 1:
-        raise RuntimeError("canonical visual supply record anchor mismatch")
+        raise RuntimeError("canonical visual supply chevron record anchor mismatch")
     text = text.replace(record_anchor, record_replacement, 1)
 
     claims_anchor = '''    claims = _trusted_grounded_claims(record)\n\n    result["subject_kind"] = _PHYSICAL_KIND\n'''
@@ -146,8 +146,6 @@ def enforce_visual_subject_anchor_query(
         return base
 
     proof_words = []
-    # Keep the physical domain first, then the trusted canonical identity, then
-    # trusted visible discriminators. Required anchors are rechecked below.
     if "aircraft" in required:
         proof_words.append("aircraft")
     for word in canonical_terms + discriminators:
@@ -161,7 +159,6 @@ def enforce_visual_subject_anchor_query(
 
     proof_anchors = extract_query_anchors(proof_query)
     if any(anchor not in proof_anchors for anchor in required):
-        # Never trade a required 3/3 subject identity for richer wording.
         return base
 
     contract.update({
@@ -203,8 +200,6 @@ def _general_fallback_queries(query):
             return
         variants.append(value)
 
-    # Keep the same number of bounded fallback opportunities. Change wording,
-    # never the trusted proof identity. No `aircraft engine detail` degradation.
     swapped = ["airplane" if word == "aircraft" else word for word in words]
     add(swapped)
     optional = [
@@ -286,13 +281,13 @@ def patch_still_fallback():
         return
 
     signature_anchor = '''    return tuple(signature) if len(signature) >= 2 else ()\n\n\ndef _reuse_signatures(scene):\n'''
-    signature_replacement = '''    if len(signature) >= 2:\n        return tuple(signature)\n    # CANONICAL_VISUAL_SUPPLY_CONTRACT_V1\n    # Engine/chevron proof scenes were previously uncacheable because this older\n    # signature helper knew only wing/window/gear families. Reuse only an already\n    # verified still with the same complete subject-anchor tuple.\n    try:\n        from video.video_downloader import extract_query_anchors\n        anchors = tuple(extract_query_anchors(query))\n    except Exception:\n        anchors = ()\n    return anchors if len(anchors) >= 2 else ()\n\n\ndef _reuse_signatures(scene):\n'''
+    signature_replacement = '''    if len(signature) >= 2:\n        return tuple(signature)\n    # CANONICAL_VISUAL_SUPPLY_CONTRACT_V1\n    try:\n        from video.video_downloader import extract_query_anchors\n        anchors = tuple(extract_query_anchors(query))\n    except Exception:\n        anchors = ()\n    return anchors if len(anchors) >= 2 else ()\n\n\ndef _reuse_signatures(scene):\n'''
     if text.count(signature_anchor) != 1:
         raise RuntimeError("canonical visual supply still signature anchor mismatch")
     text = text.replace(signature_anchor, signature_replacement, 1)
 
     reject_anchor = '''            print(\n                f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=rejected_by_vision "\n                f"count={_GENERATION_COUNT}"\n            )\n'''
-    reject_replacement = '''            # CANONICAL_VISUAL_SUPPLY_CONTRACT_V1\n            # Preserve the verifier decision for auditability; no extra Vision call.\n            reason = str(evidence.get("reason") or "unspecified")[:300]\n            visible = "+".join(str(value) for value in evidence.get("visible_components", []) or []) or "none"\n            print(\n                f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=rejected_by_vision "\n                f"count={_GENERATION_COUNT} pass={bool(evidence.get('pass', False))} "\n                f"visible={visible} reason={reason}"\n            )\n'''
+    reject_replacement = '''            # CANONICAL_VISUAL_SUPPLY_CONTRACT_V1\n            reason = str(evidence.get("reason") or "unspecified")[:300]\n            visible = "+".join(str(value) for value in evidence.get("visible_components", []) or []) or "none"\n            print(\n                f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=rejected_by_vision "\n                f"count={_GENERATION_COUNT} pass={bool(evidence.get('pass', False))} "\n                f"visible={visible} reason={reason}"\n            )\n'''
     if text.count(reject_anchor) != 1:
         raise RuntimeError("canonical visual supply still rejection anchor mismatch")
     text = text.replace(reject_anchor, reject_replacement, 1)

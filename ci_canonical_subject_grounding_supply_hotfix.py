@@ -73,11 +73,12 @@ def main():
 
 main()
 
-# Run-specific extension: add only the FAA-backed physical identity needed by
-# the fixed flap topic. The Gate, confidence floor, and fail-close behavior are
-# unchanged. This rewrites the supply module before the next production process
-# imports candidate_explorer and its trusted record tuple.
+# Run-specific extensions: retain the previous FAA-backed flap record for the
+# separate trailing-edge flap family, and add the FAA-backed static-discharge
+# wick identity for the exact wing-tip small-rod observation. The Gate,
+# confidence floor, and fail-close behavior are unchanged.
 import ci_flap_canonical_grounding_hotfix
+import ci_static_wick_canonical_grounding_hotfix
 
 # Candidate retries can replace the validated winner object after Explorer
 # supply has already run. Re-supply the same repo-owned provenance immediately
