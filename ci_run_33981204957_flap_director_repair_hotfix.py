@@ -129,6 +129,8 @@ def main():
     if "VISUAL_EXPLANATION_RETRIEVAL_V1" in engine_source:
         from ci_static_wick_visual_explanation_hotfix import main as _patch_static_wick_visual
         _patch_static_wick_visual()
+        from ci_static_wick_local_visual_handoff_hotfix import main as _patch_static_wick_local_handoff
+        _patch_static_wick_local_handoff()
     else:
         print("⏭️ Static-wick visual repair deferred until final visual composition")
 
