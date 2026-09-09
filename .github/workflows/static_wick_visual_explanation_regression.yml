@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - 'ci_static_wick_visual_explanation_hotfix.py'
+      - 'ci_static_wick_fallback_provenance_hotfix.py'
+      - 'ci_static_wick_local_visual_handoff_hotfix.py'
       - 'ci_run_33981204957_flap_director_repair_hotfix.py'
       - 'quality/static_wick_visual_explanation_regression_test.py'
+      - 'quality/static_wick_fallback_provenance_regression_test.py'
       - '.github/workflows/static_wick_visual_explanation_regression.yml'
   workflow_dispatch:
 
@@ -17,7 +20,15 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Compile repair and regression
-        run: python -m py_compile ci_static_wick_visual_explanation_hotfix.py quality/static_wick_visual_explanation_regression_test.py
-      - name: Run regression
+      - name: Compile repair and regressions
+        run: >-
+          python -m py_compile
+          ci_static_wick_visual_explanation_hotfix.py
+          ci_static_wick_fallback_provenance_hotfix.py
+          ci_static_wick_local_visual_handoff_hotfix.py
+          quality/static_wick_visual_explanation_regression_test.py
+          quality/static_wick_fallback_provenance_regression_test.py
+      - name: Run source and composition regression
         run: python quality/static_wick_visual_explanation_regression_test.py
+      - name: Run fallback provenance behavioral regression
+        run: python quality/static_wick_fallback_provenance_regression_test.py

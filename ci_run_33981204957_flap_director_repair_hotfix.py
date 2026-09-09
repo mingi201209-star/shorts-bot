@@ -123,12 +123,14 @@ def main():
 
     # Standalone flap regression runs before Visual Explanation Retrieval V1.
     # Production invokes this module again from the proven late composition hook;
-    # install the static-wick repair only on that final pass.
+    # install the static-wick repairs only on that final pass.
     engine_path = ROOT / "video/video_engine.py"
     engine_source = engine_path.read_text(encoding="utf-8") if engine_path.exists() else ""
     if "VISUAL_EXPLANATION_RETRIEVAL_V1" in engine_source:
         from ci_static_wick_visual_explanation_hotfix import main as _patch_static_wick_visual
         _patch_static_wick_visual()
+        from ci_static_wick_fallback_provenance_hotfix import main as _patch_static_wick_fallback_provenance
+        _patch_static_wick_fallback_provenance()
         from ci_static_wick_local_visual_handoff_hotfix import main as _patch_static_wick_local_handoff
         _patch_static_wick_local_handoff()
     else:
