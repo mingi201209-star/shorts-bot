@@ -21,19 +21,17 @@ assert "source_asset_id" in hotfix
 assert "protected_region" in hotfix
 
 # Run 34339557592 proved that generating the deterministic explanation is not
-# sufficient: the common download/prepare path can overwrite vertical_video_path
-# before load_video_for_scene sees it. The bounded static-wick handoff must
-# preserve the already-rendered local asset and leave unrelated scenes on the
-# original download/vertical-preparation path.
+# sufficient. Mark only trusted static-wick local assets with a private scheme;
+# downloader materializes that file into the existing source path, after which
+# the normal vertical preparation / load / subtitle / Director path is retained.
 assert "STATIC_WICK_LOCAL_VISUAL_HANDOFF_V1" in handoff
 assert "is_static_wick_explanation_scene(item)" in handoff
-assert "video_url == vertical_video_path" in handoff
-assert "os.path.exists(vertical_video_path)" in handoff
+assert 'video_url = "static-wick-local://" + vertical_video_path' in handoff
+assert "_STATIC_WICK_LOCAL_HANDOFF_PREVIOUS_DOWNLOAD_VIDEO" in handoff
+assert 'prefix = "static-wick-local://"' in handoff
+assert "shutil.copyfile(source_path, output_path)" in handoff
+assert "return _STATIC_WICK_LOCAL_HANDOFF_PREVIOUS_DOWNLOAD_VIDEO(" in handoff
 assert "[STATIC_WICK_LOCAL_HANDOFF]" in handoff
-assert "else:" in handoff
-assert "download_video(" in handoff
-assert "prepare_vertical_video(" in handoff
-assert handoff.index("if _static_wick_local_visual_ready:") < handoff.index("download_video(")
 
 # Exact trusted facts may fail closed against generic stock, but unrelated
 # visual selection must delegate to the previous selector unchanged.
