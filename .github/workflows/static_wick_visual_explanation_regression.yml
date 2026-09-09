@@ -1,0 +1,23 @@
+name: Static Wick Visual Explanation Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_static_wick_visual_explanation_hotfix.py'
+      - 'ci_run_33981204957_flap_director_repair_hotfix.py'
+      - 'quality/static_wick_visual_explanation_regression_test.py'
+      - '.github/workflows/static_wick_visual_explanation_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile repair and regression
+        run: python -m py_compile ci_static_wick_visual_explanation_hotfix.py quality/static_wick_visual_explanation_regression_test.py
+      - name: Run regression
+        run: python quality/static_wick_visual_explanation_regression_test.py
