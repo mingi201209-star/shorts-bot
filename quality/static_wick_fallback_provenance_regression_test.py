@@ -47,16 +47,43 @@ CURRENT_CONTRACT.update(
 assert choose_best_candidate([SENTINEL], subject_filter_query="airplane detail") is None
 assert choose_best_candidate([SENTINEL], subject_filter_query="airplane") is None
 
+# Run 34347759937 exact counterexample: mechanism/result scenes have no concrete
+# physical subject, so the subject-anchor contract is intentionally not required.
+# The trusted explanatory query is still preserved as provenance and must keep
+# the broadened contextual fallback closed so deterministic explanation can run.
 CURRENT_CONTRACT.update(
     {
-        "required": True,
+        "required": False,
+        "reason": "no_concrete_subject",
+        "original_query": "aircraft static charge dissipation",
+        "effective_query": "aircraft static charge dissipation",
+    }
+)
+assert choose_best_candidate([SENTINEL], subject_filter_query="airplane detail") is None
+assert choose_best_candidate([SENTINEL], subject_filter_query="airplane") is None
+
+CURRENT_CONTRACT.update(
+    {
+        "required": False,
+        "reason": "no_concrete_subject",
         "original_query": "aircraft static radio interference reduction",
         "effective_query": "aircraft static radio interference reduction",
     }
 )
-assert choose_best_candidate([SENTINEL], subject_filter_query="aircraft wing detail") is None
+assert choose_best_candidate([SENTINEL], subject_filter_query="airplane detail") is None
+assert choose_best_candidate([SENTINEL], subject_filter_query="airplane") is None
 
-# Historical selection is deliberately outside this new provenance gate.
+# Existing concrete-subject location behavior remains protected.
+CURRENT_CONTRACT.update(
+    {
+        "required": True,
+        "original_query": "aircraft static wick location identity",
+        "effective_query": "aircraft wing static wick location identity",
+    }
+)
+assert choose_best_candidate([SENTINEL], subject_filter_query="airplane wing winglet") is None
+
+# Historical selection is deliberately outside this provenance gate.
 assert (
     choose_best_candidate(
         [SENTINEL], historical=True, subject_filter_query="airplane detail"
@@ -65,7 +92,8 @@ assert (
 )
 
 # Unrelated aviation explanatory/identity scenes keep the exact previous
-# selector behavior; no broad anti-stock rule is introduced.
+# selector behavior, including when their contract is not required. No broad
+# anti-stock rule is introduced.
 CURRENT_CONTRACT.update(
     {
         "required": True,
@@ -74,6 +102,16 @@ CURRENT_CONTRACT.update(
     }
 )
 assert choose_best_candidate([SENTINEL], subject_filter_query="airplane window detail") is SENTINEL
+
+CURRENT_CONTRACT.update(
+    {
+        "required": False,
+        "reason": "no_concrete_subject",
+        "original_query": "aircraft cabin pressure distribution",
+        "effective_query": "aircraft cabin pressure distribution",
+    }
+)
+assert choose_best_candidate([SENTINEL], subject_filter_query="airplane detail") is SENTINEL
 
 CURRENT_CONTRACT.clear()
 assert choose_best_candidate([SENTINEL], subject_filter_query="airplane detail") is SENTINEL

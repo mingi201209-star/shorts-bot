@@ -13,7 +13,10 @@ PATCH = r'''
 # stock, but the later specificity/contextual ladder broadened the query and
 # reintroduced generic aircraft footage. Preserve the original trusted visual
 # authority through the entire selector chain so deterministic explanation can
-# run. No threshold, provider, model call, retry, or budget is changed.
+# run. Run 34347759937 proved that explanatory static-wick claims without a
+# concrete subject still retain their original/effective authority in the
+# subject-anchor contract even when `required=False`; that authority must remain
+# usable here. No threshold, provider, model call, retry, or budget is changed.
 _STATIC_WICK_FALLBACK_PROVENANCE_PREVIOUS_CHOOSE = choose_best_candidate
 
 
@@ -22,7 +25,7 @@ def _static_wick_contract_authority():
         contract = get_current_visual_subject_anchor_contract()
     except Exception:
         return ""
-    if not isinstance(contract, dict) or not bool(contract.get("required")):
+    if not isinstance(contract, dict):
         return ""
     return normalize_search_query(
         contract.get("effective_query") or contract.get("original_query") or ""
@@ -61,6 +64,8 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
     # The original trusted explanatory scene already failed closed against
     # generic stock in STATIC_WICK_VISUAL_EXPLANATION_V1. A broadened fallback
     # query must not erase that decision by returning contextual aircraft stock.
+    # `required=False` means there is no concrete physical subject anchor; it
+    # does not erase the trusted explanatory claim/query provenance.
     if selected is not None:
         print(
             "[STATIC_WICK_FALLBACK_PROVENANCE] "
