@@ -119,19 +119,24 @@ def main():
     text = PATH.read_text(encoding="utf-8")
     if MARKER in text:
         print("Run 33981204957 flap Director repair already installed")
-        return
-    required = (
-        "def plan_explanation(scene):",
-        "def annotation_fact_safe(scene, plan):",
-        "def _cached_verified_asset(scene):",
-        "def _draw_concept_panel(frame, plan, progress):",
-        "def generate_visual_explanation_fallback(",
-    )
-    missing = [item for item in required if item not in text]
-    if missing:
-        raise RuntimeError(f"Run 33981204957 visual explanation composition mismatch: {missing}")
-    PATH.write_text(text.rstrip() + "\n\n" + PATCH.strip() + "\n", encoding="utf-8")
-    print("✅ Run 33981204957 bounded flap Director repair installed; budgets and thresholds unchanged")
+    else:
+        required = (
+            "def plan_explanation(scene):",
+            "def annotation_fact_safe(scene, plan):",
+            "def _cached_verified_asset(scene):",
+            "def _draw_concept_panel(frame, plan, progress):",
+            "def generate_visual_explanation_fallback(",
+        )
+        missing = [item for item in required if item not in text]
+        if missing:
+            raise RuntimeError(f"Run 33981204957 visual explanation composition mismatch: {missing}")
+        PATH.write_text(text.rstrip() + "\n\n" + PATCH.strip() + "\n", encoding="utf-8")
+        print("✅ Run 33981204957 bounded flap Director repair installed; budgets and thresholds unchanged")
+
+    # The observable-opening installer invokes this module after final visual
+    # composition. Keep the static-wick repair on that same proven late hook.
+    from ci_static_wick_visual_explanation_hotfix import main as _patch_static_wick_visual
+    _patch_static_wick_visual()
 
 
 if __name__ == "__main__":
