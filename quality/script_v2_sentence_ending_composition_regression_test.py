@@ -24,7 +24,7 @@ EXPECTED = (
 
 
 def _load_production_v2_formalizer():
-    """Install the production V2 ending hotfix, then load the composed formalizer."""
+    """Install only the production V2 ending hotfix, then load its composed formalizer."""
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
         (tmp_path / "content").mkdir()
@@ -35,7 +35,15 @@ def _load_production_v2_formalizer():
         previous = Path.cwd()
         try:
             os.chdir(tmp_path)
-            runpy.run_path(str(tmp_path / "ci_script_v2_gunggeum_formal_ending_hotfix.py"), run_name="__main__")
+            # This fixture intentionally validates only the formal-ending installer.
+            # Running the module as __main__ also invokes its production-only chained
+            # writer/visual composition, whose assets are deliberately absent here.
+            # Load the module without __main__ side effects, then call main() directly.
+            module = runpy.run_path(
+                str(tmp_path / "ci_script_v2_gunggeum_formal_ending_hotfix.py"),
+                run_name="<formal-ending-composition-fixture>",
+            )
+            module["main"]()
         finally:
             os.chdir(previous)
 

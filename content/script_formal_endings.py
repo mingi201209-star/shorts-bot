@@ -72,9 +72,12 @@ _NARRATION_ATTENTION_REPAIRS = (
     ),
 )
 
-# Existing production question contract. This is deliberately separate from
-# declarative generalization so V1 does not invent a new question grammar path.
+# Existing production question contract. Keep repairs deterministic and narrow:
+# Run 34346250350 exposed the common explanatory-question form
+# `어떻게 ...시키는가?`; convert only that `시키다` family to the already-required
+# formal `~까요?` boundary without changing the factual content.
 _QUESTION_ENDING_REPAIRS = (
+    (r"어떻게 (?P<body>.+?)시키는가(?=[?…]*$)", r"어떻게 \g<body>시킬까요"),
     (r"있나요(?=[?…]*$)", "있습니까"),
 )
 
