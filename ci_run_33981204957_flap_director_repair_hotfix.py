@@ -25,11 +25,6 @@ def _run_33981204957_flap_subject(scene):
 def plan_explanation(scene):
     value = _text(scene).replace("-", " ")
     if _run_33981204957_flap_subject(scene):
-        # Run 34006225743 exposed an overlap: the identity scene contains the
-        # phrase "고양력 장치", so generic lift matching must not steal an
-        # explicitly identity-tagged trailing-edge scene from the identity
-        # plan. Keep the existing mechanism precedence for all scenes that do
-        # not carry the explicit identity discriminator.
         if "identity" in value:
             return {
                 "scene_role": "mechanism",
@@ -74,10 +69,6 @@ def annotation_fact_safe(scene, plan):
 
 def _cached_verified_asset(scene):
     plan = plan_explanation(scene)
-    # A Director repetition repair must create a genuinely distinct physical
-    # explanatory asset. Do not disguise the already repeated verified still
-    # with a new source_id; flap repair therefore uses the deterministic 2D
-    # branch only.
     if plan and plan.get("subject") == "flap":
         return None, None
     return _RUN_33981204957_ORIGINAL_CACHED_VERIFIED_ASSET(scene)
@@ -95,9 +86,6 @@ def _draw_concept_panel(frame, plan, progress):
     small = _font(38)
     draw.text((112, 145), plan["label"], font=font, fill=(255, 255, 255, 245))
 
-    # Deterministic side-view schematic: fixed wing section plus a visibly
-    # hinged trailing-edge flap. It illustrates only relationships already
-    # present in the scene text/visual goal; no extra factual claim is added.
     y = 390
     hinge_x = 700
     draw.line((170, y, hinge_x, y), fill=(235, 235, 235, 245), width=34)
@@ -133,10 +121,16 @@ def main():
         PATH.write_text(text.rstrip() + "\n\n" + PATCH.strip() + "\n", encoding="utf-8")
         print("✅ Run 33981204957 bounded flap Director repair installed; budgets and thresholds unchanged")
 
-    # The observable-opening installer invokes this module after final visual
-    # composition. Keep the static-wick repair on that same proven late hook.
-    from ci_static_wick_visual_explanation_hotfix import main as _patch_static_wick_visual
-    _patch_static_wick_visual()
+    # Standalone flap regression runs before Visual Explanation Retrieval V1.
+    # Production invokes this module again from the proven late composition hook;
+    # install the static-wick repair only on that final pass.
+    engine_path = ROOT / "video/video_engine.py"
+    engine_source = engine_path.read_text(encoding="utf-8") if engine_path.exists() else ""
+    if "VISUAL_EXPLANATION_RETRIEVAL_V1" in engine_source:
+        from ci_static_wick_visual_explanation_hotfix import main as _patch_static_wick_visual
+        _patch_static_wick_visual()
+    else:
+        print("⏭️ Static-wick visual repair deferred until final visual composition")
 
 
 if __name__ == "__main__":
