@@ -15,6 +15,16 @@ fuzzing -- no real API calls):
   hit it, instead of using the remaining bounded retries -- the same failure
   class as the CANDIDATE_POOL-outside-scope crash fixed for Run 34459538824.
 
+RED authority (Production Stability Cleanup v4, retry-loop reachability
+audit): explore_candidates() also raises RuntimeError("Candidate Explorer
+응답이 비어 있습니다.") directly when the model response content is
+empty/falsy -- the same deliberate empty-content guard used identically in
+content/candidate_gate.py and quality/judge.py, confirming it is a known,
+anticipated OpenAI response shape (e.g. content-filter/safety-refusal empty
+completions), not a hypothetical. This is the only RuntimeError
+content/candidate_explorer.py ever raises (verified), and it escaped the v3
+fix's narrower `except ValueError`, crashing the run the same way.
+
 Fix location: content/candidate_explorer/__init__.py (the package wrapper
 main.py actually imports explore_candidates from), NOT
 content/candidate_explorer.py. Several production hotfixes
@@ -142,22 +152,20 @@ def test_valid_regenerate_response_is_unaffected():
     assert result["reason"] == "no strong candidate this round", result
 
 
-def test_empty_content_still_raises_uncaught():
-    """Negative control: empty-content is a distinct, pre-existing signal
-    (RuntimeError from extract_json's own empty-input guard is raised before
-    reaching the wrapper's try/except at all via a different path in some
-    callers); this fix's scope is deliberately limited to the ValueError
-    class raised by extract_json()/validate_explorer_output() for non-empty
-    but malformed content, so behavior for a genuinely empty response is
-    unchanged.
+def test_empty_content_regenerates_instead_of_crashing():
+    """RED (v4) -> GREEN: empty/falsy model content raises
+    explore_candidates()'s own RuntimeError guard directly (not via
+    extract_json()/validate_explorer_output()'s ValueError path). v3's fix
+    only caught ValueError, so this RuntimeError still escaped uncaught;
+    v4 extends the same wrapper to catch it too.
     """
     calls = []
-    try:
-        _run("", calls_seen=calls)
-    except RuntimeError as exc:
-        assert "비어 있습니다" in str(exc), exc
-    else:
-        raise AssertionError("expected RuntimeError for empty content")
+    result = _run("", calls_seen=calls)
+    assert isinstance(result, dict), result
+    assert result["status"] == "REGENERATE", result
+    assert "malformed Candidate Explorer response" in result["reason"], result
+    assert "비어 있습니다" in result["reason"], result
+    assert len(calls) == 1, "must not spend a second API call recovering from this"
 
 
 def test_no_hotfix_anchor_text_touched():
@@ -193,7 +201,7 @@ def main():
     test_unrecognized_status_regenerates_instead_of_crashing()
     test_valid_selected_response_is_unaffected()
     test_valid_regenerate_response_is_unaffected()
-    test_empty_content_still_raises_uncaught()
+    test_empty_content_regenerates_instead_of_crashing()
     test_no_hotfix_anchor_text_touched()
     print(
         "PASS: Candidate Explorer malformed-response regenerate-not-crash "
