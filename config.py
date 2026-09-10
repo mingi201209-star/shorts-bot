@@ -176,30 +176,3 @@ def get_missing_environment_variables():
         for name, value in required.items()
         if not value
     ]
-
-
-# ============================================================
-# Production-only model routing
-# ============================================================
-#
-# Development, PR CI, regressions, and ad-hoc local runs keep their existing
-# cheap model defaults. Only the authoritative GitHub production workflow gets
-# the stronger Writer model, and explicit operator overrides always win.
-# Hook is pinned separately so V3_HOOK_MODEL does not inherit the premium
-# V3_SCRIPT_MODEL through content/hook_experiment.py.
-# ============================================================
-
-_IS_GITHUB_PRODUCTION = (
-    str(os.environ.get("GITHUB_ACTIONS", "")).strip().lower() == "true"
-    and str(os.environ.get("GITHUB_WORKFLOW", "")).strip() == "Shorts Generator"
-)
-
-if _IS_GITHUB_PRODUCTION:
-    os.environ.setdefault(
-        "V3_SCRIPT_MODEL",
-        "gpt-5.6-sol",
-    )
-    os.environ.setdefault(
-        "V3_HOOK_MODEL",
-        "gpt-4o-mini",
-    )
