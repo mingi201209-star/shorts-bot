@@ -187,9 +187,11 @@ def get_missing_environment_variables():
 # the production hotfix/compile step do not meet these conditions because they
 # either are not main/Shorts Generator or do not receive OPENAI_KEY.
 #
-# V3_HOOK_MODEL is pinned separately because hook_experiment otherwise inherits
-# V3_SCRIPT_MODEL. Candidate/quality judges keep their existing cheap defaults.
-# Existing explicit model overrides win through setdefault().
+# Only the initial Script V2 writer gets the premium model. Local repair keeps
+# V3_SCRIPT_MODEL's existing cheap default. Hook is pinned separately because
+# hook_experiment otherwise inherits V3_SCRIPT_MODEL. Candidate/quality judges
+# keep their existing cheap defaults. Explicit model overrides win via
+# setdefault().
 # ============================================================
 
 _IS_PRODUCTION_GENERATOR_RUNTIME = (
@@ -202,7 +204,7 @@ _IS_PRODUCTION_GENERATOR_RUNTIME = (
 
 if _IS_PRODUCTION_GENERATOR_RUNTIME:
     os.environ.setdefault(
-        "V3_SCRIPT_MODEL",
+        "V3_SCRIPT_WRITER_MODEL",
         "gpt-5.6-sol",
     )
     os.environ.setdefault(
