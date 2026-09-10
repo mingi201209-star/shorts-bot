@@ -1,0 +1,31 @@
+name: Candidate Explorer Malformed Response Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/candidate_explorer/__init__.py"
+      - "content/candidate_explorer.py"
+      - "quality/candidate_explorer_malformed_response_regression_test.py"
+      - ".github/workflows/candidate_explorer_malformed_response_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Compile
+        run: python -m py_compile content/candidate_explorer/__init__.py quality/candidate_explorer_malformed_response_regression_test.py
+      - name: Run Candidate Explorer malformed-response regression (deterministic fuzz-found)
+        run: python quality/candidate_explorer_malformed_response_regression_test.py
