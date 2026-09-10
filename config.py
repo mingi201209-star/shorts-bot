@@ -176,3 +176,38 @@ def get_missing_environment_variables():
         for name, value in required.items()
         if not value
     ]
+
+
+# ============================================================
+# Production-only model routing
+# ============================================================
+#
+# Premium routing activates only inside the actual Shorts Generator execution
+# on merged main. PR CI, regression workflows, feature-branch dispatches, and
+# the production hotfix/compile step do not meet these conditions because they
+# either are not main/Shorts Generator or do not receive OPENAI_KEY.
+#
+# Only the initial Script V2 writer gets the premium model. Local repair keeps
+# V3_SCRIPT_MODEL's existing cheap default. Hook is pinned separately because
+# hook_experiment otherwise inherits V3_SCRIPT_MODEL. Candidate/quality judges
+# keep their existing cheap defaults. Explicit model overrides win via
+# setdefault().
+# ============================================================
+
+_IS_PRODUCTION_GENERATOR_RUNTIME = (
+    str(os.environ.get("GITHUB_ACTIONS", "")).strip().lower() == "true"
+    and str(os.environ.get("GITHUB_WORKFLOW", "")).strip() == "Shorts Generator"
+    and str(os.environ.get("GITHUB_EVENT_NAME", "")).strip() == "workflow_dispatch"
+    and str(os.environ.get("GITHUB_REF_NAME", "")).strip() == "main"
+    and bool(OPENAI_KEY)
+)
+
+if _IS_PRODUCTION_GENERATOR_RUNTIME:
+    os.environ.setdefault(
+        "V3_SCRIPT_WRITER_MODEL",
+        "gpt-5.6-sol",
+    )
+    os.environ.setdefault(
+        "V3_HOOK_MODEL",
+        "gpt-4o-mini",
+    )
