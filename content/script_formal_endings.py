@@ -44,6 +44,7 @@ _DECLARATIVE_ENDING_REPAIRS = (
     (r"용이해진다(?=[.!…]*$)", "용이해집니다"),
     (r"가능해진다(?=[.!…]*$)", "가능해집니다"),
     (r"이루어진다(?=[.!…]*$)", "이루어집니다"),
+    (r"펼쳐진다(?=[.!…]*$)", "펼쳐집니다"),
     (r"알려진다(?=[.!…]*$)", "알려집니다"),
     (r"도와준다(?=[.!…]*$)", "도와줍니다"),
     (r"워진다(?=[.!…]*$)", "워집니다"),
@@ -75,9 +76,12 @@ _NARRATION_ATTENTION_REPAIRS = (
 # Existing production question contract. Keep repairs deterministic and narrow:
 # Run 34346250350 exposed the common explanatory-question form
 # `어떻게 ...시키는가?`; convert only that `시키다` family to the already-required
-# formal `~까요?` boundary without changing the factual content.
+# formal `~까요?` boundary without changing the factual content. Run 34480412936
+# / 34480072012 exposed the same plain-question gap for the `왜 ... 필요한가?`
+# necessity-question form.
 _QUESTION_ENDING_REPAIRS = (
     (r"어떻게 (?P<body>.+?)시키는가(?=[?…]*$)", r"어떻게 \g<body>시킬까요"),
+    (r"필요한가(?=[?…]*$)", "필요할까요"),
     (r"있나요(?=[?…]*$)", "있습니까"),
 )
 
