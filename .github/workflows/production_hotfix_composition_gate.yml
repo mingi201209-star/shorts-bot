@@ -9,6 +9,7 @@ on:
       - "quality/run_33759359725_wrapper_composition_regression_test.py"
       - "quality/final_visual_semantic_qa_regression_test.py"
       - "quality/run_33977099845_verified_still_rescue_regression_test.py"
+      - "quality/production_model_routing_composition_regression_test.py"
       - ".github/workflows/production_hotfix_composition_gate.yml"
       - "video/video_downloader.py"
       - "video/video_engine.py"
@@ -25,6 +26,7 @@ on:
       - "quality/run_33759359725_wrapper_composition_regression_test.py"
       - "quality/final_visual_semantic_qa_regression_test.py"
       - "quality/run_33977099845_verified_still_rescue_regression_test.py"
+      - "quality/production_model_routing_composition_regression_test.py"
       - ".github/workflows/production_hotfix_composition_gate.yml"
       - "video/video_downloader.py"
       - "video/video_engine.py"
@@ -113,11 +115,13 @@ jobs:
             quality/run_33759359725_wrapper_composition_regression_test.py \
             quality/final_visual_semantic_qa_regression_test.py \
             quality/run_33977099845_verified_still_rescue_regression_test.py \
+            quality/production_model_routing_composition_regression_test.py \
             quality/visual_diversity_preflight.py \
             video/still_image_fallback.py \
             video/video_downloader.py \
             video/video_engine.py \
-            content/script_engine_v2_runner.py
+            content/script_engine_v2_runner.py \
+            content/script_generator_router.py
       - name: Run wrapper composition authority regression
         run: python quality/run_33759359725_wrapper_composition_regression_test.py
       - name: Run Final Visual Semantic QA regression
@@ -129,6 +133,8 @@ jobs:
         env:
           AI_VISUAL_FALLBACK_ENABLED: "false"
         run: python quality/run_33977099845_verified_still_rescue_regression_test.py
+      - name: Run production model routing composition regression
+        run: python quality/production_model_routing_composition_regression_test.py
       - name: Assert no production side effects
         run: |
           ! grep -q "workflow_dispatch.*main.yml" .github/workflows/production_hotfix_composition_gate.yml
