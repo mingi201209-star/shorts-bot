@@ -8,6 +8,10 @@ from typing import Literal, TypedDict
 class GateStatus(str, Enum):
     PASS = "PASS"
     FAIL = "FAIL"
+    NOT_EVALUATED = "NOT_EVALUATED"
+    """No authority is wired for this gate yet. Fail-closed: never counts toward
+    is_hard_pass(), and must never be defaulted to PASS by an adapter that doesn't
+    know how to compute it."""
 
 
 class FailureLayer(str, Enum):
@@ -184,7 +188,9 @@ def semantic_validate_routing_decision(decision: RoutingDecisionDict) -> Routing
 def is_hard_pass(ledger: SceneEscalationLedgerDict) -> bool:
     """presence/coverage gates only. Never influenced by soft_gates or remaining
     budget — that boundary is the V1 invariant this function exists to enforce
-    in code, not just in the schema description.
+    in code, not just in the schema description. NOT_EVALUATED gates (fact_safety,
+    subject_identity in V1) correctly fail this check rather than being treated as
+    passing, since they compare unequal to GateStatus.PASS.
     """
     gates = ledger["hard_gates"]
     return (
