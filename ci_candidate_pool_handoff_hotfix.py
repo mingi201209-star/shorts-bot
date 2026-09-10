@@ -84,6 +84,22 @@ def validate_explorer_output(data):
         else ""
     )
     if not aviation_scope:
+        if status == "CANDIDATE_POOL":
+            # Run 34459538824: an unrelated automatic dispatch (category=역사,
+            # blank SHORTS_CANDIDATE_SCOPE) still received a CANDIDATE_POOL
+            # response, because section 15 of CANDIDATE_EXPLORER_PROMPT is
+            # always present regardless of runtime scope and the model does
+            # not reliably gate its own output format on it. Candidate Pool
+            # Handoff itself stays aviation-only exactly as before -- this
+            # candidate content is never validated or accepted here, same as
+            # before this fix. Only the failure mode changes: fail closed the
+            # same way any other unusable Explorer response already does
+            # (REGENERATE) instead of an unhandled ValueError that crashes
+            # the whole production run on the very first Candidate attempt.
+            return {
+                "status": "REGENERATE",
+                "reason": "CANDIDATE_POOL response received outside aviation scope",
+            }
         return _candidate_pool_previous_validate_explorer_output(data)
     if status == "SELECTED":
         return _legacy_selected_supply_trusted_grounding(data)

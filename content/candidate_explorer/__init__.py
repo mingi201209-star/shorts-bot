@@ -61,6 +61,44 @@ def _retry_topic_info(topic_info):
     return retry_info
 
 
+def _call_legacy_explore_candidates(topic_info, kwargs):
+    """Run the legacy Explorer call, converting its own known malformed-
+    response signals into the same bounded REGENERATE contract it already
+    uses for an explicit REGENERATE.
+
+    _LEGACY.explore_candidates() parses raw model JSON and deliberately
+    raises for a known, bounded set of failure modes:
+    - ValueError (via extract_json()/validate_explorer_output()) for
+      invalid/truncated JSON, or a syntactically valid object that fails
+      schema validation (missing/wrong-type required field, unrecognized
+      status, ...).
+    - RuntimeError ("Candidate Explorer 응답이 비어 있습니다.") when the
+      model response content is empty/falsy -- the same deliberate
+      empty-content guard used identically in content/candidate_gate.py and
+      quality/judge.py, and the only RuntimeError this module ever raises
+      (verified), so catching it here narrowly cannot mask an unrelated bug.
+
+    Nothing upstream (main.py's "CANDIDATE ATTEMPT N/total" loop) catches
+    either signal, so it previously escaped uncaught and crashed the whole
+    production run on whichever attempt hit it -- bypassing the remaining
+    bounded retries instead of using them, exactly like the
+    CANDIDATE_POOL-outside-scope crash fixed for Run 34459538824. This
+    wrapper is the one safe place to fix that: it never touches
+    content/candidate_explorer.py, so it cannot disturb the exact-text
+    anchors several production hotfixes match against that file.
+    """
+    try:
+        return _LEGACY.explore_candidates(topic_info, **kwargs)
+    except (ValueError, RuntimeError) as malformed_response_error:
+        return {
+            "status": "REGENERATE",
+            "reason": (
+                "malformed Candidate Explorer response: "
+                f"{malformed_response_error}"
+            ),
+        }
+
+
 def explore_candidates(
     topic_info,
     *,
@@ -80,10 +118,7 @@ def explore_candidates(
     if model is not None:
         kwargs["model"] = model
 
-    result = _LEGACY.explore_candidates(
-        topic_info,
-        **kwargs,
-    )
+    result = _call_legacy_explore_candidates(topic_info, kwargs)
 
     if not _is_placeholder_regenerate(result):
         return result
@@ -91,9 +126,9 @@ def explore_candidates(
     print("")
     print("♻️ Candidate Explorer placeholder 감지: 강제 재탐색 1회")
 
-    retry_result = _LEGACY.explore_candidates(
+    retry_result = _call_legacy_explore_candidates(
         _retry_topic_info(topic_info),
-        **kwargs,
+        kwargs,
     )
 
     if _is_placeholder_regenerate(retry_result):

@@ -27,7 +27,13 @@ def main():
         v2_module = types.ModuleType("content.script_engine_v2_runner")
         seen_candidates = []
 
-        def fake_v2(item):
+        def fake_v2(item, call_fn=None):
+            # Production Stability Cleanup v4: generate_script() now passes
+            # call_fn=_resilient_v2_call (a malformed-local-repair-response
+            # sanitizer) through to generate_script_v2. This fake keeps
+            # accepting and ignoring it so the fixtures below still exercise
+            # only their own concerns; script_generator_router_local_repair_
+            # sanitization_regression_test.py covers the sanitizer itself.
             seen_candidates.append(item)
             scenes = [{
                 "text": item["micro_narrative"]["hook"],

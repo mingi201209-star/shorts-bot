@@ -225,13 +225,79 @@ def _normalize_v2_result(result, topic_info, candidate):
     return normalized
 
 
+def _sanitize_local_repair_response(response):
+    """Guarantee Script Engine V2's bounded local-repair loop never receives
+    a 'repairs' value it cannot parse.
+
+    content/script_engine_v2_runner.py::_apply_local_repairs() resolves a
+    bounded, known set of envelope/alias shapes for the local-repair model
+    response (top-level "repairs"; nested under "result"/"output"/"data"/
+    "response"/"repair_result"; or aliased as "scene_repairs"/"changes"/
+    "fixed_scenes"/"items") and deliberately raises
+    ValueError("local repair response repairs must be a list") only when
+    none of those resolve to a list -- e.g. the model echoed a single repair
+    object directly instead of wrapping it in a list. Nothing in
+    generate_script_v2's MAX_LOCAL_REPAIR_CALLS loop catches that
+    ValueError, so a single malformed-but-plausible local-repair response
+    crashed the entire production run, aborting the remaining repair budget
+    and the intended graceful "validation failed within 3 calls" bounded
+    failure -- the same failure class as the Candidate Explorer malformed-
+    response crash (Production Stability Cleanup v3).
+
+    Fix location note: this mirrors (does not import) _apply_local_repairs'
+    own resolution order, because content/script_engine_v2_runner.py is
+    patched in place by ci_script_v2_visual_goal_hotfix.py's exact-text
+    anchors and several sibling hotfixes -- editing that function's body
+    risks breaking those anchors. This file is untouched by any of them
+    except one append-only, marker-guarded hotfix
+    (ci_live_script_blockers_hotfix.py) that never touches generate_script(),
+    so sanitizing the response here, before it ever reaches the runner, is
+    composition-safe by construction. It spends no additional API call and
+    never touches a response the runner would already resolve correctly --
+    it only replaces a response the runner would otherwise reject outright
+    with a safe empty-repairs no-op, which the existing validation/repair
+    loop already treats as "this attempt fixed nothing" and retries or
+    fails closed exactly as it does for any other ineffective repair.
+    """
+    if not isinstance(response, dict):
+        return response
+    repairs = response.get("repairs")
+    if isinstance(repairs, list):
+        return response
+    for envelope_key in ("result", "output", "data", "response", "repair_result"):
+        nested = response.get(envelope_key)
+        if isinstance(nested, dict) and isinstance(nested.get("repairs"), list):
+            return response
+    for alias_key in ("scene_repairs", "changes", "fixed_scenes", "items"):
+        if isinstance(response.get(alias_key), list):
+            return response
+    if repairs is None:
+        return response
+    print(
+        "🧩 Router local-repair response sanitized without API: "
+        f"non-list 'repairs' ({type(repairs).__name__})"
+    )
+    sanitized = dict(response)
+    sanitized["repairs"] = []
+    return sanitized
+
+
+def _resilient_v2_call(payload, *, mode):
+    from content.script_engine_v2_runner import _default_call
+
+    response = _default_call(payload, mode=mode)
+    if mode == "local_repair":
+        response = _sanitize_local_repair_response(response)
+    return response
+
+
 def generate_script(topic_info, candidate):
     mode = os.environ.get("SCRIPT_ENGINE_MODE", "v2").strip().lower()
     if mode in ("", "v2"):
         from content.script_engine_v2_runner import generate_script_v2
         normalized_candidate = _observable_hook_from_candidate(candidate)
         normalized_candidate = _normalize_locked_candidate_narration(normalized_candidate)
-        generated = generate_script_v2(normalized_candidate)
+        generated = generate_script_v2(normalized_candidate, call_fn=_resilient_v2_call)
         recovered = recover_unsupported_winglet_visual_beat(
             generated,
             normalized_candidate,

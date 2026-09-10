@@ -1,0 +1,22 @@
+name: Run 34480412936 Formal Need-Question Regression
+
+on:
+  pull_request:
+    paths:
+      - 'content/script_formal_endings.py'
+      - 'quality/run_34480412936_formal_need_question_regression_test.py'
+      - '.github/workflows/run_34480412936_formal_need_question_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile
+        run: python -m py_compile content/script_formal_endings.py quality/run_34480412936_formal_need_question_regression_test.py
+      - name: Run exact production counterexample
+        run: python -m quality.run_34480412936_formal_need_question_regression_test
