@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://shorts-bot/quality/visual_escalation_ledger.schema.json",
+  "title": "VisualEscalationLedger",
+  "type": "object",
+  "required": ["scene_id", "claim_id", "attempt_index", "hard_gates", "soft_gates", "attempts", "budget", "upstream_history"],
+  "additionalProperties": false,
+  "properties": {
+    "scene_id": {"type": "integer", "minimum": 0},
+    "claim_id": {"type": "string", "minLength": 1},
+    "attempt_index": {"type": "integer", "minimum": 0},
+    "hard_gates": {"$ref": "#/definitions/hard_gates"},
+    "soft_gates": {"$ref": "#/definitions/soft_gates"},
+    "failure": {"anyOf": [{"$ref": "#/definitions/failure"}, {"type": "null"}]},
+    "attempts": {"type": "array", "items": {"$ref": "#/definitions/attempt"}},
+    "budget": {"$ref": "#/definitions/budget"},
+    "upstream_history": {"type": "array", "items": {"$ref": "#/definitions/upstream_return"}}
+  },
+  "definitions": {
+    "gate_status": {"enum": ["PASS", "FAIL"]},
+
+    "requirement": {
+      "type": "object",
+      "required": ["id", "required", "present"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "required": {"type": "boolean"},
+        "present": {"type": "boolean"}
+      }
+    },
+
+    "required_claim_state": {
+      "type": "object",
+      "required": ["status", "requirements"],
+      "additionalProperties": false,
+      "properties": {
+        "status": {"$ref": "#/definitions/gate_status"},
+        "requirements": {"type": "array", "minItems": 1, "items": {"$ref": "#/definitions/requirement"}}
+      }
+    },
+
+    "hard_gates": {
+      "type": "object",
+      "required": ["fact_safety", "subject_identity", "required_claim_state"],
+      "additionalProperties": false,
+      "properties": {
+        "fact_safety": {"$ref": "#/definitions/gate_status"},
+        "subject_identity": {"$ref": "#/definitions/gate_status"},
+        "required_claim_state": {"$ref": "#/definitions/required_claim_state"}
+      },
+      "description": "Presence/coverage only. Never relaxed by remaining budget or soft_gates."
+    },
+
+    "soft_gates": {
+      "type": "object",
+      "required": ["explanation_match", "visual_quality", "explanatory_diversity"],
+      "additionalProperties": false,
+      "properties": {
+        "explanation_match": {"type": "number", "minimum": 0, "maximum": 1},
+        "visual_quality": {"type": "number", "minimum": 0, "maximum": 1},
+        "explanatory_diversity": {"type": "number", "minimum": 0, "maximum": 1}
+      },
+      "description": "Presentation/clarity only. May be relaxed under bounded escalation."
+    },
+
+    "failure_layer": {
+      "enum": ["GROUNDING", "CLAIM", "VISUAL_PLANNING", "ASSET_ACQUISITION", "RENDER", "QUALITY"]
+    },
+
+    "failure": {
+      "type": "object",
+      "required": ["reason", "layer"],
+      "additionalProperties": false,
+      "properties": {
+        "reason": {"type": "string", "minLength": 1},
+        "layer": {"$ref": "#/definitions/failure_layer"},
+        "details": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+
+    "escalation_method": {
+      "enum": [
+        "REUSE_VERIFIED",
+        "STOCK_RETRIEVAL",
+        "DETERMINISTIC_EXPLANATION",
+        "AI_EXPLANATORY_IMAGE",
+        "SAFE_MINIMAL_PRESENTATION"
+      ]
+    },
+
+    "attempt_result": {"enum": ["PASS", "FAIL"]},
+
+    "attempt": {
+      "type": "object",
+      "required": ["method", "param_signature", "provider", "cost_usd", "result"],
+      "additionalProperties": false,
+      "properties": {
+        "method": {"$ref": "#/definitions/escalation_method"},
+        "param_signature": {"type": "string", "minLength": 1},
+        "asset_id": {"type": ["string", "null"]},
+        "provider": {"type": "string", "minLength": 1},
+        "cost_usd": {"type": "number", "minimum": 0},
+        "result": {"$ref": "#/definitions/attempt_result"},
+        "failure_reason": {"type": ["string", "null"]}
+      },
+      "description": "attempt identity for reuse-ban purposes is (method, param_signature), not method alone."
+    },
+
+    "budget": {
+      "type": "object",
+      "required": ["attempts_remaining", "api_calls_remaining", "cost_usd_remaining", "upstream_returns_remaining"],
+      "additionalProperties": false,
+      "properties": {
+        "attempts_remaining": {"type": "integer", "minimum": 0},
+        "api_calls_remaining": {"type": "integer", "minimum": 0},
+        "cost_usd_remaining": {"type": "number", "minimum": 0},
+        "upstream_returns_remaining": {"type": "integer", "minimum": 0}
+      }
+    },
+
+    "upstream_target": {"enum": ["GROUNDING", "CLAIM_PLANNING", "WRITER"]},
+    "upstream_result": {"enum": ["RETURNED_RESOLVED", "RETURNED_UNRESOLVED"]},
+
+    "upstream_return": {
+      "type": "object",
+      "required": ["target", "reason", "return_index", "result"],
+      "additionalProperties": false,
+      "properties": {
+        "target": {"$ref": "#/definitions/upstream_target"},
+        "reason": {"type": "string", "minLength": 1},
+        "return_index": {"type": "integer", "minimum": 1},
+        "result": {"$ref": "#/definitions/upstream_result"}
+      },
+      "description": "V1: at most one entry per (target, reason) pair is permitted by the router; a repeat forces TERMINATE."
+    }
+  }
+}
