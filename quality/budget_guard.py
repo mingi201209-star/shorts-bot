@@ -18,6 +18,7 @@ MODEL_PRICES = {
         "input": 4.00 / 1_000_000,
         "output": 20.00 / 1_000_000,
         "cached_input": 0.40 / 1_000_000,
+        "cache_write": 5.00 / 1_000_000,
     },
 }
 
@@ -28,6 +29,7 @@ _state = {
     "calls": 0,
     "input_tokens": 0,
     "cached_input_tokens": 0,
+    "cache_write_tokens": 0,
     "output_tokens": 0,
     "cost_usd": 0.0,
 }
@@ -175,6 +177,7 @@ def record_usage(
     )
 
     cached_tokens = 0
+    cache_write_tokens = 0
 
     details = getattr(
         usage,
@@ -193,6 +196,15 @@ def record_usage(
             or 0
         )
 
+        cache_write_tokens = int(
+            getattr(
+                details,
+                "cache_write_tokens",
+                0,
+            )
+            or 0
+        )
+
     cached_tokens = max(
         0,
         min(
@@ -201,9 +213,23 @@ def record_usage(
         ),
     )
 
+    cache_write_tokens = max(
+        0,
+        min(
+            cache_write_tokens,
+            input_tokens - cached_tokens,
+        ),
+    )
+
     uncached_tokens = (
         input_tokens
         - cached_tokens
+        - cache_write_tokens
+    )
+
+    cache_write_price = price.get(
+        "cache_write",
+        price["input"],
     )
 
     cost = (
@@ -212,6 +238,9 @@ def record_usage(
 
         + cached_tokens
         * price["cached_input"]
+
+        + cache_write_tokens
+        * cache_write_price
 
         + output_tokens
         * price["output"]
@@ -226,6 +255,10 @@ def record_usage(
         _state[
             "cached_input_tokens"
         ] += cached_tokens
+
+        _state[
+            "cache_write_tokens"
+        ] += cache_write_tokens
 
         _state[
             "output_tokens"
@@ -248,6 +281,9 @@ def record_usage(
 
         "cached_input_tokens":
             cached_tokens,
+
+        "cache_write_tokens":
+            cache_write_tokens,
 
         "output_tokens":
             output_tokens,
@@ -304,6 +340,13 @@ def print_budget_status():
     )
 
     print(
+        "Cache writes:",
+        status[
+            "cache_write_tokens"
+        ],
+    )
+
+    print(
         "Output tokens:",
         status["output_tokens"],
     )
@@ -333,6 +376,10 @@ def reset_budget():
 
         _state[
             "cached_input_tokens"
+        ] = 0
+
+        _state[
+            "cache_write_tokens"
         ] = 0
 
         _state[
