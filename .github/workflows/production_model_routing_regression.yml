@@ -22,4 +22,4 @@ jobs:
       - name: Verify production-only premium writer routing
         run: |
           python -m py_compile config.py quality/budget_guard.py quality/production_model_routing_regression_test.py
-          python quality/production_model_routing_regression_test.py
+          python -m quality.production_model_routing_regression_test
