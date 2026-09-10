@@ -138,27 +138,29 @@ class RoutingValidationResult:
 
 
 # Fields exclusive to each action branch, mirroring the discriminated union declared
-# in visual_escalation_routing_decision.schema.json.
-_PRODUCE_FIELDS = ("method", "param_signature", "reason")
-_RETURN_UPSTREAM_FIELDS = ("target", "reason")
-_TERMINATE_FIELDS = ("terminal_state", "terminal_reason")
+# in visual_escalation_routing_decision.schema.json. "action" itself is excluded —
+# every decision has it.
+_PRODUCE_FIELDS = frozenset({"method", "param_signature", "reason"})
+_RETURN_UPSTREAM_FIELDS = frozenset({"target", "reason"})
+_TERMINATE_FIELDS = frozenset({"terminal_state", "terminal_reason"})
 
-_ACTION_FIELDS: dict[RoutingAction, tuple[str, ...]] = {
+_ACTION_FIELDS: dict[RoutingAction, frozenset[str]] = {
     RoutingAction.PRODUCE: _PRODUCE_FIELDS,
     RoutingAction.RETURN_UPSTREAM: _RETURN_UPSTREAM_FIELDS,
     RoutingAction.TERMINATE: _TERMINATE_FIELDS,
 }
 
-_ALL_ACTION_ONLY_FIELDS = (
-    set(_PRODUCE_FIELDS) | set(_RETURN_UPSTREAM_FIELDS) | set(_TERMINATE_FIELDS)
-) - {"reason"}  # "reason" is legitimately shared by PRODUCE and RETURN_UPSTREAM
+_ALL_ACTION_FIELDS: frozenset[str] = _PRODUCE_FIELDS | _RETURN_UPSTREAM_FIELDS | _TERMINATE_FIELDS
 
 
 def semantic_validate_routing_decision(decision: RoutingDecisionDict) -> RoutingValidationResult:
     """Shape validation only (JSON Schema is authority for that). This checks that
     exactly the fields for `action` are present and no fields from another branch
-    leaked in — the part a plain oneOf/if-then can express but is easy to get wrong
-    by hand when constructing a decision in Python.
+    leaked in — including a bare "reason" leaking into a TERMINATE decision, which
+    is legitimate on PRODUCE/RETURN_UPSTREAM but not on TERMINATE (that branch uses
+    terminal_reason instead). A plain per-action allowlist, computed fresh from
+    _ALL_ACTION_FIELDS minus the current action's own fields, catches this without
+    any blanket exemption for fields that happen to be shared by *some* branches.
     """
     result = RoutingValidationResult()
     action = decision.get("action")
@@ -167,12 +169,12 @@ def semantic_validate_routing_decision(decision: RoutingDecisionDict) -> Routing
         return result
 
     required = _ACTION_FIELDS[action]
-    missing = [f for f in required if f not in decision]
+    missing = sorted(f for f in required if f not in decision)
     if missing:
         result.add(f"action '{action}' missing required fields: {missing}")
 
-    other_fields = _ALL_ACTION_ONLY_FIELDS - set(required)
-    leaked = [f for f in other_fields if f in decision]
+    foreign_fields = _ALL_ACTION_FIELDS - required
+    leaked = sorted(f for f in foreign_fields if f in decision)
     if leaked:
         result.add(f"action '{action}' contains fields from another branch: {leaked}")
 
