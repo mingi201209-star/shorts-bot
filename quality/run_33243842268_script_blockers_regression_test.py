@@ -115,7 +115,11 @@ def assert_d_unsupported_drag_fuel_stability_still_fail():
 def assert_e_locked_scene1_uses_shared_formal_corpus():
     normalized = router._normalize_locked_candidate_narration(_candidate(_live_chevron_claims()))
     assert normalized["micro_narrative"]["hook"] == "비행기 엔진 뒤쪽의 톱니 모양이 눈에 띕니다."
-    assert formalize_declarative_text("플랩이 펼쳐진다.") == "플랩이 펼쳐진다."
+    # Any placeholder outside the shared corpus stays untouched. `펼쳐진다` was
+    # this placeholder until Run 34463253519 added it to the corpus (PR
+    # production-stability-cleanup-v1); swapped to a still-uncovered ending
+    # so this stays a negative control rather than colliding with that fix.
+    assert formalize_declarative_text("엔진 덮개가 열린다.") == "엔진 덮개가 열린다."
 
 
 def _compact_keyword_script(plan, keywords):

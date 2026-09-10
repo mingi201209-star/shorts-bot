@@ -1,0 +1,53 @@
+name: Run 34459538824 Candidate Pool Scope Crash Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_candidate_pool_handoff_hotfix.py'
+      - 'quality/candidate_pool_handoff_regression_test.py'
+      - 'quality/run_34459538824_candidate_pool_scope_crash_regression_test.py'
+      - '.github/workflows/run_34459538824_candidate_pool_scope_crash_regression.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Apply exact production composition through Candidate Pool Handoff
+        run: |
+          set -euo pipefail
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+          python ci_hook_generation_hotfix.py
+          python ci_hook_pool_guard_hotfix.py
+          python ci_retention_hotfix.py
+          python ci_first5_retention_tts_hotfix.py
+          python ci_first5_visual_contract_hotfix.py
+          python ci_video_provider_hotfix.py
+          python ci_topic_input_hotfix.py
+          python ci_aviation_candidate_context_hotfix.py
+          python ci_aviation_candidate_specificity_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          python ci_aviation_specificity_output_repair_hotfix.py
+          python ci_aviation_specificity_projection_hotfix.py
+          python ci_candidate_grounded_recovery_hotfix.py
+          python ci_aviation_context_signature_compat_hotfix.py
+          grep -q "CANDIDATE_POOL_HANDOFF_V1" content/candidate_explorer.py
+      - name: Compile
+        run: python -m py_compile ci_candidate_pool_handoff_hotfix.py quality/run_34459538824_candidate_pool_scope_crash_regression_test.py
+      - name: Run exact production counterexample
+        run: python quality/run_34459538824_candidate_pool_scope_crash_regression_test.py

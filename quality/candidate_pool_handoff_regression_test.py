@@ -199,14 +199,20 @@ def green() -> int:
     assert malformed["status"] == "REGENERATE", malformed
     print("Malformed schema: PASS (fail-close)")
 
-    os.environ["SHORTS_CANDIDATE_SCOPE"] = "urban"
-    try:
-        validate_explorer_output(_pool([_window_candidate()]))
-    except ValueError:
-        pass
-    else:
-        raise AssertionError("non-aviation scope unexpectedly activated Candidate Pool Handoff")
-    print("TEST F non-aviation compatibility: PASS")
+    # Run 34459538824: an unrelated automatic dispatch (category=역사, blank
+    # scope) still received a CANDIDATE_POOL response and crashed the whole
+    # production run on an unhandled ValueError. Candidate Pool Handoff must
+    # stay aviation-only -- the pool content is still never validated or
+    # accepted outside aviation scope -- but the failure mode must be the
+    # same bounded-retry-eligible REGENERATE every other unusable Explorer
+    # response already gets, not a raw crash.
+    for non_aviation_scope in ("urban", ""):
+        os.environ["SHORTS_CANDIDATE_SCOPE"] = non_aviation_scope
+        non_aviation_result = validate_explorer_output(_pool([_window_candidate()]))
+        assert non_aviation_result["status"] == "REGENERATE", non_aviation_result
+        assert "outside aviation scope" in non_aviation_result.get("reason", ""), non_aviation_result
+        assert "winner" not in non_aviation_result, non_aviation_result
+    print("TEST F non-aviation compatibility: PASS (fail-closed REGENERATE, no crash, pool not processed)")
     os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
 
     explorer_source = (ROOT / "content/candidate_explorer.py").read_text(encoding="utf-8")
