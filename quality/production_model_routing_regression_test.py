@@ -18,6 +18,8 @@ def _probe(extra_env):
         "GITHUB_REF_NAME",
         "OPENAI_KEY",
         "V3_SCRIPT_MODEL",
+        "V3_SCRIPT_WRITER_MODEL",
+        "V3_SCRIPT_REPAIR_MODEL",
         "V3_HOOK_MODEL",
     ):
         env.pop(key, None)
@@ -29,6 +31,8 @@ import os
 import config
 print(json.dumps({
     "script": os.environ.get("V3_SCRIPT_MODEL"),
+    "writer": os.environ.get("V3_SCRIPT_WRITER_MODEL"),
+    "repair": os.environ.get("V3_SCRIPT_REPAIR_MODEL"),
     "hook": os.environ.get("V3_HOOK_MODEL"),
 }))
 '''
@@ -55,6 +59,15 @@ def _production_env(**overrides):
     return env
 
 
+def _empty_route():
+    return {
+        "script": None,
+        "writer": None,
+        "repair": None,
+        "hook": None,
+    }
+
+
 def test_non_production_keeps_existing_defaults():
     observed = _probe({
         "GITHUB_ACTIONS": "true",
@@ -63,34 +76,27 @@ def test_non_production_keeps_existing_defaults():
         "GITHUB_REF_NAME": "feat/test",
         "OPENAI_KEY": "test-key-never-used",
     })
-    assert observed == {
-        "script": None,
-        "hook": None,
-    }, observed
+    assert observed == _empty_route(), observed
 
 
 def test_feature_branch_dispatch_cannot_activate_premium_model():
     observed = _probe(_production_env(GITHUB_REF_NAME="feat/not-main"))
-    assert observed == {
-        "script": None,
-        "hook": None,
-    }, observed
+    assert observed == _empty_route(), observed
 
 
 def test_hotfix_or_compile_stage_without_api_key_cannot_activate_premium_model():
     env = _production_env()
     env.pop("OPENAI_KEY")
     observed = _probe(env)
-    assert observed == {
-        "script": None,
-        "hook": None,
-    }, observed
+    assert observed == _empty_route(), observed
 
 
-def test_authoritative_production_routes_script_only():
+def test_authoritative_production_routes_initial_writer_only():
     observed = _probe(_production_env())
     assert observed == {
-        "script": "gpt-5.6-sol",
+        "script": None,
+        "writer": "gpt-5.6-sol",
+        "repair": None,
         "hook": "gpt-4o-mini",
     }, observed
 
@@ -98,12 +104,31 @@ def test_authoritative_production_routes_script_only():
 def test_explicit_operator_override_wins():
     observed = _probe(_production_env(
         V3_SCRIPT_MODEL="gpt-4o-mini",
+        V3_SCRIPT_WRITER_MODEL="gpt-4o-mini",
+        V3_SCRIPT_REPAIR_MODEL="gpt-4o-mini",
         V3_HOOK_MODEL="gpt-4o-mini",
     ))
     assert observed == {
         "script": "gpt-4o-mini",
+        "writer": "gpt-4o-mini",
+        "repair": "gpt-4o-mini",
         "hook": "gpt-4o-mini",
     }, observed
+
+
+def test_script_v2_runner_keeps_writer_and_repair_models_separate():
+    source = (ROOT / "content" / "script_engine_v2_runner.py").read_text(encoding="utf-8")
+    required = (
+        'WRITER_MODEL = os.environ.get("V3_SCRIPT_WRITER_MODEL", MODEL)',
+        'REPAIR_MODEL = os.environ.get("V3_SCRIPT_REPAIR_MODEL", MODEL)',
+        'if mode == "writer":\n        return WRITER_MODEL',
+        'if mode == "local_repair":\n        return REPAIR_MODEL',
+        'model = _model_for_mode(mode)',
+        'record_usage(model, response)',
+        'return {"reasoning_effort": "none"}',
+    )
+    for marker in required:
+        assert marker in source, marker
 
 
 def test_sol_price_and_cost_limit_are_registered_without_relaxation():
@@ -154,11 +179,12 @@ def main():
     test_non_production_keeps_existing_defaults()
     test_feature_branch_dispatch_cannot_activate_premium_model()
     test_hotfix_or_compile_stage_without_api_key_cannot_activate_premium_model()
-    test_authoritative_production_routes_script_only()
+    test_authoritative_production_routes_initial_writer_only()
     test_explicit_operator_override_wins()
+    test_script_v2_runner_keeps_writer_and_repair_models_separate()
     test_sol_price_and_cost_limit_are_registered_without_relaxation()
     test_sol_cache_write_usage_is_billed_at_1_25x_input()
-    print("PASS: premium script routing is production-only and budget accounting remains bounded")
+    print("PASS: premium model is production-only, writer-only, and budget accounting remains bounded")
 
 
 if __name__ == "__main__":
