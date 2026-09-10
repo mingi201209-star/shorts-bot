@@ -113,8 +113,19 @@ def director_qa(scene_observations):
             metric = failure["metric"]
             issue_type = "low_explanatory_power" if metric == "explanatory_power" else metric
             issues.append({"scene_index": idx, "start_sec": obs.get("start_sec"), "end_sec": obs.get("end_sec"), "severity": "high", "type": issue_type, "reason": f"{metric} hard floor failed"})
-        if counts.get(str(obs.get("source_id") or ""), 0) >= 3:
-            issues.append({"scene_index": idx, "start_sec": obs.get("start_sec"), "end_sec": obs.get("end_sec"), "severity": "high", "type": "repetition_risk", "reason": "same visual source appears in at least three scenes"})
+        source_id = str(obs.get("source_id") or "")
+        repetition_count = counts.get(source_id, 0)
+        if repetition_count >= 3:
+            issues.append({
+                "scene_index": idx,
+                "start_sec": obs.get("start_sec"),
+                "end_sec": obs.get("end_sec"),
+                "severity": "high",
+                "type": "repetition_risk",
+                "reason": "same visual source appears in at least three scenes",
+                "source_id": source_id,
+                "repetition_count": repetition_count,
+            })
         if bool(obs.get("subtitle_obstruction")):
             issues.append({"scene_index": idx, "severity": "high", "type": "subtitle_obstruction", "reason": "subtitle overlaps protected visual region", "repair": "subtitle_relocation"})
         if float(scores.get("ai_artifact_risk", scores.get("artifact_risk", 0)) or 0) > 4.0:
@@ -143,6 +154,41 @@ def director_qa(scene_observations):
 REPAIR_PRIORITY = {"hook_visual_strength": 0, "subject_prominence": 0, "low_explanatory_power": 1, "semantic_match": 2, "ai_artifact_risk": 3, "subtitle_obstruction": 4, "repetition_risk": 5, "stale_information_beat": 6}
 
 
+def _minimal_repetition_repairs(visual_issues):
+    """Return the minimum scene replacements needed for repetition-only QA.
+
+    A source used N times only needs N-2 replacements to satisfy the existing
+    hard rule (no source may appear in 3+ scenes). This does not relax the rule;
+    it avoids recreating an extra healthy scene before Director re-evaluates.
+    """
+    if not visual_issues or any(x.get("type") != "repetition_risk" for x in visual_issues):
+        return None
+    if any(not x.get("source_id") or int(x.get("repetition_count", 0) or 0) < 3 for x in visual_issues):
+        return None
+
+    by_source = {}
+    source_order = []
+    for issue in visual_issues:
+        source_id = str(issue["source_id"])
+        if source_id not in by_source:
+            by_source[source_id] = []
+            source_order.append(source_id)
+        by_source[source_id].append(issue)
+
+    selected = []
+    for source_id in source_order:
+        group = sorted(by_source[source_id], key=lambda x: int(x["scene_index"]))
+        repetition_count = max(int(x.get("repetition_count", 0) or 0) for x in group)
+        needed = max(1, repetition_count - 2)
+        for issue in group[:needed]:
+            idx = int(issue["scene_index"])
+            if idx not in selected:
+                selected.append(idx)
+            if len(selected) == MAX_DIRECTOR_REPAIR_SCENES:
+                return selected
+    return selected
+
+
 def selective_repair_plan(qa_result, recovery_round):
     if recovery_round >= MAX_DIRECTOR_RECOVERY_ROUNDS:
         return {"status": "HOLD", "reason": "director recovery limit reached", "scene_indexes": [], "subtitle_only": []}
@@ -152,12 +198,14 @@ def selective_repair_plan(qa_result, recovery_round):
     subtitle_only = sorted({int(x["scene_index"]) for x in issues if x["type"] == "subtitle_obstruction" and x.get("repair") == "subtitle_relocation"})
     visual_issues = [x for x in issues if int(x["scene_index"]) not in subtitle_only]
     visual_issues.sort(key=lambda x: (REPAIR_PRIORITY.get(x["type"], 99), int(x["scene_index"])))
-    selected = []
-    for issue in visual_issues:
-        idx = int(issue["scene_index"])
-        if idx not in selected:
-            selected.append(idx)
-        if len(selected) == MAX_DIRECTOR_REPAIR_SCENES:
-            break
+    selected = _minimal_repetition_repairs(visual_issues)
+    if selected is None:
+        selected = []
+        for issue in visual_issues:
+            idx = int(issue["scene_index"])
+            if idx not in selected:
+                selected.append(idx)
+            if len(selected) == MAX_DIRECTOR_REPAIR_SCENES:
+                break
     print(f"[DirectorQA] selective_repair scenes={selected} subtitle_only={subtitle_only}")
     return {"status": "REPAIR", "scene_indexes": selected, "subtitle_only": subtitle_only}
