@@ -2,6 +2,8 @@ import json
 import os
 import subprocess
 import sys
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -148,6 +150,18 @@ def test_sol_price_and_cost_limit_are_registered_without_relaxation():
             os.environ["V3_MAX_COST_USD"] = old
 
 
+def test_authorize_call_logs_exact_resolved_model():
+    from quality.budget_guard import authorize_call, reset_budget
+
+    reset_budget()
+    stdout = StringIO()
+    with redirect_stdout(stdout):
+        call_number = authorize_call("gpt-5.6-sol")
+
+    assert call_number == 1
+    assert stdout.getvalue().strip() == "[API_MODEL_ROUTE] call=1 model=gpt-5.6-sol"
+
+
 def test_sol_cache_write_usage_is_billed_at_1_25x_input():
     from quality.budget_guard import record_usage, reset_budget
 
@@ -183,8 +197,9 @@ def main():
     test_explicit_operator_override_wins()
     test_script_v2_runner_keeps_writer_and_repair_models_separate()
     test_sol_price_and_cost_limit_are_registered_without_relaxation()
+    test_authorize_call_logs_exact_resolved_model()
     test_sol_cache_write_usage_is_billed_at_1_25x_input()
-    print("PASS: premium model is production-only, writer-only, and budget accounting remains bounded")
+    print("PASS: premium model is production-only, writer-only, observable, and budget accounting remains bounded")
 
 
 if __name__ == "__main__":
