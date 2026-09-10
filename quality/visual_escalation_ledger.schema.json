@@ -17,7 +17,10 @@
     "upstream_history": {"type": "array", "items": {"$ref": "#/definitions/upstream_return"}}
   },
   "definitions": {
-    "gate_status": {"enum": ["PASS", "FAIL"]},
+    "gate_status": {
+      "enum": ["PASS", "FAIL", "NOT_EVALUATED"],
+      "description": "NOT_EVALUATED means no authority is wired for this gate yet — it is fail-closed (never counted toward is_hard_pass) and must never be defaulted to PASS."
+    },
 
     "requirement": {
       "type": "object",
@@ -49,7 +52,7 @@
         "subject_identity": {"$ref": "#/definitions/gate_status"},
         "required_claim_state": {"$ref": "#/definitions/required_claim_state"}
       },
-      "description": "Presence/coverage only. Never relaxed by remaining budget or soft_gates."
+      "description": "Presence/coverage only. Never relaxed by remaining budget or soft_gates. In V1, fact_safety and subject_identity have no wired authority and MUST be NOT_EVALUATED; only required_claim_state is computed (from the V2.1 evidence authority)."
     },
 
     "soft_gates": {
