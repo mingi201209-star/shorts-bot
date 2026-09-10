@@ -133,8 +133,14 @@ def authorize_call(
             )
 
         _state["calls"] += 1
+        call_number = _state["calls"]
 
-        return _state["calls"]
+    print(
+        "[API_MODEL_ROUTE] "
+        f"call={call_number} model={model}"
+    )
+
+    return call_number
 
 
 def record_usage(
