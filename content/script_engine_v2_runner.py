@@ -26,8 +26,25 @@ from content.script_engine_v2 import (
 from content.script_engine_v2_validation import validate_script_v2
 
 MODEL = os.environ.get("V3_SCRIPT_MODEL", "gpt-4o-mini")
+WRITER_MODEL = os.environ.get("V3_SCRIPT_WRITER_MODEL", MODEL)
+REPAIR_MODEL = os.environ.get("V3_SCRIPT_REPAIR_MODEL", MODEL)
 if OPENAI_KEY:
     openai.api_key = OPENAI_KEY
+
+
+def _model_for_mode(mode: str) -> str:
+    if mode == "writer":
+        return WRITER_MODEL
+    if mode == "local_repair":
+        return REPAIR_MODEL
+    raise ValueError(f"Unsupported Script V2 call mode: {mode}")
+
+
+def _model_request_options(model: str) -> Dict[str, Any]:
+    """Keep GPT-5.6 bounded while preserving legacy 4o-mini sampling."""
+    if str(model).startswith("gpt-5.6"):
+        return {"reasoning_effort": "none"}
+    return {"temperature": 0.2}
 
 
 def _extract_json(text: Any) -> Dict[str, Any]:
@@ -87,7 +104,8 @@ def _writer_response_format(payload: Dict[str, Any], *, mode: str) -> Dict[str, 
 
 
 def _default_call(payload: Dict[str, Any], *, mode: str) -> Dict[str, Any]:
-    authorize_call(MODEL)
+    model = _model_for_mode(mode)
+    authorize_call(model)
     if mode == "writer":
         instruction = (
             "Return JSON only with top-level keys title and scenes. "
@@ -105,15 +123,15 @@ def _default_call(payload: Dict[str, Any], *, mode: str) -> Dict[str, Any]:
             "Every keyword must be 2-7 ASCII English words. Use formal Korean and preserve factual scope."
         )
     response = openai.chat.completions.create(
-        model=MODEL,
-        temperature=0.2,
+        model=model,
         messages=[
             {"role": "system", "content": instruction},
             {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
         ],
         response_format=_writer_response_format(payload, mode=mode),
+        **_model_request_options(model),
     )
-    record_usage(MODEL, response)
+    record_usage(model, response)
     return _extract_json(response.choices[0].message.content)
 
 
