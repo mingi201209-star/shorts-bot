@@ -3,6 +3,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,6 +14,9 @@ def _probe(extra_env):
     for key in (
         "GITHUB_ACTIONS",
         "GITHUB_WORKFLOW",
+        "GITHUB_EVENT_NAME",
+        "GITHUB_REF_NAME",
+        "OPENAI_KEY",
         "V3_SCRIPT_MODEL",
         "V3_HOOK_MODEL",
     ):
@@ -39,10 +43,25 @@ print(json.dumps({
     return json.loads(result.stdout.strip())
 
 
+def _production_env(**overrides):
+    env = {
+        "GITHUB_ACTIONS": "true",
+        "GITHUB_WORKFLOW": "Shorts Generator",
+        "GITHUB_EVENT_NAME": "workflow_dispatch",
+        "GITHUB_REF_NAME": "main",
+        "OPENAI_KEY": "test-key-never-used",
+    }
+    env.update(overrides)
+    return env
+
+
 def test_non_production_keeps_existing_defaults():
     observed = _probe({
         "GITHUB_ACTIONS": "true",
         "GITHUB_WORKFLOW": "Production Model Routing Regression",
+        "GITHUB_EVENT_NAME": "pull_request",
+        "GITHUB_REF_NAME": "feat/test",
+        "OPENAI_KEY": "test-key-never-used",
     })
     assert observed == {
         "script": None,
@@ -50,11 +69,26 @@ def test_non_production_keeps_existing_defaults():
     }, observed
 
 
-def test_authoritative_production_routes_writer_only():
-    observed = _probe({
-        "GITHUB_ACTIONS": "true",
-        "GITHUB_WORKFLOW": "Shorts Generator",
-    })
+def test_feature_branch_dispatch_cannot_activate_premium_model():
+    observed = _probe(_production_env(GITHUB_REF_NAME="feat/not-main"))
+    assert observed == {
+        "script": None,
+        "hook": None,
+    }, observed
+
+
+def test_hotfix_or_compile_stage_without_api_key_cannot_activate_premium_model():
+    env = _production_env()
+    env.pop("OPENAI_KEY")
+    observed = _probe(env)
+    assert observed == {
+        "script": None,
+        "hook": None,
+    }, observed
+
+
+def test_authoritative_production_routes_script_only():
+    observed = _probe(_production_env())
     assert observed == {
         "script": "gpt-5.6-sol",
         "hook": "gpt-4o-mini",
@@ -62,12 +96,10 @@ def test_authoritative_production_routes_writer_only():
 
 
 def test_explicit_operator_override_wins():
-    observed = _probe({
-        "GITHUB_ACTIONS": "true",
-        "GITHUB_WORKFLOW": "Shorts Generator",
-        "V3_SCRIPT_MODEL": "gpt-4o-mini",
-        "V3_HOOK_MODEL": "gpt-4o-mini",
-    })
+    observed = _probe(_production_env(
+        V3_SCRIPT_MODEL="gpt-4o-mini",
+        V3_HOOK_MODEL="gpt-4o-mini",
+    ))
     assert observed == {
         "script": "gpt-4o-mini",
         "hook": "gpt-4o-mini",
@@ -80,6 +112,7 @@ def test_sol_price_and_cost_limit_are_registered_without_relaxation():
     price = get_price("gpt-5.6-sol")
     assert price["input"] == 4.00 / 1_000_000
     assert price["cached_input"] == 0.40 / 1_000_000
+    assert price["cache_write"] == 5.00 / 1_000_000
     assert price["output"] == 20.00 / 1_000_000
 
     old = os.environ.pop("V3_MAX_COST_USD", None)
@@ -90,12 +123,42 @@ def test_sol_price_and_cost_limit_are_registered_without_relaxation():
             os.environ["V3_MAX_COST_USD"] = old
 
 
+def test_sol_cache_write_usage_is_billed_at_1_25x_input():
+    from quality.budget_guard import record_usage, reset_budget
+
+    response = SimpleNamespace(
+        usage=SimpleNamespace(
+            prompt_tokens=100,
+            completion_tokens=10,
+            prompt_tokens_details=SimpleNamespace(
+                cached_tokens=20,
+                cache_write_tokens=30,
+            ),
+        )
+    )
+
+    reset_budget()
+    usage = record_usage("gpt-5.6-sol", response)
+
+    expected = (
+        50 * (4.00 / 1_000_000)
+        + 20 * (0.40 / 1_000_000)
+        + 30 * (5.00 / 1_000_000)
+        + 10 * (20.00 / 1_000_000)
+    )
+    assert abs(usage["cost_usd"] - expected) < 1e-12, usage
+    assert usage["cache_write_tokens"] == 30, usage
+
+
 def main():
     test_non_production_keeps_existing_defaults()
-    test_authoritative_production_routes_writer_only()
+    test_feature_branch_dispatch_cannot_activate_premium_model()
+    test_hotfix_or_compile_stage_without_api_key_cannot_activate_premium_model()
+    test_authoritative_production_routes_script_only()
     test_explicit_operator_override_wins()
     test_sol_price_and_cost_limit_are_registered_without_relaxation()
-    print("PASS: production premium writer routing is isolated and budget cap is unchanged")
+    test_sol_cache_write_usage_is_billed_at_1_25x_input()
+    print("PASS: premium script routing is production-only and budget accounting remains bounded")
 
 
 if __name__ == "__main__":
