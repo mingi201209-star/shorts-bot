@@ -1,0 +1,20 @@
+name: Run 34610328000 Window Scene4 Deterministic Regression
+
+on:
+  pull_request:
+    paths:
+      - "video/aircraft_window_stress_grounding.py"
+      - "quality/run_34610328000_window_scene4_deterministic_regression_test.py"
+      - ".github/workflows/run_34610328000_window_scene4_deterministic_regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run Run 34610328000 Scene 4 regression
+        run: python quality/run_34610328000_window_scene4_deterministic_regression_test.py
