@@ -1,0 +1,22 @@
+name: Run 34625637738 Human Quality Regression
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  human-quality-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Fixed-topic Hook floor production composition
+        run: python quality/fixed_topic_consensus_call_regression_test.py
+      - name: Window human visual quality regression
+        run: python quality/aircraft_window_stress_renderer_regression_test.py
