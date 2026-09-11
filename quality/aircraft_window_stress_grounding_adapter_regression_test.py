@@ -167,6 +167,25 @@ def test_non_result_scene_rejected():
     assert supports_aircraft_window_stress_from_grounding(scene) is None
 
 
+def test_negative_aircraft_window_generic_anchors_only_no_claim_discriminator():
+    # Same subject (aircraft + window anchors present), but the keyword
+    # reflects an entirely different, ungrounded aspect of the same
+    # physical object -- must stay fail-closed even with a result role and
+    # valid canonical supply. This is the "aircraft passenger window but
+    # unrelated claim" control for the realistic runtime case where
+    # owned_claim_id is absent (the common case per
+    # video.grounded_explanatory_visual.chevron_flow_mixing_supported's own
+    # documented behavior).
+    scene = _result_scene(keyword="aircraft window why small size")
+    assert supports_aircraft_window_stress_from_grounding(scene) is None
+
+
+def test_positive_each_claim_discriminator_word_alone_is_sufficient():
+    for word in ("squarish", "rounded", "stress", "fatigue", "rupture", "concentration", "distribution"):
+        scene = _result_scene(keyword=f"modern aircraft window {word} corner")
+        assert supports_aircraft_window_stress_from_grounding(scene) is not None, word
+
+
 def main():
     test_positive_eligible_result_scene()
     test_positive_explicit_owned_claim_matches()
@@ -182,6 +201,8 @@ def main():
     test_adapter_never_imports_vision_evidence_state()
     test_missing_anchor_words_rejected()
     test_non_result_scene_rejected()
+    test_negative_aircraft_window_generic_anchors_only_no_claim_discriminator()
+    test_positive_each_claim_discriminator_word_alone_is_sufficient()
     print("AIRCRAFT WINDOW STRESS GROUNDING ADAPTER PHASE 2 REGRESSION: PASS")
 
 

@@ -92,6 +92,27 @@ def _window_canonical_supply_present(scene):
     return supply
 
 
+# Every word (split on "_") of the three claim ids this exact canonical
+# record supports, excluding the generic "window" anchor already checked
+# separately. Mirrors video.grounded_explanatory_visual.chevron_flow_mixing_
+# supported's own {"chevron", "flow", "mixing"} <= words check exactly: this
+# reads the deterministic grounded keyword for the claim identity's own
+# structured words (the Grounded Keyword Contract already derives keyword
+# terms directly from owned_claim_id.replace("_", " ")), not a new inferred
+# vocabulary. Without this, a same-subject scene about an unrelated aspect
+# (e.g. "why is this window small") would wrongly pass on generic
+# aircraft+window anchors alone -- the required "aircraft passenger window
+# but unrelated claim" negative control.
+_CLAIM_DISCRIMINATOR_WORDS = frozenset({
+    "squarish", "stress", "concentration", "rounded", "distribution", "fatigue", "rupture",
+})
+
+
+def _has_claim_discriminator_word(scene):
+    words = set(re.findall(r"[a-z]+", _text((scene or {}).get("keyword")).lower()))
+    return bool(words & _CLAIM_DISCRIMINATOR_WORDS)
+
+
 def _window_subject_anchor_words(scene):
     """Same anchor-word style as
     video.grounded_explanatory_visual.subject_anchor_words, scoped to the
@@ -149,6 +170,11 @@ def supports_aircraft_window_stress_from_grounding(scene, candidate=None):
         aircraft-passenger-window subject (never inferred from keyword alone)
       - the window subject anchors (aircraft + window) are present in the
         deterministic grounded keyword
+      - at least one of the three supported claims' own discriminator words
+        (split from their claim_id, e.g. "squarish"/"fatigue"/"rupture") is
+        present in that same keyword -- rejects an aircraft-window scene
+        about an unrelated aspect (e.g. "why is this window small") that
+        only happens to share the generic aircraft+window anchors
       - an explicit owned_claim_id, if present, is one of the three claims
         this exact canonical record supports (never a foreign claim)
       - the scene is a result/payoff scene (matches the "result" claim_type
@@ -169,6 +195,9 @@ def supports_aircraft_window_stress_from_grounding(scene, candidate=None):
 
     anchors = _window_subject_anchor_words(scene)
     if set(anchors) != {"aircraft", "window"}:
+        return None
+
+    if not _has_claim_discriminator_word(scene):
         return None
 
     owned_claim = _owned_claim_id_from_scene(scene, candidate)
