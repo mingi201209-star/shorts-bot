@@ -19,7 +19,16 @@ def _scene(text, role="mechanism", keyword="aircraft wing winglet"):
     return {"text": text, "role": role, "keyword": keyword, "visual_goal": text}
 
 
-def _lineage(index, source="still-winglet-a", *, template="", mode="REUSED_VERIFIED_STILL_MOTION", source_asset_id=""):
+def _lineage(
+    index,
+    source="still-winglet-a",
+    *,
+    template="",
+    mode="REUSED_VERIFIED_STILL_MOTION",
+    source_asset_id="",
+    presentation_variant="",
+    motion_profile="",
+):
     return {
         "scene_index": index,
         "accepted": True,
@@ -28,6 +37,8 @@ def _lineage(index, source="still-winglet-a", *, template="", mode="REUSED_VERIF
         "source_asset_id": source_asset_id,
         "mode": mode,
         "template_type": template,
+        "presentation_variant": presentation_variant,
+        "motion_profile": motion_profile,
         "visual_state": "TRUE",
     }
 
@@ -62,6 +73,72 @@ def main():
         ],
     )
     assert transformed["pass"] is True, transformed
+
+    # Run 34616204901 counterexample: claim-specific deterministic asset ids
+    # must not hide three effectively identical uses of one explanation family.
+    window_scenes = [
+        _scene("각진 모서리 응력", keyword="aircraft window corner stress"),
+        _scene("둥근 모서리 분산", keyword="aircraft window rounded stress"),
+        _scene("응력 집중과 재료 피로", "result", keyword="aircraft window fatigue"),
+    ]
+    window_same_presentation = evaluate_visual_diversity(
+        window_scenes,
+        [
+            _lineage(
+                i,
+                source=f"vx-window-{i}",
+                source_asset_id=f"deterministic-window-claim-{i}",
+                template="AIRCRAFT_WINDOW_STRESS_V1",
+                mode="EXPLANATORY_2D",
+            )
+            for i in range(3)
+        ],
+    )
+    assert window_same_presentation["pass"] is False, window_same_presentation
+    presentation_failures = [
+        group for group in window_same_presentation["repetition_groups"]
+        if group.get("group_type") == "presentation_family"
+        and group.get("severity") == "high"
+    ]
+    assert len(presentation_failures) == 1, window_same_presentation
+    assert presentation_failures[0]["hard_repeat_count"] == 3
+
+    # A real claim-aware treatment is allowed: same comparison template, but
+    # three stable presentation identities and the same deterministic motion
+    # profile. This is visual differentiation, not asset-id laundering.
+    window_distinct_presentation = evaluate_visual_diversity(
+        window_scenes,
+        [
+            _lineage(
+                0,
+                source="vx-window-left",
+                source_asset_id="deterministic-window-claim-left",
+                template="AIRCRAFT_WINDOW_STRESS_V1",
+                mode="EXPLANATORY_2D",
+                presentation_variant="LEFT_STRESS_INSPECTION",
+                motion_profile="SUBTLE_INSPECTION",
+            ),
+            _lineage(
+                1,
+                source="vx-window-right",
+                source_asset_id="deterministic-window-claim-right",
+                template="AIRCRAFT_WINDOW_STRESS_V1",
+                mode="EXPLANATORY_2D",
+                presentation_variant="RIGHT_FLOW_INSPECTION",
+                motion_profile="SUBTLE_INSPECTION",
+            ),
+            _lineage(
+                2,
+                source="vx-window-fatigue",
+                source_asset_id="deterministic-window-claim-fatigue",
+                template="AIRCRAFT_WINDOW_STRESS_V1",
+                mode="EXPLANATORY_2D",
+                presentation_variant="LEFT_FATIGUE_PAYOFF",
+                motion_profile="SUBTLE_INSPECTION",
+            ),
+        ],
+    )
+    assert window_distinct_presentation["pass"] is True, window_distinct_presentation
 
     zoom = evaluate_visual_diversity(
         scenes[:3],
