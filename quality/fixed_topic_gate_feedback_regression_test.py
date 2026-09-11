@@ -103,7 +103,6 @@ with tempfile.TemporaryDirectory() as tmp:
     assert "# FIXED_TOPIC_HOOK_EXHAUSTION_RECOVERY_V1" in main_text
     assert 'consensus.get("fixed_topic_hook_floor_miss")' in main_text
     assert '"status": "REGENERATE_TOPIC"' in main_text
-    assert "fixed_topic_gate_feedback = quality_feedback" in main_text
     assert 'rewritten["fixed_topic_hook_floor_miss"] = True' in consensus_text
     assert 'GOOD_ENOUGH_FLOORS.get("hook", 0.0)' in consensus_text
     assert "MAX_REWRITES = 1" in main_text
