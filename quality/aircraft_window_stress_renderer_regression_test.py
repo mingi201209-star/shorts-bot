@@ -2,7 +2,7 @@
 
 Run 34625637738 was machine-green but human review found two visual escapes:
 UNKNOWN aircraft-window stock was accepted for the opening and the explanatory
-section occupied only a small repeated panel.  This suite composes the real
+section occupied only a small repeated panel. This suite composes the real
 hotfix chain, verifies claim-specific large presentations, and verifies the
 closed aircraft-window stock gate without adding network/LLM/Vision calls.
 """
@@ -82,16 +82,24 @@ def _claim_scene(claim_id):
     if claim_id == "squarish_window_stress_concentration":
         return _window_scene(
             owned_claim_id=claim_id,
+            causal_role="constraint",
+            role="causal_clue",
             text="각진 창문 모서리에는 높은 응력이 집중됐습니다.",
             keyword="aircraft window squarish corner stress concentration",
         )
     if claim_id == "rounded_window_stress_distribution":
         return _window_scene(
             owned_claim_id=claim_id,
+            causal_role="mechanism_change",
+            role="reveal",
             text="둥근 모서리에서는 응력이 곡선을 따라 흘러 한 지점에 쌓이는 것을 줄입니다.",
             keyword="aircraft window rounded corner stress distribution",
         )
-    return _window_scene(owned_claim_id=claim_id)
+    return _window_scene(
+        owned_claim_id=claim_id,
+        causal_role="primary_result",
+        role="payoff",
+    )
 
 
 def test_positive_plan_and_render():
@@ -230,7 +238,9 @@ def test_existing_winglet_template_unaffected():
 
 def test_existing_chevron_flow_mixing_unaffected():
     scene = {
-        "scene_id": 4, "role": "reveal", "owned_claim_id": "chevron_flow_mixing",
+        "scene_id": 4,
+        "role": "reveal",
+        "owned_claim_id": "chevron_flow_mixing",
         "text": "톱니 모양 셰브론은 배기 흐름과 주변 흐름이 섞이는 방식을 바꿉니다.",
         "visual_goal": "제트 엔진 뒤 셰브론과 두 흐름이 섞이는 관계를 보여준다.",
         "keyword": "jet engine chevron flow mixing",
