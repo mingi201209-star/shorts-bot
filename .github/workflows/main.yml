@@ -150,6 +150,11 @@ jobs:
           python ci_cross_process_video_dedupe_hotfix.py
           python ci_writer_observable_opening_hotfix.py
 
+          # Must run after ci_writer_observable_opening_hotfix.py: it chains in
+          # the last upstream video/visual_explanation.py wrapper layer
+          # (STATIC_WICK_VISUAL_EXPLANATION_V1) that this hotfix wraps.
+          python ci_grounded_deterministic_explanation_hotfix.py
+
           # Some later production hotfixes rewrite candidate_explorer wrappers.
           # Re-apply the compatibility patch against the FINAL production state.
           python ci_aviation_context_signature_compat_hotfix.py
