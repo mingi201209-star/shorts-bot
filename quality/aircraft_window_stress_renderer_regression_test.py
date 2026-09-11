@@ -138,11 +138,12 @@ def test_claims_have_large_distinct_presentations():
     from PIL import Image, ImageChops
     base = Image.new("RGBA", (1080, 1920), (28, 31, 38, 255))
     rendered = [_draw_concept_panel(base.copy(), plan, 0.55) for plan in plans]
+    base_rgb = base.convert("RGB")
     for image in rendered:
-        bbox = ImageChops.difference(base, image).getbbox()
+        bbox = ImageChops.difference(base_rgb, image.convert("RGB")).getbbox()
         assert bbox is not None and bbox[3] >= 1300, bbox
-    assert ImageChops.difference(rendered[0], rendered[1]).getbbox() is not None
-    assert ImageChops.difference(rendered[1], rendered[2]).getbbox() is not None
+    assert ImageChops.difference(rendered[0].convert("RGB"), rendered[1].convert("RGB")).getbbox() is not None
+    assert ImageChops.difference(rendered[1].convert("RGB"), rendered[2].convert("RGB")).getbbox() is not None
 
 
 def test_subtle_inspection_moves_composed_layer():
