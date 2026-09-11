@@ -65,4 +65,9 @@ _DEFAULT_SPECS: dict[str, SubjectStateSpec] = {
         claim_aliases={},
         vision_aliases={},
     ),
+    "window_corner": SubjectStateSpec(
+        canonical_states=frozenset({"SQUARISH", "ROUNDED"}),
+        claim_aliases={},
+        vision_aliases={},
+    ),
 }

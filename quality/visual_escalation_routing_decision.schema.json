@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://shorts-bot/quality/visual_escalation_routing_decision.schema.json",
+  "title": "VisualEscalationRoutingDecision",
+  "type": "object",
+  "required": ["action"],
+  "additionalProperties": false,
+  "properties": {
+    "action": {"enum": ["PRODUCE", "RETURN_UPSTREAM", "TERMINATE"]},
+    "method": {
+      "enum": [
+        "REUSE_VERIFIED",
+        "STOCK_RETRIEVAL",
+        "DETERMINISTIC_EXPLANATION",
+        "AI_EXPLANATORY_IMAGE",
+        "SAFE_MINIMAL_PRESENTATION"
+      ]
+    },
+    "param_signature": {"type": "string", "minLength": 1},
+    "reason": {"type": "string", "minLength": 1},
+    "target": {"enum": ["GROUNDING", "CLAIM_PLANNING", "WRITER"]},
+    "terminal_state": {"const": "HUMAN_HOLD"},
+    "terminal_reason": {"type": "string", "minLength": 1}
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"action": {"const": "PRODUCE"}}},
+      "then": {
+        "required": ["method", "param_signature", "reason"],
+        "properties": {"target": false, "terminal_state": false, "terminal_reason": false}
+      }
+    },
+    {
+      "if": {"properties": {"action": {"const": "RETURN_UPSTREAM"}}},
+      "then": {
+        "required": ["target", "reason"],
+        "properties": {"method": false, "param_signature": false, "terminal_state": false, "terminal_reason": false}
+      }
+    },
+    {
+      "if": {"properties": {"action": {"const": "TERMINATE"}}},
+      "then": {
+        "required": ["terminal_state", "terminal_reason"],
+        "properties": {"method": false, "param_signature": false, "reason": false, "target": false}
+      }
+    }
+  ]
+}
