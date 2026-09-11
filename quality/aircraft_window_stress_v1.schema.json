@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://shorts-bot/quality/aircraft_window_stress_v1.schema.json",
+  "title": "DeterministicExplanationParams_AircraftWindowStressV1",
+  "description": "Shape only. This describes the params object attached to a Bounded Visual Escalation RoutingDecision (quality/visual_escalation_routing_decision.schema.json) when action=PRODUCE and method=DETERMINISTIC_EXPLANATION. Template-specific semantic eligibility (does this grounding actually license this template for this scene) is a separate Python check in quality/grounded_deterministic_explanation.py -- this schema only rejects malformed shape (missing field, wrong type, unsupported enum value).",
+  "type": "object",
+  "required": [
+    "template_id",
+    "presentation",
+    "canonical_subject_id",
+    "owned_claim_id",
+    "evidence_source",
+    "grounding_provenance_ref",
+    "grounding_fingerprint",
+    "comparison_segment_id",
+    "param_signature"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "template_id": {
+      "enum": ["AIRCRAFT_WINDOW_STRESS_V1"],
+      "description": "V1 supports exactly one template. No stub or TODO entries for future templates."
+    },
+    "presentation": {
+      "enum": ["CONTRAST"],
+      "description": "Escalation-level relation shape. Distinct from ComparisonSegmentDict.presentation (SPLIT_SCREEN/SEQUENTIAL) in the existing V2.1 contract, which this template reuses unchanged via comparison_segment_id."
+    },
+    "canonical_subject_id": {"type": "string", "minLength": 1},
+    "owned_claim_id": {"type": "string", "minLength": 1},
+    "evidence_source": {
+      "enum": ["TRUSTED_GROUNDING"],
+      "description": "V1 permits exactly one evidence source. VISION, SCRIPT_ONLY, INFERRED, UNKNOWN, LLM and similar are not permitted, and this enum is deliberately not widened for future extensibility (out of V1 scope)."
+    },
+    "grounding_provenance_ref": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference into the existing trusted grounding/claim registry (e.g. a source URL or record key), not a freshly-computed value."
+    },
+    "grounding_fingerprint": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable identity derived only from grounding/claim/relation identity -- never raw narration, keyword, run id, timestamp, UUID, or output path."
+    },
+    "comparison_segment_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "References a ComparisonSegmentDict emitted via the existing quality/visual_explanation_contract_v2.py contract -- no separate comparison schema is defined here."
+    },
+    "param_signature": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Attempt identity for the (method, param_signature) reuse-ban invariant in the escalation ledger."
+    }
+  }
+}
