@@ -97,6 +97,18 @@ with tempfile.TemporaryDirectory() as tmp:
     assert "if forced_topic" in main_text
     assert "# FIXED_TOPIC_HOOK_QUALITY_GUARD_V1" in consensus_text
 
+    # Run 34641471858: Hook remained 6.0 after the one allowed rewrite.
+    # The fixed-topic path must preserve the same Hook floor and rewrite cap,
+    # then reuse the already-bounded Candidate regeneration path.
+    assert "# FIXED_TOPIC_HOOK_EXHAUSTION_RECOVERY_V1" in main_text
+    assert 'consensus.get("fixed_topic_hook_floor_miss")' in main_text
+    assert '"status": "REGENERATE_TOPIC"' in main_text
+    assert "fixed_topic_gate_feedback = quality_feedback" in main_text
+    assert 'rewritten["fixed_topic_hook_floor_miss"] = True' in consensus_text
+    assert 'GOOD_ENOUGH_FLOORS.get("hook", 0.0)' in consensus_text
+    assert "MAX_REWRITES = 1" in main_text
+    assert "MAX_REWRITES = 2" not in main_text
+
     assert "[PREVIOUS CANDIDATE GATE FEEDBACK]" in explorer_text
     assert "{fixed_topic_gate_feedback}" in explorer_text
     assert "같은 Core Question" in explorer_text
