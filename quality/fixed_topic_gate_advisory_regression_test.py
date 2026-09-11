@@ -1,6 +1,8 @@
 from ci_fixed_topic_gate_advisory_hotfix import (
+    HOOK_GUARD_MARKER,
     MARKER,
     apply_fixed_topic_gate_advisory,
+    apply_fixed_topic_hook_quality_guard,
 )
 
 
@@ -25,6 +27,8 @@ FIXTURE = '''                if (
                 )
 '''
 
+CONSENSUS_FIXTURE = '''GOOD_ENOUGH_FLOORS = {"hook": 7.0}\n\ndef safe_float(value, default=0.0):\n    try:\n        return float(value)\n    except Exception:\n        return default\n\ndef build_consensus(pool_results, reliability_report=None):\n    return {\n        "decision": "PASS",\n        "pass_tier": "IDEAL",\n        "domain_summaries": pool_results,\n        "weak_domains": [],\n        "reasons": ["base pass"],\n    }\n'''
+
 
 def main():
     patched = apply_fixed_topic_gate_advisory(FIXTURE)
@@ -43,6 +47,12 @@ def main():
 
     # Installer must remain idempotent when workflow/tests re-run it.
     assert apply_fixed_topic_gate_advisory(patched) == patched
+
+    guarded = apply_fixed_topic_hook_quality_guard(CONSENSUS_FIXTURE)
+    assert HOOK_GUARD_MARKER in guarded
+    assert "GOOD_ENOUGH_FLOORS.get(\"hook\"" in guarded
+    assert "action=REWRITE" in guarded
+    assert apply_fixed_topic_hook_quality_guard(guarded) == guarded
 
     print("FIXED TOPIC GATE ADVISORY REGRESSION: PASS")
 
