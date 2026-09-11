@@ -213,6 +213,25 @@ def _micro_content_tokens(value):
     return tokens
 
 
+# General Korean discourse markers that signal the hook is committing to a
+# claim (intent, negation, contrast) rather than merely describing the
+# visible subject -- not specific to any one topic's vocabulary, so this list
+# is reusable across every Candidate the same way _MICRO_QUESTION_MARKERS is.
+# Run 34625637738's own counterexample hook ("비행기 창문 모서리는 둥급니다.")
+# carries none of these; the task's own worked GOOD examples ("일부러 ...",
+# "... 장식이 아닙니다") do.
+_MICRO_HOOK_CLAIM_MARKERS = (
+    "일부러", "의도적으로", "고의로",
+    "아니다", "아닙니다", "아니라", "않습니다", "않는다",
+    "사실은", "실제로는", "오히려", "대신",
+)
+
+
+def _hook_makes_explicit_claim(hook):
+    value = str(hook or "")
+    return any(marker in value for marker in _MICRO_HOOK_CLAIM_MARKERS)
+
+
 def _hook_restates_question(hook, question):
     q_text = str(question or "")
     if not any(marker in q_text for marker in _MICRO_QUESTION_MARKERS):
@@ -222,7 +241,16 @@ def _hook_restates_question(hook, question):
     if len(hook_tokens) < 2:
         return False
     shared = hook_tokens & question_tokens
-    return len(shared) >= 2 and (len(shared) / float(len(hook_tokens))) >= 0.50
+    overlap_ratio = len(shared) / float(len(hook_tokens))
+    if _hook_makes_explicit_claim(hook):
+        # A hook that already commits to intent/negation/contrast beyond the
+        # bare subject is the normal, expected Hook -> Core Question shape
+        # (state a claim, then ask "why"/"how"). Sharing the same subject
+        # tokens with the question that follows is not itself a restatement;
+        # only flag it if the hook is otherwise almost nothing but the
+        # question's own words (a degenerate near-duplicate).
+        return len(shared) == len(hook_tokens) and overlap_ratio >= 0.90
+    return len(shared) >= 2 and overlap_ratio >= 0.50
 
 
 def _validate_hook_question_progression(candidate_result, prefix):
