@@ -94,6 +94,15 @@ def test_first5_contract():
     ok, reason = validate_first5_progression(good_scenes())
     assert ok, reason
 
+    # Run 34640186032: Script Engine V2 already recognizes stress as a
+    # concrete causal clue. The first-5 validator must use the same vocabulary
+    # instead of rejecting the same grounded Scene 3 after deterministic repair.
+    stress_clue = good_scenes()
+    stress_clue[2] = dict(stress_clue[2])
+    stress_clue[2]["text"] = "각진 창문 모서리에는 높은 응력이 집중됩니다."
+    ok, reason = validate_first5_progression(stress_clue)
+    assert ok, reason
+
     bad_role = good_scenes()
     bad_role[1] = dict(bad_role[1])
     bad_role[1]["retention_role"] = "consequence"
