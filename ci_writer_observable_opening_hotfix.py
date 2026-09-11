@@ -120,6 +120,228 @@ else:
     ENGINE.write_text(engine, encoding="utf-8")
     print("Fixed Topic Flap Observable Opening V2 installed through production writer hotfix")
 
+
+# ---------------------------------------------------------------------------
+# SCRIPT HUMAN QUALITY V1
+#
+# Run 34625637738 was machine-green but exposed a script-authority mismatch:
+# Candidate Explorer says Micro Narrative is not finished dialogue, while
+# Script Engine V2 locks hook/reveal/payoff verbatim.  Make those upstream locks
+# speakable before they become immutable, reject a Hook -> Question restatement,
+# and keep mutable Writer scenes concise/natural.  No new API call, no threshold,
+# retry, scene-count, or budget change.
+# ---------------------------------------------------------------------------
+HUMAN_QUALITY_MARKER = "# SCRIPT_HUMAN_QUALITY_V1"
+
+CANDIDATE = Path("content/candidate_explorer.py")
+candidate_text = CANDIDATE.read_text(encoding="utf-8")
+if HUMAN_QUALITY_MARKER not in candidate_text:
+    micro_anchor = '''각 요소는 짧고 구체적으로 작성한다.
+
+완성 대사처럼 꾸미지 마라.
+
+Clickbait 제목처럼 만들지 마라.
+
+새로운 사실을 추가하지 마라.
+'''
+    micro_replacement = '''각 요소는 짧고 구체적으로 작성한다.
+
+# SCRIPT_HUMAN_QUALITY_V1
+Micro Narrative 전체를 완성 대본처럼 쓰지는 마라.
+하지만 hook / reveal / payoff는 후단 Script Engine에서 문장 lock으로 사용될 수 있으므로
+각 요소 자체는 그대로 읽어도 자연스러운 짧은 한 문장이어야 한다.
+
+HOOK 규칙:
+- 대상의 모양이나 존재를 사전식으로 다시 말하는 첫 문장은 피한다.
+- 이미 Candidate가 가진 근거 안에서 결과, 제약, 대조, 이상한 점 중 하나를 즉시 보여준다.
+- 질문형 Hook보다 관찰 또는 결과를 단정하는 문장을 우선한다.
+- Hook 다음 Core Question이 Hook과 같은 명제를 다시 묻는 구조는 금지한다.
+  첫 두 문장은 반드시 정보가 전진해야 한다.
+
+REVEAL 규칙:
+- 한 문장에 핵심 mechanism 하나만 둔다.
+- 같은 명사를 불필요하게 반복하지 말고 사람이 말하듯 짧게 쓴다.
+
+PAYOFF 규칙:
+- Reveal이 허용한 사실·인과 범위를 넘어 더 큰 재난이나 결과로 확대하지 마라.
+- 직접 근거가 없는 강한 인과 표현(\"~때문에 결국 ~했다\", \"~로 이어졌다\")으로 긴장감을 만들지 마라.
+- 이미 제시한 mechanism을 그대로 반복하지 말고 시청자가 얻는 최종 이해를 짧게 회수한다.
+
+Clickbait 제목처럼 만들지 마라.
+새로운 사실을 추가하지 마라.
+'''
+    if micro_anchor not in candidate_text:
+        raise RuntimeError("script human-quality Candidate Explorer prompt anchor mismatch")
+    candidate_text = candidate_text.replace(micro_anchor, micro_replacement, 1)
+
+    validator_anchor = '''def validate_candidate(
+    candidate,
+    *,
+    prefix,
+    runner_up=False,
+):
+'''
+    validator_helpers = r'''
+
+_MICRO_QUESTION_MARKERS = ("왜", "이유", "무엇", "어떻게", "어째서", "?")
+_MICRO_TOKEN_STOPWORDS = {
+    "그런데", "그리고", "하지만", "정말", "과연", "이유", "무엇", "어떻게", "어째서",
+    "디자인", "설계", "되어", "되는", "되다", "것", "수", "왜",
+}
+_MICRO_TOKEN_SUFFIXES = (
+    "에서는", "에게서", "으로는", "라는", "에서", "으로", "에게",
+    "은", "는", "이", "가", "을", "를", "의", "에", "로", "와", "과", "도", "만",
+)
+
+
+def _micro_content_tokens(value):
+    tokens = []
+    for raw in re.findall(r"[0-9A-Za-z가-힣]+", str(value or "").lower()):
+        token = raw
+        changed = True
+        while changed:
+            changed = False
+            for suffix in _MICRO_TOKEN_SUFFIXES:
+                if token.endswith(suffix) and len(token) - len(suffix) >= 2:
+                    token = token[:-len(suffix)]
+                    changed = True
+                    break
+        if len(token) < 2 or token in _MICRO_TOKEN_STOPWORDS:
+            continue
+        if token not in tokens:
+            tokens.append(token)
+    return tokens
+
+
+def _hook_restates_question(hook, question):
+    q_text = str(question or "")
+    if not any(marker in q_text for marker in _MICRO_QUESTION_MARKERS):
+        return False
+    hook_tokens = set(_micro_content_tokens(hook))
+    question_tokens = set(_micro_content_tokens(question))
+    if len(hook_tokens) < 2:
+        return False
+    shared = hook_tokens & question_tokens
+    return len(shared) >= 2 and (len(shared) / float(len(hook_tokens))) >= 0.50
+
+
+def _validate_hook_question_progression(candidate_result, prefix):
+    micro = candidate_result.get("micro_narrative") or {}
+    hook = str(micro.get("hook") or "").strip()
+    questions = [
+        str(candidate_result.get("core_question") or "").strip(),
+        str(micro.get("core_question") or "").strip(),
+    ]
+    for question in questions:
+        if question and _hook_restates_question(hook, question):
+            raise ValueError(
+                f"{prefix}.micro_narrative hook이 Core Question과 같은 내용을 반복합니다. "
+                "첫 두 beat는 새 정보를 전진시켜야 합니다."
+            )
+
+'''
+    if validator_anchor not in candidate_text:
+        raise RuntimeError("script human-quality Candidate validator anchor mismatch")
+    candidate_text = candidate_text.replace(validator_anchor, validator_helpers + validator_anchor, 1)
+
+    candidate_return_anchor = '''    if runner_up:
+
+        result[
+            "backup_independence"
+'''
+    candidate_return_replacement = '''    _validate_hook_question_progression(result, prefix)
+
+    if runner_up:
+
+        result[
+            "backup_independence"
+'''
+    if candidate_return_anchor not in candidate_text:
+        raise RuntimeError("script human-quality Candidate result anchor mismatch")
+    candidate_text = candidate_text.replace(candidate_return_anchor, candidate_return_replacement, 1)
+    CANDIDATE.write_text(candidate_text, encoding="utf-8")
+    print("Script Human Quality V1 Candidate contract installed")
+else:
+    print("Script Human Quality V1 Candidate contract already installed")
+
+# Avoid the deterministic filler that made grounded stress narration read like
+# '원인의 첫 단서는 ...'.  Stress itself is a concrete causal clue, so it should
+# satisfy the existing causal-clue contract without adding filler text.
+engine = ENGINE.read_text(encoding="utf-8")
+STRESS_MARKER = "# SCRIPT_HUMAN_QUALITY_STRESS_CLUE_V1"
+if STRESS_MARKER not in engine:
+    clue_anchor = '''CAUSAL_CLUE_TOKENS = (
+    "때문", "원인", "압력", "힘", "공기", "구조", "작동", "차이", "분산", "조절", "균형",
+)
+'''
+    clue_replacement = '''# SCRIPT_HUMAN_QUALITY_STRESS_CLUE_V1
+CAUSAL_CLUE_TOKENS = (
+    "때문", "원인", "압력", "응력", "힘", "공기", "구조", "작동", "차이", "분산", "조절", "균형",
+)
+'''
+    if clue_anchor not in engine:
+        raise RuntimeError("script human-quality causal-clue anchor mismatch")
+    engine = engine.replace(clue_anchor, clue_replacement, 1)
+    ENGINE.write_text(engine, encoding="utf-8")
+    print("Script Human Quality V1 causal-clue contract installed")
+
+RUNNER = Path("content/script_engine_v2_runner.py")
+runner = RUNNER.read_text(encoding="utf-8")
+RUNNER_MARKER = "SCRIPT_HUMAN_QUALITY_WRITER_V1"
+if RUNNER_MARKER not in runner:
+    runner_anchor = '''            "Use easy language. Do not reveal the final answer before reveal/payoff."
+'''
+    runner_replacement = '''            "Use easy, natural spoken Korean. Keep each scene to one short sentence and one new idea. "
+            "Avoid bureaucratic filler, repeated noun phrases, and restating the previous scene. "
+            "Prefer concrete subject+verb wording over abstract nominalizations. "
+            "Do not strengthen causal claims beyond the supplied facts. "
+            "Do not reveal the final answer before reveal/payoff. "
+            "SCRIPT_HUMAN_QUALITY_WRITER_V1"
+'''
+    if runner_anchor not in runner:
+        raise RuntimeError("script human-quality Writer instruction anchor mismatch")
+    runner = runner.replace(runner_anchor, runner_replacement, 1)
+    RUNNER.write_text(runner, encoding="utf-8")
+    print("Script Human Quality V1 Writer instruction installed")
+
+REWRITE = Path("quality/rewrite_engine.py")
+rewrite = REWRITE.read_text(encoding="utf-8")
+REWRITE_MARKER = "SCRIPT_HUMAN_QUALITY_REWRITE_V1"
+if REWRITE_MARKER not in rewrite:
+    hook_anchor = '''[HOOK 수정]
+- 첫 1~3초 표현을 우선 개선한다.
+- 설명형 오프닝을 피한다.
+- 정보 공백과 구체성을 강화한다.
+- Candidate의 핵심 질문이나 사실은 바꾸지 않는다.
+'''
+    hook_replacement = '''[HOOK 수정]
+- 첫 1~3초 표현을 우선 개선한다.
+- 설명형 오프닝을 피한다.
+- 정보 공백과 구체성을 강화한다.
+- Scene 1과 Scene 2가 같은 명제를 진술→질문으로 반복하면 두 장면을 함께 고쳐 정보가 전진하게 한다.
+- 첫 문장은 질문보다 관찰/결과/대조를 우선하고, Candidate에 없는 새 사실은 추가하지 않는다.
+- 대사는 짧은 구어체 격식문 한 문장으로 만들고 같은 명사를 불필요하게 반복하지 않는다.
+- Candidate의 핵심 질문이나 사실은 바꾸지 않는다.
+- SCRIPT_HUMAN_QUALITY_REWRITE_V1
+'''
+    if hook_anchor not in rewrite:
+        raise RuntimeError("script human-quality Rewrite hook anchor mismatch")
+    rewrite = rewrite.replace(hook_anchor, hook_replacement, 1)
+
+    absolute_anchor = '''- Fact Judge가 근거 부족이라고 지적한 주장을 그대로 남기지 않는다.
+- Explanation 문제를 고치기 위해 검증되지 않은 새 원인을 발명하지 않는다.
+'''
+    absolute_replacement = '''- Fact Judge가 근거 부족이라고 지적한 주장을 그대로 남기지 않는다.
+- 인과 표현은 Candidate/Fact 근거보다 강하게 키우지 않는다. 긴장감을 위해 결과를 재난 수준으로 확대하지 않는다.
+- 한 Scene 안에서 같은 핵심 명사를 불필요하게 반복하지 않고 자연스러운 짧은 한국어로 쓴다.
+- Explanation 문제를 고치기 위해 검증되지 않은 새 원인을 발명하지 않는다.
+'''
+    if absolute_anchor not in rewrite:
+        raise RuntimeError("script human-quality Rewrite absolute-rule anchor mismatch")
+    rewrite = rewrite.replace(absolute_anchor, absolute_replacement, 1)
+    REWRITE.write_text(rewrite, encoding="utf-8")
+    print("Script Human Quality V1 Rewrite instruction installed")
+
 # This installer is already the final substantive production hotfix in main.yml.
 # Chain the verified-still rescue here so the live workflow receives the same
 # final-composition patch proven by the composition gate, without changing any
