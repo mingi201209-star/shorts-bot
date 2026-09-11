@@ -38,7 +38,20 @@ def _still_vision_component_matches_group(component, group):
     component = _still_vision_norm_component(component)
     group = _still_vision_norm_component(group)
     aliases = set(_STILL_VISION_GROUP_ALIASES.get(group, ())) | {group}
-    return bool(component and group and component in aliases)
+    if component and group and component in aliases:
+        return True
+    # Run 34596419083: the Vision model may reasonably describe one visible
+    # object as a multi-word compound noun phrase (e.g. "aircraft window")
+    # instead of one visible_components entry per required group. Crediting
+    # the group when its own exact word is a whitespace-delimited token of
+    # that phrase is not new alias/vocabulary leniency -- it is the same
+    # literal required word the prompt asked for, just not split into a
+    # separate list entry. This does not match on substrings (a token must be
+    # a full word), does not touch the alias tables above (still exact-only),
+    # and never credits a group whose own word is genuinely absent.
+    if component and group and " " in component:
+        return group in component.split(" ")
+    return False
 
 
 def _still_vision_reason_mentions_group(reason, group):
