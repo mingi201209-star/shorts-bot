@@ -1,13 +1,10 @@
-"""PHASE 5 + PHASE 7 regression: AIRCRAFT_WINDOW_STRESS_V1 deterministic
-renderer wired into the live video/visual_explanation.py production consumer
-via ci_grounded_deterministic_explanation_hotfix.py.
+"""Production-composed regression for AIRCRAFT_WINDOW_STRESS_V1.
 
-Zero network/LLM/Vision/AI-image calls. Composes the exact real hotfix chain
-in an isolated scratch copy of the repo, then exercises video.visual_explanation
-directly.  Run 34616204901 human QA also established a presentation regression:
-three different grounded claims looked like the same static split panel.  This
-suite therefore verifies claim-aware variants plus composed-layer
-SUBTLE_INSPECTION motion without changing LEFT/RIGHT comparison semantics.
+Run 34625637738 was machine-green but human review found two visual escapes:
+UNKNOWN aircraft-window stock was accepted for the opening and the explanatory
+section occupied only a small repeated panel. This suite composes the real
+hotfix chain, verifies claim-specific large presentations, and verifies the
+closed aircraft-window stock gate without adding network/LLM/Vision calls.
 """
 from __future__ import annotations
 
@@ -85,16 +82,24 @@ def _claim_scene(claim_id):
     if claim_id == "squarish_window_stress_concentration":
         return _window_scene(
             owned_claim_id=claim_id,
+            causal_role="constraint",
+            role="causal_clue",
             text="각진 창문 모서리에는 높은 응력이 집중됐습니다.",
             keyword="aircraft window squarish corner stress concentration",
         )
     if claim_id == "rounded_window_stress_distribution":
         return _window_scene(
             owned_claim_id=claim_id,
+            causal_role="mechanism_change",
+            role="reveal",
             text="둥근 모서리에서는 응력이 곡선을 따라 흘러 한 지점에 쌓이는 것을 줄입니다.",
             keyword="aircraft window rounded corner stress distribution",
         )
-    return _window_scene(owned_claim_id=claim_id)
+    return _window_scene(
+        owned_claim_id=claim_id,
+        causal_role="primary_result",
+        role="payoff",
+    )
 
 
 def test_positive_plan_and_render():
@@ -114,7 +119,7 @@ def test_positive_plan_and_render():
     assert out.size == (1080, 1920)
 
 
-def test_claims_have_distinct_presentations():
+def test_claims_have_large_distinct_presentations():
     claims = [
         "squarish_window_stress_concentration",
         "rounded_window_stress_distribution",
@@ -131,12 +136,14 @@ def test_claims_have_distinct_presentations():
     assert [plan["scene_role"] for plan in plans] == ["mechanism", "mechanism", "result"]
 
     from PIL import Image, ImageChops
-    rendered = []
-    for plan in plans:
-        frame = Image.new("RGBA", (1080, 1920), (28, 31, 38, 255))
-        rendered.append(_draw_concept_panel(frame, plan, 0.55))
-    assert ImageChops.difference(rendered[0], rendered[1]).getbbox() is not None
-    assert ImageChops.difference(rendered[1], rendered[2]).getbbox() is not None
+    base = Image.new("RGBA", (1080, 1920), (28, 31, 38, 255))
+    rendered = [_draw_concept_panel(base.copy(), plan, 0.55) for plan in plans]
+    base_rgb = base.convert("RGB")
+    for image in rendered:
+        bbox = ImageChops.difference(base_rgb, image.convert("RGB")).getbbox()
+        assert bbox is not None and bbox[3] >= 1300, bbox
+    assert ImageChops.difference(rendered[0].convert("RGB"), rendered[1].convert("RGB")).getbbox() is not None
+    assert ImageChops.difference(rendered[1].convert("RGB"), rendered[2].convert("RGB")).getbbox() is not None
 
 
 def test_subtle_inspection_moves_composed_layer():
@@ -153,6 +160,28 @@ def test_subtle_inspection_moves_composed_layer():
     end = _apply_subtle_inspection(overlay, plan, 1.0)
     assert start.size == end.size == (1080, 1920)
     assert ImageChops.difference(start, end).getbbox() is not None
+
+
+def test_window_unknown_stock_is_not_human_quality_safe():
+    downloader = runpy.run_module("video.video_downloader", run_name="video.video_downloader")
+    helper = downloader["_window_hq_candidate_ok"]
+    globals_ = helper.__globals__
+    old_visible = globals_["candidate_visible_component_evidence"]
+    old_compat = globals_["candidate_anchor_compatibility"]
+    candidate = {"provider": "pixabay", "source_id": "fixture-window"}
+    try:
+        globals_["candidate_visible_component_evidence"] = lambda *_a, **_k: {"state": "UNKNOWN"}
+        globals_["candidate_anchor_compatibility"] = lambda *_a, **_k: {"matched": 2, "total": 2}
+        assert helper(candidate, "aircraft passenger window rounded") is False
+        assert helper(candidate, "aircraft wing clouds") is True
+
+        globals_["candidate_visible_component_evidence"] = lambda *_a, **_k: {"state": "TRUE"}
+        assert helper(candidate, "aircraft passenger window rounded") is True
+        globals_["candidate_anchor_compatibility"] = lambda *_a, **_k: {"matched": 1, "total": 2}
+        assert helper(candidate, "aircraft passenger window rounded") is False
+    finally:
+        globals_["candidate_visible_component_evidence"] = old_visible
+        globals_["candidate_anchor_compatibility"] = old_compat
 
 
 def test_negative_full_integration_building_window():
@@ -210,7 +239,9 @@ def test_existing_winglet_template_unaffected():
 
 def test_existing_chevron_flow_mixing_unaffected():
     scene = {
-        "scene_id": 4, "role": "reveal", "owned_claim_id": "chevron_flow_mixing",
+        "scene_id": 4,
+        "role": "reveal",
+        "owned_claim_id": "chevron_flow_mixing",
         "text": "톱니 모양 셰브론은 배기 흐름과 주변 흐름이 섞이는 방식을 바꿉니다.",
         "visual_goal": "제트 엔진 뒤 셰브론과 두 흐름이 섞이는 관계를 보여준다.",
         "keyword": "jet engine chevron flow mixing",
@@ -252,8 +283,9 @@ def test_render_frame_is_deterministic_across_calls():
 
 def main():
     test_positive_plan_and_render()
-    test_claims_have_distinct_presentations()
+    test_claims_have_large_distinct_presentations()
     test_subtle_inspection_moves_composed_layer()
+    test_window_unknown_stock_is_not_human_quality_safe()
     test_negative_full_integration_building_window()
     test_negative_full_integration_cockpit_windshield()
     test_negative_full_integration_wrong_claim()

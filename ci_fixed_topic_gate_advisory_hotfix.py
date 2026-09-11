@@ -7,7 +7,29 @@ MARKER = "[FIXED_TOPIC_GATE_ADVISORY]"
 HOOK_GUARD_MARKER = "# FIXED_TOPIC_HOOK_QUALITY_GUARD_V1"
 
 
+def _apply_hook_guard_to_consensus_file():
+    """Install the pinned-topic Hook floor into the live composed consensus.
+
+    ci_topic_input_hotfix imports this module and calls
+    apply_fixed_topic_gate_advisory() on the full production main.py before the
+    later Script-V2 soft-judge installer rewrites the original consensus body.
+    Installing the wrapper here keeps the existing Hook Good-Enough floor
+    authoritative in the real production composition, not only in isolated
+    regression fixtures.
+    """
+    consensus_text = CONSENSUS_PATH.read_text(encoding="utf-8")
+    patched = apply_fixed_topic_hook_quality_guard(consensus_text)
+    if patched != consensus_text:
+        CONSENSUS_PATH.write_text(patched, encoding="utf-8")
+        print("✅ Fixed-topic Hook Good-Enough floor installed in composed consensus")
+
+
 def apply_fixed_topic_gate_advisory(text):
+    # Production call path supplies the whole main.py.  Fixture-only unit tests
+    # intentionally do not mutate repository consensus state.
+    if "def run_quality_process(" in text:
+        _apply_hook_guard_to_consensus_file()
+
     if MARKER in text:
         return text
 
@@ -29,8 +51,8 @@ def apply_fixed_topic_hook_quality_guard(text):
 
     The later Script-V2 composition intentionally makes Novelty/Visual advisory
     for an explicitly pinned canary topic so the engine does not silently swap
-    the requested subject.  Hook quality is different: a weak opening can still
-    be repaired without changing the topic.  This post-consensus wrapper keeps
+    the requested subject. Hook quality is different: a weak opening can still
+    be repaired without changing the topic. This post-consensus wrapper keeps
     the repo's existing GOOD_ENOUGH_FLOORS['hook'] value unchanged and turns an
     otherwise-PASS fixed-topic result into REWRITE when that floor is missed.
     """
@@ -58,9 +80,6 @@ def build_consensus(pool_results, reliability_report=None):
     hook_floor = safe_float(GOOD_ENOUGH_FLOORS.get("hook", 0.0), 0.0)
     hook_score = safe_float(hook_summary.get("score", 0.0), 0.0)
 
-    # Only tighten a result that the fixed-topic advisory composition would
-    # otherwise approve. REVIEW/HOLD paths and all non-fixed topics are left
-    # exactly as the existing consensus engine decided them.
     if result.get("decision") != "PASS" or hook_score >= hook_floor:
         return result
 
