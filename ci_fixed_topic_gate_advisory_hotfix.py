@@ -5,6 +5,7 @@ MAIN_PATH = Path("main.py")
 CONSENSUS_PATH = Path("quality/consensus.py")
 MARKER = "[FIXED_TOPIC_GATE_ADVISORY]"
 HOOK_GUARD_MARKER = "# FIXED_TOPIC_HOOK_QUALITY_GUARD_V1"
+HOOK_EXHAUSTION_MARKER = "# FIXED_TOPIC_HOOK_EXHAUSTION_RECOVERY_V1"
 
 
 def _apply_hook_guard_to_consensus_file():
@@ -24,6 +25,110 @@ def _apply_hook_guard_to_consensus_file():
         print("✅ Fixed-topic Hook Good-Enough floor installed in composed consensus")
 
 
+def apply_fixed_topic_hook_exhaustion_recovery(text):
+    """Regenerate the same pinned topic when its Hook floor survives one rewrite.
+
+    This does not add rewrites, retries, model calls, or relax the Hook floor.
+    It only reuses the already-bounded Candidate regeneration path after the
+    existing single rewrite has been exhausted by a fixed-topic Hook miss.
+    """
+    if HOOK_EXHAUSTION_MARKER in text:
+        return text
+
+    rewrite_anchor = '''            if (
+                rewrite_count
+                >= MAX_REWRITES
+            ):
+
+                if (
+                    has_persistent_novelty_failure(
+                        consensus
+                    )
+                ):
+'''
+    rewrite_replacement = '''            if (
+                rewrite_count
+                >= MAX_REWRITES
+            ):
+
+                # FIXED_TOPIC_HOOK_EXHAUSTION_RECOVERY_V1
+                # Run 34641471858: the pinned rounded-window canary remained
+                # Hook=6.0 after the one allowed rewrite while FACT/Visual
+                # stayed healthy. Do not lower the Hook floor or add rewrites;
+                # reuse the existing bounded Candidate regeneration path so
+                # the same forced topic can supply a stronger opening.
+                if (
+                    __import__("os").environ.get("SHORTS_TOPIC", "").strip()
+                    and consensus.get("fixed_topic_hook_floor_miss")
+                ):
+                    hook_summary = (
+                        (consensus.get("domain_summaries") or {})
+                        .get("hook", {})
+                    ) or {}
+                    hook_reason = str(
+                        hook_summary.get("reason", "")
+                    ).strip()
+                    hook_issues = [
+                        str(issue).strip()
+                        for issue in (hook_summary.get("issues") or [])
+                        if str(issue).strip()
+                    ]
+                    hook_details = "; ".join(
+                        item
+                        for item in (
+                            hook_reason,
+                            ", ".join(hook_issues),
+                        )
+                        if item
+                    )
+                    reason = (
+                        "Fixed-topic Hook가 bounded rewrite 후에도 "
+                        "기존 품질 floor 미달"
+                    )
+                    if hook_details:
+                        reason += f": {hook_details}"
+
+                    print(
+                        "\\n🔁 Fixed-topic Hook 지속 실패 → "
+                        "같은 주제 Candidate Explorer 재생성"
+                    )
+                    return {
+                        "status": "REGENERATE_TOPIC",
+                        "script_data": current_script,
+                        "consensus": consensus,
+                        "rewrite_count": rewrite_count,
+                        "review_count": review_count,
+                        "reason": reason,
+                    }
+
+                if (
+                    has_persistent_novelty_failure(
+                        consensus
+                    )
+                ):
+'''
+    rewrite_count = text.count(rewrite_anchor)
+    if rewrite_count == 0:
+        # Consensus-only unit fixtures intentionally provide a tiny
+        # run_quality_process stub with no rewrite loop. There is nothing to
+        # recover there; keep validating the production path fail-closed.
+        if (
+            "MAX_REWRITES" not in text
+            and "has_persistent_novelty_failure" not in text
+        ):
+            return text
+        raise RuntimeError(
+            "fixed-topic Hook exhaustion rewrite marker count mismatch: 0"
+        )
+    if rewrite_count != 1:
+        raise RuntimeError(
+            "fixed-topic Hook exhaustion rewrite marker count mismatch: "
+            f"{rewrite_count}"
+        )
+    text = text.replace(rewrite_anchor, rewrite_replacement, 1)
+    return text
+
+
 def apply_fixed_topic_gate_advisory(text):
     # Production call path supplies the whole main.py.  Fixture-only unit tests
     # intentionally do not mutate repository consensus state.
@@ -31,11 +136,69 @@ def apply_fixed_topic_gate_advisory(text):
         _apply_hook_guard_to_consensus_file()
 
     if MARKER in text:
-        return text
+        return apply_fixed_topic_hook_exhaustion_recovery(text)
 
-    old = '''                if (\n                    topic_attempt\n                    < total_topic_attempts\n                ):\n\n                    print(\"\")\n\n                    print(\n                        \"➡️ Candidate Explorer 재탐색\"\n                    )\n\n                    continue\n\n                raise RuntimeError(\n                    \"Candidate Gate를 통과하는 \"\n                    \"Winner를 확보하지 못했습니다. \"\n                    \"마지막 이유: \"\n                    f\"{winner_gate.get('reason', '')}\"\n                )\n'''
+    old = '''                if (
+                    topic_attempt
+                    < total_topic_attempts
+                ):
 
-    new = '''                if forced_topic:\n\n                    if topic_attempt == 1:\n\n                        print(\"\")\n                        print(\n                            \"➡️ 지정 주제 Gate 피드백으로 1회 재탐색\"\n                        )\n\n                        continue\n\n                    print(\"\")\n                    print(\n                        \"⚠️ [FIXED_TOPIC_GATE_ADVISORY] \"\n                        \"편집성 Candidate Gate 거절은 1회 피드백 후 \"\n                        \"advisory로 전환; FACT 및 downstream 품질 Gate는 유지\"\n                    )\n\n                else:\n\n                    if (\n                        topic_attempt\n                        < total_topic_attempts\n                    ):\n\n                        print(\"\")\n\n                        print(\n                            \"➡️ Candidate Explorer 재탐색\"\n                        )\n\n                        continue\n\n                    raise RuntimeError(\n                        \"Candidate Gate를 통과하는 \"\n                        \"Winner를 확보하지 못했습니다. \"\n                        \"마지막 이유: \"\n                        f\"{winner_gate.get('reason', '')}\"\n                    )\n'''
+                    print("")
+
+                    print(
+                        "➡️ Candidate Explorer 재탐색"
+                    )
+
+                    continue
+
+                raise RuntimeError(
+                    "Candidate Gate를 통과하는 "
+                    "Winner를 확보하지 못했습니다. "
+                    "마지막 이유: "
+                    f"{winner_gate.get('reason', '')}"
+                )
+'''
+
+    new = '''                if forced_topic:
+
+                    if topic_attempt == 1:
+
+                        print("")
+                        print(
+                            "➡️ 지정 주제 Gate 피드백으로 1회 재탐색"
+                        )
+
+                        continue
+
+                    print("")
+                    print(
+                        "⚠️ [FIXED_TOPIC_GATE_ADVISORY] "
+                        "편집성 Candidate Gate 거절은 1회 피드백 후 "
+                        "advisory로 전환; FACT 및 downstream 품질 Gate는 유지"
+                    )
+
+                else:
+
+                    if (
+                        topic_attempt
+                        < total_topic_attempts
+                    ):
+
+                        print("")
+
+                        print(
+                            "➡️ Candidate Explorer 재탐색"
+                        )
+
+                        continue
+
+                    raise RuntimeError(
+                        "Candidate Gate를 통과하는 "
+                        "Winner를 확보하지 못했습니다. "
+                        "마지막 이유: "
+                        f"{winner_gate.get('reason', '')}"
+                    )
+'''
 
     count = text.count(old)
     if count != 1:
@@ -43,7 +206,8 @@ def apply_fixed_topic_gate_advisory(text):
             f"fixed-topic Candidate Gate tail marker count mismatch: {count}"
         )
 
-    return text.replace(old, new, 1)
+    patched = text.replace(old, new, 1)
+    return apply_fixed_topic_hook_exhaustion_recovery(patched)
 
 
 def apply_fixed_topic_hook_quality_guard(text):
@@ -86,6 +250,7 @@ def build_consensus(pool_results, reliability_report=None):
     rewritten = dict(result)
     rewritten["decision"] = "REWRITE"
     rewritten["pass_tier"] = None
+    rewritten["fixed_topic_hook_floor_miss"] = True
 
     weak_domains = [dict(item) for item in (result.get("weak_domains") or [])]
     if not any(item.get("judge_type") == "hook" for item in weak_domains):
