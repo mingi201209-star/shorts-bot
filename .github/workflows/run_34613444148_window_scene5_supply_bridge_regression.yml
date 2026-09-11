@@ -16,5 +16,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
       - name: Run Run 34613444148 Scene 5 supply bridge regression
         run: python quality/run_34613444148_window_scene5_supply_bridge_regression_test.py
