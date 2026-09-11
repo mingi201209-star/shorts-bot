@@ -41,33 +41,78 @@ def _template(item):
 def _variant(scene, item):
     template = _template(item)
     mode = str((item or {}).get("mode") or "").upper()
+    presentation = str((item or {}).get("presentation_variant") or "").strip().upper()
+    if presentation and template and ("ANNOTATED" in mode or "EXPLANATORY" in mode):
+        return f"presentation:{template}:{presentation}"
     if template in SUPPORTED_TRANSFORMS and ("ANNOTATED" in mode or "EXPLANATORY" in mode):
         return f"transform:{template}"
     return "raw_physical_asset"
+
+
+def _member(idx, scene, item, asset_id):
+    return {
+        "scene_index": idx,
+        "human_scene_number": idx + 1,
+        "role": _role(scene),
+        "source_type": str(item.get("mode") or item.get("provider") or ""),
+        "physical_signature": str(item.get("physical_signature") or ""),
+        "source_asset_id": str(item.get("source_asset_id") or ""),
+        "source_id": str(item.get("source_id") or ""),
+        "template": _template(item),
+        "presentation_variant": str(item.get("presentation_variant") or ""),
+        "motion_profile": str(item.get("motion_profile") or ""),
+        "information_beat": _norm(scene.get("text")),
+        "variant": _variant(scene, item),
+        "asset_id": asset_id,
+    }
+
+
+def _append_group(groups, group_id, members, *, group_type):
+    info = [m for m in members if m["role"] not in NON_INFORMATION_ROLES]
+    if len(info) < 2:
+        return False
+    counts = Counter(m["variant"] for m in info)
+    hard_count = max(counts.values()) if counts else 0
+    severity = "high" if hard_count >= HARD_REPEAT_COUNT else "medium"
+    groups.append({
+        "asset_id": group_id,
+        "group_type": group_type,
+        "scene_indices": [m["scene_index"] for m in info],
+        "human_scene_numbers": [m["human_scene_number"] for m in info],
+        "count": len(info),
+        "hard_repeat_count": hard_count,
+        "severity": severity,
+        "members": info,
+    })
+    return severity == "high"
 
 
 def evaluate_visual_diversity(scenes, lineage):
     scenes = list(scenes or [])
     by_index = {int(x.get("scene_index", -1)): dict(x or {}) for x in list(lineage or [])}
     physical_groups = defaultdict(list)
+    presentation_groups = defaultdict(list)
     information_groups = defaultdict(list)
+
     for idx, scene in enumerate(scenes):
         role = _role(scene)
         item = by_index.get(idx, {})
         asset_id = physical_asset_identity(item)
+        member = _member(idx, scene, item, asset_id)
         if asset_id:
-            physical_groups[asset_id].append({
-                "scene_index": idx,
-                "human_scene_number": idx + 1,
-                "role": role,
-                "source_type": str(item.get("mode") or item.get("provider") or ""),
-                "physical_signature": str(item.get("physical_signature") or ""),
-                "source_asset_id": str(item.get("source_asset_id") or ""),
-                "source_id": str(item.get("source_id") or ""),
-                "template": _template(item),
-                "information_beat": _norm(scene.get("text")),
-                "variant": _variant(scene, item),
-            })
+            physical_groups[asset_id].append(member)
+
+        # Run 34616204901: AIRCRAFT_WINDOW_STRESS_V1 used three different
+        # claim-derived source_asset_id values, so physical identity alone hid
+        # an effectively identical split-screen composition repeated 3 times.
+        # Group explanatory renders by template family too.  A real
+        # presentation_variant keeps distinct treatments distinct; merely
+        # changing the claim-specific asset id does not.
+        template = _template(item)
+        mode = str(item.get("mode") or "").upper()
+        if template and ("ANNOTATED" in mode or "EXPLANATORY" in mode):
+            presentation_groups[template].append(member)
+
         text = _norm(scene.get("text"))
         if text and role not in NON_INFORMATION_ROLES:
             information_groups[text].append(idx)
@@ -75,22 +120,17 @@ def evaluate_visual_diversity(scenes, lineage):
     groups = []
     hard_failure = False
     for asset_id, members in physical_groups.items():
-        info = [m for m in members if m["role"] not in NON_INFORMATION_ROLES]
-        if len(info) < 2:
-            continue
-        counts = Counter(m["variant"] for m in info)
-        hard_count = max(counts.values()) if counts else 0
-        severity = "high" if hard_count >= HARD_REPEAT_COUNT else "medium"
-        hard_failure = hard_failure or severity == "high"
-        groups.append({
-            "asset_id": asset_id,
-            "scene_indices": [m["scene_index"] for m in info],
-            "human_scene_numbers": [m["human_scene_number"] for m in info],
-            "count": len(info),
-            "hard_repeat_count": hard_count,
-            "severity": severity,
-            "members": info,
-        })
+        hard_failure = _append_group(
+            groups, asset_id, members, group_type="physical_asset"
+        ) or hard_failure
+
+    for template, members in presentation_groups.items():
+        hard_failure = _append_group(
+            groups,
+            f"presentation-family:{template}",
+            members,
+            group_type="presentation_family",
+        ) or hard_failure
 
     information = [{
         "information_beat": text,

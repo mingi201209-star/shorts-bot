@@ -23,9 +23,11 @@ qa = replace_once(
             "physical_signature": str(selection.get("physical_signature") or ""),
             "source_asset_id": str(selection.get("source_asset_id") or ""),
             "template_type": str(selection.get("template_type") or ""),
+            "presentation_variant": str(selection.get("presentation_variant") or ""),
+            "motion_profile": str(selection.get("motion_profile") or ""),
             "metadata": str(selection.get("metadata") or "")[:500],
 ''',
-    "final visual physical lineage",
+    "final visual physical/presentation lineage",
 )
 qa_path.write_text(qa, encoding="utf-8")
 
@@ -66,9 +68,11 @@ engine = replace_once(
     '''                    "source_id": still_result.get("source_id", "generated-still"),
                     "source_asset_id": still_result.get("source_asset_id", still_result.get("source_id", "generated-still")),
                     "template_type": still_result.get("template_type", ""),
+                    "presentation_variant": still_result.get("presentation_variant", ""),
+                    "motion_profile": still_result.get("motion_profile", ""),
                     "metadata": " | ".join(part for part in metadata_parts if part),
 ''',
-    "visual explanation physical lineage",
+    "visual explanation physical/presentation lineage",
 )
 engine_path.write_text(engine, encoding="utf-8")
 
