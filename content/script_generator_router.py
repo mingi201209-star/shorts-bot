@@ -283,9 +283,54 @@ def _sanitize_local_repair_response(response):
 
 
 def _resilient_v2_call(payload, *, mode):
-    from content.script_engine_v2_runner import _default_call
+    import content.script_engine_v2_runner as _v2_runner
 
-    response = _default_call(payload, mode=mode)
+    # Production Writer model routing recovery (Run 34539602721):
+    # Several production hotfixes -- ci_writer_compliance_plan_hotfix.py,
+    # ci_grounded_claim_plan_hotfix.py, ci_grounded_causal_role_hotfix.py,
+    # ci_grounded_causal_contrast_hotfix.py (all chain-imported by
+    # ci_cross_process_video_dedupe_hotfix.py, itself part of the real
+    # .github/workflows/main.yml production hotfix chain) -- each append
+    # their own _default_call() to content/script_engine_v2_runner.py.
+    # Every one of those overrides hardcodes the plain module-level MODEL
+    # constant for its openai.chat.completions.create(model=MODEL, ...)
+    # request (and for authorize_call(MODEL)), for BOTH "writer" and
+    # "local_repair" modes, whenever the payload carries a
+    # grounded_claim_plan/grounded_claim_mode (which current production
+    # writer_payload()/local_repair_payload() output always does). These
+    # hotfixes predate the #312 writer/repair model separation and were
+    # never updated to route through _model_for_mode()/WRITER_MODEL/
+    # REPAIR_MODEL, so applying them silently regressed every real
+    # production Writer call back to the cheap model -- confirmed via Run
+    # 34539602721's [API_MODEL_ROUTE] log (call=5, the Writer call,
+    # logged model=gpt-4o-mini) and reproduced directly against the exact
+    # hotfix-composed _default_call().
+    #
+    # quality/production_model_routing_composition_regression_test.py
+    # missed this because it only re-checks the WRITER_MODEL *constant*
+    # (which config.py/script_engine_v2_runner.py resolve correctly) and
+    # never exercises a real writer-mode call through the fully
+    # hotfix-composed _default_call() -- the constant is right, but none
+    # of these hotfix overrides ever reads it.
+    #
+    # Fix: every one of these overrides resolves `model=MODEL` as a
+    # late-bound lookup of content.script_engine_v2_runner's own MODEL
+    # attribute at call time. Temporarily aliasing that attribute to
+    # WRITER_MODEL for the exact duration of a "writer" call (restored
+    # immediately after, in a finally block, so a "local_repair" call --
+    # same or next -- is completely unaffected) routes whichever
+    # hotfix-appended _default_call ends up executing through the correct
+    # model, without editing any hotfix file or the hotfix-mutated runner
+    # file itself. No extra API call, no budget/threshold change: the same
+    # single call now simply authorizes and requests the right model.
+    original_model = _v2_runner.MODEL
+    if mode == "writer":
+        _v2_runner.MODEL = _v2_runner.WRITER_MODEL
+    try:
+        response = _v2_runner._default_call(payload, mode=mode)
+    finally:
+        _v2_runner.MODEL = original_model
+
     if mode == "local_repair":
         response = _sanitize_local_repair_response(response)
     return response
