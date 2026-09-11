@@ -21,12 +21,43 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
+# Exact .github/workflows/main.yml "Apply production hotfixes" order, through
+# ci_writer_observable_opening_hotfix.py (the last hotfix this PR extends).
+# ci_writer_observable_opening_hotfix.py's own anchors depend on several
+# earlier hotfixes having already run in this exact order (Run 34601308285 /
+# PR #323 established this precedent) -- most relevantly here,
+# ci_script_v2_gunggeum_formal_ending_hotfix.py (chain-imports
+# ci_writer_audience_comprehension_hotfix.py, which rewrites the Writer
+# instruction text this PR's own anchor depends on) and
+# ci_cross_process_video_dedupe_hotfix.py (chain-imports the grounded claim
+# plan layer that installs _grounded_opening in content/script_engine_v2.py).
+_PRODUCTION_HOTFIX_CHAIN = [
+    "ci_hotfix.py", "ci_novelty_budget_hotfix.py", "ci_fact_critical_hotfix.py",
+    "ci_speech_style_hotfix.py", "ci_hook_generation_hotfix.py", "ci_hook_pool_guard_hotfix.py",
+    "ci_retention_hotfix.py", "ci_first5_retention_tts_hotfix.py", "ci_first5_visual_contract_hotfix.py",
+    "ci_video_provider_hotfix.py", "ci_topic_input_hotfix.py", "ci_aviation_candidate_context_hotfix.py",
+    "ci_aviation_candidate_specificity_hotfix.py", "ci_aviation_context_signature_compat_hotfix.py",
+    "ci_aviation_specificity_output_repair_hotfix.py", "ci_aviation_specificity_projection_hotfix.py",
+    "ci_candidate_grounded_recovery_hotfix.py", "ci_growth_candidate_shadow_hotfix.py",
+    "ci_final_render_content_integrity_hotfix.py", "ci_output_quality_hotfix.py",
+    "ci_curiosity_retention_hotfix.py", "ci_visual_specificity_hotfix.py", "ci_design_causality_hotfix.py",
+    "ci_query_semantic_integrity_hotfix.py", "ci_concrete_visual_evidence_hotfix.py",
+    "ci_visible_evidence_provenance_hotfix.py", "ci_hook_production_parity_hotfix.py",
+    "ci_hook_fallback_quality_floor_hotfix.py", "ci_ai_visual_fallback_hotfix.py",
+    "ci_ai_visual_mechanism_fallback_hotfix.py", "ci_problem_solution_narrative_hotfix.py",
+    "ci_causal_information_progression_hotfix.py", "ci_retention_structure_experiment_hotfix.py",
+    "ci_subscriber_conversion_hotfix.py", "ci_script_production_parity_hotfix.py",
+    "ci_script_production_parity_bridge_hotfix.py", "ci_adaptive_scene_count_hotfix.py",
+    "ci_general_scene_visual_parity_hotfix.py", "ci_script_validation_recovery_hotfix.py",
+    "ci_script_v2_visual_goal_hotfix.py", "ci_script_v2_gunggeum_formal_ending_hotfix.py",
+    "ci_final_visual_semantic_qa_hotfix.py", "ci_cross_process_video_dedupe_hotfix.py",
+    "ci_writer_observable_opening_hotfix.py",
+]
+
+
 def _install_production_final_hotfix() -> None:
-    subprocess.run(
-        [sys.executable, "ci_writer_observable_opening_hotfix.py"],
-        cwd=ROOT,
-        check=True,
-    )
+    for script in _PRODUCTION_HOTFIX_CHAIN:
+        subprocess.run([sys.executable, script], cwd=ROOT, check=True)
     importlib.invalidate_caches()
 
 

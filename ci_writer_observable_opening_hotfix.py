@@ -289,18 +289,31 @@ RUNNER = Path("content/script_engine_v2_runner.py")
 runner = RUNNER.read_text(encoding="utf-8")
 RUNNER_MARKER = "SCRIPT_HUMAN_QUALITY_WRITER_V1"
 if RUNNER_MARKER not in runner:
-    runner_anchor = '''            "Use easy language. Do not reveal the final answer before reveal/payoff."
+    # Two possible anchor shapes depending on whether
+    # ci_writer_audience_comprehension_hotfix.py (chain-imported by
+    # ci_script_v2_gunggeum_formal_ending_hotfix.py, which always runs earlier
+    # in main.yml's production hotfix order) has already run: pre-composition
+    # the trailing instruction is still combined with "Use easy language. ";
+    # post-composition (the real production/CI shape) it is its own line with
+    # no such prefix, since that hotfix's own guidance replaced it. Support
+    # both so this hotfix stays composition-order-safe either way.
+    runner_anchor_precomposition = '''            "Use easy language. Do not reveal the final answer before reveal/payoff."
 '''
-    runner_replacement = '''            "Use easy, natural spoken Korean. Keep each scene to one short sentence and one new idea. "
+    runner_anchor_composed = '''            "Do not reveal the final answer before reveal/payoff."
+'''
+    runner_replacement_tail = '''            "Use easy, natural spoken Korean. Keep each scene to one short sentence and one new idea. "
             "Avoid bureaucratic filler, repeated noun phrases, and restating the previous scene. "
             "Prefer concrete subject+verb wording over abstract nominalizations. "
             "Do not strengthen causal claims beyond the supplied facts. "
-            "Do not reveal the final answer before reveal/payoff. "
-            "SCRIPT_HUMAN_QUALITY_WRITER_V1"
+            "SCRIPT_HUMAN_QUALITY_WRITER_V1 "
+            "Do not reveal the final answer before reveal/payoff."
 '''
-    if runner_anchor not in runner:
+    if runner_anchor_precomposition in runner:
+        runner = runner.replace(runner_anchor_precomposition, runner_replacement_tail, 1)
+    elif runner_anchor_composed in runner:
+        runner = runner.replace(runner_anchor_composed, runner_replacement_tail, 1)
+    else:
         raise RuntimeError("script human-quality Writer instruction anchor mismatch")
-    runner = runner.replace(runner_anchor, runner_replacement, 1)
     RUNNER.write_text(runner, encoding="utf-8")
     print("Script Human Quality V1 Writer instruction installed")
 
