@@ -26,6 +26,7 @@ CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
         "subject_kind": "physical_entity",
         "canonical_subject": "modern aircraft passenger window with rounded/oval corners",
         "identity_confidence": 0.97,
+        "visual_discriminators": ["window", "rounded", "oval", "curved"],
         "feature_descriptions": [
             "round or oval shaped airplane window with curved edges",
             "비행기 창문 가장자리의 둥근 모서리",
