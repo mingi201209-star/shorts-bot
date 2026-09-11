@@ -28,6 +28,10 @@ def _install_production_final_hotfix() -> None:
         check=True,
     )
     importlib.invalidate_caches()
+    # Chained final-composition installers may import Candidate Explorer before
+    # this regression reaches it. Drop only that cached module so assertions
+    # read the just-patched production source from disk.
+    sys.modules.pop("content.candidate_explorer", None)
 
 
 def _candidate(*, hook: str, question: str) -> dict:
