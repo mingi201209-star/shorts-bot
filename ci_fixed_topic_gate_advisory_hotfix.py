@@ -114,38 +114,7 @@ def apply_fixed_topic_hook_exhaustion_recovery(text):
             f"{rewrite_count}"
         )
     text = text.replace(rewrite_anchor, rewrite_replacement, 1)
-
-    feedback_anchor = '''            if (
-                status
-                == "REGENERATE_TOPIC"
-            ):
-
-                rejected_topic = str(
-'''
-    feedback_replacement = '''            if (
-                status
-                == "REGENERATE_TOPIC"
-            ):
-
-                # Carry the downstream Hook failure back into the next pinned
-                # Candidate attempt. ci_topic_input_hotfix already keeps the
-                # forced topic fixed and bounds Candidate regeneration.
-                if forced_topic:
-                    quality_feedback = str(
-                        quality_result.get("reason", "")
-                    ).strip()
-                    if quality_feedback:
-                        fixed_topic_gate_feedback = quality_feedback
-
-                rejected_topic = str(
-'''
-    feedback_count = text.count(feedback_anchor)
-    if feedback_count != 1:
-        raise RuntimeError(
-            "fixed-topic Hook exhaustion feedback marker count mismatch: "
-            f"{feedback_count}"
-        )
-    return text.replace(feedback_anchor, feedback_replacement, 1)
+    return text
 
 
 def apply_fixed_topic_gate_advisory(text):
