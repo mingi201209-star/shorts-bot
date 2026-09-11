@@ -108,6 +108,18 @@ def apply_fixed_topic_hook_exhaustion_recovery(text):
                 ):
 '''
     rewrite_count = text.count(rewrite_anchor)
+    if rewrite_count == 0:
+        # Consensus-only unit fixtures intentionally provide a tiny
+        # run_quality_process stub with no rewrite loop. There is nothing to
+        # recover there; keep validating the production path fail-closed.
+        if (
+            "MAX_REWRITES" not in text
+            and "has_persistent_novelty_failure" not in text
+        ):
+            return text
+        raise RuntimeError(
+            "fixed-topic Hook exhaustion rewrite marker count mismatch: 0"
+        )
     if rewrite_count != 1:
         raise RuntimeError(
             "fixed-topic Hook exhaustion rewrite marker count mismatch: "
