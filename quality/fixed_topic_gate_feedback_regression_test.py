@@ -32,12 +32,17 @@ def committed_text(path):
 with tempfile.TemporaryDirectory() as tmp:
     work = Path(tmp)
     (work / "content").mkdir()
+    (work / "quality").mkdir()
     (work / "main.py").write_text(
         committed_text("main.py"),
         encoding="utf-8",
     )
     (work / "content" / "candidate_explorer.py").write_text(
         committed_text("content/candidate_explorer.py"),
+        encoding="utf-8",
+    )
+    (work / "quality" / "consensus.py").write_text(
+        committed_text("quality/consensus.py"),
         encoding="utf-8",
     )
     (work / "ci_topic_input_hotfix.py").write_text(
@@ -81,12 +86,16 @@ with tempfile.TemporaryDirectory() as tmp:
     explorer_text = (
         work / "content" / "candidate_explorer.py"
     ).read_text(encoding="utf-8")
+    consensus_text = (
+        work / "quality" / "consensus.py"
+    ).read_text(encoding="utf-8")
 
     assert 'fixed_topic_gate_feedback = ""' in main_text
     assert "fixed_topic_gate_feedback = str(" in main_text
     assert "winner_gate.get(" in main_text
     assert "fixed_topic_gate_feedback=(" in main_text
     assert "if forced_topic" in main_text
+    assert "# FIXED_TOPIC_HOOK_QUALITY_GUARD_V1" in consensus_text
 
     assert "[PREVIOUS CANDIDATE GATE FEEDBACK]" in explorer_text
     assert "{fixed_topic_gate_feedback}" in explorer_text
@@ -104,5 +113,6 @@ with tempfile.TemporaryDirectory() as tmp:
         str(work / "content" / "candidate_explorer.py"),
         doraise=True,
     )
+    py_compile.compile(str(work / "quality" / "consensus.py"), doraise=True)
 
 print("fixed-topic gate feedback regression: PASS")
