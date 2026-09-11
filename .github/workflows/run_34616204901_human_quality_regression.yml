@@ -4,7 +4,9 @@ on:
   pull_request:
     paths:
       - "ci_run_34616204901_human_quality_hotfix.py"
+      - "ci_run_34616204901_human_script_v2_hotfix.py"
       - "ci_aviation_context_signature_compat_hotfix.py"
+      - "quality/human_quality_floor.py"
       - "quality/run_34616204901_human_quality_regression_test.py"
       - ".github/workflows/run_34616204901_human_quality_regression.yml"
   workflow_dispatch:
@@ -28,11 +30,16 @@ jobs:
         run: |
           python ci_general_scene_visual_parity_hotfix.py
           python ci_grounded_deterministic_explanation_hotfix.py
+          python ci_run_34616204901_human_script_v2_hotfix.py
           python ci_run_34616204901_human_quality_hotfix.py
           python -m py_compile \
             ci_run_34616204901_human_quality_hotfix.py \
+            ci_run_34616204901_human_script_v2_hotfix.py \
+            quality/human_quality_floor.py \
             quality/run_34616204901_human_quality_regression_test.py \
-            content/script_generator.py \
+            content/script_generator_router.py \
+            content/script_engine_v2.py \
+            content/script_engine_v2_validation.py \
             video/video_downloader.py \
             video/visual_explanation.py
       - name: Run human quality regression
