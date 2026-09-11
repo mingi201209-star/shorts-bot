@@ -383,6 +383,246 @@ if REWRITE_MARKER not in rewrite:
     REWRITE.write_text(rewrite, encoding="utf-8")
     print("Script Human Quality V1 Rewrite instruction installed")
 
+# Section 2.H (PR #330): Rewrite must never increase the epistemic strength
+# of the grounded evidence beyond what the pre-Rewrite candidate/script text
+# already supported (e.g. a hedge "도움이 된다" must not become the absolute
+# "완전히 막는다"). This adds a standalone, deterministic, no-model-call
+# primitive (causal_strength_escalated) and wires it into the existing Fact
+# Rewrite Guard retry path -- reusing FACT_REWRITE_MAX_ATTEMPTS unchanged
+# instead of adding any new retry/API call, per the task's absolute
+# prohibition on retry/API increases.
+CAUSAL_STRENGTH_MARKER = "SCRIPT_HUMAN_QUALITY_CAUSAL_STRENGTH_V1"
+rewrite = REWRITE.read_text(encoding="utf-8")
+if CAUSAL_STRENGTH_MARKER not in rewrite:
+    causal_strength_anchor = '''def build_rewrite_prompt(
+'''
+    causal_strength_insertion = '''# SCRIPT_HUMAN_QUALITY_CAUSAL_STRENGTH_V1
+_ORIGINAL_find_persistent_fact_issues = find_persistent_fact_issues
+
+# General (non-topic-specific) Korean hedge-vs-absolute epistemic-marker
+# regex patterns. Detects only the Run 34625637738 escalation shape: a hedge
+# present in the pre-Rewrite text is missing from the post-Rewrite text and
+# an absolute/completing claim has appeared in its place on the same scene.
+# Patterns (not bare substrings) so this matches across the formal 합니다체
+# conjugations production narration actually uses (됩니다/된다/되는/...),
+# where 되다's formal stem 됩 is a distinct Hangul syllable block from 되.
+_CAUSAL_HEDGE_PATTERNS = (
+    r"도움이\s*(?:됩니다|된다|되는|되고|되어|돼)",
+    r"도움을\s*(?:줍니다|준다|주는|주고|줘)",
+    r"(?:줄이는|낮추는)\s*데\s*도움",
+    r"관련(?:이|은)\s*(?:있습니다|있다|있는)",
+    r"연관(?:이|은)\s*(?:있습니다|있다|있는)",
+    r"영향을\s*(?:줍니다|준다|미칩니다|미친다)",
+    r"위험을\s*(?:낮춥니다|낮춘다|낮추는)",
+    r"가능성을\s*(?:낮춥니다|낮춘다|줄입니다|줄인다)",
+)
+_CAUSAL_ABSOLUTE_PATTERNS = (
+    r"완전히\s*(?:막습니다|막는다|없앱니다|없앤다|제거합니다|제거한다)",
+    r"직접(?:적인)?\s*원인",
+    r"사고를\s*(?:막습니다|막는다|방지합니다|방지한다)",
+    r"(?:반드시|무조건)\s*막",
+    r"전혀\s*발생하지",
+    r"100\s*%",
+    r"절대\s*발생하지",
+)
+
+
+def causal_strength_escalated(original_text, rewritten_text):
+    """Return True iff rewritten_text drops an original hedge and asserts an
+    absolute/completing causal claim the original hedge did not support.
+
+    Standalone and deterministic (no model call); compares one scene's pre-
+    and post-Rewrite text only. It does not judge truth, only epistemic-
+    strength escalation shape, so it never fires on a scene Rewrite left
+    unchanged or on a scene that had no hedge to begin with.
+    """
+    original = str(original_text or "")
+    rewritten = str(rewritten_text or "")
+    if not original.strip() or not rewritten.strip():
+        return False
+    hedge_patterns_matched = [
+        pattern for pattern in _CAUSAL_HEDGE_PATTERNS if re.search(pattern, original)
+    ]
+    if not hedge_patterns_matched:
+        return False
+    if not any(re.search(pattern, rewritten) for pattern in _CAUSAL_ABSOLUTE_PATTERNS):
+        return False
+    if any(re.search(pattern, rewritten) for pattern in hedge_patterns_matched):
+        return False
+    return True
+
+
+def _human_quality_full_scene_texts(script_data):
+    scenes = script_data.get("scenes", []) if isinstance(script_data, dict) else []
+    if not isinstance(scenes, list):
+        return []
+    return [
+        str(scene.get("text", "")) if isinstance(scene, dict) else ""
+        for scene in scenes
+    ]
+
+
+def _causal_strength_escalations(original_script, rewritten_script):
+    if not isinstance(original_script, dict) or not isinstance(rewritten_script, dict):
+        return []
+    before = _human_quality_full_scene_texts(original_script)
+    after = _human_quality_full_scene_texts(rewritten_script)
+    escalations = []
+    for original_text, rewritten_text in zip(before, after):
+        if causal_strength_escalated(original_text, rewritten_text):
+            escalations.append(rewritten_text)
+    return escalations
+
+
+def find_persistent_fact_issues(consensus, rewritten_script, original_script=None):
+    persistent = list(_ORIGINAL_find_persistent_fact_issues(consensus, rewritten_script))
+    for escalated_text in _causal_strength_escalations(original_script, rewritten_script):
+        issue = f"causal strength escalated beyond original evidence: {escalated_text}"
+        if issue not in persistent:
+            persistent.append(issue)
+    return persistent
+
+
+'''
+    if causal_strength_anchor not in rewrite:
+        raise RuntimeError("script human-quality causal-strength anchor mismatch")
+    rewrite = rewrite.replace(causal_strength_anchor, causal_strength_insertion + causal_strength_anchor, 1)
+
+    call_site_anchor = '''        persistent = find_persistent_fact_issues(consensus, rewritten)
+'''
+    call_site_replacement = '''        persistent = find_persistent_fact_issues(consensus, rewritten, original_script=script_data)
+'''
+    if call_site_anchor not in rewrite:
+        raise RuntimeError("script human-quality causal-strength call-site anchor mismatch")
+    rewrite = rewrite.replace(call_site_anchor, call_site_replacement, 1)
+
+    REWRITE.write_text(rewrite, encoding="utf-8")
+    print("Script Human Quality V1 causal-strength guard installed")
+else:
+    print("Script Human Quality V1 causal-strength guard already installed")
+
+# Section 2.B/2.E (PR #330): the deterministic scene validator did not catch
+# mechanical filler phrasing or a Payoff scene that only restates Reveal's
+# mechanism. This wraps the existing validate_scene_basics the same
+# late-binding way ci_grounded_keyword_contract_hotfix.py already wraps it
+# (that hotfix runs earlier in main.yml's chain, so by the time this runs
+# validate_scene_basics is already once-wrapped) -- it only adds new,
+# additive failures on top of whatever the current validate_scene_basics
+# already returns and never removes or loosens an existing check.
+VALIDATION = Path("content/script_engine_v2_validation.py")
+validation = VALIDATION.read_text(encoding="utf-8")
+SCENE_PROGRESSION_MARKER = "SCRIPT_HUMAN_QUALITY_SCENE_PROGRESSION_V1"
+if SCENE_PROGRESSION_MARKER not in validation:
+    scene_progression_insertion = '''
+
+# SCRIPT_HUMAN_QUALITY_SCENE_PROGRESSION_V1
+# Run 34625637738 (PR #330): machine-green scenes still contained mechanical
+# filler phrasing (Section 2.B) and a Payoff that only restated Reveal's
+# mechanism instead of connecting it to the subject (Section 2.E). Wraps the
+# existing validate_scene_basics late-binding-style, additive only.
+_SCENE_PROGRESSION_BEFORE_HUMAN_QUALITY = validate_scene_basics
+
+# General (non-topic-specific) Korean filler phrases Section 2.B forbids.
+# "원인의 첫 단서는" is deliberately excluded: it is
+# deterministic_scene_repair's own designed causal_clue fallback, already
+# correctly scoped away from scenes that already state a causal clue (see
+# CAUSAL_CLUE_TOKENS / SCRIPT_HUMAN_QUALITY_STRESS_CLUE_V1) -- banning it
+# here would fight that existing, legitimate repair path instead of the
+# mechanical filler this section targets.
+_HUMAN_QUALITY_FILLER_PHRASES = (
+    "중요한 이유는 다음과 같습니다",
+    "라는 것을 의미합니다",
+    "다는 것을 의미합니다",
+    "하도록 설계되었습니다",
+    "그 결과 결과적으로",
+)
+
+
+def _human_quality_char_bigrams(text):
+    core = re.sub(r"\\s+", "", str(text or ""))
+    core = re.sub(r"[^0-9A-Za-z가-힣]", "", core)
+    if len(core) < 2:
+        return set()
+    return {core[i:i + 2] for i in range(len(core) - 1)}
+
+
+def _human_quality_payoff_repeats_reveal(reveal_text, payoff_text):
+    """Character-bigram Jaccard between Reveal and Payoff scene text.
+
+    Deterministic, no model call, not topic-specific: Korean verb/noun
+    inflection (e.g. "분산합니다" vs "분산하기") shares character bigrams even
+    when whitespace-token matching would miss it entirely -- exactly the
+    CASE 6 (Section 5) shape, Payoff restating Reveal's mechanism in a
+    slightly different grammatical form.
+    """
+    reveal_bigrams = _human_quality_char_bigrams(reveal_text)
+    payoff_bigrams = _human_quality_char_bigrams(payoff_text)
+    if len(reveal_bigrams) < 3 or len(payoff_bigrams) < 3:
+        return False
+    shared = reveal_bigrams & payoff_bigrams
+    # Calibrated against Run 34625637738's own CASE 6 shape (jaccard ~0.185,
+    # 5 shared bigrams) versus unrelated mechanism/result Reveal-Payoff pairs
+    # already in production fixtures (jaccard <= 0.061, <= 3 shared bigrams)
+    # -- both bounds required so a short, coincidentally-shared function-word
+    # bigram alone cannot trip this on an otherwise-unrelated pair.
+    if len(shared) < 4:
+        return False
+    union = reveal_bigrams | payoff_bigrams
+    return (len(shared) / len(union)) >= 0.12
+
+
+def validate_scene_basics(script, plan):
+    ok, failures = _SCENE_PROGRESSION_BEFORE_HUMAN_QUALITY(script, plan)
+    failures = list(failures)
+
+    scenes = script.get("scenes") if isinstance(script, dict) else None
+    if isinstance(scenes, list):
+        reveal_text = ""
+        payoff_text = ""
+        for index, scene in enumerate(scenes, start=1):
+            if not isinstance(scene, dict):
+                continue
+            text = str(scene.get("text", "")).strip()
+            role = str(scene.get("role", "")).strip().lower()
+            if not text:
+                continue
+
+            for phrase in _HUMAN_QUALITY_FILLER_PHRASES:
+                if phrase in text:
+                    failures.append({
+                        "scene_index": index,
+                        "reason": f"scene text uses mechanical filler phrase: {phrase}",
+                    })
+                    break
+
+            if role == "reveal":
+                reveal_text = text
+            elif role == "payoff":
+                payoff_text = text
+
+        if reveal_text and payoff_text and _human_quality_payoff_repeats_reveal(reveal_text, payoff_text):
+            failures.append({
+                "scene_index": None,
+                "reason": "payoff repeats reveal's mechanism instead of connecting it to the subject",
+            })
+
+    deduped = []
+    seen = set()
+    for failure in failures:
+        key = (failure.get("scene_index"), failure.get("reason"))
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(failure)
+
+    return not deduped, deduped
+'''
+    validation = validation + scene_progression_insertion
+    VALIDATION.write_text(validation, encoding="utf-8")
+    print("Script Human Quality V1 scene-progression validator installed")
+else:
+    print("Script Human Quality V1 scene-progression validator already installed")
+
 # This installer is already the final substantive production hotfix in main.yml.
 # Chain the verified-still rescue here so the live workflow receives the same
 # final-composition patch proven by the composition gate, without changing any
