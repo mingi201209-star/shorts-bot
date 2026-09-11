@@ -3,19 +3,11 @@ renderer wired into the live video/visual_explanation.py production consumer
 via ci_grounded_deterministic_explanation_hotfix.py.
 
 Zero network/LLM/Vision/AI-image calls. Composes the exact real hotfix chain
-(mirroring quality/run_33257939720_chevron_flow_mixing_visual_supply_regression_test.py's
-established pattern) in an isolated scratch copy of the repo, then exercises
-video.visual_explanation directly.
-
-Note: video._render_clip()'s actual video-file write goes through moviepy/
-ffmpeg, which is not installed in this sandbox (confirmed pre-existing,
-unrelated to this change -- matching PR #322's documented precedent for
-run_33865295007_effective_presentation_motion / early_verified_asset_
-presentation_repetition, which fail identically on unmodified main for the
-same reason). This test therefore verifies everything reachable without an
-actual ffmpeg process: plan selection, fact-safety re-check, deterministic
-PIL frame rendering (pure Pillow, no ffmpeg), signature/dedup bookkeeping,
-and downstream-QA non-bypass -- not the final .mp4 write itself.
+in an isolated scratch copy of the repo, then exercises video.visual_explanation
+directly.  Run 34616204901 human QA also established a presentation regression:
+three different grounded claims looked like the same static split panel.  This
+suite therefore verifies claim-aware variants plus composed-layer
+SUBTLE_INSPECTION motion without changing LEFT/RIGHT comparison semantics.
 """
 from __future__ import annotations
 
@@ -67,6 +59,7 @@ vx = runpy.run_module("video.visual_explanation", run_name="video.visual_explana
 plan_explanation = vx["plan_explanation"]
 annotation_fact_safe = vx["annotation_fact_safe"]
 _draw_concept_panel = vx["_draw_concept_panel"]
+_apply_subtle_inspection = vx["_gde_apply_subtle_inspection"]
 reset_visual_explanation_budget = vx["reset_visual_explanation_budget"]
 
 _FAA_SOURCE = "https://www.faa.gov/lessons_learned/transport_airplane/accidents/G-ALYV"
@@ -88,6 +81,22 @@ def _window_scene(**overrides):
     return scene
 
 
+def _claim_scene(claim_id):
+    if claim_id == "squarish_window_stress_concentration":
+        return _window_scene(
+            owned_claim_id=claim_id,
+            text="각진 창문 모서리에는 높은 응력이 집중됐습니다.",
+            keyword="aircraft window squarish corner stress concentration",
+        )
+    if claim_id == "rounded_window_stress_distribution":
+        return _window_scene(
+            owned_claim_id=claim_id,
+            text="둥근 모서리에서는 응력이 곡선을 따라 흘러 한 지점에 쌓이는 것을 줄입니다.",
+            keyword="aircraft window rounded corner stress distribution",
+        )
+    return _window_scene(owned_claim_id=claim_id)
+
+
 def test_positive_plan_and_render():
     reset_visual_explanation_budget()
     scene = _window_scene()
@@ -95,12 +104,55 @@ def test_positive_plan_and_render():
     assert plan is not None
     assert plan["template"] == "AIRCRAFT_WINDOW_STRESS_V1"
     assert plan["evidence_source"] == "TRUSTED_GROUNDING"
+    assert plan["motion_profile"] == "SUBTLE_INSPECTION"
+    assert plan["presentation_variant"] == "LEFT_FATIGUE_PAYOFF"
     assert annotation_fact_safe(scene, plan) is True
 
     from PIL import Image
     frame = Image.new("RGBA", (1080, 1920), (28, 31, 38, 255))
     out = _draw_concept_panel(frame, plan, 0.4)
     assert out.size == (1080, 1920)
+
+
+def test_claims_have_distinct_presentations():
+    claims = [
+        "squarish_window_stress_concentration",
+        "rounded_window_stress_distribution",
+        "squarish_window_fatigue_rupture",
+    ]
+    plans = [plan_explanation(_claim_scene(claim)) for claim in claims]
+    assert all(plan and plan["template"] == "AIRCRAFT_WINDOW_STRESS_V1" for plan in plans), plans
+    assert {plan["presentation_variant"] for plan in plans} == {
+        "LEFT_STRESS_INSPECTION",
+        "RIGHT_FLOW_INSPECTION",
+        "LEFT_FATIGUE_PAYOFF",
+    }
+    assert {plan["motion_profile"] for plan in plans} == {"SUBTLE_INSPECTION"}
+    assert [plan["scene_role"] for plan in plans] == ["mechanism", "mechanism", "result"]
+
+    from PIL import Image, ImageChops
+    rendered = []
+    for plan in plans:
+        frame = Image.new("RGBA", (1080, 1920), (28, 31, 38, 255))
+        rendered.append(_draw_concept_panel(frame, plan, 0.55))
+    assert ImageChops.difference(rendered[0], rendered[1]).getbbox() is not None
+    assert ImageChops.difference(rendered[1], rendered[2]).getbbox() is not None
+
+
+def test_subtle_inspection_moves_composed_layer():
+    from PIL import Image, ImageChops, ImageDraw
+
+    overlay = Image.new("RGBA", (1080, 1920), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    draw.rectangle((100, 120, 500, 620), fill=(255, 255, 255, 255))
+    plan = {
+        "motion_profile": "SUBTLE_INSPECTION",
+        "presentation_variant": "LEFT_STRESS_INSPECTION",
+    }
+    start = _apply_subtle_inspection(overlay, plan, 0.0)
+    end = _apply_subtle_inspection(overlay, plan, 1.0)
+    assert start.size == end.size == (1080, 1920)
+    assert ImageChops.difference(start, end).getbbox() is not None
 
 
 def test_negative_full_integration_building_window():
@@ -195,10 +247,13 @@ def test_render_frame_is_deterministic_across_calls():
     plan1 = plan_explanation(scene)
     plan2 = plan_explanation(_window_scene())
     assert plan1["param_signature"] == plan2["param_signature"]
+    assert plan1["presentation_variant"] == plan2["presentation_variant"]
 
 
 def main():
     test_positive_plan_and_render()
+    test_claims_have_distinct_presentations()
+    test_subtle_inspection_moves_composed_layer()
     test_negative_full_integration_building_window()
     test_negative_full_integration_cockpit_windshield()
     test_negative_full_integration_wrong_claim()
