@@ -323,12 +323,60 @@ def _resilient_v2_call(payload, *, mode):
     # model, without editing any hotfix file or the hotfix-mutated runner
     # file itself. No extra API call, no budget/threshold change: the same
     # single call now simply authorizes and requests the right model.
+    #
+    # Sol request-option compatibility recovery (Run 34570864208):
+    # Fixing the model above proved the routing itself (the real production
+    # log showed "[API_MODEL_ROUTE] call=3 model=gpt-5.6-sol" for this exact
+    # Writer call) -- but the very same hotfix-appended _default_call()
+    # overrides (all four: ci_writer_compliance_plan_hotfix.py,
+    # ci_grounded_claim_plan_hotfix.py, ci_grounded_causal_role_hotfix.py,
+    # ci_grounded_causal_contrast_hotfix.py -- the last of which is the one
+    # that actually executes in the exact final composition) also hardcode
+    # `temperature=0.2` directly in their own
+    # openai.chat.completions.create(...) call, instead of calling the
+    # checked-in _model_request_options(model) helper the way the original
+    # (un-hotfixed) _default_call() does. GPT-5.6 Sol rejects any non-default
+    # temperature outright: "Error code: 400 - Unsupported value:
+    # 'temperature' does not support 0.2 with this model." -- confirmed by
+    # Run 34570864208's job log, immediately after the correctly-routed
+    # call=3 model=gpt-5.6-sol line.
+    #
+    # quality/script_generator_router_writer_model_routing_regression_test.py
+    # missed this because it only asserted on the captured `model` kwarg,
+    # never on the full request kwargs -- the model was already right by
+    # the time that regression ran, so it had nothing to catch here.
+    #
+    # Fix: temperature=0.2 is a literal baked into each hotfix override's
+    # source, not a variable lookup, so it cannot be corrected by aliasing a
+    # module attribute the way MODEL is above. Instead, temporarily wrap the
+    # shared openai.chat.completions.create for the exact duration of this
+    # one call: re-derive the correct options for whatever model is actually
+    # being requested via the same authoritative, hotfix-untouched
+    # _model_request_options(model) helper the checked-in _default_call()
+    # already uses, drop an incompatible temperature, and apply the right
+    # option set. This reuses the single source of truth for model-aware
+    # request options rather than duplicating that policy here or patching
+    # any hotfix file/the hotfix-mutated runner file. Restored in the same
+    # finally block, so it can never leak into an unrelated call.
+    import openai as _openai
+
+    original_create = _openai.chat.completions.create
+
+    def _model_aware_create(**kwargs):
+        options = _v2_runner._model_request_options(kwargs.get("model"))
+        if "temperature" not in options:
+            kwargs.pop("temperature", None)
+        kwargs.update(options)
+        return original_create(**kwargs)
+
     original_model = _v2_runner.MODEL
     if mode == "writer":
         _v2_runner.MODEL = _v2_runner.WRITER_MODEL
+    _openai.chat.completions.create = _model_aware_create
     try:
         response = _v2_runner._default_call(payload, mode=mode)
     finally:
+        _openai.chat.completions.create = original_create
         _v2_runner.MODEL = original_model
 
     if mode == "local_repair":
