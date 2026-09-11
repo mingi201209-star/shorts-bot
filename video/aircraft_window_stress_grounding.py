@@ -50,7 +50,24 @@ SUPPORTED_OWNED_CLAIM_IDS = frozenset({
     "squarish_window_fatigue_rupture",
 })
 
-_RESULT_ROLES = frozenset({"payoff", "result", "primary_result"})
+# Runtime scene dicts do not preserve the private Writer-owned claim id, but
+# they do preserve the already-authoritative causal/structural role. These
+# closed mappings reconstruct only the exact three claim identities in the
+# existing grounded plan. They do not inspect narration or invent semantics.
+_CLAIM_BY_CAUSAL_ROLE = {
+    "constraint": "squarish_window_stress_concentration",
+    "mechanism_change": "rounded_window_stress_distribution",
+    "primary_result": "squarish_window_fatigue_rupture",
+}
+_CLAIM_BY_STRUCTURAL_ROLE = {
+    "causal_clue": "squarish_window_stress_concentration",
+    "constraint": "squarish_window_stress_concentration",
+    "reveal": "rounded_window_stress_distribution",
+    "mechanism_change": "rounded_window_stress_distribution",
+    "payoff": "squarish_window_fatigue_rupture",
+    "result": "squarish_window_fatigue_rupture",
+    "primary_result": "squarish_window_fatigue_rupture",
+}
 
 
 def _text(value):
@@ -130,35 +147,34 @@ def _window_subject_anchor_words(scene):
     return anchors
 
 
-def _owned_claim_id_from_scene(scene, candidate):
-    """Runtime Script scenes do not carry the private Grounded Claim Plan
-    object (owned_claim_id lives only on the Writer-facing contract, which
-    does not survive into the final scene dict -- confirmed against
-    ci_grounded_keyword_contract_hotfix.py). If an explicit owned_claim_id is
-    present (fixtures/diagnostics, or a future runtime attachment), it must
-    match; its absence is not itself disqualifying as long as the other
-    grounding signals hold, mirroring
-    video.grounded_explanatory_visual.chevron_flow_mixing_supported exactly.
-    """
-    if isinstance(scene, dict):
-        explicit = _text(scene.get("owned_claim_id"))
-        if explicit:
-            return explicit
-    if isinstance(candidate, dict):
-        explicit = _text(candidate.get("owned_claim_id"))
-        if explicit:
-            return explicit
-    return ""
-
-
-def _result_scene(scene):
+def _claim_id_from_authoritative_role(scene):
     if not isinstance(scene, dict):
-        return False
+        return ""
     causal_role = _text(scene.get("causal_role")).lower()
     if causal_role:
-        return causal_role == "primary_result"
+        return _CLAIM_BY_CAUSAL_ROLE.get(causal_role, "")
     role = _text(scene.get("role")).lower()
-    return role in _RESULT_ROLES
+    return _CLAIM_BY_STRUCTURAL_ROLE.get(role, "")
+
+
+def _owned_claim_id_from_scene(scene, candidate):
+    """Resolve claim identity without narration/keyword inference.
+
+    Prefer an explicit owned_claim_id when present. Production scenes currently
+    drop the private Writer claim id, so otherwise recover only the exact claim
+    implied by the already-authoritative causal/structural role from the fixed
+    three-claim grounded plan. Unknown roles fail closed.
+    """
+    explicit = ""
+    if isinstance(scene, dict):
+        explicit = _text(scene.get("owned_claim_id"))
+    if not explicit and isinstance(candidate, dict):
+        explicit = _text(candidate.get("owned_claim_id"))
+
+    role_claim = _claim_id_from_authoritative_role(scene)
+    if explicit and role_claim and explicit != role_claim:
+        return ""
+    return explicit or role_claim
 
 
 def supports_aircraft_window_stress_from_grounding(scene, candidate=None):
@@ -171,17 +187,16 @@ def supports_aircraft_window_stress_from_grounding(scene, candidate=None):
       - the window subject anchors (aircraft + window) are present in the
         deterministic grounded keyword
       - at least one of the three supported claims' own discriminator words
-        (split from their claim_id, e.g. "squarish"/"fatigue"/"rupture") is
-        present in that same keyword -- rejects an aircraft-window scene
-        about an unrelated aspect (e.g. "why is this window small") that
-        only happens to share the generic aircraft+window anchors
-      - an explicit owned_claim_id, if present, is one of the three claims
-        this exact canonical record supports (never a foreign claim)
-      - the scene is a result/payoff scene (matches the "result" claim_type
-        that needed deterministic rescue in Run 34604725427 Scene 5; the two
-        upstream mechanism claims already get real generated stills and are
-        not this template's concern)
+        is present in that same deterministic grounded keyword
+      - exact claim ownership resolves from an explicit owned_claim_id or the
+        existing authoritative causal/structural role and belongs to the
+        closed three-claim trusted record
       - evidence_source is TRUSTED_GROUNDING (there is no other kind here)
+
+    Run 34610328000 proved the previous result-only role restriction was an
+    invalid runtime assumption: Scene 4 (rounded_window_stress_distribution)
+    can exhaust stock/still supply before Scene 5. Eligibility therefore
+    follows the already-grounded claim identity, not an assumed scene index.
 
     Vision EvidenceState is never consulted -- this function does not import
     quality.visual_state_evidence and never will for eligibility purposes.
@@ -201,17 +216,14 @@ def supports_aircraft_window_stress_from_grounding(scene, candidate=None):
         return None
 
     owned_claim = _owned_claim_id_from_scene(scene, candidate)
-    if owned_claim and owned_claim not in SUPPORTED_OWNED_CLAIM_IDS:
-        return None
-
-    if not _result_scene(scene):
+    if not owned_claim or owned_claim not in SUPPORTED_OWNED_CLAIM_IDS:
         return None
 
     return {
         "template_id": "AIRCRAFT_WINDOW_STRESS_V1",
         "presentation": "CONTRAST",
         "canonical_subject_id": canonical_subject_id(supply.get("canonical_subject")),
-        "owned_claim_id": owned_claim or "squarish_window_fatigue_rupture",
+        "owned_claim_id": owned_claim,
         "evidence_source": "TRUSTED_GROUNDING",
         "grounding_provenance_ref": _text(supply.get("grounding_source")),
         "_canonical_subject_text": _text(supply.get("canonical_subject")),
