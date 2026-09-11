@@ -1,7 +1,7 @@
 """Regression for Script Human Quality V1.
 
 Authority: Run 34625637738 was machine-green but human review rejected the
-narration.  Its opening restated the same rounded-window proposition as a
+narration. Its opening restated the same rounded-window proposition as a
 statement and then a question; Scene 3 also received the deterministic
 "원인의 첫 단서는" filler despite already containing the concrete stress clue.
 
@@ -28,10 +28,13 @@ def _install_production_final_hotfix() -> None:
         check=True,
     )
     importlib.invalidate_caches()
-    # Chained final-composition installers may import Candidate Explorer before
-    # this regression reaches it. Drop only that cached module so assertions
-    # read the just-patched production source from disk.
-    sys.modules.pop("content.candidate_explorer", None)
+
+
+def _explorer_namespace() -> dict:
+    # Final-composition installers may preload a wrapper/module under the
+    # content.candidate_explorer name. Execute the patched production source
+    # directly so this regression cannot accidentally inspect a stale module.
+    return runpy.run_path(str(ROOT / "content" / "candidate_explorer.py"))
 
 
 def _candidate(*, hook: str, question: str) -> dict:
@@ -59,9 +62,8 @@ def _candidate(*, hook: str, question: str) -> dict:
 
 
 def test_candidate_prompt_is_lock_aware() -> None:
-    import content.candidate_explorer as explorer
-
-    prompt = explorer.CANDIDATE_EXPLORER_PROMPT
+    explorer = _explorer_namespace()
+    prompt = explorer["CANDIDATE_EXPLORER_PROMPT"]
     assert "SCRIPT_HUMAN_QUALITY_V1" in prompt
     assert "Hook 다음 Core Question이 Hook과 같은 명제를 다시 묻는 구조는 금지" in prompt
     assert "그대로 읽어도 자연스러운 짧은 한 문장" in prompt
@@ -69,35 +71,32 @@ def test_candidate_prompt_is_lock_aware() -> None:
 
 
 def test_run_346256_opening_counterexample_fails_closed() -> None:
-    import content.candidate_explorer as explorer
-
+    explorer = _explorer_namespace()
     bad = _candidate(
         hook="비행기 창문 모서리는 둥급니다.",
         question="비행기 창문 모서리가 둥글게 디자인된 이유는 무엇일까요?",
     )
     try:
-        explorer.validate_explorer_output(bad)
+        explorer["validate_explorer_output"](bad)
     except ValueError as exc:
-        message = str(exc)
-        assert "같은 내용을 반복" in message
+        assert "같은 내용을 반복" in str(exc)
         return
     raise AssertionError("Run 34625637738 hook/question restatement must fail closed")
 
 
 def test_progressive_opening_is_accepted() -> None:
-    import content.candidate_explorer as explorer
-
+    explorer = _explorer_namespace()
     good = _candidate(
         hook="작은 모서리 형상 차이가 반복 하중을 받는 구조의 응력 분포를 바꿉니다.",
         question="비행기 창문 모서리가 둥근 이유는 무엇일까요?",
     )
-    result = explorer.validate_explorer_output(good)
+    result = explorer["validate_explorer_output"](good)
     assert result["status"] == "SELECTED"
     assert result["winner"]["micro_narrative"]["hook"].startswith("작은 모서리")
 
 
 def test_stress_is_already_a_causal_clue() -> None:
-    engine = runpy.run_module("content.script_engine_v2", run_name="script_engine_v2_hq_test")
+    engine = runpy.run_path(str(ROOT / "content" / "script_engine_v2.py"))
     assert "응력" in engine["CAUSAL_CLUE_TOKENS"]
     repair = engine["deterministic_scene_repair"]
     text = "초기 코멧의 각진 창문 모서리에는 높은 응력이 집중됐습니다."
