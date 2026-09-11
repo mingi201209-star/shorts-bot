@@ -121,6 +121,18 @@ def _patch_engine():
             + '    (r"둥글게 설계되었을까$", "둥글게 설계되었습니다"),\n'
             + '    (r"펼쳐질까$", "펼쳐집니다"),\n'
             + '    (r"둥근가$", "둥급니다"),\n'
+            # Run 34601308285 ("비행기 창문 모서리는 왜 둥글까"): the plain
+            # adjective-stem question ending "둥글까" (round?) has no repair
+            # entry -- only the unrelated adnominal form "둥근가" and the
+            # differently-worded "둥글게 설계되었을까" paraphrase are covered.
+            # Both this candidate's topic and the grounded topic-question
+            # fallback in _question_hook_to_observation reduce to exactly
+            # "...둥글까" once the embedded "왜" is stripped, so this is the
+            # same already-grounded canonical shape ("modern aircraft
+            # passenger window with rounded/oval corners", confidence=0.97)
+            # as the existing "둥근가" sibling, not a new subject or a new
+            # fact -- just its own question-ending variant.
+            + '    (r"둥글까$", "둥급니다"),\n'
             + '    (r"있을까$", "있습니다"),\n'
             + '    (r"없을까$", "없습니다"),\n'
             + '    (r"일까$", "입니다"),\n'
