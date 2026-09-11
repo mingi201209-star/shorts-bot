@@ -136,6 +136,156 @@ def test_stress_is_already_a_causal_clue() -> None:
     assert not repaired.startswith("원인의 첫 단서는")
 
 
+def _vsb():
+    """Fresh, chain-composed content.script_engine_v2_validation.validate_scene_basics."""
+    return runpy.run_path(str(ROOT / "content" / "script_engine_v2_validation.py"))["validate_scene_basics"]
+
+
+def _rewrite_engine_ns():
+    return runpy.run_path(str(ROOT / "quality" / "rewrite_engine.py"))
+
+
+def _scene(role: str, text: str, keyword: str) -> dict:
+    return {
+        "role": role,
+        "text": text,
+        "visual_goal": "aircraft window corner comparison shot",
+        "keyword": keyword,
+    }
+
+
+def _contract(role: str) -> dict:
+    return {"role": role}
+
+
+# ---------------------------------------------------------------------------
+# Section 5 CASE 1-8 (task-mandated minimum regression additions).
+# ---------------------------------------------------------------------------
+
+def test_case1_statement_then_identical_question_rejected() -> None:
+    """CASE 1: statement -> identical-question restatement must REJECT."""
+    explorer = _explorer_namespace()
+    bad = _candidate(
+        hook="비행기 창문 모서리는 둥급니다.",
+        question="왜 비행기 창문 모서리는 둥글까요?",
+    )
+    try:
+        explorer["validate_explorer_output"](bad)
+    except ValueError as exc:
+        assert "같은 내용을 반복" in str(exc)
+        return
+    raise AssertionError("CASE 1 statement/identical-question restatement must fail closed")
+
+
+def test_case2_same_subject_progressing_information_accepted() -> None:
+    """CASE 2: same subject, but information genuinely progresses -> PASS."""
+    explorer = _explorer_namespace()
+    good = _candidate(
+        hook="비행기 창문 모서리는 일부러 둥글게 만듭니다.",
+        question="각진 부분에는 힘이 한곳에 몰릴 수 있기 때문일까요?",
+    )
+    result = explorer["validate_explorer_output"](good)
+    assert result["status"] == "SELECTED"
+
+
+def test_case3_low_overlap_semantic_repetition_is_a_known_limitation() -> None:
+    """CASE 3: low lexical overlap but semantic repetition.
+
+    Section 3/5 require testing this direction and explicitly acknowledge the
+    current deterministic, no-model-call token-overlap approach may not be
+    able to catch every such case -- a full vocabulary swap of the same
+    meaning is a semantic/synonymy problem a token-overlap check cannot solve
+    without a model call, which this task forbids adding. This test documents
+    the current, honest boundary instead of hiding it.
+    """
+    explorer = _explorer_namespace()
+    hook_restates_question = explorer["_hook_restates_question"]
+    # Same meaning as CASE 1, expressed with almost entirely different words.
+    not_caught = hook_restates_question(
+        "여객기 유리창 코너는 둥급니다.",
+        "비행기 창문 모서리가 곡선인 이유는 무엇일까요?",
+    )
+    assert not_caught is False, (
+        "documented limitation: full-vocabulary-swap semantic repetition is "
+        "not caught by deterministic token overlap without a new model call"
+    )
+
+
+def test_case4_existing_stress_clue_blocks_filler_insertion() -> None:
+    """CASE 4: a scene already containing '응력' must not receive the
+    deterministic '원인의 첫 단서는' filler."""
+    engine = runpy.run_path(str(ROOT / "content" / "script_engine_v2.py"))
+    repair = engine["deterministic_scene_repair"]
+    text = "초기 코멧의 각진 창문 모서리에는 높은 응력이 집중됐습니다."
+    repaired = repair(text, "causal_clue")
+    assert repaired == text
+    assert not repaired.startswith("원인의 첫 단서는")
+
+
+def test_case5_rewrite_causal_hedge_must_not_be_strengthened() -> None:
+    """CASE 5: Rewrite turning a grounded hedge into an absolute claim must
+    be caught by the deterministic causal-strength guard."""
+    rewrite_ns = _rewrite_engine_ns()
+    escalated = rewrite_ns["causal_strength_escalated"](
+        "이 형상은 응력 집중을 줄이는 데 도움이 됩니다.",
+        "이 형상은 응력 집중을 완전히 막습니다.",
+    )
+    assert escalated is True
+
+    consensus = {"domain_summaries": {"fact": {"issues": []}}}
+    original_script = {"scenes": [{"text": "이 형상은 응력 집중을 줄이는 데 도움이 됩니다."}]}
+    rewritten_script = {"scenes": [{"text": "이 형상은 응력 집중을 완전히 막습니다."}]}
+    persistent = rewrite_ns["find_persistent_fact_issues"](
+        consensus, rewritten_script, original_script=original_script
+    )
+    assert any("causal strength escalated" in issue for issue in persistent)
+
+
+def test_case6_payoff_repeating_reveal_mechanism_fails() -> None:
+    """CASE 6: Payoff that just restates Reveal's mechanism must be flagged."""
+    vsb = _vsb()
+    script = {"scenes": [
+        _scene("hook", "비행기 창문 모서리는 일부러 둥글게 만듭니다.", "aircraft window corner shape"),
+        _scene("reveal", "둥근 모서리는 응력을 분산합니다.", "aircraft window stress distribution"),
+        _scene("payoff", "결국 응력을 분산하기 위해 둥글게 만든 것입니다.", "aircraft window stress distribution result"),
+    ]}
+    plan = {"contracts": [_contract("hook"), _contract("reveal"), _contract("payoff")]}
+    ok, failures = vsb(script, plan)
+    assert ok is False
+    assert any("payoff repeats reveal" in str(f.get("reason", "")) for f in failures)
+
+
+def test_case7_full_causal_ladder_progresses_cleanly() -> None:
+    """CASE 7: a positive case where observation->cause->mechanism->payoff
+    progresses naturally must produce no new human-quality failures."""
+    vsb = _vsb()
+    script = {"scenes": [
+        _scene("hook", "비행기 창문은 일부러 모서리를 없앴습니다.", "aircraft window corner shape"),
+        _scene("causal_clue", "각진 모서리에는 응력이 한 곳에 몰립니다.", "aircraft window stress concentration"),
+        _scene("reveal", "둥근 모서리는 그 응력을 넓게 분산시킵니다.", "aircraft window stress distribution"),
+        _scene("payoff", "그래서 현대 여객기 창문은 처음부터 둥글게 설계됩니다.", "modern aircraft window design"),
+    ]}
+    plan = {"contracts": [
+        _contract("hook"), _contract("causal_clue"), _contract("reveal"), _contract("payoff"),
+    ]}
+    ok, failures = vsb(script, plan)
+    assert ok is True, failures
+
+
+def test_case8_grounded_question_form_hook_is_not_banned() -> None:
+    """CASE 8: question-form Hooks must not be unconditionally rejected --
+    only an actual restatement of the same proposition is rejected."""
+    explorer = _explorer_namespace()
+    hook_restates_question = explorer["_hook_restates_question"]
+    # Structurally a question, but asks something the core question does not
+    # (a genuinely different proposition), so it must not be flagged.
+    result = hook_restates_question(
+        "비행기 창문은 왜 각진 모서리를 버렸을까요?",
+        "그 형상 변화가 구조에 어떤 차이를 만들까요?",
+    )
+    assert result is False
+
+
 def test_writer_and_rewrite_prompts_carry_human_quality_contract() -> None:
     runner = (ROOT / "content" / "script_engine_v2_runner.py").read_text(encoding="utf-8")
     rewrite = (ROOT / "quality" / "rewrite_engine.py").read_text(encoding="utf-8")
@@ -153,6 +303,14 @@ def main() -> None:
     test_run_346256_opening_counterexample_fails_closed()
     test_progressive_opening_is_accepted()
     test_stress_is_already_a_causal_clue()
+    test_case1_statement_then_identical_question_rejected()
+    test_case2_same_subject_progressing_information_accepted()
+    test_case3_low_overlap_semantic_repetition_is_a_known_limitation()
+    test_case4_existing_stress_clue_blocks_filler_insertion()
+    test_case5_rewrite_causal_hedge_must_not_be_strengthened()
+    test_case6_payoff_repeating_reveal_mechanism_fails()
+    test_case7_full_causal_ladder_progresses_cleanly()
+    test_case8_grounded_question_form_hook_is_not_banned()
     test_writer_and_rewrite_prompts_carry_human_quality_contract()
     print("SCRIPT HUMAN QUALITY V1 REGRESSION: PASS")
 
