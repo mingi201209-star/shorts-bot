@@ -138,9 +138,26 @@ def assert_same_asset_repeat_detected(scene, result, label):
     check = diversity.evaluate_visual_diversity(repeated_scenes, lineage)
     assert check["pass"] is False, (label, check)
     high = [g for g in check["repetition_groups"] if g.get("severity") == "high"]
-    assert len(high) == 1, (label, check)
-    assert high[0]["asset_id"] == result["source_asset_id"].lower(), (label, high)
-    assert high[0]["hard_repeat_count"] == 3, (label, high)
+
+    # Run 34616204901 added an independent presentation-family guard on top
+    # of physical-asset identity.  A true 3x deterministic repeat must now be
+    # caught by BOTH guards; the older `len(high) == 1` assertion became stale
+    # once that stricter protection landed.  Keep both protections binding.
+    physical = [
+        g for g in high
+        if g.get("group_type") == "physical_asset"
+        and g.get("asset_id") == result["source_asset_id"].lower()
+    ]
+    assert len(physical) == 1, (label, check)
+    assert physical[0]["hard_repeat_count"] == 3, (label, physical)
+
+    presentation = [
+        g for g in high
+        if g.get("group_type") == "presentation_family"
+        and g.get("asset_id") == f"presentation-family:{result['template_type']}"
+    ]
+    assert len(presentation) == 1, (label, check)
+    assert presentation[0]["hard_repeat_count"] == 3, (label, presentation)
 
 
 # B/C/D. Every established deterministic template still detects true reuse.
