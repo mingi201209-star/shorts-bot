@@ -635,3 +635,12 @@ _patch_verified_still_rescue()
 # explanatory fallback once the unchanged 2/2 still budget was exhausted.
 from ci_run_33981204957_flap_director_repair_hotfix import main as _patch_flap_director_repair
 _patch_flap_director_repair()
+
+# Run 34645762458 exposed the next independent bottleneck after the flap
+# Director repair: a fixed-topic Candidate Explorer rejection (hook/Core
+# Question restatement) was never fed back into the next bounded attempt, so
+# all 7/7 attempts regenerated the same rejected shape. Reuse the existing
+# fixed_topic_gate_feedback channel for the Explorer's own rejection reason;
+# no validator/retry/API/cost change.
+from ci_run_34645762458_candidate_feedback_hotfix import main as _patch_candidate_feedback
+_patch_candidate_feedback()
