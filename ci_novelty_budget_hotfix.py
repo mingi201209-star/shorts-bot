@@ -20,7 +20,7 @@ else:
 # Production counterexample: run 32538176597 selected a candidate that was
 # specific enough for Candidate Gate but predictably scored Novelty 5/10 before
 # and after rewrite. Align the pre-script gate with the downstream novelty
-# contract without changing any judge threshold or adding another API call.
+# contract without changing any judge threshold.
 gate_path = Path("content/candidate_gate.py")
 gate_text = gate_path.read_text(encoding="utf-8")
 
@@ -47,3 +47,187 @@ else:
 
     gate_path.write_text(gate_text, encoding="utf-8")
     print("candidate novelty parity hotfix applied")
+
+
+# Run 34705737709 spent one GPT-5.6 Sol Writer on a rounded-window Candidate
+# that the unchanged downstream Novelty Judge scored 4/10, then spent a second
+# Sol Writer when the same trusted physical subject returned under a different
+# topic label. With the production $0.05 ceiling, that second Writer alone pushed
+# the run to $0.055195 before the next Judge could start.
+#
+# Move the existing novelty authority in front of the expensive Writer only for
+# automatic aviation Winners. This adds one bounded gpt-4o-mini Judge call after
+# Candidate Gate PASS, but synthesizes no fact, changes no threshold, and does
+# not add a Writer/rewrite/retry. A low-novelty trusted physical identity is also
+# remembered for this Python process so a renamed version cannot spend another
+# Candidate Gate / novelty / Writer path in the same run.
+PREWRITE_MARKER = "# RUN_34705737709_PREWRITER_NOVELTY_V1"
+PREWRITE_PATCH = r'''
+
+# RUN_34705737709_PREWRITER_NOVELTY_V1
+# Authority: Production Run 34705737709. The downstream Novelty minimum remains
+# 5.0; this layer merely evaluates that same editorial property before the costly
+# Writer in automatic aviation mode. Fixed-topic behavior is untouched.
+_PREWRITER_NOVELTY_MIN_SCORE = 5.0
+_PREWRITER_NOVELTY_REJECTED_CANONICALS = set()
+_PREWRITER_UNKNOWN_CANONICALS = {"", "unknown", "not_applicable", "not applicable"}
+_original_evaluate_candidate_before_prewriter_novelty = evaluate_candidate
+
+
+def _prewriter_normalize_identity(value):
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _prewriter_automatic_aviation_enabled(role):
+    return (
+        str(role or "").strip().lower() == "winner"
+        and not str(os.environ.get("SHORTS_TOPIC", "")).strip()
+        and str(os.environ.get("SHORTS_CANDIDATE_SCOPE", "")).strip().lower()
+        == "aviation"
+    )
+
+
+def _prewriter_trusted_canonical_family(candidate):
+    if not isinstance(candidate, dict):
+        return ""
+    if str(candidate.get("subject_kind") or "").strip().lower() != "physical_entity":
+        return ""
+
+    canonical = _prewriter_normalize_identity(candidate.get("canonical_subject"))
+    if canonical in _PREWRITER_UNKNOWN_CANONICALS:
+        return ""
+
+    evidence = candidate.get("_trusted_grounding_evidence")
+    if not isinstance(evidence, list):
+        return ""
+    for item in evidence:
+        if not isinstance(item, dict):
+            continue
+        supported = _prewriter_normalize_identity(item.get("supports_subject"))
+        source = str(item.get("source") or "").strip()
+        detail = str(item.get("detail") or "").strip()
+        if supported == canonical and source and detail:
+            return canonical
+    return ""
+
+
+def _prewriter_novelty_probe(candidate):
+    micro = candidate.get("micro_narrative")
+    if not isinstance(micro, dict):
+        micro = {}
+
+    beats = (
+        ("hook", micro.get("hook")),
+        ("core_question", micro.get("core_question") or candidate.get("core_question")),
+        ("reveal", micro.get("reveal")),
+        ("payoff", micro.get("payoff")),
+    )
+    scenes = []
+    for purpose, text in beats:
+        value = str(text or "").strip()
+        if value:
+            scenes.append({
+                "text": value,
+                "semantic_purpose": purpose,
+            })
+
+    return {
+        "title": str(candidate.get("topic") or "").strip(),
+        "topic": str(candidate.get("topic") or "").strip(),
+        "scenes": scenes,
+    }
+
+
+def _run_prewriter_novelty(candidate):
+    # Import at call time so any later production Judge wrappers remain
+    # authoritative. Novelty does not use the FACT-only identity precheck.
+    from quality.judge import run_judge, print_judge_result
+
+    result = run_judge(
+        "novelty",
+        _prewriter_novelty_probe(candidate),
+        model=os.environ.get("V3_JUDGE_MODEL", "gpt-4o-mini"),
+    )
+    print("")
+    print("🧪 PRE-WRITER NOVELTY PREFLIGHT")
+    print_judge_result(result)
+    return result
+
+
+def evaluate_candidate(candidate, *, model=MODEL, role="Winner"):
+    enabled = _prewriter_automatic_aviation_enabled(role)
+    canonical_family = (
+        _prewriter_trusted_canonical_family(candidate)
+        if enabled
+        else ""
+    )
+
+    if (
+        canonical_family
+        and canonical_family in _PREWRITER_NOVELTY_REJECTED_CANONICALS
+    ):
+        print("")
+        print(
+            "🚫 PRE-WRITER NOVELTY FAMILY MEMORY: "
+            f"{canonical_family}"
+        )
+        return {
+            "status": "REGENERATE",
+            "failure_type": "PREWRITER_NOVELTY_FAMILY_REPEAT",
+            "reason": (
+                "이번 실행에서 Novelty 최소 기준 미달로 폐기한 동일한 "
+                "trusted canonical subject가 다른 표현으로 다시 선택되었습니다."
+            ),
+        }
+
+    editorial = _original_evaluate_candidate_before_prewriter_novelty(
+        candidate,
+        model=model,
+        role=role,
+    )
+    if not enabled or editorial.get("status") != "PASS":
+        return editorial
+
+    novelty = _run_prewriter_novelty(candidate)
+    try:
+        novelty_score = float(novelty.get("score", 0.0))
+    except (TypeError, ValueError):
+        novelty_score = 0.0
+
+    if novelty_score < _PREWRITER_NOVELTY_MIN_SCORE:
+        if canonical_family:
+            _PREWRITER_NOVELTY_REJECTED_CANONICALS.add(canonical_family)
+        print(
+            "🚫 PRE-WRITER NOVELTY BLOCK: "
+            f"{novelty_score:.2f} < {_PREWRITER_NOVELTY_MIN_SCORE:.2f}"
+        )
+        return {
+            "status": "REGENERATE",
+            "failure_type": "PREWRITER_NOVELTY_LOW",
+            "reason": (
+                "Writer 실행 전 Novelty Judge가 기존 최소 기준 미달을 확인했습니다: "
+                f"{novelty_score:.2f} < {_PREWRITER_NOVELTY_MIN_SCORE:.2f}. "
+                "비싼 Writer를 사용하지 않고 새 Candidate를 탐색합니다."
+            ),
+        }
+
+    print(
+        "✅ PRE-WRITER NOVELTY PASS: "
+        f"{novelty_score:.2f} >= {_PREWRITER_NOVELTY_MIN_SCORE:.2f}"
+    )
+    return editorial
+'''
+
+
+gate_text = gate_path.read_text(encoding="utf-8")
+if PREWRITE_MARKER in gate_text:
+    print("pre-Writer novelty preflight already applied")
+else:
+    gate_path.write_text(
+        gate_text.rstrip() + PREWRITE_PATCH + "\n",
+        encoding="utf-8",
+    )
+    print(
+        "pre-Writer novelty preflight applied; "
+        "Writer/rewrite/retry/quality/cost ceilings unchanged"
+    )
