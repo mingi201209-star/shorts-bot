@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 
 from quality.canonical_subject_grounding_supply import (
     PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS,
@@ -14,6 +15,9 @@ from quality.grounding_aware_candidate_supply import (
     all_trusted_candidate_records,
     grounded_seed_candidate_pool,
 )
+
+
+ROOT = Path(__file__).resolve().parents[1]
 
 
 def _validate(candidate, *, prefix="Candidate"):
@@ -153,10 +157,26 @@ def main() -> int:
     assert not spoof_diag.get("trusted_seed_scope"), spoof_diag
     print("CASE B copied/model-authored private seed metadata cannot gain trust: PASS")
 
+    # Run 34710062143 exposed an integration-only failure: production imports the
+    # installer rather than executing it as a script. Lock that composition path so
+    # a __main__-only guard can never silently disable this patch again.
+    chain_source = (ROOT / "ci_grounding_aware_candidate_supply_hotfix.py").read_text(
+        encoding="utf-8"
+    )
+    installer_source = (
+        ROOT / "ci_run_34708987774_grounded_seed_identity_hotfix.py"
+    ).read_text(encoding="utf-8")
+    assert "import ci_run_34708987774_grounded_seed_identity_hotfix" in chain_source
+    assert installer_source.rstrip().endswith("main()"), (
+        "production-imported seed identity installer must execute main() on import"
+    )
+    assert 'if __name__ == "__main__":\n    main()' not in installer_source
+    print("CASE C production import actually executes seed identity installer: PASS")
+
     # The patch is a narrowing operation only; it does not change retry, API,
     # cost, Candidate Gate, FACT, or quality thresholds.
     assert len(observed_canonicals) == len(observed_topics)
-    print("CASE C seed provenance narrows canonical matching without gate relaxation: PASS")
+    print("CASE D seed provenance narrows canonical matching without gate relaxation: PASS")
     print("RUN 34708987774 GROUNDED SEED IDENTITY REGRESSION: PASS")
     return 0
 
