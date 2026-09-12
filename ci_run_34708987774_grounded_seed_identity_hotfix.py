@@ -135,7 +135,11 @@ def main() -> None:
     _patch_grounding_supply()
     _patch_candidate_pool_handoff()
     subprocess.run(
-        [sys.executable, "quality/run_34708987774_grounded_seed_identity_regression_test.py"],
+        [
+            sys.executable,
+            "-m",
+            "quality.run_34708987774_grounded_seed_identity_regression_test",
+        ],
         check=True,
     )
 
