@@ -1,0 +1,35 @@
+name: Run 34705737709 Pre-Writer Novelty Regression
+
+on:
+  push:
+    branches:
+      - fix/run-34705737709-prewriter-novelty
+    paths:
+      - "ci_novelty_budget_hotfix.py"
+      - "quality/run_34705737709_prewriter_novelty_regression_test.py"
+      - ".github/workflows/run_34705737709_prewriter_novelty_regression.yml"
+  pull_request:
+    paths:
+      - "ci_novelty_budget_hotfix.py"
+      - "quality/run_34705737709_prewriter_novelty_regression_test.py"
+      - ".github/workflows/run_34705737709_prewriter_novelty_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run pre-Writer novelty regression
+        run: python quality/run_34705737709_prewriter_novelty_regression_test.py
+      - name: Verify installer composes on production sources
+        run: |
+          python ci_novelty_budget_hotfix.py
+          grep -n "RUN_34705737709_PREWRITER_NOVELTY_V1\|PRE-WRITER NOVELTY" content/candidate_gate.py
+          python -m py_compile main.py content/candidate_gate.py ci_novelty_budget_hotfix.py
