@@ -129,7 +129,7 @@ def validate_explorer_output(data):
     return result
 
 
-CANDIDATE_EXPLORER_PROMPT += r"""
+_AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX = r"""
 
 ============================================================
 15. AVIATION CANDIDATE POOL HANDOFF V1 — HOST AUTHORITY
@@ -199,6 +199,48 @@ Return REGENERATE only when reviewable supply is truly zero after the narrow
 supply-time failures above. Structural/factual/grounding failures still fail
 closed at host validation; no quality threshold is relaxed.
 """
+
+CANDIDATE_EXPLORER_PROMPT += _AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX
+
+
+# RUN_34686824352_AVIATION_PROMPT_SCOPE_V1
+# Run 34686824352 (automatic-topic mode, blank SHORTS_CANDIDATE_SCOPE) showed
+# section 15 above is always present in the system prompt regardless of the
+# runtime scope, and the model does not reliably gate its own output format on
+# the in-prompt "When SHORTS_CANDIDATE_SCOPE=aviation" instruction alone -- 5 of
+# 7 Candidate attempts returned a CANDIDATE_POOL envelope for ordinary
+# non-aviation topics (desert ant navigation was one of only two attempts that
+# reached a real topic at all), each one an automatic REGENERATE that spent a
+# bounded attempt without ever reaching Candidate Gate. This does not touch
+# CANDIDATE_POOL parsing/validation at all -- that stays aviation-only exactly
+# as installed above, and a CANDIDATE_POOL envelope outside aviation scope still
+# fails closed to REGENERATE if the model returns one anyway. It only stops
+# teaching the model that output shape when the run cannot use it, by keeping
+# section 15 out of the system prompt for that one call.
+_candidate_pool_scope_previous_explore_candidates = explore_candidates
+
+
+def explore_candidates(*args, **kwargs):
+    global CANDIDATE_EXPLORER_PROMPT
+    aviation_scope = (
+        os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower()
+        == "aviation"
+    )
+    if aviation_scope:
+        return _candidate_pool_scope_previous_explore_candidates(*args, **kwargs)
+    original_prompt = CANDIDATE_EXPLORER_PROMPT
+    if _AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX in original_prompt:
+        # Later hotfixes append more prompt text after section 15, so this
+        # cannot assume the appendix is the current suffix -- remove exactly
+        # that substring (first occurrence) wherever it now sits and leave
+        # everything appended before/after it untouched.
+        CANDIDATE_EXPLORER_PROMPT = original_prompt.replace(
+            _AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX, "", 1
+        )
+    try:
+        return _candidate_pool_scope_previous_explore_candidates(*args, **kwargs)
+    finally:
+        CANDIDATE_EXPLORER_PROMPT = original_prompt
 '''
 
 
