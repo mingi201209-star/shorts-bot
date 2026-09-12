@@ -134,6 +134,23 @@ def _reapply_final_run_336911_guard():
     patch_run_33691170895()
 
 
+def _apply_run_346162_human_quality_if_ready():
+    # This installer is invoked twice by production composition. Apply only on
+    # the final pass, after Grounded Deterministic Explanation has installed the
+    # AIRCRAFT_WINDOW_STRESS_V1 runtime functions. The V2 script floor is wired
+    # here as well so it affects the real production router, not only legacy
+    # content/script_generator.py.
+    visual_path = Path("video/visual_explanation.py")
+    if not visual_path.exists():
+        return
+    source = visual_path.read_text(encoding="utf-8")
+    if "GROUNDED_DETERMINISTIC_EXPLANATION_V1" not in source:
+        print("⏭️ Run 34616204901 Human Quality floor deferred until grounded visual composition")
+        return
+    runpy.run_path("ci_run_34616204901_human_script_v2_hotfix.py", run_name="__main__")
+    runpy.run_path("ci_run_34616204901_human_quality_hotfix.py", run_name="__main__")
+
+
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
 
@@ -168,6 +185,7 @@ def main():
     _apply_final_script_scene_recovery_if_ready()
     _patch_script_engine_router()
     _reapply_final_run_336911_guard()
+    _apply_run_346162_human_quality_if_ready()
     print("✅ Aviation fixed-topic + automatic gate-feedback compatibility applied")
 
 
