@@ -9,20 +9,27 @@ from PIL import Image, ImageChops
 
 
 def assert_script_floor():
-    from content import script_generator as sg
+    from quality.human_quality_floor import opening_repeat_issue
+    from content import script_engine_v2_validation as v2_validation
+
+    wired = getattr(v2_validation, "_hq_opening_repeat_issue", None)
+    assert wired is opening_repeat_issue, (
+        "Run 34616204901 human-quality opening detector must be wired into "
+        "the actual Script Engine V2 validation path"
+    )
 
     bad = [
         {"text": "비행기 창문 모서리는 둥글게 되어 있습니다."},
         {"text": "그런데 비행기 창문 모서리가 둥글게 디자인된 이유는 무엇일까요?"},
     ]
-    issue = sg._hq_opening_repeat_issue(bad)
+    issue = wired(bad)
     assert issue, "Run 34616204901 opening repetition must be rejected"
 
     good = [
         {"text": "비행기 창문은 네모가 아니라 모서리가 둥근 형태입니다."},
         {"text": "그 곡선은 동체에 걸리는 응력이 한곳에 몰리는 것을 줄입니다."},
     ]
-    assert sg._hq_opening_repeat_issue(good) is None
+    assert wired(good) is None
 
 
 def assert_window_stock_floor():
