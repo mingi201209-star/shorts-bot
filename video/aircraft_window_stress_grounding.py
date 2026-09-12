@@ -235,9 +235,7 @@ def supports_aircraft_window_stress_from_grounding(scene, candidate=None):
 # never supposed to answer anything (content.grounded_claim_plan reserves
 # claim ownership starting at scene 3). But its Writer-authored visual_goal
 # can still legitimately ask for a squarish-vs-rounded shape comparison
-# before any mechanism claim is revealed (Run 34663907508's own Visual
-# Judge praised exactly this script-level intent: "둥근 창문과 각진 창문의
-# 대비가 효과적으로 나타나고 있습니다"). The previous behaviour let a single
+# before any mechanism claim is revealed. The previous behaviour let a single
 # reused verified still silently satisfy that comparison goal
 # (REUSED_VERIFIED_QUESTION_SUBJECT_MOTION), which is a false pass: one
 # photo of one window state cannot show a contrast. This is a second,
@@ -247,10 +245,6 @@ def supports_aircraft_window_stress_from_grounding(scene, candidate=None):
 # mechanism/result claim (those remain scene 3-5's exclusive authority).
 SHAPE_CONTRAST_INTRO_CLAIM_ID = "window_corner_shape_contrast_intro"
 
-# General (non-topic-specific) Korean/English comparison-intent markers a
-# Writer-authored visual_goal uses when it asks for two states shown
-# together. Not a semantic classifier -- a closed, literal marker list,
-# mirroring the same style as _CLAIM_DISCRIMINATOR_WORDS above.
 _COMPARISON_INTENT_MARKERS = (
     "비교", "대비", "나란히", "차이", "대조",
     "versus", " vs ", "vs.", "side by side", "side-by-side", "before", "after",
@@ -266,25 +260,35 @@ def _visual_goal_expresses_comparison_intent(scene):
     return any(marker.lower() in goal for marker in _COMPARISON_INTENT_MARKERS)
 
 
+def _keyword_expresses_grounded_rounded_corner_question(scene):
+    """Recognize the existing deterministic rounded-corner question query.
+
+    Run 34675233154 showed that Script V2's neutral Scene-2 visual_goal can say
+    only "emphasize the rounded corner while asking the question" even though
+    the already-grounded query lock is `aircraft window why rounded corners`.
+    Under the same trusted subject + question-role + no-owned-claim guards used
+    below, `rounded` + `corner(s)` carries only physical shape intent; it does
+    not assert stress, fatigue, or any mechanism. This lets the existing
+    SHAPE_CONTRAST_INTRO render show the two shapes instead of reusing Scene 1.
+    """
+    if not isinstance(scene, dict):
+        return False
+    words = set(re.findall(r"[a-z]+", _text(scene.get("keyword")).lower()))
+    return "rounded" in words and bool(words & {"corner", "corners"})
+
+
 def supports_aircraft_window_shape_contrast_intro_from_grounding(scene, candidate=None):
     """Eligibility for the neutral SHAPE_CONTRAST_INTRO presentation.
 
     ALL of the following must hold:
       - the scene is a "question" beat (existing authoritative role) that
-        owns no claim (explicit owned_claim_id absent) -- this path never
-        applies to a claim-owning scene, which stays exclusively governed by
-        supports_aircraft_window_stress_from_grounding above
-      - its Writer-authored visual_goal explicitly expresses comparison
-        intent (closed marker list, not inferred from narration/keyword)
+        owns no claim (explicit owned_claim_id absent)
       - existing canonical visual supply provenance identifies the exact
-        aircraft-passenger-window subject (same authority as the claim path)
+        aircraft-passenger-window subject
       - the window subject anchors (aircraft + window) are present
-
-    Deliberately does NOT require a claim discriminator word (a question
-    scene's deterministic keyword never carries one by design) and does NOT
-    resolve any owned_claim_id from role/causal_role -- it always returns
-    the fixed SHAPE_CONTRAST_INTRO_CLAIM_ID identity, since this path never
-    asserts a specific mechanism/result claim.
+      - either the Writer visual_goal explicitly asks for comparison OR the
+        existing grounded rounded-corner question query carries rounded+corner
+        shape terms. Neither path authorizes any causal/mechanism claim.
     """
     if not isinstance(scene, dict):
         return None
@@ -294,7 +298,10 @@ def supports_aircraft_window_shape_contrast_intro_from_grounding(scene, candidat
         return None
     if _text(scene.get("owned_claim_id")):
         return None
-    if not _visual_goal_expresses_comparison_intent(scene):
+    if not (
+        _visual_goal_expresses_comparison_intent(scene)
+        or _keyword_expresses_grounded_rounded_corner_question(scene)
+    ):
         return None
 
     supply = _window_canonical_supply_present(scene)
@@ -314,3 +321,6 @@ def supports_aircraft_window_shape_contrast_intro_from_grounding(scene, candidat
         "grounding_provenance_ref": _text(supply.get("grounding_source")),
         "_canonical_subject_text": _text(supply.get("canonical_subject")),
     }
+
+
+# RUN_34675233154_GROUNDED_WINDOW_PROGRESSION_V1
