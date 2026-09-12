@@ -2,7 +2,9 @@ from pathlib import Path
 
 
 EXPLORER_PATH = Path("content/candidate_explorer.py")
+MAIN_PATH = Path("main.py")
 MARKER = "# CANDIDATE_POOL_HANDOFF_V1"
+REJECTION_MEMORY_MARKER = "# RUN_34704697595_CANDIDATE_REJECT_MEMORY_V1"
 
 
 PATCH = r'''
@@ -136,6 +138,14 @@ def validate_explorer_output(data):
             f"index={item.get('index')} status={item.get('status')} "
             f"topic={item.get('topic', '')} reason={item.get('reason', '')}"
         )
+        item_normalization = item.get("normalization") or {}
+        if item_normalization:
+            print(
+                "[CANDIDATE_POOL_ITEM_NORMALIZE] "
+                f"index={item.get('index')} "
+                f"status={item_normalization.get('status')} "
+                f"source_field={item_normalization.get('source_field', '')}"
+            )
     return result
 
 
@@ -268,7 +278,108 @@ def explore_candidates(*args, **kwargs):
 '''
 
 
-def main():
+REJECTION_MEMORY_ANCHOR = '''                reason = (
+                    explorer_result.get(
+                        "reason",
+                        (
+                            "Candidate Explorer가 "
+                            "후보를 선택하지 못했습니다."
+                        ),
+                    )
+                )
+
+                print("")
+'''
+
+REJECTION_MEMORY_REPLACEMENT = '''                reason = (
+                    explorer_result.get(
+                        "reason",
+                        (
+                            "Candidate Explorer가 "
+                            "후보를 선택하지 못했습니다."
+                        ),
+                    )
+                )
+
+                # RUN_34704697595_CANDIDATE_REJECT_MEMORY_V1
+                # Automatic aviation exploration must remember exact topics the
+                # deterministic host already rejected. This prevents later bounded
+                # attempts from repeatedly spending supply on the same malformed or
+                # ungrounded topic. No retry/quality/cost limit is changed.
+                remembered_pool_topics = []
+                candidate_pool_trace = (
+                    explorer_result.get(
+                        "_candidate_pool_handoff",
+                        {},
+                    )
+                    if isinstance(
+                        explorer_result,
+                        dict,
+                    )
+                    else {}
+                )
+                if (
+                    not str(
+                        os.environ.get(
+                            "SHORTS_TOPIC",
+                            "",
+                        )
+                    ).strip()
+                    and isinstance(
+                        candidate_pool_trace,
+                        dict,
+                    )
+                    and candidate_pool_trace.get(
+                        "status"
+                    )
+                    == "ALL_CANDIDATES_HARD_FAILED"
+                ):
+                    for rejected_item in (
+                        candidate_pool_trace.get(
+                            "diagnostics"
+                        )
+                        or []
+                    ):
+                        if (
+                            not isinstance(
+                                rejected_item,
+                                dict,
+                            )
+                            or rejected_item.get(
+                                "status"
+                            )
+                            != "REJECT"
+                        ):
+                            continue
+                        rejected_pool_topic = str(
+                            rejected_item.get(
+                                "topic",
+                                "",
+                            )
+                        ).strip()
+                        if (
+                            rejected_pool_topic
+                            and rejected_pool_topic
+                            not in rejected_topics
+                        ):
+                            rejected_topics.append(
+                                rejected_pool_topic
+                            )
+                            remembered_pool_topics.append(
+                                rejected_pool_topic
+                            )
+                if remembered_pool_topics:
+                    print(
+                        "🧠 CANDIDATE_REJECT_MEMORY:",
+                        len(remembered_pool_topics),
+                        "topic(s)",
+                    )
+
+                print("")
+'''
+
+
+def _install_explorer_handoff():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
     if MARKER in text:
         print("ℹ️ Candidate Pool Handoff V1 already applied")
@@ -285,6 +396,36 @@ def main():
         )
     EXPLORER_PATH.write_text(text.rstrip() + PATCH + "\n", encoding="utf-8")
     print("✅ Candidate Pool Handoff V1 installed; host validation authority active")
+
+
+def _install_rejection_memory():
+    text = MAIN_PATH.read_text(encoding="utf-8")
+    if REJECTION_MEMORY_MARKER in text:
+        print("ℹ️ Run 34704697595 Candidate reject memory already applied")
+        return
+    count = text.count(REJECTION_MEMORY_ANCHOR)
+    if count != 1:
+        raise RuntimeError(
+            "Run 34704697595 Candidate reject memory anchor mismatch: "
+            f"{count}"
+        )
+    MAIN_PATH.write_text(
+        text.replace(
+            REJECTION_MEMORY_ANCHOR,
+            REJECTION_MEMORY_REPLACEMENT,
+            1,
+        ),
+        encoding="utf-8",
+    )
+    print(
+        "✅ Run 34704697595 Candidate reject memory installed; "
+        "retry/quality/API/cost limits unchanged"
+    )
+
+
+def main():
+    _install_explorer_handoff()
+    _install_rejection_memory()
 
 
 main()

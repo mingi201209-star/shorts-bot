@@ -25,6 +25,35 @@ from quality.candidate_pool_grounding_records import (
 # Reuses the existing Candidate Explorer shortlist ceiling ("최대 3개").
 CANDIDATE_POOL_MAX = 3
 
+# Run 34704697595 showed that the model can still paraphrase Core Question in
+# micro_narrative.hook despite the prompt contract. Only already-supplied
+# specificity fields may repair that malformed first beat. No fact is invented.
+_HOOK_REPAIR_FIELDS = (
+    "specific_observation",
+    "counterintuitive_result",
+    "constraint",
+    "tradeoff",
+    "concrete_condition",
+)
+_HOOK_REPEAT_ERROR_MARKERS = (
+    "micro_narrative hook",
+    "Core Question",
+)
+_QUESTION_PREFIXES = (
+    "왜 ",
+    "왜?",
+    "어떻게 ",
+    "무엇",
+    "어떤 ",
+    "언제 ",
+    "어디",
+    "how ",
+    "why ",
+    "what ",
+    "when ",
+    "where ",
+)
+
 
 def candidate_pool_handoff_enabled(scope: Any) -> bool:
     return str(scope or "").strip().lower() == "aviation"
@@ -57,6 +86,56 @@ def _copy_model_identity_metadata(raw: Dict[str, Any], validated: Dict[str, Any]
             validated[key] = deepcopy(value)
 
 
+def _looks_like_declarative_supplied_beat(value: Any) -> bool:
+    text = str(value or "").strip()
+    if not text or text.endswith("?"):
+        return False
+    lowered = text.lower()
+    return not any(lowered.startswith(prefix) for prefix in _QUESTION_PREFIXES)
+
+
+def _validate_with_bounded_hook_repair(
+    raw: Dict[str, Any],
+    *,
+    prefix: str,
+    validate_candidate_fn: Callable[..., Dict[str, Any]],
+) -> Tuple[Dict[str, Any], str]:
+    """Validate once, then repair only the exact repeated-Hook failure.
+
+    The replacement must come from one of the Candidate's own specificity fields
+    and must itself pass the unchanged candidate validator. Any other schema
+    failure remains fail-closed. Returns (validated, source_field), where an empty
+    source_field means no repair was needed.
+    """
+
+    try:
+        return validate_candidate_fn(raw, prefix=prefix), ""
+    except (TypeError, ValueError) as original_exc:
+        error_text = str(original_exc)
+        if not all(marker in error_text for marker in _HOOK_REPEAT_ERROR_MARKERS):
+            raise
+
+        micro = raw.get("micro_narrative")
+        if not isinstance(micro, dict):
+            raise
+
+        for field in _HOOK_REPAIR_FIELDS:
+            supplied = raw.get(field)
+            if not _looks_like_declarative_supplied_beat(supplied):
+                continue
+            repaired = deepcopy(raw)
+            repaired_micro = deepcopy(micro)
+            repaired_micro["hook"] = str(supplied).strip()
+            repaired["micro_narrative"] = repaired_micro
+            try:
+                validated = validate_candidate_fn(repaired, prefix=prefix)
+            except (TypeError, ValueError):
+                continue
+            return validated, field
+
+        raise original_exc
+
+
 def handoff_candidate_pool(
     data: Dict[str, Any],
     *,
@@ -71,12 +150,11 @@ def handoff_candidate_pool(
     remains fail-closed and deliberately emits the existing #283 semantic recovery
     marker so the established 1/1 supply recovery contract can still run.
 
-    Run 34703818223 exposed one malformed-but-reviewable envelope where the model
-    returned five candidates even though the supplier contract caps the pool at
-    three. Rejecting the whole envelope discarded potentially valid supply before
-    any candidate-level gate could inspect it. Oversize envelopes are therefore
-    normalized to the existing first-three ceiling without adding calls, retries,
-    candidates, or relaxing any per-candidate schema/grounding/quality authority.
+    Run 34703818223 exposed malformed oversize pools; those are bounded to the
+    existing first-three ceiling. Run 34704697595 then showed repeated Hook/Core
+    Question phrasing can survive prompt guidance. The host may repair only that
+    exact malformed beat from already-supplied specificity evidence, after which
+    the unchanged validator and grounding authorities run again.
     """
 
     if not candidate_pool_handoff_enabled(scope):
@@ -122,11 +200,21 @@ def handoff_candidate_pool(
             continue
 
         try:
-            validated = validate_candidate_fn(raw, prefix=f"Candidate pool[{index}]")
+            validated, hook_repair_field = _validate_with_bounded_hook_repair(
+                raw,
+                prefix=f"Candidate pool[{index}]",
+                validate_candidate_fn=validate_candidate_fn,
+            )
         except (TypeError, ValueError) as exc:
             diag.update(status="REJECT", reason=f"schema: {exc}")
             diagnostics.append(diag)
             continue
+
+        if hook_repair_field:
+            diag["normalization"] = {
+                "status": "REPAIRED_REPEATED_HOOK_FROM_SUPPLIED_EVIDENCE",
+                "source_field": hook_repair_field,
+            }
 
         _copy_model_identity_metadata(raw, validated)
 
