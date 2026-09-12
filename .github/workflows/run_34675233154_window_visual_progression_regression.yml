@@ -1,0 +1,28 @@
+name: Run 34675233154 Window Visual Progression Regression
+
+on:
+  pull_request:
+    paths:
+      - 'video/aircraft_window_stress_grounding.py'
+      - 'video/visual_explanation.py'
+      - 'ci_grounded_deterministic_explanation_hotfix.py'
+      - 'quality/run_34675233154_window_visual_progression_regression_test.py'
+      - '.github/workflows/run_34675233154_window_visual_progression_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile grounded visual progression modules
+        run: |
+          python -m py_compile \
+            video/aircraft_window_stress_grounding.py \
+            video/visual_explanation.py \
+            quality/run_34675233154_window_visual_progression_regression_test.py
+      - name: Run Run-524 authority regression
+        run: python quality/run_34675233154_window_visual_progression_regression_test.py

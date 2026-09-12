@@ -246,6 +246,41 @@ def _explanatory_asset_id(source_id, plan):
     return str(source_id) if source_id else _deterministic_explanatory_asset_id(plan)
 
 
+def _information_signature_for_plan(asset_id, plan):
+    """Return visual-information identity without hiding physical reuse.
+
+    Normally the same physical asset + template is one information state. The
+    closed AIRCRAFT_WINDOW_STRESS_V1 renderer is different: trusted grounded
+    claim ownership and presentation variants are explicit, deterministic
+    render inputs. Run 34675233154 proved that treating S4 stress-flow and S5
+    fatigue-payoff as identical merely because both annotate the same verified
+    window still falsely rejects real information progression.
+
+    Keep the physical asset id unchanged for diversity/lineage. Only the
+    information-repeat signature becomes claim/presentation aware, and only
+    when all trusted plan fields are present. Exact repeated states still map
+    to the same signature and remain rejected.
+    """
+    template = str((plan or {}).get("template") or "")
+    if (
+        template == "AIRCRAFT_WINDOW_STRESS_V1"
+        and str((plan or {}).get("evidence_source") or "") == "TRUSTED_GROUNDING"
+        and str((plan or {}).get("owned_claim_id") or "").strip()
+        and str((plan or {}).get("presentation_variant") or "").strip()
+        and str((plan or {}).get("param_signature") or "").strip()
+    ):
+        identity = "|".join((
+            template,
+            str(plan["owned_claim_id"]),
+            str(plan["presentation_variant"]),
+            str(plan["param_signature"]),
+        ))
+        return (asset_id, identity)
+    return (asset_id, template)
+
+
+# RUN_34675233154_GROUNDED_INFORMATION_IDENTITY_V1
+
 def generate_visual_explanation_fallback(scene, *, output_path, duration, trigger_reason="semantic_scarcity"):
     global _TRANSFORM_COUNT
     plan = plan_explanation(scene)
@@ -259,7 +294,7 @@ def generate_visual_explanation_fallback(scene, *, output_path, duration, trigge
     image_path, source_id = _cached_verified_asset(scene)
     source_type = "annotated_verified_still" if image_path else "explanatory_2d"
     asset_id = _explanatory_asset_id(source_id, plan)
-    information_signature = (asset_id, str(plan["template"]))
+    information_signature = _information_signature_for_plan(asset_id, plan)
     if information_signature in _INFORMATION_SIGNATURES:
         print(f"[VisualExplanation] status=information_repeat_rejected source={asset_id} template={plan['template']}")
         return None
