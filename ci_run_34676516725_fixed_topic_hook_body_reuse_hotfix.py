@@ -207,9 +207,14 @@ def apply_fixed_topic_hook_body_reuse(text: str) -> str:
         if count != 1:
             diagnostic = ""
             if label == "Writer call":
-                marker_index = text.find("# Winner Script")
-                if marker_index >= 0:
-                    diagnostic = text[marker_index:marker_index + 1800]
+                winner_index = text.find("# Winner Script")
+                call_index = (
+                    text.find("generate_script(", winner_index)
+                    if winner_index >= 0
+                    else -1
+                )
+                if call_index >= 0:
+                    diagnostic = text[max(winner_index, call_index - 500):call_index + 900]
             raise RuntimeError(
                 "Run 34676516725 Hook body reuse "
                 f"{label} anchor count mismatch: {count}"
