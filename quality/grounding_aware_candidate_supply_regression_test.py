@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Regression for Run 33960845940 grounding-aware aviation supply."""
+"""Regression for grounding-aware aviation supply and Run 34707653148 fallback."""
 
 from __future__ import annotations
 
@@ -12,7 +12,9 @@ from quality.canonical_subject_grounding_supply import (
 from quality.candidate_pool_handoff import handoff_candidate_pool
 from quality.grounding_aware_candidate_supply import (
     NO_GROUNDED_CANDIDATE_SUPPLY,
+    NO_GROUNDED_SEED_SUPPLY,
     all_trusted_candidate_records,
+    grounded_seed_candidate_pool,
     grounding_candidate_capabilities,
     grounding_capability_context,
     no_grounded_candidate_supply_result,
@@ -58,8 +60,6 @@ def _unsupported_run_candidate():
         constraint="활주로 운항 표시",
         counterintuitive_result="표시 위치마다 의미가 다르다",
         concrete_condition="항공기가 활주로를 사용할 때",
-        # Match Run 33960845940: model supplied a concrete physical identity,
-        # but the host had no repo-owned trusted evidence for that identity.
         subject_kind="physical_entity",
         canonical_subject="airport runway white markings",
         subject_identity_confidence=0.9,
@@ -118,9 +118,14 @@ def _hard_validate(candidate):
     return True, "PASS"
 
 
-def _handoff(candidate):
+def _handoff(candidate_or_pool):
+    candidates = (
+        candidate_or_pool
+        if isinstance(candidate_or_pool, list)
+        else [candidate_or_pool]
+    )
     return handoff_candidate_pool(
-        {"status": "CANDIDATE_POOL", "candidates": [candidate]},
+        {"status": "CANDIDATE_POOL", "candidates": candidates},
         scope="aviation",
         validate_candidate_fn=_validate,
         hard_validate_fn=_hard_validate,
@@ -145,6 +150,10 @@ def main() -> int:
     assert "GROUNDING-AWARE CANDIDATE SUPPLY" in context
     assert "modern aircraft passenger window with rounded/oval corners" in context
     assert "jet engine nacelle/nozzle chevrons" in context
+    assert "aircraft static discharger (static wick)" in context
+    assert "aircraft wing spoilers" in context
+    assert "aircraft pitot tube" in context
+    assert "aircraft winglet" in context
     assert "비행기 활주로의 흰색 선" not in context
     print("TEST A capability context constrains supply to trusted subject space: PASS")
 
@@ -169,6 +178,47 @@ def main() -> int:
     )
     print("TEST C unresolved/untrusted subject still fail-closed: PASS")
 
+    seed_pool = grounded_seed_candidate_pool(recent_topics=[], rejected_topics=[])
+    assert seed_pool["status"] == "CANDIDATE_POOL", seed_pool
+    seed_candidates = seed_pool["candidates"]
+    assert 1 <= len(seed_candidates) <= 3
+    seed_topics = [candidate["topic"] for candidate in seed_candidates]
+    assert seed_topics[0] == "비행기 날개 뒤의 가느다란 스태틱 윅", seed_topics
+    assert "착륙 직후 날개 위로 솟는 스포일러" in seed_topics
+    assert "비행기 바깥쪽의 작은 피토관" in seed_topics
+    seed_handoff = _handoff(seed_candidates)
+    assert seed_handoff["status"] == "SELECTED", seed_handoff
+    trace = seed_handoff.get("_candidate_pool_handoff") or {}
+    assert trace.get("survived", 0) >= 1, trace
+    print(
+        "TEST D deterministic grounded seed pool -> unchanged host handoff survivor: "
+        f"PASS supplied={len(seed_candidates)} survived={trace.get('survived', 0)}"
+    )
+
+    blocked_pool = grounded_seed_candidate_pool(
+        recent_topics=[seed_topics[0]],
+        rejected_topics=[],
+    )
+    assert blocked_pool["status"] == "CANDIDATE_POOL", blocked_pool
+    blocked_topics = [candidate["topic"] for candidate in blocked_pool["candidates"]]
+    assert seed_topics[0] not in blocked_topics, blocked_topics
+    assert blocked_topics[0] == "착륙 직후 날개 위로 솟는 스포일러", blocked_topics
+    print("TEST E recent/rejected deterministic seed is not replayed: PASS")
+
+    all_seed_topics = [
+        record.get("seed_candidate", {}).get("topic")
+        for record in records
+        if isinstance(record.get("seed_candidate"), dict)
+        and record.get("seed_candidate", {}).get("topic")
+    ]
+    exhausted = grounded_seed_candidate_pool(
+        recent_topics=all_seed_topics,
+        rejected_topics=[],
+    )
+    assert exhausted["status"] == "REGENERATE", exhausted
+    assert NO_GROUNDED_SEED_SUPPLY in exhausted["reason"]
+    print("TEST F exhausted deterministic seeds -> fail closed: PASS")
+
     empty_caps = grounding_candidate_capabilities(production_records=(), pool_records=())
     assert empty_caps == ()
     empty_context = grounding_capability_context(production_records=(), pool_records=())
@@ -178,7 +228,13 @@ def main() -> int:
     )
     assert empty_result and empty_result["status"] == "REGENERATE"
     assert NO_GROUNDED_CANDIDATE_SUPPLY in empty_result["reason"]
-    print("TEST E empty capability -> deterministic fail-close without fallback: PASS")
+    empty_seed = grounded_seed_candidate_pool(
+        production_records=(),
+        pool_records=(),
+    )
+    assert empty_seed["status"] == "REGENERATE"
+    assert NO_GROUNDED_SEED_SUPPLY in empty_seed["reason"]
+    print("TEST G empty capability/seed supply -> deterministic fail-close: PASS")
 
     installer = (ROOT / "ci_grounding_aware_candidate_supply_hotfix.py").read_text(
         encoding="utf-8"
@@ -186,6 +242,9 @@ def main() -> int:
     assert "GROUNDING_AWARE_CANDIDATE_SUPPLY_V1" in installer
     assert 'CANDIDATE_EXPLORER_PROMPT += "\\n\\n" + grounding_capability_context()' in installer
     assert "no_grounded_candidate_supply_result" in installer
+    assert "grounded_seed_candidate_pool" in installer
+    assert "validate_explorer_output(seed_pool)" in installer
+    assert "fixed_topic_requested" in installer
     assert "Candidate Gate" in installer
     forbidden_calls = (
         "authorize_call(",
@@ -200,7 +259,7 @@ def main() -> int:
         + installer
     ).lower()
     assert all(token not in surface for token in forbidden_calls)
-    print("TEST D system-authority capability + quality/fact authority unchanged; new calls=0: PASS")
+    print("TEST H system authority + bounded seed fallback; new model/network calls=0: PASS")
 
     projection = (ROOT / "ci_aviation_specificity_projection_hotfix.py").read_text(
         encoding="utf-8"
@@ -210,7 +269,7 @@ def main() -> int:
     recovery = (ROOT / "ci_candidate_supply_recovery_hotfix.py").read_text(encoding="utf-8")
     assert "CANDIDATE SUPPLY RECOVERY (1/1)" in recovery
     assert "_candidate_supply_recovery_used" in recovery
-    print("TEST F production composition + existing 1/1 recovery contract preserved: PASS")
+    print("TEST I production composition + existing 1/1 recovery contract preserved: PASS")
 
     main_workflow = (ROOT / ".github/workflows/main.yml").read_text(encoding="utf-8")
     assert 'V3_MAX_API_CALLS: "60"' in main_workflow
