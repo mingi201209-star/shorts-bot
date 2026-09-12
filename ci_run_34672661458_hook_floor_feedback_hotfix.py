@@ -117,21 +117,6 @@ def _install_hook_body_reuse() -> None:
     _hook_body_reuse_main()
 
 
-def _install_run_526_human_visual_progression() -> None:
-    # Run 34682392892 was machine-green but failed direct MP4 HUMAN QA: the
-    # recovered opening only negated a superficial explanation before Scene 2
-    # asked the same reason, and the grounded fatigue/rupture payoff reused a
-    # subject-visible still with no payoff state. Install the narrow additive
-    # human/visual guards only after the existing Hook-body recovery is fully
-    # composed; floors, budgets, retries, Writer calls, and scene counts stay
-    # unchanged.
-    from ci_run_34682392892_human_visual_progression_hotfix import (
-        main as _run_526_human_visual_progression_main,
-    )
-
-    _run_526_human_visual_progression_main()
-
-
 def main() -> None:
     text = PATH.read_text(encoding="utf-8")
     patched = apply_hook_floor_feedback(text)
@@ -151,7 +136,6 @@ def main() -> None:
         )
 
     _install_hook_body_reuse()
-    _install_run_526_human_visual_progression()
 
 
 if __name__ == "__main__":
