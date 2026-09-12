@@ -3,6 +3,7 @@ from pathlib import Path
 
 PATH = Path("main.py")
 MARKER = "# RUN_34672661458_HOOK_FLOOR_FEEDBACK_V1"
+HOOK_EXHAUSTION_MARKER = "# FIXED_TOPIC_HOOK_EXHAUSTION_RECOVERY_V1"
 HOOK_REASON_PREFIX = (
     "Fixed-topic Hook가 bounded rewrite 후에도 기존 품질 floor 미달"
 )
@@ -17,6 +18,11 @@ def apply_hook_floor_feedback(text: str) -> str:
     call. The Explorer therefore retried without knowing that the opening was
     still a generic description.
 
+    Run 34673458379 then proved the first installer guard was too brittle: it
+    looked for the full runtime reason as one contiguous source string, while
+    #333 composes that reason from adjacent Python string literals. Use #333's
+    stable semantic marker instead of depending on source formatting.
+
     This patch only copies that already-produced reason into the existing
     fixed_topic_gate_feedback channel. It adds no Candidate attempt, Rewrite,
     model/API call, threshold change, scene change, or budget change.
@@ -27,7 +33,7 @@ def apply_hook_floor_feedback(text: str) -> str:
     prerequisites = (
         'fixed_topic_gate_feedback = ""',
         'status\n                == "REGENERATE_TOPIC"',
-        HOOK_REASON_PREFIX,
+        HOOK_EXHAUSTION_MARKER,
     )
     if not all(marker in text for marker in prerequisites):
         # Partial/early fixtures may not yet have the fixed-topic Hook

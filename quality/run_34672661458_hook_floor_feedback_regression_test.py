@@ -7,6 +7,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from ci_run_34672661458_hook_floor_feedback_hotfix import (
+    HOOK_EXHAUSTION_MARKER,
     HOOK_REASON_PREFIX,
     MARKER,
     apply_hook_floor_feedback,
@@ -59,14 +60,29 @@ def run_case(forced_topic, quality_result, existing_feedback=""):
 
     return fixed_topic_gate_feedback
 
-# The installer requires proof that #333 Hook exhaustion recovery is already
-# composed. Keep its exact reason prefix present in this executable fixture:
-RUN_34641471858_REASON_PREFIX = "Fixed-topic Hook가 bounded rewrite 후에도 기존 품질 floor 미달"
+# FIXED_TOPIC_HOOK_EXHAUSTION_RECOVERY_V1
+def _run_34641471858_reason_fixture():
+    # Match the real #333 production source shape: the runtime reason is one
+    # contiguous value, but its source is intentionally split across adjacent
+    # string literals. Run 34673458379 proved the installer must not depend on
+    # that formatting.
+    reason = (
+        "Fixed-topic Hook가 bounded rewrite 후에도 "
+        "기존 품질 floor 미달"
+    )
+    return reason
 '''
 
 
 def main():
     source = _synthetic_runtime_source()
+
+    # Authority regression for Run 34673458379: #333's stable marker is in the
+    # composed source, while the runtime reason prefix is NOT contiguous in
+    # that source. The pre-fix prerequisite therefore deferred in production.
+    assert HOOK_EXHAUSTION_MARKER in source
+    assert HOOK_REASON_PREFIX not in source
+
     patched = apply_hook_floor_feedback(source)
 
     assert MARKER in patched
