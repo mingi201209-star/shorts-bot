@@ -1,5 +1,11 @@
 import sys
 import types
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from ci_run_34671707523_opening_candidate_recovery_hotfix import (
     MARKER,
@@ -18,49 +24,6 @@ ANCHOR = '''            # =================================================
                 )
             )
 '''
-
-
-def _runtime_source():
-    return '''def run_case(forced_topic, winners, total_topic_attempts):
-    fixed_topic_gate_feedback = ""
-    writer_calls = []
-    topic_info = {"topic": "fixed"}
-
-    def print_budget_status():
-        return None
-
-    def generate_script(topic_info, winner):
-        writer_calls.append(winner.get("name"))
-        return {"winner": winner.get("name")}
-
-    for topic_attempt in range(1, total_topic_attempts + 1):
-        winner = winners[topic_attempt - 1]
-
-            # =================================================
-            # Winner Script
-            # =================================================
-
-            script_data = (
-                generate_script(
-                    topic_info,
-                    winner,
-                )
-            )
-
-        return {
-            "script_data": script_data,
-            "writer_calls": writer_calls,
-            "feedback": fixed_topic_gate_feedback,
-            "attempt": topic_attempt,
-        }
-
-    return {
-        "script_data": None,
-        "writer_calls": writer_calls,
-        "feedback": fixed_topic_gate_feedback,
-        "attempt": total_topic_attempts,
-    }
-'''.replace("        winner = winners[topic_attempt - 1]\n\n            #", "        winner = winners[topic_attempt - 1]\n\n            #")
 
 
 def _build_compilable_runtime():
@@ -94,8 +57,6 @@ def _build_compilable_runtime():
     patched_shape = apply_opening_candidate_recovery(production_shape)
     assert MARKER in patched_shape
     block = patched_shape.split('if forced_topic:\n', 1)[1].rsplit('generate_script(\n', 1)[0]
-    # Strip four leading spaces from each production block line so it nests
-    # inside the synthetic for-loop correctly.
     shifted = []
     for line in block.splitlines():
         shifted.append(line[4:] if line.startswith("    ") else line)
