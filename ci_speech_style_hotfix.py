@@ -127,19 +127,17 @@ _REWRITE_SAFE_FORMAL_ENDING_REPAIRS = (
     (re.compile(r"되어 있는데요(?P<p>[.!?]?)$"), r"되어 있습니다\g<p>"),
     (re.compile(r"있는데요(?P<p>[.!?]?)$"), r"있습니다\g<p>"),
     (re.compile(r"인데요(?P<p>[.!?]?)$"), r"입니다\g<p>"),
-    (re.compile(r"(?:이에요|예요)(?P<p>[.!?]?)$"), r"입니다\g<p>"),
-    (re.compile(r"(?:거예요|것이에요)(?P<p>[.!?]?)$"), r"것입니다\g<p>"),
-    (re.compile(r"(?:돼요|되어요)(?P<p>[.!?]?)$"), r"됩니다\g<p>"),
 )
 
 
 def _repair_rewrite_speech_style(script_data):
     """Repair only semantically unambiguous terminal casual forms.
 
-    This is intentionally narrower than the validator. Ambiguous endings such
-    as ~네요/~군요/~나요/~죠/~세요/~해요 are not rewritten here; if one of
-    those remains, the non-FACT Rewrite is discarded rather than spending a
-    second model call. No keyword/visual/grounding/ownership field is touched.
+    This is intentionally much narrower than the validator. Ambiguous or
+    morphology-sensitive endings such as ~해요/~돼요/~예요/~네요/~군요/
+    ~나요/~죠/~세요 are never guessed here. If one remains, a non-FACT
+    Rewrite is discarded rather than spending a second model call. No
+    keyword/visual/grounding/ownership field is touched.
     """
     repaired = copy.deepcopy(script_data)
     changed = False
