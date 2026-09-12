@@ -123,6 +123,18 @@ def apply_opening_candidate_recovery(text: str) -> str:
     return text.replace(anchor, anchor + insertion, 1)
 
 
+def _install_hook_floor_feedback() -> None:
+    # Run 34672661458 exposed the next bounded-recovery gap: after the single
+    # allowed Hook rewrite still misses the floor, #333 returns
+    # REGENERATE_TOPIC with a concrete Hook Judge reason, but main.py did not
+    # carry that reason into the next fixed-topic Candidate Explorer attempt.
+    from ci_run_34672661458_hook_floor_feedback_hotfix import (
+        main as _hook_floor_feedback_main,
+    )
+
+    _hook_floor_feedback_main()
+
+
 def main() -> None:
     text = PATH.read_text(encoding="utf-8")
     patched = apply_opening_candidate_recovery(text)
@@ -134,13 +146,14 @@ def main() -> None:
                 "⏭️ Run 34671707523 opening Candidate recovery deferred until "
                 "fixed-topic final composition"
             )
-        return
+    else:
+        PATH.write_text(patched, encoding="utf-8")
+        print(
+            "✅ Run 34671707523 opening Candidate recovery installed; "
+            "Writer/Candidate/API/cost limits unchanged"
+        )
 
-    PATH.write_text(patched, encoding="utf-8")
-    print(
-        "✅ Run 34671707523 opening Candidate recovery installed; "
-        "Writer/Candidate/API/cost limits unchanged"
-    )
+    _install_hook_floor_feedback()
 
 
 if __name__ == "__main__":
