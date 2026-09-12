@@ -141,12 +141,25 @@ def recovery_eligibility(candidate, gate_result):
 
     status = _text(gate_result.get("status")).upper()
     reason = _text(gate_result.get("reason"))
+    failure_type = _text(gate_result.get("failure_type")).upper()
 
     if status != "REGENERATE":
         return False, "gate_status_not_rejected"
 
     if not reason:
         return False, "missing_gate_reason"
+
+    # RUN_34706837906_RECOVERY_NOVELTY_BYPASS_V1
+    # The automatic-aviation pre-Writer novelty layer is an authoritative
+    # rejection boundary, not a soft editorial suggestion. Run 34706837906
+    # correctly blocked jet-engine chevrons at 4/10 before the expensive Writer,
+    # but the bounded grounded-recovery pool later classified that result as a
+    # generic soft editorial reject and revived the exact same Candidate into
+    # GPT-5.6 Sol. Preserve the structured failure authority across recovery:
+    # any current/future PREWRITER_NOVELTY_* rejection is terminal for this pool.
+    # This consumes zero API calls and changes no threshold, retry, or budget.
+    if failure_type.startswith("PREWRITER_NOVELTY_"):
+        return False, "prewriter_novelty_reject"
 
     if _reason_is_hard_reject(reason):
         return False, "hard_grounding_reject"

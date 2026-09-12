@@ -1,0 +1,38 @@
+name: Run 34706837906 Recovery Novelty Bypass Regression
+
+on:
+  push:
+    branches:
+      - fix/run-34706837906-recovery-novelty-bypass
+    paths:
+      - "content/candidate_recovery.py"
+      - "quality/run_34706837906_recovery_novelty_bypass_regression_test.py"
+      - ".github/workflows/run_34706837906_recovery_novelty_bypass_regression.yml"
+  pull_request:
+    paths:
+      - "content/candidate_recovery.py"
+      - "quality/run_34706837906_recovery_novelty_bypass_regression_test.py"
+      - ".github/workflows/run_34706837906_recovery_novelty_bypass_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run recovery novelty bypass regression
+        run: python quality/run_34706837906_recovery_novelty_bypass_regression_test.py
+      - name: Run existing grounded recovery regression
+        run: |
+          python ci_candidate_grounded_recovery_hotfix.py
+          python quality/candidate_grounded_recovery_regression_test.py
+      - name: Verify recovery authority compiles
+        run: |
+          python -m py_compile content/candidate_recovery.py quality/run_34706837906_recovery_novelty_bypass_regression_test.py
+          grep -n "RUN_34706837906_RECOVERY_NOVELTY_BYPASS_V1\|prewriter_novelty_reject" content/candidate_recovery.py
