@@ -94,7 +94,9 @@ if hook_generation_hotfix_path.exists():
 
 
 # ============================================================
-# Rewrite Engine: validate rewritten narration and retry at most once
+# Rewrite Engine: validate rewritten narration without spending a second LLM
+# call merely to normalize speech style. FACT-owned retry semantics remain
+# untouched and can still use FACT_REWRITE_MAX_ATTEMPTS=2.
 # ============================================================
 rewrite_path = Path("quality/rewrite_engine.py")
 rewrite_source = rewrite_path.read_text(encoding="utf-8")
@@ -110,18 +112,67 @@ if "from quality.korean_speech_style import validate_script_speech_style" not in
         raise RuntimeError("rewrite_engine.py speech-style import marker mismatch")
     rewrite_source = rewrite_source.replace(rewrite_import_marker, rewrite_import_replacement, 1)
 
+# Run 34670696121 authority: keep the committed base semantics exactly:
+# non-FACT Rewrite has one LLM attempt; FACT-owned recovery may use the existing
+# FACT_REWRITE_MAX_ATTEMPTS=2. The old speech hotfix had expanded non-FACT to 2.
 max_attempts_marker = "    max_attempts = FACT_REWRITE_MAX_ATTEMPTS if fact_guard_enabled else 1\n"
-max_attempts_replacement = "    max_attempts = FACT_REWRITE_MAX_ATTEMPTS if fact_guard_enabled else 2\n"
-if max_attempts_replacement not in rewrite_source:
-    if rewrite_source.count(max_attempts_marker) != 1:
-        raise RuntimeError("rewrite_engine.py max_attempts marker mismatch")
-    rewrite_source = rewrite_source.replace(max_attempts_marker, max_attempts_replacement, 1)
+if rewrite_source.count(max_attempts_marker) != 1:
+    raise RuntimeError("rewrite_engine.py max_attempts marker mismatch")
+
+repair_helper_marker = "# REWRITE_SPEECH_DETERMINISTIC_REPAIR_V1\n"
+repair_helper = r'''
+
+# REWRITE_SPEECH_DETERMINISTIC_REPAIR_V1
+_REWRITE_SAFE_FORMAL_ENDING_REPAIRS = (
+    (re.compile(r"되어 있는데요(?P<p>[.!?]?)$"), r"되어 있습니다\g<p>"),
+    (re.compile(r"있는데요(?P<p>[.!?]?)$"), r"있습니다\g<p>"),
+    (re.compile(r"인데요(?P<p>[.!?]?)$"), r"입니다\g<p>"),
+)
+
+
+def _repair_rewrite_speech_style(script_data):
+    """Repair only semantically unambiguous terminal casual forms.
+
+    Ambiguous or morphology-sensitive endings such as ~해요/~돼요/~예요/
+    ~네요/~군요/~나요/~죠/~세요 are never guessed here. If one remains,
+    a non-FACT Rewrite is discarded rather than spending a second model call.
+    No keyword/visual/grounding/ownership field is touched.
+    """
+    repaired = copy.deepcopy(script_data)
+    changed = False
+    for scene in repaired.get("scenes", []):
+        text = scene.get("text")
+        if not isinstance(text, str) or not text.strip():
+            continue
+        candidate = text.rstrip()
+        for pattern, replacement in _REWRITE_SAFE_FORMAL_ENDING_REPAIRS:
+            updated = pattern.sub(replacement, candidate)
+            if updated != candidate:
+                scene["text"] = updated
+                changed = True
+                break
+
+    if not changed:
+        return None
+
+    speech_valid, _ = validate_script_speech_style(repaired)
+    return repaired if speech_valid else None
+'''
+fact_attempt_anchor = "FACT_REWRITE_MAX_ATTEMPTS = 2\n"
+if repair_helper_marker not in rewrite_source:
+    if rewrite_source.count(fact_attempt_anchor) != 1:
+        raise RuntimeError("rewrite_engine.py FACT_REWRITE_MAX_ATTEMPTS anchor mismatch")
+    rewrite_source = rewrite_source.replace(
+        fact_attempt_anchor,
+        fact_attempt_anchor + repair_helper,
+        1,
+    )
 
 rewrite_call_marker = '''        rewritten = _run_rewrite_call(\n            script_data,\n            consensus,\n            domains,\n            model=model,\n            retry_fact_issues=retry_fact_issues,\n        )\n\n        if not fact_guard_enabled:\n            break\n'''
-rewrite_call_replacement = '''        rewritten = _run_rewrite_call(\n            script_data,\n            consensus,\n            domains,\n            model=model,\n            retry_fact_issues=retry_fact_issues,\n        )\n\n        speech_valid, speech_reason = validate_script_speech_style(rewritten)\n        if not speech_valid:\n            print(f"🚫 Rewrite speech-style 검사 실패: {speech_reason}")\n            if attempt < max_attempts:\n                print("➡️ 동일 Rewrite를 격식체 조건으로 제한 재시도합니다.")\n                continue\n\n            print(\n                "⚠️ Rewrite speech-style 재시도 한도 초과. "\n                "비격식/해요체 Rewrite 결과를 사용하지 않고 원본 Script로 복귀합니다."\n            )\n            rewritten = copy.deepcopy(script_data)\n            break\n\n        if not fact_guard_enabled:\n            break\n'''
+rewrite_call_replacement = '''        rewritten = _run_rewrite_call(\n            script_data,\n            consensus,\n            domains,\n            model=model,\n            retry_fact_issues=retry_fact_issues,\n        )\n\n        speech_valid, speech_reason = validate_script_speech_style(rewritten)\n        if not speech_valid:\n            print(f"🚫 Rewrite speech-style 검사 실패: {speech_reason}")\n            repaired = _repair_rewrite_speech_style(rewritten)\n            if repaired is not None:\n                rewritten = repaired\n                print("✅ Rewrite speech-style을 deterministic 격식체 repair로 복구했습니다.")\n            elif fact_guard_enabled and attempt < max_attempts:\n                # FACT-owned bounded retry semantics are preserved. A second\n                # model call remains possible only because this rewrite is\n                # already FACT-critical, never merely to normalize speech.\n                print("➡️ FACT Rewrite의 기존 bounded 재시도를 유지합니다.")\n                continue\n            else:\n                print(\n                    "⚠️ Rewrite speech-style을 안전하게 복구할 수 없어 "\n                    "추가 LLM 호출 없이 원본 Script로 복귀합니다."\n                )\n                rewritten = copy.deepcopy(script_data)\n                break\n\n        if not fact_guard_enabled:\n            break\n'''
 if rewrite_call_replacement not in rewrite_source:
     if rewrite_source.count(rewrite_call_marker) != 1:
-        raise RuntimeError("rewrite_engine.py speech-style retry marker mismatch")
+        raise RuntimeError("rewrite_engine.py speech-style repair marker mismatch")
     rewrite_source = rewrite_source.replace(rewrite_call_marker, rewrite_call_replacement, 1)
 
 rewrite_path.write_text(rewrite_source, encoding="utf-8")
