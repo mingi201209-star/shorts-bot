@@ -16,6 +16,13 @@ def apply_opening_candidate_recovery(text: str) -> str:
     preflight the locked pair with the exact final validator and feed its reason
     into the already-existing fixed_topic_gate_feedback channel.
 
+    Run 34674162505 exposed a question-authority mismatch in this preflight:
+    Script Engine V2 locks candidate.core_question first and only falls back to
+    micro_narrative.core_question, while this recovery originally checked them
+    in the opposite order. A Candidate could therefore pass preflight on the
+    micro question but fail all three Writer calls against the top-level locked
+    question. Keep the preflight authority identical to Script Engine V2.
+
     No threshold, retry ceiling, model/API call allowance, scene count, or cost
     budget is changed.
     """
@@ -62,9 +69,12 @@ def apply_opening_candidate_recovery(text: str) -> str:
                 locked_hook = str(
                     micro_narrative.get("hook", "")
                 ).strip()
+                # Match content/script_engine_v2.py::build_narrative_plan
+                # exactly: top-level candidate.core_question is authoritative;
+                # micro_narrative.core_question is only the fallback.
                 locked_question = str(
-                    micro_narrative.get("core_question", "")
-                    or winner.get("core_question", "")
+                    winner.get("core_question", "")
+                    or micro_narrative.get("core_question", "")
                 ).strip()
 
                 if locked_hook and locked_question:
