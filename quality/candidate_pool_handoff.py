@@ -70,6 +70,13 @@ def handoff_candidate_pool(
     Individual failures do not erase surviving supply. All-candidate hard failure
     remains fail-closed and deliberately emits the existing #283 semantic recovery
     marker so the established 1/1 supply recovery contract can still run.
+
+    Run 34703818223 exposed one malformed-but-reviewable envelope where the model
+    returned five candidates even though the supplier contract caps the pool at
+    three. Rejecting the whole envelope discarded potentially valid supply before
+    any candidate-level gate could inspect it. Oversize envelopes are therefore
+    normalized to the existing first-three ceiling without adding calls, retries,
+    candidates, or relaxing any per-candidate schema/grounding/quality authority.
     """
 
     if not candidate_pool_handoff_enabled(scope):
@@ -82,11 +89,22 @@ def handoff_candidate_pool(
     raw_pool = data.get("candidates")
     if not isinstance(raw_pool, list):
         raise ValueError("Candidate pool candidates must be a list")
-    if not 1 <= len(raw_pool) <= CANDIDATE_POOL_MAX:
+    if not raw_pool:
         return _failure(
-            f"pool size must be 1..{CANDIDATE_POOL_MAX}; got {len(raw_pool)}",
+            f"pool size must be 1..{CANDIDATE_POOL_MAX}; got 0",
             [],
         )
+
+    supplied_count = len(raw_pool)
+    pool_normalization = None
+    if supplied_count > CANDIDATE_POOL_MAX:
+        raw_pool = raw_pool[:CANDIDATE_POOL_MAX]
+        pool_normalization = {
+            "status": "TRUNCATED_TO_HOST_MAX",
+            "supplied": supplied_count,
+            "validated": len(raw_pool),
+            "limit": CANDIDATE_POOL_MAX,
+        }
 
     survivors: List[Dict[str, Any]] = []
     diagnostics: List[Dict[str, Any]] = []
@@ -137,19 +155,29 @@ def handoff_candidate_pool(
         survivors.append(grounded)
 
     if not survivors:
-        return _failure("no host-validated survivors", diagnostics)
+        result = _failure("no host-validated survivors", diagnostics)
+        if pool_normalization is not None:
+            result["_candidate_pool_handoff"]["supplied"] = supplied_count
+            result["_candidate_pool_handoff"]["validated"] = len(raw_pool)
+            result["_candidate_pool_handoff"]["normalization"] = pool_normalization
+        return result
 
     # Preserve supplier order. Editorial ranking remains downstream Candidate Gate
     # authority; this layer does not invent a new score or quality threshold.
+    trace: Dict[str, Any] = {
+        "status": "SURVIVORS",
+        "supplied": supplied_count,
+        "validated": len(raw_pool),
+        "survived": len(survivors),
+        "diagnostics": diagnostics,
+    }
+    if pool_normalization is not None:
+        trace["normalization"] = pool_normalization
+
     result: Dict[str, Any] = {
         "status": "SELECTED",
         "winner": survivors[0],
         "runner_up": None,
-        "_candidate_pool_handoff": {
-            "status": "SURVIVORS",
-            "supplied": len(raw_pool),
-            "survived": len(survivors),
-            "diagnostics": diagnostics,
-        },
+        "_candidate_pool_handoff": trace,
     }
     return result
