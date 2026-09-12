@@ -25,6 +25,11 @@ def _patch_viewpoint_structure_proof():
     patch_viewpoint_structure()
 
 
+def _patch_still_generation_response():
+    from ci_run_33506951642_still_generation_response_hotfix import main as patch_still_generation_response
+    patch_still_generation_response()
+
+
 def main():
     path = ROOT / "video/still_image_fallback.py"
     text = path.read_text(encoding="utf-8")
@@ -33,6 +38,7 @@ def main():
         _patch_question_subject_reuse()
         _patch_early_verified_asset_presentation()
         _patch_viewpoint_structure_proof()
+        _patch_still_generation_response()
         return
     if "STILL_VISION_EVIDENCE_GROUPS_V1" not in text:
         raise RuntimeError("Vision evidence trace requires structured evidence groups")
@@ -83,6 +89,7 @@ def main():
     _patch_question_subject_reuse()
     _patch_early_verified_asset_presentation()
     _patch_viewpoint_structure_proof()
+    _patch_still_generation_response()
     print("✅ Vision evidence trace records structured accept/reject decisions")
 
 
