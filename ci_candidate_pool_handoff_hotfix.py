@@ -118,8 +118,18 @@ def validate_explorer_output(data):
         "[CANDIDATE_POOL_HANDOFF] "
         f"status={trace.get('status')} "
         f"supplied={trace.get('supplied', len((data or {}).get('candidates') or []))} "
+        f"validated={trace.get('validated', len((data or {}).get('candidates') or []))} "
         f"survived={trace.get('survived', 0)}"
     )
+    normalization = trace.get("normalization") or {}
+    if normalization:
+        print(
+            "[CANDIDATE_POOL_NORMALIZE] "
+            f"status={normalization.get('status')} "
+            f"supplied={normalization.get('supplied')} "
+            f"validated={normalization.get('validated')} "
+            f"limit={normalization.get('limit')}"
+        )
     for item in trace.get("diagnostics") or []:
         print(
             "[CANDIDATE_POOL_ITEM] "
@@ -157,9 +167,23 @@ SUPPLY-TIME terminal failure remains limited to:
 Host owns grounding sufficiency, canonical subject identity, deterministic
 specificity/structure, visual-proof validation, and fail-close handling.
 
-[POOL SIZE]
-Reuse the existing shortlist ceiling: return 1..3 Candidates. Never add filler,
-placeholder, fabricated provenance, or invented technical identity to reach 3.
+[POOL SIZE — HARD OUTPUT CONTRACT]
+The `candidates` array MUST contain 1, 2, or 3 items. This is an output contract,
+not a preference. NEVER return 4 or more Candidates. Before emitting JSON, count
+the array. If more than 3 reviewable Candidates exist, keep only the strongest
+first 3 and delete every extra item. Do not add filler, placeholder, fabricated
+provenance, or invented technical identity to reach 3.
+
+[MICRO NARRATIVE PROGRESSION — HARD OUTPUT CONTRACT]
+For every Candidate, `micro_narrative.hook` MUST be a concrete declarative first
+beat already supported by that Candidate: an observable detail, concrete result,
+constraint, contrast, or causal clue. It MUST NOT be a question. It MUST NOT
+repeat, paraphrase, or merely restate either the top-level `core_question` or
+`micro_narrative.core_question`. The first two beats must advance information:
+HOOK = concrete observation/result/constraint; CORE QUESTION = ask why/how that
+observation exists. Do not turn "왜 X인가?" into "X는 왜 그럴까?" and call it a
+new Hook. Do not invent a new fact to satisfy this rule; if no grounded concrete
+first beat exists, omit that Candidate from the supplied pool.
 
 [AVIATION PRIMARY OUTPUT]
 If at least one reviewable Candidate exists, return exactly one JSON object:
@@ -171,8 +195,8 @@ If at least one reviewable Candidate exists, return exactly one JSON object:
       "angle": "...",
       "core_question": "...",
       "micro_narrative": {
-        "hook": "...",
-        "core_question": "...",
+        "hook": "구체 관찰/결과/제약을 말하는 서술문. 질문 재진술 금지.",
+        "core_question": "왜/어떻게를 묻는 하나의 중심 질문",
         "reveal": "...",
         "payoff": "..."
       },
