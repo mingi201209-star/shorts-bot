@@ -86,6 +86,8 @@ def _install_fake_final_validator():
     def opening_human_contract_violation_reason(scene1, scene2):
         if str(scene1).startswith("BAD:"):
             return "opening scene 1 restates the same proposition scene 2 asks as a question"
+        if str(scene2).startswith("BADQ:"):
+            return "opening scene 1 restates the same proposition scene 2 asks as a question"
         return ""
 
     module.opening_human_contract_violation_reason = (
@@ -95,13 +97,13 @@ def _install_fake_final_validator():
     setattr(content_pkg, "script_engine_v2_validation", module)
 
 
-def _winner(name, hook):
+def _winner(name, hook, *, top_question="왜 그런가요?", micro_question="왜 그런가요?"):
     return {
         "name": name,
-        "core_question": "왜 그런가요?",
+        "core_question": top_question,
         "micro_narrative": {
             "hook": hook,
-            "core_question": "왜 그런가요?",
+            "core_question": micro_question,
         },
     }
 
@@ -148,6 +150,42 @@ def main():
     assert result["writer_calls"] == ["good-second"]
     assert "Final opening human contract rejected" in result["feedback"]
     assert "Do not invent new facts" in result["feedback"]
+
+    # Authority behavior from Run 34674162505: Script Engine V2 locks the
+    # top-level candidate.core_question first. A benign micro question must not
+    # hide a violating top-level question during the pre-Writer preflight.
+    result = run_case(
+        True,
+        [
+            _winner(
+                "bad-top-question",
+                "둥근 창문 모서리는 압력을 분산합니다.",
+                top_question="BADQ: 비행기 창문 모서리는 왜 둥글까요?",
+                micro_question="GOODQ: 압력이 어떻게 달라질까요?",
+            ),
+            _winner("good-after-authority-fix", "응력이 모서리에 집중됩니다."),
+        ],
+        2,
+    )
+    assert result["attempt"] == 2
+    assert result["writer_calls"] == ["good-after-authority-fix"]
+    assert "Final opening human contract rejected" in result["feedback"]
+
+    # If the top-level question is absent, preserve Script V2's existing
+    # fallback to micro_narrative.core_question.
+    result = run_case(
+        True,
+        [
+            _winner(
+                "micro-fallback",
+                "응력이 모서리에 집중됩니다.",
+                top_question="",
+                micro_question="GOODQ: 압력이 어떻게 달라질까요?",
+            ),
+        ],
+        1,
+    )
+    assert result["writer_calls"] == ["micro-fallback"]
 
     # Non-fixed-topic flow is intentionally untouched by this recovery layer.
     result = run_case(
