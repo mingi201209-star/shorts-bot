@@ -23,6 +23,10 @@ def apply_fixed_topic_hook_body_reuse(text: str) -> str:
     Scene 2+ exactly, validates Scene 1 -> preserved Scene 2 with the existing
     final opening-human contract, then lets the normal Judge Committee rerun.
 
+    Production composition wraps the Writer call in the existing bounded
+    Script-generation fallback from ci_hotfix.py. Support exactly that composed
+    shape and the unwrapped base shape; any other shape still fails closed.
+
     No Hook/FACT/Visual threshold, retry ceiling, Candidate-attempt ceiling,
     model route, API allowance, scene count, or cost cap is changed.
     """
@@ -51,14 +55,49 @@ def apply_fixed_topic_hook_body_reuse(text: str) -> str:
         final_script = None
 '''
 
-    writer_anchor = '''            script_data = (
+    writer_base_anchor = '''            script_data = (
                 generate_script(
                     topic_info,
                     winner,
                 )
             )
 '''
-    writer_replacement = '''            if (
+
+    writer_composed_anchor = '''            try:
+                script_data = (
+                    generate_script(
+                        topic_info,
+                        winner,
+                    )
+                )
+            except RuntimeError as exc:
+                message = str(exc)
+                if "Script Generator가 유효한 대본 생성에 실패했습니다" not in message:
+                    raise
+
+                if current_topic not in rejected_topics:
+                    rejected_topics.append(current_topic)
+
+                print("")
+                print("=" * 64)
+                print("♻️ SCRIPT GENERATION FAILED → CANDIDATE REGENERATION")
+                print("=" * 64)
+                print("폐기 소재:", current_topic)
+                print("이유:", message)
+                print_budget_status()
+
+                if topic_attempt < total_topic_attempts:
+                    print("")
+                    print("➡️ Candidate Explorer 재탐색")
+                    continue
+
+                raise RuntimeError(
+                    "Script 생성 가능한 Winner를 확보하지 못했습니다. "
+                    f"마지막 이유: {message}"
+                )
+'''
+
+    recovery_branch = '''            if (
                 forced_topic
                 and fixed_topic_hook_recovery_script is not None
             ):
@@ -136,13 +175,50 @@ def apply_fixed_topic_hook_body_reuse(text: str) -> str:
                     "♻️ fixed-topic Hook-only recovery reused validated "
                     "Scene 2+ body; full Writer call skipped"
                 )
-            else:
+'''
+
+    writer_base_replacement = recovery_branch + '''            else:
                 script_data = (
                     generate_script(
                         topic_info,
                         winner,
                     )
                 )
+'''
+
+    writer_composed_replacement = recovery_branch + '''            else:
+                try:
+                    script_data = (
+                        generate_script(
+                            topic_info,
+                            winner,
+                        )
+                    )
+                except RuntimeError as exc:
+                    message = str(exc)
+                    if "Script Generator가 유효한 대본 생성에 실패했습니다" not in message:
+                        raise
+
+                    if current_topic not in rejected_topics:
+                        rejected_topics.append(current_topic)
+
+                    print("")
+                    print("=" * 64)
+                    print("♻️ SCRIPT GENERATION FAILED → CANDIDATE REGENERATION")
+                    print("=" * 64)
+                    print("폐기 소재:", current_topic)
+                    print("이유:", message)
+                    print_budget_status()
+
+                    if topic_attempt < total_topic_attempts:
+                        print("")
+                        print("➡️ Candidate Explorer 재탐색")
+                        continue
+
+                    raise RuntimeError(
+                        "Script 생성 가능한 Winner를 확보하지 못했습니다. "
+                        f"마지막 이유: {message}"
+                    )
 '''
 
     quality_anchor = '''            # =================================================
@@ -178,7 +254,13 @@ def apply_fixed_topic_hook_body_reuse(text: str) -> str:
                     ):
                         fixed_topic_gate_feedback = (
 '''
-    feedback_replacement = '''                    if hook_floor_reason.startswith(
+    feedback_replacement = '''                    if not hook_floor_reason.startswith(
+                        "Fixed-topic Hook가 bounded rewrite 후에도 "
+                        "기존 품질 floor 미달"
+                    ):
+                        fixed_topic_hook_recovery_script = None
+
+                    if hook_floor_reason.startswith(
                         "Fixed-topic Hook가 bounded rewrite 후에도 "
                         "기존 품질 floor 미달"
                     ):
@@ -199,28 +281,37 @@ def apply_fixed_topic_hook_body_reuse(text: str) -> str:
 
     for anchor, replacement, label in (
         (state_anchor, state_replacement, "state"),
-        (writer_anchor, writer_replacement, "Writer call"),
         (quality_anchor, quality_replacement, "quality cache"),
         (feedback_anchor, feedback_replacement, "Hook exhaustion cache"),
     ):
         count = text.count(anchor)
         if count != 1:
-            diagnostic = ""
-            if label == "Writer call":
-                winner_index = text.find("# Winner Script")
-                call_index = (
-                    text.find("generate_script(", winner_index)
-                    if winner_index >= 0
-                    else -1
-                )
-                if call_index >= 0:
-                    diagnostic = text[max(winner_index, call_index - 500):call_index + 900]
             raise RuntimeError(
                 "Run 34676516725 Hook body reuse "
                 f"{label} anchor count mismatch: {count}"
-                + (f"\nFINAL_COMPOSED_WRITER_EXCERPT:\n{diagnostic}" if diagnostic else "")
             )
         text = text.replace(anchor, replacement, 1)
+
+    base_count = text.count(writer_base_anchor)
+    composed_count = text.count(writer_composed_anchor)
+    if base_count + composed_count != 1:
+        raise RuntimeError(
+            "Run 34676516725 Hook body reuse Writer shape mismatch: "
+            f"base={base_count} composed={composed_count}"
+        )
+
+    if composed_count == 1:
+        text = text.replace(
+            writer_composed_anchor,
+            writer_composed_replacement,
+            1,
+        )
+    else:
+        text = text.replace(
+            writer_base_anchor,
+            writer_base_replacement,
+            1,
+        )
 
     return text
 
