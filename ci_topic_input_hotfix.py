@@ -195,6 +195,174 @@ def patch_main():
             print("")
 '''
 
+    # RUN_34702571133_REWRITE_EXHAUSTION_CANDIDATE_REGENERATION_V1
+    # Classify this one HOLD explicitly so the outer Candidate loop can decide
+    # whether automatic exploration still has another topic attempt available.
+    # The rewrite ceiling itself is intentionally unchanged.
+    rewrite_exhaustion_marker = '''                return {
+                    "status":
+                        "HOLD",
+
+                    "script_data":
+                        current_script,
+
+                    "consensus":
+                        consensus,
+
+                    "pool_results":
+                        pool_results,
+
+                    "rewrite_count":
+                        rewrite_count,
+
+                    "review_count":
+                        review_count,
+
+                    "reason":
+                        "Rewrite 최대 횟수 초과",
+                }
+'''
+
+    rewrite_exhaustion_replacement = '''                return {
+                    "status":
+                        "HOLD",
+
+                    "failure_type":
+                        "REWRITE_EXHAUSTED",
+
+                    "script_data":
+                        current_script,
+
+                    "consensus":
+                        consensus,
+
+                    "pool_results":
+                        pool_results,
+
+                    "rewrite_count":
+                        rewrite_count,
+
+                    "review_count":
+                        review_count,
+
+                    "reason":
+                        "Rewrite 최대 횟수 초과",
+                }
+'''
+
+    main_def_marker = '''# ============================================================
+# MAIN
+# ============================================================
+
+def main():
+'''
+
+    main_def_replacement = '''# ============================================================
+# Run 34702571133 automatic Candidate recovery
+# ============================================================
+
+def _should_regenerate_after_rewrite_exhaustion(
+    status,
+    failure_type,
+    forced_topic,
+):
+    return (
+        status == "HOLD"
+        and failure_type == "REWRITE_EXHAUSTED"
+        and not str(forced_topic or "").strip()
+    )
+
+
+# ============================================================
+# MAIN
+# ============================================================
+
+def main():
+'''
+
+    runner_failed_marker = '''            # =================================================
+            # Runner-up Failed
+            # =================================================
+'''
+
+    runner_failed_replacement = '''            # =================================================
+            # Rewrite exhausted -> automatic Candidate regeneration
+            # =================================================
+            # RUN_34702571133_REWRITE_EXHAUSTION_CANDIDATE_REGENERATION_V1
+
+            if _should_regenerate_after_rewrite_exhaustion(
+                status,
+                quality_result.get(
+                    "failure_type",
+                    "",
+                ),
+                forced_topic,
+            ):
+
+                rejected_topic = str(
+                    quality_result
+                    .get(
+                        "script_data",
+                        {},
+                    )
+                    .get(
+                        "topic",
+                        current_topic,
+                    )
+                ).strip()
+
+                if (
+                    rejected_topic
+                    and rejected_topic
+                    not in rejected_topics
+                ):
+
+                    rejected_topics.append(
+                        rejected_topic
+                    )
+
+                print("")
+                print("=" * 64)
+
+                print(
+                    "♻️ REWRITE EXHAUSTED → CANDIDATE REGENERATION"
+                )
+
+                print("=" * 64)
+
+                print(
+                    "폐기 소재:",
+                    rejected_topic,
+                )
+
+                print(
+                    "이유:",
+                    quality_result.get(
+                        "reason",
+                        "",
+                    ),
+                )
+
+                print_budget_status()
+
+                if (
+                    topic_attempt
+                    < total_topic_attempts
+                ):
+
+                    print("")
+
+                    print(
+                        "➡️ 남은 Candidate attempt로 재탐색"
+                    )
+
+                    continue
+
+            # =================================================
+            # Runner-up Failed
+            # =================================================
+'''
+
     for marker, replacement, label in (
         (
             environment_marker,
@@ -230,6 +398,21 @@ def patch_main():
             gate_feedback_marker,
             gate_feedback_replacement,
             "main fixed topic gate feedback",
+        ),
+        (
+            rewrite_exhaustion_marker,
+            rewrite_exhaustion_replacement,
+            "main rewrite exhaustion classification",
+        ),
+        (
+            main_def_marker,
+            main_def_replacement,
+            "main rewrite exhaustion helper",
+        ),
+        (
+            runner_failed_marker,
+            runner_failed_replacement,
+            "main automatic rewrite exhaustion recovery",
         ),
     ):
         text = replace_once(

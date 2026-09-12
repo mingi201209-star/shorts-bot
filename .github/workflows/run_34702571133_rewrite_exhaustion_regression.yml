@@ -1,0 +1,35 @@
+name: Run 34702571133 Rewrite Exhaustion Regression
+
+on:
+  pull_request:
+    paths:
+      - "ci_topic_input_hotfix.py"
+      - "quality/run_34702571133_rewrite_exhaustion_regression_test.py"
+      - ".github/workflows/run_34702571133_rewrite_exhaustion_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Compile patch and regression
+        run: |
+          python -m py_compile \
+            ci_topic_input_hotfix.py \
+            quality/run_34702571133_rewrite_exhaustion_regression_test.py
+
+      - name: Run focused regression
+        run: python quality/run_34702571133_rewrite_exhaustion_regression_test.py
