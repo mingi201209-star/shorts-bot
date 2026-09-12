@@ -34,6 +34,18 @@ def _normalize_topic(value: Any) -> str:
     return " ".join(text.split())
 
 
+def _preferred_grounding_phrase(values: Any) -> str:
+    """Prefer a Korean evidence-owned phrase, falling back to the first phrase."""
+
+    phrases = [_text(item) for item in (values or []) if _text(item)]
+    if not phrases:
+        return ""
+    for phrase in phrases:
+        if re.search(r"[가-힣]", phrase):
+            return phrase
+    return phrases[0]
+
+
 def all_trusted_candidate_records(
     *,
     production_records: Sequence[Dict[str, Any]] | None = None,
@@ -196,6 +208,11 @@ def grounded_seed_candidate_pool(
     authority: callers must still send this CANDIDATE_POOL through the unchanged
     Candidate Pool Handoff, canonical grounding, Candidate Gate, FACT, and all
     downstream quality gates. The seed itself carries no private trust channel.
+
+    To make the existing text-based trusted supplier deterministic for repo-owned
+    seeds, ``specific_observation`` is rebuilt from the record's own evidence-owned
+    feature + context descriptions. This adds no new identity or provenance; it
+    simply prevents wording drift between a trusted record and its own seed.
     """
 
     try:
@@ -219,9 +236,6 @@ def grounded_seed_candidate_pool(
         topic = _text(seed.get("topic"))
         if not topic or _topic_is_blocked(topic, blocked):
             continue
-        # A seed is eligible only when the same record is complete enough to be
-        # projected as a trusted grounding capability. This prevents an orphan
-        # fixture from becoming production supply.
         required_record_fields = (
             _text(record.get("canonical_subject")),
             _text(record.get("subject_kind")),
@@ -230,10 +244,21 @@ def grounded_seed_candidate_pool(
         )
         if not all(required_record_fields):
             continue
-        if not (record.get("feature_descriptions") or record.get("feature_description")):
+        feature_values = record.get("feature_descriptions") or [
+            record.get("feature_description")
+        ]
+        context_values = record.get("context_descriptions") or [
+            record.get("context_description")
+        ]
+        feature_phrase = _preferred_grounding_phrase(feature_values)
+        context_phrase = _preferred_grounding_phrase(context_values)
+        if not feature_phrase or not context_phrase:
             continue
-        if not (record.get("context_descriptions") or record.get("context_description")):
-            continue
+
+        grounded_seed = deepcopy(seed)
+        grounded_seed["specific_observation"] = (
+            f"{feature_phrase}. {context_phrase}."
+        )
         try:
             priority = float(record.get("seed_priority", 0))
         except (TypeError, ValueError):
@@ -242,7 +267,7 @@ def grounded_seed_candidate_pool(
             (
                 -priority,
                 _text(record.get("canonical_subject")).lower(),
-                deepcopy(seed),
+                grounded_seed,
             )
         )
 
