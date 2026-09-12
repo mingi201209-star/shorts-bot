@@ -1,0 +1,45 @@
+name: Run 34685288234 Fixed Topic Candidate Opening Regression
+
+on:
+  push:
+    branches:
+      - "fix/**"
+    paths:
+      - "content/fixed_topic_candidate_opening_recovery.py"
+      - "ci_run_34685288234_fixed_topic_candidate_opening_hotfix.py"
+      - "ci_run_34672661458_hook_floor_feedback_hotfix.py"
+      - "quality/run_34685288234_fixed_topic_candidate_opening_regression_test.py"
+      - ".github/workflows/run_34685288234_fixed_topic_candidate_opening_regression.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "content/fixed_topic_candidate_opening_recovery.py"
+      - "ci_run_34685288234_fixed_topic_candidate_opening_hotfix.py"
+      - "ci_run_34672661458_hook_floor_feedback_hotfix.py"
+      - "quality/run_34685288234_fixed_topic_candidate_opening_regression_test.py"
+      - ".github/workflows/run_34685288234_fixed_topic_candidate_opening_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install repository dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile Run 527 recovery and regression
+        run: |
+          python -m py_compile \
+            content/fixed_topic_candidate_opening_recovery.py \
+            ci_run_34685288234_fixed_topic_candidate_opening_hotfix.py \
+            ci_run_34672661458_hook_floor_feedback_hotfix.py \
+            quality/run_34685288234_fixed_topic_candidate_opening_regression_test.py
+      - name: Run Run 527 authority regression
+        run: python quality/run_34685288234_fixed_topic_candidate_opening_regression_test.py
