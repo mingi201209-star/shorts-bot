@@ -1,0 +1,39 @@
+name: Run 34686824352 Automatic Topic Candidate Pool Scope Regression
+
+on:
+  push:
+    branches:
+      - "fix/**"
+    paths:
+      - "ci_candidate_pool_handoff_hotfix.py"
+      - "quality/run_34686824352_automatic_topic_candidate_pool_scope_regression_test.py"
+      - ".github/workflows/run_34686824352_automatic_topic_candidate_pool_scope_regression.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ci_candidate_pool_handoff_hotfix.py"
+      - "quality/run_34686824352_automatic_topic_candidate_pool_scope_regression_test.py"
+      - ".github/workflows/run_34686824352_automatic_topic_candidate_pool_scope_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install production Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile fix and regression
+        run: |
+          python -m py_compile \
+            ci_candidate_pool_handoff_hotfix.py \
+            quality/run_34686824352_automatic_topic_candidate_pool_scope_regression_test.py
+      - name: Run Run 529 automatic-topic CANDIDATE_POOL scope regression
+        run: python quality/run_34686824352_automatic_topic_candidate_pool_scope_regression_test.py
