@@ -34,21 +34,17 @@ def apply_opening_candidate_recovery(text: str) -> str:
     if not all(marker in text for marker in prerequisites):
         return text
 
+    # Anchor only to the stable Winner Script section header. Later production
+    # hotfixes are allowed to wrap or reshape generate_script(...) itself, so
+    # coupling this recovery installer to one exact call layout would make a
+    # partial regression fixture fail even though the semantic insertion point
+    # is still unambiguous.
     anchor = '''            # =================================================
             # Winner Script
             # =================================================
-
-            script_data = (
-                generate_script(
-                    topic_info,
-                    winner,
-                )
-            )
 '''
 
-    replacement = '''            # =================================================
-            # Winner Script
-            # =================================================
+    insertion = '''
 
             # RUN_34671707523_OPENING_CANDIDATE_RECOVERY_V1
             # The final Script V2 opening contract is stricter than the older
@@ -116,22 +112,15 @@ def apply_opening_candidate_recovery(text: str) -> str:
                             "attempts under the final opening human contract: "
                             f"{opening_reason}"
                         )
-
-            script_data = (
-                generate_script(
-                    topic_info,
-                    winner,
-                )
-            )
 '''
 
     count = text.count(anchor)
     if count != 1:
         raise RuntimeError(
-            "Run 34671707523 opening Candidate recovery marker count mismatch: "
+            "Run 34671707523 opening Candidate recovery section count mismatch: "
             f"{count}"
         )
-    return text.replace(anchor, replacement, 1)
+    return text.replace(anchor, anchor + insertion, 1)
 
 
 def main() -> None:
