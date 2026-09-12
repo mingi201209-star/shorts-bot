@@ -12,6 +12,15 @@ import os
 import shutil
 import subprocess
 import sys
+from pathlib import Path
+
+
+# Running this file as `python quality/...py` makes `quality/` sys.path[0].
+# Add the repository root explicitly before importing the existing Run #526
+# scratch-composition helper; this changes only the test harness, not runtime.
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from quality.run_34682392892_human_visual_progression_regression_test import (
     _prepare_repo,
