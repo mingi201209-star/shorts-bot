@@ -23,6 +23,12 @@ def apply_hook_floor_feedback(text: str) -> str:
     #333 composes that reason from adjacent Python string literals. Use #333's
     stable semantic marker instead of depending on source formatting.
 
+    Run 34702571133 later added a second automatic Candidate-regeneration path
+    after nonpersistent rewrite exhaustion. Both paths intentionally print the
+    same reason/budget tail, so the old tail-only anchor became ambiguous.
+    Anchor through the original generic Candidate-regeneration banner instead;
+    the rewrite-exhaustion path has a distinct banner and must stay untouched.
+
     This patch only copies that already-produced reason into the existing
     fixed_topic_gate_feedback channel. It adds no Candidate attempt, Rewrite,
     model/API call, threshold change, scene change, or budget change.
@@ -38,7 +44,21 @@ def apply_hook_floor_feedback(text: str) -> str:
     if not all(marker in text for marker in prerequisites):
         return text
 
-    anchor = '''                print(
+    anchor = '''                print("")
+                print("=" * 64)
+
+                print(
+                    "♻️ CANDIDATE REGENERATION"
+                )
+
+                print("=" * 64)
+
+                print(
+                    "폐기 소재:",
+                    rejected_topic,
+                )
+
+                print(
                     "이유:",
                     quality_result.get(
                         "reason",
@@ -54,7 +74,21 @@ def apply_hook_floor_feedback(text: str) -> str:
                 ):
 '''
 
-    replacement = '''                print(
+    replacement = '''                print("")
+                print("=" * 64)
+
+                print(
+                    "♻️ CANDIDATE REGENERATION"
+                )
+
+                print("=" * 64)
+
+                print(
+                    "폐기 소재:",
+                    rejected_topic,
+                )
+
+                print(
                     "이유:",
                     quality_result.get(
                         "reason",
