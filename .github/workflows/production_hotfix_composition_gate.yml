@@ -10,6 +10,7 @@ on:
       - "quality/final_visual_semantic_qa_regression_test.py"
       - "quality/run_33977099845_verified_still_rescue_regression_test.py"
       - "quality/production_model_routing_composition_regression_test.py"
+      - "quality/run_34672661458_hook_floor_feedback_regression_test.py"
       - ".github/workflows/production_hotfix_composition_gate.yml"
       - "video/video_downloader.py"
       - "video/video_engine.py"
@@ -27,6 +28,7 @@ on:
       - "quality/final_visual_semantic_qa_regression_test.py"
       - "quality/run_33977099845_verified_still_rescue_regression_test.py"
       - "quality/production_model_routing_composition_regression_test.py"
+      - "quality/run_34672661458_hook_floor_feedback_regression_test.py"
       - ".github/workflows/production_hotfix_composition_gate.yml"
       - "video/video_downloader.py"
       - "video/video_engine.py"
@@ -104,6 +106,11 @@ jobs:
           python ci_writer_observable_opening_hotfix.py
           python ci_run_33977099845_verified_still_rescue_hotfix.py
           python ci_aviation_context_signature_compat_hotfix.py
+      - name: Assert Run 34673458379 Hook feedback final composition
+        run: |
+          grep -q "# FIXED_TOPIC_HOOK_EXHAUSTION_RECOVERY_V1" main.py
+          grep -q "# RUN_34672661458_HOOK_FLOOR_FEEDBACK_V1" main.py
+          python quality/run_34672661458_hook_floor_feedback_regression_test.py
       - name: Compile composed production surface
         run: |
           python -m py_compile \
@@ -112,10 +119,12 @@ jobs:
             ci_final_visual_semantic_qa_hotfix.py \
             ci_writer_observable_opening_hotfix.py \
             ci_run_33977099845_verified_still_rescue_hotfix.py \
+            ci_run_34672661458_hook_floor_feedback_hotfix.py \
             quality/run_33759359725_wrapper_composition_regression_test.py \
             quality/final_visual_semantic_qa_regression_test.py \
             quality/run_33977099845_verified_still_rescue_regression_test.py \
             quality/production_model_routing_composition_regression_test.py \
+            quality/run_34672661458_hook_floor_feedback_regression_test.py \
             quality/visual_diversity_preflight.py \
             video/still_image_fallback.py \
             video/video_downloader.py \
