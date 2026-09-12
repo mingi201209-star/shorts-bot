@@ -85,30 +85,7 @@ EXPLORER_FINAL_RECOVERY = '''                recovered = select_best_recovery(re
                 }
 '''
 
-GATE_RECORD_MARKER = '''                print_budget_status()
-
-                if (
-                    topic_attempt
-                    < total_topic_attempts
-                ):
-
-                    print("")
-
-                    print(
-                        "➡️ Candidate Explorer 재탐색"
-                    )
-
-                    continue
-
-                raise RuntimeError(
-                    "Candidate Gate를 통과하는 "
-                    "Winner를 확보하지 못했습니다. "
-                    "마지막 이유: "
-                    f"{winner_gate.get('reason', '')}"
-                )
-'''
-GATE_RECORD_REPLACEMENT = '''                print_budget_status()
-
+GATE_RECORD_INSERTION = '''
                 recovery_record = make_recovery_record(
                     winner,
                     winner_gate,
@@ -128,21 +105,9 @@ GATE_RECORD_REPLACEMENT = '''                print_budget_status()
                         "🧺 CANDIDATE_RECOVERY_POOL "
                         f"eligible=false attempt={topic_attempt}"
                     )
+'''
 
-                if (
-                    topic_attempt
-                    < total_topic_attempts
-                ):
-
-                    print("")
-
-                    print(
-                        "➡️ Candidate Explorer 재탐색"
-                    )
-
-                    continue
-
-                recovered = select_best_recovery(recovery_candidates)
+GATE_TERMINAL_REPLACEMENT = '''                recovered = select_best_recovery(recovery_candidates)
 
                 if recovered is not None:
                     winner = recovered["candidate"]
@@ -380,6 +345,54 @@ def replace_rejected_topic_guard(source):
     insertion = f"{indent}    and not recovered_from_pool\n"
     lines.insert(end_index, insertion)
     return "".join(lines)
+
+
+def replace_gate_recovery(source):
+    section_start_marker = "            # Winner Candidate Gate\n"
+    section_end_marker = "            # Winner Script\n"
+    section_start = source.find(section_start_marker)
+    section_end = source.find(section_end_marker, section_start + 1)
+    if section_start < 0 or section_end < 0:
+        raise RuntimeError("Candidate recovery gate section marker mismatch")
+
+    section = source[section_start:section_end]
+    if "CANDIDATE_RECOVERY_POOL" in section:
+        return source
+
+    budget_marker = "                print_budget_status()\n"
+    if section.count(budget_marker) != 1:
+        raise RuntimeError(
+            "Candidate recovery gate budget marker mismatch: "
+            f"{section.count(budget_marker)}"
+        )
+    section = section.replace(
+        budget_marker,
+        budget_marker + GATE_RECORD_INSERTION,
+        1,
+    )
+
+    terminal_start = section.rfind("                raise RuntimeError(\n")
+    if terminal_start < 0:
+        raise RuntimeError("Candidate recovery terminal raise marker mismatch: 0")
+
+    terminal_end = section.find("                )\n", terminal_start)
+    if terminal_end < 0:
+        raise RuntimeError("Candidate recovery terminal raise end marker mismatch: 0")
+    terminal_end += len("                )\n")
+
+    terminal_block = section[terminal_start:terminal_end]
+    if (
+        "Candidate Gate를 통과하는 " not in terminal_block
+        or "winner_gate.get('reason', '')" not in terminal_block
+    ):
+        raise RuntimeError("Candidate recovery terminal raise identity mismatch")
+
+    section = (
+        section[:terminal_start]
+        + GATE_TERMINAL_REPLACEMENT
+        + section[terminal_end:]
+    )
+    return source[:section_start] + section + source[section_end:]
 
 
 if "# CANDIDATE_GROUNDED_RECOVERY_V1" in text:
