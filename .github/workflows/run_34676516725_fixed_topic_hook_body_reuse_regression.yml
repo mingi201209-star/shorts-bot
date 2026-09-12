@@ -1,0 +1,40 @@
+name: Run 34676516725 Fixed Topic Hook Body Reuse Regression
+
+on:
+  push:
+    branches:
+      - "fix/**"
+    paths:
+      - "ci_run_34676516725_fixed_topic_hook_body_reuse_hotfix.py"
+      - "ci_run_34672661458_hook_floor_feedback_hotfix.py"
+      - "quality/run_34676516725_fixed_topic_hook_body_reuse_regression_test.py"
+      - ".github/workflows/run_34676516725_fixed_topic_hook_body_reuse_regression.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "ci_run_34676516725_fixed_topic_hook_body_reuse_hotfix.py"
+      - "ci_run_34672661458_hook_floor_feedback_hotfix.py"
+      - "quality/run_34676516725_fixed_topic_hook_body_reuse_regression_test.py"
+      - ".github/workflows/run_34676516725_fixed_topic_hook_body_reuse_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile authority patch and regression
+        run: |
+          python -m py_compile \
+            ci_run_34676516725_fixed_topic_hook_body_reuse_hotfix.py \
+            ci_run_34672661458_hook_floor_feedback_hotfix.py \
+            quality/run_34676516725_fixed_topic_hook_body_reuse_regression_test.py
+      - name: Run authority regression
+        run: python quality/run_34676516725_fixed_topic_hook_body_reuse_regression_test.py
