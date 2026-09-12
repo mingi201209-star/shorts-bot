@@ -1,0 +1,39 @@
+name: Run 34689059742 Recovery Canonical Grounding Regression
+
+on:
+  push:
+    branches:
+      - "fix/**"
+    paths:
+      - "content/candidate_recovery.py"
+      - "quality/run_34689059742_recovery_canonical_grounding_regression_test.py"
+      - ".github/workflows/run_34689059742_recovery_canonical_grounding_regression.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "content/candidate_recovery.py"
+      - "quality/run_34689059742_recovery_canonical_grounding_regression_test.py"
+      - ".github/workflows/run_34689059742_recovery_canonical_grounding_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install production Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile fix and regression
+        run: |
+          python -m py_compile \
+            content/candidate_recovery.py \
+            quality/run_34689059742_recovery_canonical_grounding_regression_test.py
+      - name: Run Run 532 recovery/canonical-grounding regression
+        run: python quality/run_34689059742_recovery_canonical_grounding_regression_test.py

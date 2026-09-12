@@ -28,7 +28,37 @@ def candidate(topic="날개 끝 윙렛의 실제 역할", reveal="날개 끝 와
         "fact_check_focus": ["winglets reduce induced drag under relevant conditions"],
         "visual_proof": ["visible upturned wingtip"],
         "selection_reason": "구조와 메커니즘을 직접 시각화할 수 있습니다.",
+        # RUN_34689059742: every recoverable candidate must also satisfy the
+        # exact pre-Writer canonical grounding contract a normal SELECTED
+        # candidate already has to (content.candidate_recovery.recovery_eligibility).
+        "subject_kind": "physical_entity",
+        "canonical_subject": "aircraft wingtip winglet",
+        "subject_identity_confidence": 0.92,
+        "grounding_evidence": [],
+        "_trusted_grounding_evidence": [
+            {
+                "evidence_type": "source_backed_identity",
+                "supports_subject": "aircraft wingtip winglet",
+                "source": "FAA winglet aerodynamics reference",
+                "detail": "Documented wingtip device reducing induced drag",
+            }
+        ],
     }
+
+
+def ungrounded_candidate(**kwargs):
+    """A candidate that has never had its subject identity resolved -- the
+    exact Run 34689059742 shape ("도로에서 보이는 미세한 경사")."""
+    base = candidate(**kwargs)
+    for field in (
+        "subject_kind",
+        "canonical_subject",
+        "subject_identity_confidence",
+        "grounding_evidence",
+        "_trusted_grounding_evidence",
+    ):
+        base.pop(field, None)
+    return base
 
 
 def test_soft_editorial_reject_is_recoverable():
@@ -37,6 +67,40 @@ def test_soft_editorial_reject_is_recoverable():
         "reason": "두 번째 인과 단계가 약하고 payoff를 더 구체화해야 합니다.",
     }
     eligible, reason = recovery_eligibility(candidate(), gate)
+    assert eligible is True
+    assert reason == "soft_editorial_reject"
+
+
+def test_run_34689059742_ungrounded_candidate_is_never_recoverable():
+    """Exact Run 34689059742 counterexample: a soft-editorial-rejected
+    candidate whose physical/non-physical subject kind was never resolved
+    must not enter the recovery pool, even though the Gate's own rejection
+    reason is purely editorial and says nothing about grounding."""
+    gate = {
+        "status": "REGENERATE",
+        "reason": (
+            "질문이 지나치게 넓고 일반적이며, Reveal이 구체적인 메커니즘을 "
+            "제공하지 않고 일반론으로 끝나기 때문에 약하다."
+        ),
+    }
+    bad = ungrounded_candidate(topic="도로에서 보이는 미세한 경사")
+    eligible, reason = recovery_eligibility(bad, gate)
+    assert eligible is False
+    assert reason == "pre_writer_grounding_unresolved"
+    assert make_recovery_record(bad, gate, attempt=4) is None
+
+
+def test_run_34689059742_non_physical_candidate_is_recoverable():
+    """A candidate explicitly declared non_physical_concept must not be
+    misclassified as an unresolved physical subject -- the grounding gate
+    itself already treats non-physical subjects as PASS."""
+    gate = {
+        "status": "REGENERATE",
+        "reason": "Payoff가 다소 예측 범위 안에 있어 한 단계 더 구체화가 필요합니다.",
+    }
+    concept = ungrounded_candidate(topic="유도항력이라는 개념 자체")
+    concept["subject_kind"] = "non_physical_concept"
+    eligible, reason = recovery_eligibility(concept, gate)
     assert eligible is True
     assert reason == "soft_editorial_reject"
 
@@ -256,6 +320,10 @@ def test_supply_recovery_only_triggers_on_zero_usable_reason():
 def main():
     test_soft_editorial_reject_is_recoverable()
     print("CASE A soft editorial recovery: PASS")
+    test_run_34689059742_ungrounded_candidate_is_never_recoverable()
+    print("CASE A2 Run 34689059742 ungrounded recovery candidate excluded: PASS")
+    test_run_34689059742_non_physical_candidate_is_recoverable()
+    print("CASE A3 non-physical candidate not misclassified as unresolved: PASS")
     test_predictable_candidate_is_never_recoverable()
     print("CASE B predictable candidate exclusion: PASS")
     test_low_novelty_candidate_cannot_revive_after_exhaustion()
