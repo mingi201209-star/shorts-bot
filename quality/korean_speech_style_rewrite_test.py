@@ -36,20 +36,16 @@ def _consensus():
     }
 
 
-def test_rewrite_retries_then_accepts_formal():
+def test_rewrite_repairs_safe_formal_ending_without_second_llm_call():
     original = _script("원래 대사는 자연스러운 격식체입니다.")
-    outputs = [
-        _script("첫 Rewrite는 해요체로 끝나요."),
-        _script("두 번째 Rewrite는 격식체로 끝납니다."),
-    ]
+    output = _script("창문은 둥근 형태로 되어 있는데요.")
     calls = {"count": 0}
     original_call = rewrite_engine._run_rewrite_call
 
     def fake_call(*args, **kwargs):
         del args, kwargs
-        result = copy.deepcopy(outputs[calls["count"]])
         calls["count"] += 1
-        return result
+        return copy.deepcopy(output)
 
     rewrite_engine._run_rewrite_call = fake_call
     try:
@@ -57,14 +53,15 @@ def test_rewrite_retries_then_accepts_formal():
     finally:
         rewrite_engine._run_rewrite_call = original_call
 
-    _assert("casual-polite Rewrite triggers one bounded retry", calls["count"] == 2)
+    _assert("repairable casual Rewrite uses one LLM call", calls["count"] == 1)
     _assert(
-        "second formal Rewrite is accepted",
-        result["script_data"]["scenes"][0]["text"].endswith("끝납니다."),
+        "safe terminal form is repaired deterministically",
+        result["script_data"]["scenes"][0]["text"]
+        == "창문은 둥근 형태로 되어 있습니다.",
     )
 
 
-def test_rewrite_falls_back_after_retry_limit():
+def test_rewrite_falls_back_without_second_call_when_repair_is_unsafe():
     original = _script("원래 대사는 자연스러운 격식체입니다.")
     calls = {"count": 0}
     original_call = rewrite_engine._run_rewrite_call
@@ -72,7 +69,7 @@ def test_rewrite_falls_back_after_retry_limit():
     def fake_call(*args, **kwargs):
         del args, kwargs
         calls["count"] += 1
-        return _script("계속 해요체로 끝나요.")
+        return _script("이 차이가 정말 중요하네요.")
 
     rewrite_engine._run_rewrite_call = fake_call
     try:
@@ -80,9 +77,9 @@ def test_rewrite_falls_back_after_retry_limit():
     finally:
         rewrite_engine._run_rewrite_call = original_call
 
-    _assert("Rewrite retry remains bounded at two attempts", calls["count"] == 2)
+    _assert("unrepairable non-FACT Rewrite stays at one LLM call", calls["count"] == 1)
     _assert(
-        "non-formal Rewrite never replaces the original narration",
+        "unsafe non-formal Rewrite never replaces the original narration",
         result["script_data"]["scenes"][0]["text"]
         == original["scenes"][0]["text"],
     )
@@ -111,8 +108,8 @@ def test_rewrite_prompt_requires_formal_endings():
 
 def main():
     test_rewrite_prompt_requires_formal_endings()
-    test_rewrite_retries_then_accepts_formal()
-    test_rewrite_falls_back_after_retry_limit()
+    test_rewrite_repairs_safe_formal_ending_without_second_llm_call()
+    test_rewrite_falls_back_without_second_call_when_repair_is_unsafe()
     print("✅ Rewrite formal speech-style regression suite passed")
 
 
