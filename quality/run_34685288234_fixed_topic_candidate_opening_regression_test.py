@@ -7,7 +7,7 @@ calls, and use only Candidate-owned text.
 """
 from __future__ import annotations
 
-import importlib
+import importlib.util
 import os
 import shutil
 import subprocess
@@ -30,15 +30,24 @@ from quality.run_34682392892_human_visual_progression_regression_test import (
 FIXED_TOPIC = "비행기 창문 모서리는 왜 둥글까"
 
 
-def _fresh_import(repo, module_name):
+def _fresh_import(repo: Path, module_name: str):
+    """Load the exact scratch-composed .py file, never the checkout copy."""
     for name in list(sys.modules):
         if name == module_name or name.startswith(module_name + "."):
             del sys.modules[name]
         if module_name.startswith("content.") and (name == "content" or name.startswith("content.")):
             del sys.modules[name]
+
+    module_path = repo.joinpath(*module_name.split(".")).with_suffix(".py")
+    assert module_path.exists(), module_path
     sys.path.insert(0, str(repo))
     try:
-        return importlib.import_module(module_name)
+        spec = importlib.util.spec_from_file_location(module_name, module_path)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
+        return module
     finally:
         sys.path.remove(str(repo))
 
@@ -74,6 +83,7 @@ def main():
 
         explorer_source = (repo / "content/candidate_explorer.py").read_text(encoding="utf-8")
         assert "RUN_34685288234_FIXED_TOPIC_CANDIDATE_OPENING_RECOVERY_V1" in explorer_source
+        assert "def _hook_restates_question(" in explorer_source
 
         explorer = _fresh_import(repo, "content.candidate_explorer")
         validation = _fresh_import(repo, "content.script_engine_v2_validation")
