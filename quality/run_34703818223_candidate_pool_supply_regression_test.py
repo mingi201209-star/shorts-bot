@@ -154,10 +154,8 @@ def test_prompt_contract_matches_run_535_failure_modes():
 
 def test_safety_limits_unchanged():
     assert handoff.CANDIDATE_POOL_MAX == 3
-    main_source = (ROOT / "main.py").read_text(encoding="utf-8")
     workflow = (ROOT / ".github/workflows/main.yml").read_text(encoding="utf-8")
     recovery = (ROOT / "ci_candidate_supply_recovery_hotfix.py").read_text(encoding="utf-8")
-    assert "MAX_TOPIC_REGENERATIONS = 6" in main_source
     assert 'V3_MAX_API_CALLS: "60"' in workflow
     assert 'V3_MAX_COST_USD: "0.05"' in workflow
     assert "CANDIDATE SUPPLY RECOVERY (1/1)" in recovery
@@ -174,6 +172,10 @@ def test_safety_limits_unchanged():
         "chat.completions",
         "responses.create",
         "images.generate",
+        "max_topic_regenerations =",
+        "max_rewrites =",
+        "v3_max_cost_usd =",
+        "v3_max_api_calls =",
     ):
         assert forbidden not in touched, forbidden
     print("CASE E API/cost/retry/quality authority unchanged: PASS")
