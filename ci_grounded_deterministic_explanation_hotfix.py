@@ -3,9 +3,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 PATH = ROOT / "video/visual_explanation.py"
 DOWNLOADER_PATH = ROOT / "video/video_downloader.py"
+STILL_FALLBACK_PATH = ROOT / "video/still_image_fallback.py"
 MARKER = "# GROUNDED_DETERMINISTIC_EXPLANATION_V1"
 WINDOW_STOCK_MARKER = "# WINDOW_HUMAN_VISUAL_QUALITY_V1"
 LINEAGE_MARKER = '        "presentation_variant": plan.get("presentation_variant", ""),\n'
+COMPARISON_SKIP_MARKER = "# WINDOW_COMPARISON_INTENT_SKIP_V1"
 
 # Grounded deterministic aircraft-window explanation.  Run 34625637738 proved
 # that semantic correctness alone was not enough for human viewing quality:
@@ -17,7 +19,11 @@ LINEAGE_MARKER = '        "presentation_variant": plan.get("presentation_variant
 _APPEND = r'''
 
 # GROUNDED_DETERMINISTIC_EXPLANATION_V1
-from video.aircraft_window_stress_grounding import supports_aircraft_window_stress_from_grounding
+from video.aircraft_window_stress_grounding import (
+    SHAPE_CONTRAST_INTRO_CLAIM_ID,
+    supports_aircraft_window_shape_contrast_intro_from_grounding,
+    supports_aircraft_window_stress_from_grounding,
+)
 from video.aircraft_window_stress_signature import build_deterministic_explanation_params
 from video.aircraft_window_stress_comparison import (
     LEFT_CAPTION,
@@ -41,16 +47,19 @@ _GDE_SUPPORTED_OWNED_CLAIM_IDS = frozenset({
     "squarish_window_stress_concentration",
     "rounded_window_stress_distribution",
     "squarish_window_fatigue_rupture",
+    SHAPE_CONTRAST_INTRO_CLAIM_ID,
 })
 _GDE_PRESENTATION_VARIANTS = {
     "squarish_window_stress_concentration": "LEFT_STRESS_INSPECTION",
     "rounded_window_stress_distribution": "RIGHT_FLOW_INSPECTION",
     "squarish_window_fatigue_rupture": "LEFT_FATIGUE_PAYOFF",
+    SHAPE_CONTRAST_INTRO_CLAIM_ID: "SHAPE_CONTRAST_INTRO",
 }
 _GDE_SCENE_ROLES = {
     "squarish_window_stress_concentration": "mechanism",
     "rounded_window_stress_distribution": "mechanism",
     "squarish_window_fatigue_rupture": "result",
+    SHAPE_CONTRAST_INTRO_CLAIM_ID: "question",
 }
 
 
@@ -132,6 +141,13 @@ def _gde_build_plan(scene, eligibility):
 
 def plan_explanation(scene):
     eligibility = supports_aircraft_window_stress_from_grounding(scene)
+    if not eligibility:
+        # Run 34663907508 (HUMAN QA FAILURE B): a claim-owning scene stays
+        # exclusively on the path above. This second, independent check only
+        # ever applies to a question-role, no-owned-claim scene whose own
+        # visual_goal asked for a shape comparison -- never a relaxation of
+        # the three-claim eligibility.
+        eligibility = supports_aircraft_window_shape_contrast_intro_from_grounding(scene)
     if eligibility:
         plan = _gde_build_plan(scene, eligibility)
         if plan is not None:
@@ -141,7 +157,9 @@ def plan_explanation(scene):
 
 def annotation_fact_safe(scene, plan):
     if plan and plan.get("template") == "AIRCRAFT_WINDOW_STRESS_V1":
-        eligibility = supports_aircraft_window_stress_from_grounding(scene)
+        eligibility = supports_aircraft_window_stress_from_grounding(
+            scene
+        ) or supports_aircraft_window_shape_contrast_intro_from_grounding(scene)
         return bool(
             eligibility
             and plan.get("owned_claim_id") in _GDE_SUPPORTED_OWNED_CLAIM_IDS
@@ -265,6 +283,21 @@ def _draw_concept_panel(frame, plan, progress):
         draw.text((470, 990), "곡선을 따라 응력이 분산", font=label_font, fill=(175, 225, 255, 250))
         insight = "현대의 둥근·타원형 창문은 모서리에 쌓이는 응력을 줄입니다"
 
+    elif variant == "SHAPE_CONTRAST_INTRO":
+        # Run 34663907508 (HUMAN QA FAILURE B): this variant renders for a
+        # question-role scene that owns no claim yet. It shows only that the
+        # two corner SHAPES differ -- deliberately no stress/mechanism/result
+        # wording, since that authority belongs exclusively to scenes 3-5.
+        # Balanced sizing/placement (no directional pan bias in
+        # _gde_apply_subtle_inspection either) because neither shape is being
+        # favored: this is the comparison itself, not a claim about it.
+        draw.text((92, 132), "창문 모서리 형태를 비교합니다", font=title_font, fill=(255, 255, 255, 250))
+        _gde_draw_sharp_corner(draw, 220, 640, 300, 34, 220, 60, pulse)
+        draw.text((115, 745), "각진 모서리", font=label_font, fill=(230, 215, 215, 245))
+        _gde_draw_rounded_window(draw, (560, 380, 940, 760), 230, 210, progress)
+        draw.text((640, 800), "둥근 모서리", font=label_font, fill=(200, 225, 245, 245))
+        insight = "창문 모서리 형태는 각진 모양과 둥근 모양으로 나뉩니다"
+
     else:
         draw.text((92, 132), "응력 집중이 반복되면 재료가 피로해집니다", font=title_font, fill=(255, 255, 255, 250))
         _gde_draw_sharp_corner(draw, 205, 820, 420, 40, 250, 92, pulse, fatigue=True)
@@ -350,6 +383,42 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
     return None
 '''
 
+# Run 34663907508 (HUMAN QA FAILURE B): skip both existing single-state
+# reuse paths (verified-question-subject reuse and generic anchor-based
+# still reuse) for exactly the scenes now eligible for the neutral
+# SHAPE_CONTRAST_INTRO deterministic render above, so a single reused photo
+# can no longer silently satisfy a comparison visual_goal. Reuses the same
+# eligibility function as the single source of truth for "this scene needs
+# an actual two-shape comparison, not one photo" -- no duplicated
+# condition, no new Vision/API call, no still-generation budget change
+# (the deterministic render below draws with Pillow only, using the
+# existing independent MAX_EXPLANATION_TRANSFORMS_PER_VIDEO ceiling, not
+# STILL_IMAGE_MAX_PER_VIDEO).
+_STILL_FALLBACK_APPEND = r'''
+
+# WINDOW_COMPARISON_INTENT_SKIP_V1
+from video.aircraft_window_stress_grounding import (
+    supports_aircraft_window_shape_contrast_intro_from_grounding,
+)
+
+_window_comparison_original_generate_still_motion_fallback = generate_still_motion_fallback
+
+
+def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reason="semantic_scarcity"):
+    if supports_aircraft_window_shape_contrast_intro_from_grounding(scene):
+        print(
+            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=comparison_intent_skip "
+            f"trigger={trigger_reason}"
+        )
+        return None
+    return _window_comparison_original_generate_still_motion_fallback(
+        scene,
+        output_path=output_path,
+        duration=duration,
+        trigger_reason=trigger_reason,
+    )
+'''
+
 
 def main():
     text = PATH.read_text(encoding="utf-8")
@@ -399,6 +468,22 @@ def main():
         print("✅ Aircraft-window UNKNOWN stock is rejected before fallback selection")
     else:
         print("ℹ️ Aircraft-window human visual quality gate already installed")
+
+    still_fallback = STILL_FALLBACK_PATH.read_text(encoding="utf-8")
+    if COMPARISON_SKIP_MARKER not in still_fallback:
+        if "def generate_still_motion_fallback(" not in still_fallback:
+            raise RuntimeError(
+                "window comparison-intent skip requires still_image_fallback.generate_still_motion_fallback"
+            )
+        if "def _scene_id(scene):" not in still_fallback:
+            raise RuntimeError("window comparison-intent skip requires still_image_fallback._scene_id")
+        STILL_FALLBACK_PATH.write_text(
+            still_fallback.rstrip() + "\n" + _STILL_FALLBACK_APPEND + "\n",
+            encoding="utf-8",
+        )
+        print("✅ Comparison-intent question scenes no longer satisfied by single-state reuse")
+    else:
+        print("ℹ️ Window comparison-intent reuse skip already installed")
 
 
 if __name__ == "__main__":

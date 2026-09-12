@@ -228,3 +228,89 @@ def supports_aircraft_window_stress_from_grounding(scene, candidate=None):
         "grounding_provenance_ref": _text(supply.get("grounding_source")),
         "_canonical_subject_text": _text(supply.get("canonical_subject")),
     }
+
+
+# Run 34663907508 (HUMAN QA FAILURE B): a "question" beat scene owns no
+# claim yet -- by the existing grounded-plan design a question scene is
+# never supposed to answer anything (content.grounded_claim_plan reserves
+# claim ownership starting at scene 3). But its Writer-authored visual_goal
+# can still legitimately ask for a squarish-vs-rounded shape comparison
+# before any mechanism claim is revealed (Run 34663907508's own Visual
+# Judge praised exactly this script-level intent: "둥근 창문과 각진 창문의
+# 대비가 효과적으로 나타나고 있습니다"). The previous behaviour let a single
+# reused verified still silently satisfy that comparison goal
+# (REUSED_VERIFIED_QUESTION_SUBJECT_MOTION), which is a false pass: one
+# photo of one window state cannot show a contrast. This is a second,
+# independent eligibility path -- not a relaxation of the three-claim path
+# above -- for the closed, non-causal "shape contrast intro" identity: it
+# asserts only that the two corner *shapes* differ, never any stress/
+# mechanism/result claim (those remain scene 3-5's exclusive authority).
+SHAPE_CONTRAST_INTRO_CLAIM_ID = "window_corner_shape_contrast_intro"
+
+# General (non-topic-specific) Korean/English comparison-intent markers a
+# Writer-authored visual_goal uses when it asks for two states shown
+# together. Not a semantic classifier -- a closed, literal marker list,
+# mirroring the same style as _CLAIM_DISCRIMINATOR_WORDS above.
+_COMPARISON_INTENT_MARKERS = (
+    "비교", "대비", "나란히", "차이", "대조",
+    "versus", " vs ", "vs.", "side by side", "side-by-side", "before", "after",
+)
+
+
+def _visual_goal_expresses_comparison_intent(scene):
+    if not isinstance(scene, dict):
+        return False
+    goal = _text(scene.get("visual_goal")).lower()
+    if not goal:
+        return False
+    return any(marker.lower() in goal for marker in _COMPARISON_INTENT_MARKERS)
+
+
+def supports_aircraft_window_shape_contrast_intro_from_grounding(scene, candidate=None):
+    """Eligibility for the neutral SHAPE_CONTRAST_INTRO presentation.
+
+    ALL of the following must hold:
+      - the scene is a "question" beat (existing authoritative role) that
+        owns no claim (explicit owned_claim_id absent) -- this path never
+        applies to a claim-owning scene, which stays exclusively governed by
+        supports_aircraft_window_stress_from_grounding above
+      - its Writer-authored visual_goal explicitly expresses comparison
+        intent (closed marker list, not inferred from narration/keyword)
+      - existing canonical visual supply provenance identifies the exact
+        aircraft-passenger-window subject (same authority as the claim path)
+      - the window subject anchors (aircraft + window) are present
+
+    Deliberately does NOT require a claim discriminator word (a question
+    scene's deterministic keyword never carries one by design) and does NOT
+    resolve any owned_claim_id from role/causal_role -- it always returns
+    the fixed SHAPE_CONTRAST_INTRO_CLAIM_ID identity, since this path never
+    asserts a specific mechanism/result claim.
+    """
+    if not isinstance(scene, dict):
+        return None
+
+    role = _text(scene.get("role")).lower()
+    if role != "question":
+        return None
+    if _text(scene.get("owned_claim_id")):
+        return None
+    if not _visual_goal_expresses_comparison_intent(scene):
+        return None
+
+    supply = _window_canonical_supply_present(scene)
+    if supply is None:
+        return None
+
+    anchors = _window_subject_anchor_words(scene)
+    if set(anchors) != {"aircraft", "window"}:
+        return None
+
+    return {
+        "template_id": "AIRCRAFT_WINDOW_STRESS_V1",
+        "presentation": "CONTRAST",
+        "canonical_subject_id": canonical_subject_id(supply.get("canonical_subject")),
+        "owned_claim_id": SHAPE_CONTRAST_INTRO_CLAIM_ID,
+        "evidence_source": "TRUSTED_GROUNDING",
+        "grounding_provenance_ref": _text(supply.get("grounding_source")),
+        "_canonical_subject_text": _text(supply.get("canonical_subject")),
+    }
