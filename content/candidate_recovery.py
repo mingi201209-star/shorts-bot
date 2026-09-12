@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+from quality.canonical_subject_grounding import evaluate_candidate_subject_grounding
+
 
 _PLACEHOLDER_MARKERS = (
     "재탐색이 필요한 구체적인 이유",
@@ -151,6 +153,27 @@ def recovery_eligibility(candidate, gate_result):
 
     if _reason_is_novelty_reject(reason):
         return False, "hard_novelty_reject"
+
+    # RUN_34689059742_RECOVERY_CANONICAL_GROUNDING_V1
+    # A Candidate Gate rejection can be purely editorial (evaluate_candidate
+    # returns early on that REGENERATE, before it ever reaches the canonical
+    # subject grounding check) even when the candidate's own subject_kind /
+    # canonical_subject was never resolved. The Gate's rejection reason then
+    # says nothing about grounding at all, so pattern-matching that reason
+    # text (above) cannot see the problem. Run 34689059742 recovered exactly
+    # such a candidate ("도로에서 보이는 미세한 경사", soft_editorial_reject)
+    # straight into Script Generator, where the same pre-Writer
+    # CANONICAL_SUBJECT_GROUNDING_GATE_V1 ran for the first time and hard-
+    # crashed the whole production instead of failing this one recovery
+    # candidate closed.
+    #
+    # Reuse the existing deterministic gate function directly (no new LLM/
+    # network call, no synthesized grounding, no relaxation of that gate) so
+    # a recovered candidate must satisfy the exact same pre-Writer grounding
+    # contract a normal SELECTED candidate already has to.
+    grounding = evaluate_candidate_subject_grounding(candidate)
+    if grounding.get("status") != "PASS":
+        return False, "pre_writer_grounding_unresolved"
 
     return True, "soft_editorial_reject"
 
