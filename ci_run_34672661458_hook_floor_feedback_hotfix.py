@@ -25,9 +25,10 @@ def apply_hook_floor_feedback(text: str) -> str:
 
     Run 34702571133 later added a second automatic Candidate-regeneration path
     after nonpersistent rewrite exhaustion. Both paths intentionally print the
-    same reason/budget tail, so the old tail-only anchor became ambiguous.
-    Anchor through the original generic Candidate-regeneration banner instead;
-    the rewrite-exhaustion path has a distinct banner and must stay untouched.
+    same reason/budget tail, so the old tail-only anchor can become ambiguous.
+    Preserve the original single-tail fixture behavior, but when multiple tails
+    exist select only the original generic Candidate-regeneration banner. The
+    rewrite-exhaustion path has a distinct banner and must stay untouched.
 
     This patch only copies that already-produced reason into the existing
     fixed_topic_gate_feedback channel. It adds no Candidate attempt, Rewrite,
@@ -44,21 +45,7 @@ def apply_hook_floor_feedback(text: str) -> str:
     if not all(marker in text for marker in prerequisites):
         return text
 
-    anchor = '''                print("")
-                print("=" * 64)
-
-                print(
-                    "♻️ CANDIDATE REGENERATION"
-                )
-
-                print("=" * 64)
-
-                print(
-                    "폐기 소재:",
-                    rejected_topic,
-                )
-
-                print(
+    tail_anchor = '''                print(
                     "이유:",
                     quality_result.get(
                         "reason",
@@ -74,21 +61,7 @@ def apply_hook_floor_feedback(text: str) -> str:
                 ):
 '''
 
-    replacement = '''                print("")
-                print("=" * 64)
-
-                print(
-                    "♻️ CANDIDATE REGENERATION"
-                )
-
-                print("=" * 64)
-
-                print(
-                    "폐기 소재:",
-                    rejected_topic,
-                )
-
-                print(
+    tail_replacement = '''                print(
                     "이유:",
                     quality_result.get(
                         "reason",
@@ -133,14 +106,50 @@ def apply_hook_floor_feedback(text: str) -> str:
                 ):
 '''
 
-    count = text.count(anchor)
-    if count != 1:
-        raise RuntimeError(
-            "Run 34672661458 Hook-floor feedback marker count mismatch: "
-            f"{count}"
+    tail_count = text.count(tail_anchor)
+
+    # Legacy/minimal regression fixture and older compositions only have one
+    # eligible reason/budget tail. Preserve that behavior exactly.
+    if tail_count == 1:
+        return text.replace(
+            tail_anchor,
+            tail_replacement,
+            1,
         )
 
-    return text.replace(anchor, replacement, 1)
+    # Final Run 34702571133 composition has two equivalent tails. Select the
+    # original REGENERATE_TOPIC block through its unique banner so the new
+    # rewrite-exhaustion recovery remains untouched.
+    banner_prefix = '''                print("")
+                print("=" * 64)
+
+                print(
+                    "♻️ CANDIDATE REGENERATION"
+                )
+
+                print("=" * 64)
+
+                print(
+                    "폐기 소재:",
+                    rejected_topic,
+                )
+
+'''
+    targeted_anchor = banner_prefix + tail_anchor
+    targeted_replacement = banner_prefix + tail_replacement
+
+    targeted_count = text.count(targeted_anchor)
+    if targeted_count != 1:
+        raise RuntimeError(
+            "Run 34672661458 Hook-floor feedback marker count mismatch: "
+            f"tail={tail_count}, targeted={targeted_count}"
+        )
+
+    return text.replace(
+        targeted_anchor,
+        targeted_replacement,
+        1,
+    )
 
 
 def _install_hook_body_reuse() -> None:
