@@ -13,65 +13,62 @@ from ci_run_34676516725_fixed_topic_hook_body_reuse_hotfix import (
 
 
 FIXTURE = '''def main():
-    forced_topic = "fixed"
-    fixed_topic_gate_feedback = ""
+    try:
+        forced_topic = "fixed"
+        fixed_topic_gate_feedback = ""
 
-    final_script = None
-    fixed_topic_hook_recovery_script = None_unused
+        final_script = None
 
-    for topic_attempt in range(1, total_topic_attempts + 1):
-        winner = {}
-        # RUN_34671707523_OPENING_CANDIDATE_RECOVERY_V1
-        # =================================================
-        # Winner Script
-        # =================================================
-        script_data = (
-            generate_script(
-                topic_info,
-                winner,
+        for topic_attempt in range(1, total_topic_attempts + 1):
+            winner = {}
+            # RUN_34671707523_OPENING_CANDIDATE_RECOVERY_V1
+            # =================================================
+            # Winner Script
+            # =================================================
+            script_data = (
+                generate_script(
+                    topic_info,
+                    winner,
+                )
             )
-        )
 
-        if not isinstance(script_data, dict):
-            raise RuntimeError("bad")
+            if not isinstance(script_data, dict):
+                raise RuntimeError("bad")
 
-        # =================================================
-        # Quality
-        # =================================================
+            # =================================================
+            # Quality
+            # =================================================
 
-        quality_result = (
-            run_quality_process(
-                script_data
+            quality_result = (
+                run_quality_process(
+                    script_data
+                )
             )
-        )
 
-        status = quality_result.get("status")
-        if status == "REGENERATE_TOPIC":
-            # RUN_34672661458_HOOK_FLOOR_FEEDBACK_V1
-            if forced_topic:
-                hook_floor_reason = str(
-                    quality_result.get(
-                        "reason",
-                        "",
-                    )
-                ).strip()
-                if hook_floor_reason.startswith(
-                    "Fixed-topic Hook가 bounded rewrite 후에도 "
-                    "기존 품질 floor 미달"
-                ):
-                    fixed_topic_gate_feedback = (
-                        hook_floor_reason
-                    )
+            status = quality_result.get("status")
+            if status == "REGENERATE_TOPIC":
+                # RUN_34672661458_HOOK_FLOOR_FEEDBACK_V1
+                if forced_topic:
+                    hook_floor_reason = str(
+                        quality_result.get(
+                            "reason",
+                            "",
+                        )
+                    ).strip()
+                    if hook_floor_reason.startswith(
+                        "Fixed-topic Hook가 bounded rewrite 후에도 "
+                        "기존 품질 floor 미달"
+                    ):
+                        fixed_topic_gate_feedback = (
+                            hook_floor_reason
+                        )
+    except Exception:
+        raise
 '''
 
 
 def main():
-    fixture = FIXTURE.replace(
-        "    fixed_topic_hook_recovery_script = None_unused\n",
-        "",
-    )
-
-    patched = apply_fixed_topic_hook_body_reuse(fixture)
+    patched = apply_fixed_topic_hook_body_reuse(FIXTURE)
 
     assert MARKER in patched
     assert patched == apply_fixed_topic_hook_body_reuse(patched)
@@ -117,6 +114,8 @@ def main():
     assert "openai." not in patched
     assert "authorize_call(" not in patched
     assert "call_llm(" not in patched
+
+    compile(patched, "synthetic-main.py", "exec")
 
     print("RUN 34676516725 FIXED-TOPIC HOOK BODY REUSE REGRESSION: PASS")
 
