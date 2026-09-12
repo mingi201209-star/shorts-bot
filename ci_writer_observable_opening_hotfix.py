@@ -644,3 +644,12 @@ _patch_flap_director_repair()
 # no validator/retry/API/cost change.
 from ci_run_34645762458_candidate_feedback_hotfix import main as _patch_candidate_feedback
 _patch_candidate_feedback()
+
+# Run 34663907508 machine-green production still failed HUMAN QA: the final,
+# post-Rewrite Scene 1/2 pair repeated the opening's information stage in a
+# way PR #330's Candidate-level restatement guard did not catch (longer,
+# meta-teaser-padded Writer/Rewrite prose dilutes that guard's token-overlap
+# ratio). Add a second, independent, additive final-gate check -- never a
+# relaxation of the existing Candidate-level guard.
+from ci_run_34663907508_human_qa_escape_hotfix import main as _patch_opening_human_qa_escape
+_patch_opening_human_qa_escape()
