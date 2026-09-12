@@ -10,20 +10,37 @@ Authority failures reproduced here:
    progression; exact duplicates must still fail closed.
 """
 
+import ast
+from pathlib import Path
+
 from video.aircraft_window_stress_grounding import (
     SHAPE_CONTRAST_INTRO_CLAIM_ID,
     supports_aircraft_window_shape_contrast_intro_from_grounding,
 )
-from video.visual_explanation import (
-    MAX_EXPLANATION_TRANSFORMS_PER_VIDEO,
-    _information_signature_for_plan,
-)
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+VISUAL_EXPLANATION = REPO_ROOT / "video" / "visual_explanation.py"
 SUPPLY = {
     "canonical_subject": "modern aircraft passenger window with rounded/oval corners",
     "grounding_source": "faa_comet_lessons_v1",
 }
+
+
+def _load_information_signature_helper():
+    """Load only the pure helper, avoiding moviepy/Pillow CI dependencies."""
+    source = VISUAL_EXPLANATION.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    matches = [
+        node for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == "_information_signature_for_plan"
+    ]
+    assert len(matches) == 1, "information-signature helper must exist exactly once"
+    module = ast.Module(body=[matches[0]], type_ignores=[])
+    namespace = {}
+    exec(compile(module, str(VISUAL_EXPLANATION), "exec"), namespace)
+    return namespace["_information_signature_for_plan"], source
 
 
 def _question_scene(keyword, visual_goal="둥근 창문 모서리를 강조하며 질문을 제시합니다."):
@@ -46,6 +63,8 @@ def _grounded_plan(claim, presentation, param_signature):
 
 
 def main():
+    information_signature_for_plan, visual_source = _load_information_signature_helper()
+
     # Exact Run #524 Scene-2 shape: no explicit comparison word in visual_goal,
     # but the existing deterministic query lock carries rounded+corners under
     # trusted aircraft-window grounding. It must route to the neutral two-shape
@@ -81,28 +100,30 @@ def main():
         "LEFT_FATIGUE_PAYOFF",
         "sig-fatigue",
     )
-    scene4_sig = _information_signature_for_plan(asset_id, scene4_plan)
-    scene5_sig = _information_signature_for_plan(asset_id, scene5_plan)
+    scene4_sig = information_signature_for_plan(asset_id, scene4_plan)
+    scene5_sig = information_signature_for_plan(asset_id, scene5_plan)
     assert scene4_sig != scene5_sig
 
     # Exact repeat remains a repeat. We are refining information identity, not
     # disabling the duplicate guard.
-    assert scene4_sig == _information_signature_for_plan(asset_id, dict(scene4_plan))
+    assert scene4_sig == information_signature_for_plan(asset_id, dict(scene4_plan))
 
     # Anything outside the closed trusted aircraft-window plan keeps the old
     # physical-asset + template identity semantics.
     untrusted_a = dict(scene4_plan, evidence_source="UNVERIFIED")
     untrusted_b = dict(scene5_plan, evidence_source="UNVERIFIED")
-    assert _information_signature_for_plan(asset_id, untrusted_a) == (
+    assert information_signature_for_plan(asset_id, untrusted_a) == (
         asset_id,
         "AIRCRAFT_WINDOW_STRESS_V1",
     )
-    assert _information_signature_for_plan(asset_id, untrusted_a) == _information_signature_for_plan(
+    assert information_signature_for_plan(asset_id, untrusted_a) == information_signature_for_plan(
         asset_id, untrusted_b
     )
 
-    # No explanation budget increase accompanies this recovery.
-    assert MAX_EXPLANATION_TRANSFORMS_PER_VIDEO == 3
+    # No explanation budget increase accompanies this recovery. Check the
+    # source declaration itself so the test remains dependency-free.
+    assert 'os.environ.get("MAX_EXPLANATION_TRANSFORMS_PER_VIDEO", "3")' in visual_source
+    assert "# RUN_34675233154_GROUNDED_INFORMATION_IDENTITY_V1" in visual_source
 
     print("Run 34675233154 window visual progression regression PASS")
 
