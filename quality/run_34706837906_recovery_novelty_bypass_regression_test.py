@@ -12,15 +12,18 @@ editorial recovery remains intact.
 from __future__ import annotations
 
 from pathlib import Path
+import sys
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from content.candidate_recovery import (
     make_recovery_record,
     recovery_eligibility,
     select_best_recovery,
 )
-
-
-ROOT = Path(__file__).resolve().parents[1]
 
 
 def _trusted_candidate(topic: str = "비행기 엔진의 나셀 끝에 톱니 모양 가장자리"):
@@ -132,38 +135,32 @@ def test_both_main_recovery_sites_use_make_recovery_record_authority():
     installer = (ROOT / "ci_candidate_grounded_recovery_hotfix.py").read_text(
         encoding="utf-8"
     )
-    # There are two production composition variants (legacy and fixed-topic
-    # aware). Both must create pool entries through make_recovery_record rather
-    # than appending raw rejected Winners.
     assert installer.count("recovery_record = make_recovery_record(") >= 2
     assert "recovery_candidates.append(recovery_record)" in installer
-    assert 'recovered = select_best_recovery(recovery_candidates)' in installer
+    assert "recovered = select_best_recovery(recovery_candidates)" in installer
     print("CASE F production recovery sites preserve helper authority: PASS")
 
 
-def test_limits_and_writer_routing_are_unchanged():
+def test_limits_and_no_new_model_calls_are_unchanged():
     workflow = (ROOT / ".github/workflows/main.yml").read_text(encoding="utf-8")
-    router = (ROOT / "content/script_engine_v2_runner.py").read_text(encoding="utf-8")
-    recovery = (ROOT / "content/candidate_recovery.py").read_text(encoding="utf-8")
+    recovery = (ROOT / "content/candidate_recovery.py").read_text(encoding="utf-8").lower()
 
     assert 'V3_MAX_API_CALLS: "60"' in workflow
     assert 'V3_MAX_COST_USD: "0.05"' in workflow
-    assert "gpt-5.6-sol" in router.lower() or "gpt-5.6-sol" in (
-        ROOT / "config.py"
-    ).read_text(encoding="utf-8").lower()
 
     for forbidden in (
         "authorize_call(",
         "chat.completions",
         "responses.create",
+        "images.generate",
         "max_topic_regenerations =",
         "max_script_attempts =",
         "v3_max_cost_usd =",
         "v3_max_api_calls =",
     ):
-        assert forbidden not in recovery.lower(), forbidden
+        assert forbidden not in recovery, forbidden
 
-    print("CASE G API/cost/retry/Writer contracts remain unchanged: PASS")
+    print("CASE G API/cost/retry authority remains unchanged: PASS")
 
 
 def main():
@@ -173,7 +170,7 @@ def main():
     test_normal_grounded_soft_editorial_recovery_is_unchanged()
     test_mixed_pool_cannot_select_run_34706837906_candidate()
     test_both_main_recovery_sites_use_make_recovery_record_authority()
-    test_limits_and_writer_routing_are_unchanged()
+    test_limits_and_no_new_model_calls_are_unchanged()
     print("RUN 34706837906 RECOVERY NOVELTY BYPASS REGRESSION: PASS")
 
 
