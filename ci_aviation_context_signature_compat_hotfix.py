@@ -134,6 +134,34 @@ def _reapply_final_run_336911_guard():
     patch_run_33691170895()
 
 
+def _apply_run_526_human_visual_progression_if_ready():
+    # This compatibility installer intentionally runs twice in production:
+    # once early and once after grounded deterministic visual composition.
+    # Run #526's payoff-state guard requires the latter state because
+    # WINDOW_COMPARISON_INTENT_SKIP_V1 and AIRCRAFT_WINDOW_STRESS_V1 are
+    # installed by ci_grounded_deterministic_explanation_hotfix.py.
+    validation_path = Path("content/script_engine_v2_validation.py")
+    still_path = Path("video/still_image_fallback.py")
+    explanation_path = Path("video/visual_explanation.py")
+    if not (validation_path.exists() and still_path.exists() and explanation_path.exists()):
+        return
+    validation = validation_path.read_text(encoding="utf-8")
+    still = still_path.read_text(encoding="utf-8")
+    explanation = explanation_path.read_text(encoding="utf-8")
+    ready = (
+        "# RUN_34663907508_OPENING_HUMAN_CONTRACT_V1" in validation
+        and "# WINDOW_COMPARISON_INTENT_SKIP_V1" in still
+        and "# GROUNDED_DETERMINISTIC_EXPLANATION_V1" in explanation
+    )
+    if not ready:
+        print("⏭️ Run 34682392892 human/visual progression deferred until grounded final composition")
+        return
+    from ci_run_34682392892_human_visual_progression_hotfix import (
+        main as patch_run_34682392892,
+    )
+    patch_run_34682392892()
+
+
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
 
@@ -168,6 +196,7 @@ def main():
     _apply_final_script_scene_recovery_if_ready()
     _patch_script_engine_router()
     _reapply_final_run_336911_guard()
+    _apply_run_526_human_visual_progression_if_ready()
     print("✅ Aviation fixed-topic + automatic gate-feedback compatibility applied")
 
 
