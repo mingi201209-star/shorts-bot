@@ -180,3 +180,8 @@ def main():
 
 
 main()
+
+# Run 34708987774: deterministic repo-owned seeds can overlap multiple generic
+# text descriptions even though the originating trusted record is already known.
+# Install a fail-closed in-memory identity scope after the seed supplier exists.
+import ci_run_34708987774_grounded_seed_identity_hotfix  # noqa: E402,F401
