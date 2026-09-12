@@ -11,7 +11,12 @@ Authority failures reproduced here:
 """
 
 import ast
+import sys
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from video.aircraft_window_stress_grounding import (
     SHAPE_CONTRAST_INTRO_CLAIM_ID,
@@ -19,7 +24,6 @@ from video.aircraft_window_stress_grounding import (
 )
 
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
 VISUAL_EXPLANATION = REPO_ROOT / "video" / "visual_explanation.py"
 SUPPLY = {
     "canonical_subject": "modern aircraft passenger window with rounded/oval corners",
