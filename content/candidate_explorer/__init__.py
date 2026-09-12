@@ -106,8 +106,26 @@ def explore_candidates(
     recent_content=None,
     rejected_topics=None,
     fixed_topic=None,
+    fixed_topic_gate_feedback=None,
     model=None,
 ):
+    # RUN_34685288234_FIXED_TOPIC_GATE_FEEDBACK_SHADOW_FIX_V1
+    # This package shadows content/candidate_explorer.py (a package always
+    # wins import resolution over a same-named module), so every call from
+    # main.py resolves here, not to the legacy file. Until this fix, this
+    # wrapper's own signature never accepted fixed_topic_gate_feedback, so
+    # main.py's call (main.py's primary explore_candidates(...,
+    # fixed_topic_gate_feedback=...) call site, installed by
+    # ci_topic_input_hotfix.py / ci_run_34645762458_candidate_feedback_hotfix.py)
+    # always raised TypeError here, silently falling back (via
+    # ci_fixed_topic_runtime_call_compat_hotfix.py's except TypeError branch)
+    # to stuffing the rejection reason into rejected_topics -- a no-op in
+    # fixed-topic mode, since the topic itself never changes. The legacy
+    # module (content/candidate_explorer.py) and every hotfix that patches it
+    # already correctly wire fixed_topic_gate_feedback into the Explorer
+    # prompt's "[PREVIOUS CANDIDATE GATE FEEDBACK]" section; this wrapper only
+    # needed to stop dropping the argument. No prompt/validator/threshold
+    # change -- purely restores an already-designed feedback path.
     kwargs = {
         "recent_topics": recent_topics,
         "recent_content": recent_content,
@@ -115,6 +133,8 @@ def explore_candidates(
     }
     if fixed_topic is not None:
         kwargs["fixed_topic"] = fixed_topic
+    if fixed_topic_gate_feedback is not None:
+        kwargs["fixed_topic_gate_feedback"] = fixed_topic_gate_feedback
     if model is not None:
         kwargs["model"] = model
 
