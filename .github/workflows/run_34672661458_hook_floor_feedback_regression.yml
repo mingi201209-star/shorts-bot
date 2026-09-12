@@ -1,0 +1,30 @@
+name: Run 34672661458 Hook Floor Feedback Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_run_34672661458_hook_floor_feedback_hotfix.py'
+      - 'ci_run_34671707523_opening_candidate_recovery_hotfix.py'
+      - 'quality/run_34672661458_hook_floor_feedback_regression_test.py'
+      - 'ci_fixed_topic_gate_advisory_hotfix.py'
+      - 'ci_topic_input_hotfix.py'
+      - 'main.py'
+      - '.github/workflows/run_34672661458_hook_floor_feedback_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile feedback installer and regression
+        run: |
+          python -m py_compile \
+            ci_run_34672661458_hook_floor_feedback_hotfix.py \
+            ci_run_34671707523_opening_candidate_recovery_hotfix.py \
+            quality/run_34672661458_hook_floor_feedback_regression_test.py
+      - name: Run authority regression
+        run: python quality/run_34672661458_hook_floor_feedback_regression_test.py
