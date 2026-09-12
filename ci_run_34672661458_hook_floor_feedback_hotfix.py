@@ -36,8 +36,6 @@ def apply_hook_floor_feedback(text: str) -> str:
         HOOK_EXHAUSTION_MARKER,
     )
     if not all(marker in text for marker in prerequisites):
-        # Partial/early fixtures may not yet have the fixed-topic Hook
-        # exhaustion recovery composed. Defer safely there.
         return text
 
     anchor = '''                print(
@@ -111,6 +109,14 @@ def apply_hook_floor_feedback(text: str) -> str:
     return text.replace(anchor, replacement, 1)
 
 
+def _install_hook_body_reuse() -> None:
+    from ci_run_34676516725_fixed_topic_hook_body_reuse_hotfix import (
+        main as _hook_body_reuse_main,
+    )
+
+    _hook_body_reuse_main()
+
+
 def main() -> None:
     text = PATH.read_text(encoding="utf-8")
     patched = apply_hook_floor_feedback(text)
@@ -122,13 +128,14 @@ def main() -> None:
                 "⏭️ Run 34672661458 Hook-floor feedback deferred until "
                 "fixed-topic Hook exhaustion composition"
             )
-        return
+    else:
+        PATH.write_text(patched, encoding="utf-8")
+        print(
+            "✅ Run 34672661458 Hook-floor feedback propagation installed; "
+            "quality floors/retries/API/cost limits unchanged"
+        )
 
-    PATH.write_text(patched, encoding="utf-8")
-    print(
-        "✅ Run 34672661458 Hook-floor feedback propagation installed; "
-        "quality floors/retries/API/cost limits unchanged"
-    )
+    _install_hook_body_reuse()
 
 
 if __name__ == "__main__":
