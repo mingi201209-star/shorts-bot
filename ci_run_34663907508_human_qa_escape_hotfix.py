@@ -174,10 +174,23 @@ def validate_scene_basics(script, plan):
 '''
 
 
+def _patch_run_34671707523_candidate_recovery() -> None:
+    # Run 34671707523 showed that a fixed-topic Candidate can pass the older
+    # Candidate overlap heuristic but still deterministically fail this final
+    # opening contract after SCRIPT_OPENING_LOCK_V1. Chain the bounded
+    # Candidate-level recovery only after this validator exists.
+    from ci_run_34671707523_opening_candidate_recovery_hotfix import (
+        main as _candidate_recovery_main,
+    )
+
+    _candidate_recovery_main()
+
+
 def main():
     text = PATH.read_text(encoding="utf-8")
     if MARKER in text:
         print("Run 34663907508 opening human contract already installed")
+        _patch_run_34671707523_candidate_recovery()
         return
     if "def validate_scene_basics(" not in text:
         raise RuntimeError(
@@ -186,6 +199,7 @@ def main():
         )
     PATH.write_text(text.rstrip() + "\n" + _APPEND + "\n", encoding="utf-8")
     print("✅ Run 34663907508 opening human contract installed; no threshold/retry/budget change")
+    _patch_run_34671707523_candidate_recovery()
 
 
 if __name__ == "__main__":

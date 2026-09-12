@@ -1,0 +1,30 @@
+name: Run 34671707523 Opening Candidate Recovery Regression
+
+on:
+  pull_request:
+    paths:
+      - 'ci_run_34671707523_opening_candidate_recovery_hotfix.py'
+      - 'ci_run_34663907508_human_qa_escape_hotfix.py'
+      - 'quality/run_34671707523_opening_candidate_recovery_regression_test.py'
+      - 'ci_writer_observable_opening_hotfix.py'
+      - 'content/script_engine_v2_validation.py'
+      - 'main.py'
+      - '.github/workflows/run_34671707523_opening_candidate_recovery_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Compile recovery installer and regression
+        run: |
+          python -m py_compile \
+            ci_run_34671707523_opening_candidate_recovery_hotfix.py \
+            ci_run_34663907508_human_qa_escape_hotfix.py \
+            quality/run_34671707523_opening_candidate_recovery_regression_test.py
+      - name: Run authority regression
+        run: python quality/run_34671707523_opening_candidate_recovery_regression_test.py
