@@ -117,6 +117,18 @@ def _install_hook_body_reuse() -> None:
     _hook_body_reuse_main()
 
 
+def _install_run_527_candidate_opening_recovery() -> None:
+    # Run 34685288234 failed before Writer because all seven fixed-topic
+    # Candidate attempts repeated Hook -> Core Question despite feedback.
+    # Install the zero-call Candidate-owned projection after the Script Human
+    # Quality contract exists.  Existing validators remain authoritative.
+    from ci_run_34685288234_fixed_topic_candidate_opening_hotfix import (
+        main as _run_527_candidate_opening_main,
+    )
+
+    _run_527_candidate_opening_main()
+
+
 def main() -> None:
     text = PATH.read_text(encoding="utf-8")
     patched = apply_hook_floor_feedback(text)
@@ -136,6 +148,7 @@ def main() -> None:
         )
 
     _install_hook_body_reuse()
+    _install_run_527_candidate_opening_recovery()
 
 
 if __name__ == "__main__":
