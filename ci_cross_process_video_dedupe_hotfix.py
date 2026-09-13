@@ -135,3 +135,14 @@ import ci_grounded_causal_contrast_hotfix  # noqa: F401,E402
 import ci_live_script_blockers_hotfix  # noqa: F401,E402
 import ci_run_33245676515_script_contract_hotfix  # noqa: F401,E402
 import ci_grounded_keyword_contract_hotfix  # noqa: F401,E402
+
+# Run 34786153210 HUMAN QA: workflow SUCCESS rendered generic night-vision and
+# wing B-roll because spoiler disappeared from the final required-anchor state.
+# Execute the assertion in a fresh interpreter so it observes the files exactly
+# as this real production composition leaves them, not cached imported modules.
+import subprocess  # noqa: E402
+import sys  # noqa: E402
+subprocess.run(
+    [sys.executable, "quality/run_34786153210_spoiler_final_composition_regression_test.py"],
+    check=True,
+)
