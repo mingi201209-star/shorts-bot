@@ -188,6 +188,18 @@ def supply_trusted_subject_grounding(
     if _text(result.get("subject_kind")).lower() == _NON_PHYSICAL_KIND:
         return result
 
+    # Selection and pre-Writer wrappers may supply the same candidate again
+    # against different registries. Preserve an identity already established by
+    # host-owned evidence instead of replacing it through broad prose overlap.
+    # Public/model evidence alone cannot activate this path; the unchanged gate
+    # must pass using only the existing private trusted channel.
+    if result.get("_trusted_grounding_evidence"):
+        from quality.canonical_subject_grounding import evaluate_candidate_subject_grounding
+
+        trusted_only = dict(result, grounding_evidence=[])
+        if evaluate_candidate_subject_grounding(trusted_only).get("status") == "PASS":
+            return result
+
     text = _candidate_text(result)
     matches: List[Dict[str, Any]] = []
     for record in trusted_records or ():
