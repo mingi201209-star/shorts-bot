@@ -81,6 +81,7 @@ def _patch_candidate_pool_handoff() -> None:
     CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS,
 )
 from quality.grounding_aware_candidate_supply import (
+    REPO_OWNED_SEED_RECORD_REF_FIELD,
     repo_owned_seed_trusted_record,
 )
 '''
@@ -120,6 +121,10 @@ from quality.grounding_aware_candidate_supply import (
             validated,
             trusted_records=candidate_trusted_records,
         )
+        if repo_seed_record is not None:
+            # Preserve the exact host-owned capability across supplier deepcopy so
+            # the pre-Writer resupply can keep the same one-record trust scope.
+            grounded[REPO_OWNED_SEED_RECORD_REF_FIELD] = repo_seed_record
 '''
     if text.count(supply_anchor) != 1:
         raise RuntimeError(
