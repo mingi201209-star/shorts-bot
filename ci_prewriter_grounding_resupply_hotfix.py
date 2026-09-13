@@ -26,17 +26,34 @@ PATCH = r'''
 # match for any existing PRODUCTION-registry subject (chevron/flap/wick): each
 # subject's own PRODUCTION record still resolves alone, exactly as before.
 from quality.canonical_subject_grounding_supply import supply_trusted_subject_grounding
-from quality.grounding_aware_candidate_supply import all_trusted_candidate_records
+from quality.grounding_aware_candidate_supply import (
+    REPO_OWNED_SEED_RECORD_REF_FIELD,
+    all_trusted_candidate_records,
+    repo_owned_seed_trusted_record,
+)
 
 _original_generate_script_before_trusted_grounding_resupply = generate_script
 
 
 def generate_script(topic_info, candidate):
     if isinstance(candidate, dict):
+        trusted_records = all_trusted_candidate_records()
+        repo_seed_record = repo_owned_seed_trusted_record(
+            candidate,
+            trusted_records=trusted_records,
+        )
+        candidate_trusted_records = (
+            (repo_seed_record,)
+            if repo_seed_record is not None
+            else trusted_records
+        )
         supplied = supply_trusted_subject_grounding(
             candidate,
-            trusted_records=all_trusted_candidate_records(),
+            trusted_records=candidate_trusted_records,
         )
+        if repo_seed_record is not None:
+            # Keep the unforgeable exact record identity across supplier deepcopy.
+            supplied[REPO_OWNED_SEED_RECORD_REF_FIELD] = repo_seed_record
         # Preserve object identity because downstream wrappers may retain the
         # original Candidate reference. Only deterministic trusted supply data
         # is copied back; unresolved candidates remain fail-closed.
