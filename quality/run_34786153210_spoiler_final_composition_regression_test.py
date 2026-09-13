@@ -8,6 +8,12 @@ This test intentionally applies no hotfix installers. It validates the files as
 composed by the real production chain immediately before generation.
 """
 
+from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 from quality import final_visual_semantic_qa as fvs
 from video import video_downloader as vd
 
