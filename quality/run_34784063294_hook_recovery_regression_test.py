@@ -19,6 +19,7 @@ from quality.candidate_pool_grounding_records import (
     CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS,
 )
 from quality.candidate_pool_handoff import _validate_with_bounded_hook_repair
+from quality.consensus import GOOD_ENOUGH_FLOORS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -132,10 +133,10 @@ def test_safety_budgets_and_floor_unchanged():
     assert 'V3_MAX_API_CALLS: "60"' in workflow
     assert 'V3_MAX_COST_USD: "0.05"' in workflow
 
-    floor_source = (ROOT / "ci_run_34672661458_hook_floor_feedback_hotfix.py").read_text(
-        encoding="utf-8"
-    )
-    assert "FIXED_TOPIC_HOOK_MIN_SCORE = 7.0" in floor_source
+    # #552 was rejected at Hook 6.0 because the production Good Enough Hook
+    # floor is 7.0. Read that real runtime authority instead of inventing a
+    # fixed-topic-only constant in the feedback installer.
+    assert GOOD_ENOUGH_FLOORS["hook"] == 7.0, GOOD_ENOUGH_FLOORS
     print("TEST D API/cost/Hook floor unchanged: PASS")
 
 
