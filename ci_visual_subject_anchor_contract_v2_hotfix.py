@@ -95,6 +95,40 @@ def extract_query_anchors(query):
     return _dedupe_words(anchors)[:3]
 
 
+# #547 Scene 2 carried only "착륙 직후 + 스포일러" in narration and a weak
+# keyword (`why after landing`). A bare source alias therefore produced a
+# one-anchor spoiler contract. Landing context makes this identity unambiguous:
+# bind the named spoiler to the aircraft wing it physically belongs to. Do not
+# apply this to arbitrary automotive/aero spoilers without aviation context.
+_visual_subject_anchor_v2_previous_required_scene_subject_anchors = _required_scene_subject_anchors
+
+
+def _required_scene_subject_anchors(narration, visual_goal):
+    required = list(
+        _visual_subject_anchor_v2_previous_required_scene_subject_anchors(
+            narration, visual_goal
+        )
+    )
+    raw = f"{narration or ''} {visual_goal or ''}".strip().lower()
+    spoiler_aliases = _VISUAL_SOURCE_ANCHOR_ALIASES.get("spoiler", ())
+    spoiler_named = (
+        "spoiler" in required
+        or any(str(alias).lower() in raw for alias in spoiler_aliases)
+    )
+    aviation_context = (
+        bool({"aircraft", "wing"} & set(required))
+        or any(token in raw for token in (
+            "착륙", "항공기", "비행기", "날개", "여객기",
+            "landing", "landed", "aircraft", "airplane", "airliner", "wing",
+        ))
+    )
+    if spoiler_named and aviation_context:
+        combined = _dedupe_words(["aircraft", "wing", "spoiler"] + required)
+        ordered = [anchor for anchor in _VISUAL_ANCHOR_ORDER if anchor in combined]
+        return ordered[:3]
+    return required
+
+
 def _candidate_text_for_visual_contract(candidate):
     if not isinstance(candidate, dict):
         return ""
