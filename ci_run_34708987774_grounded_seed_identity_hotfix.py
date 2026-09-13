@@ -92,12 +92,22 @@ from quality.grounding_aware_candidate_supply import (
         )
     text = text.replace(import_anchor, import_replacement, 1)
 
-    supply_anchor = '''        grounded = supply_trusted_subject_grounding(
+    # Legacy Candidate Pool had generic grounding at loop scope (8 spaces).
+    # Run 34753007203 adds an exact fixed-topic branch first, moving that same
+    # generic fallback under ``else`` (12 spaces). Support both compositions;
+    # never patch both and never alter the exact fixed-topic branch.
+    legacy_supply_anchor = '''        grounded = supply_trusted_subject_grounding(
             validated,
             trusted_records=combined_trusted_records,
         )
 '''
-    supply_replacement = '''        # RUN_34708987774_REPO_OWNED_SEED_HANDOFF_V1
+    nested_supply_anchor = '''            grounded = supply_trusted_subject_grounding(
+                validated,
+                trusted_records=combined_trusted_records,
+            )
+'''
+
+    legacy_supply_replacement = '''        # RUN_34708987774_REPO_OWNED_SEED_HANDOFF_V1
         # A repo-owned deterministic seed already has an exact host-owned record
         # provenance. Restrict the supplier to that ONE record so broad text overlap
         # with another trusted aviation family cannot create a false ambiguity.
@@ -126,12 +136,47 @@ from quality.grounding_aware_candidate_supply import (
             # the pre-Writer resupply can keep the same one-record trust scope.
             grounded[REPO_OWNED_SEED_RECORD_REF_FIELD] = repo_seed_record
 '''
-    if text.count(supply_anchor) != 1:
+
+    nested_supply_replacement = '''            # RUN_34708987774_REPO_OWNED_SEED_HANDOFF_V1
+            # Run 34753007203 exact fixed-topic grounding has already had first
+            # authority above. For its generic fallback, preserve the existing
+            # repo-owned deterministic seed narrowing contract unchanged.
+            repo_seed_record = repo_owned_seed_trusted_record(
+                raw,
+                trusted_records=combined_trusted_records,
+            )
+            candidate_trusted_records = (
+                (repo_seed_record,)
+                if repo_seed_record is not None
+                else combined_trusted_records
+            )
+            if repo_seed_record is not None:
+                diag["trusted_seed_scope"] = str(
+                    repo_seed_record.get("canonical_subject") or ""
+                )
+
+            grounded = supply_trusted_subject_grounding(
+                validated,
+                trusted_records=candidate_trusted_records,
+            )
+            if repo_seed_record is not None:
+                # Preserve the exact host-owned capability across supplier deepcopy so
+                # the pre-Writer resupply can keep the same one-record trust scope.
+                grounded[REPO_OWNED_SEED_RECORD_REF_FIELD] = repo_seed_record
+'''
+
+    legacy_count = text.count(legacy_supply_anchor)
+    nested_count = text.count(nested_supply_anchor)
+    if legacy_count == 1 and nested_count == 0:
+        text = text.replace(legacy_supply_anchor, legacy_supply_replacement, 1)
+    elif legacy_count == 0 and nested_count == 1:
+        text = text.replace(nested_supply_anchor, nested_supply_replacement, 1)
+    else:
         raise RuntimeError(
             "Run 34708987774 handoff supply anchor mismatch: "
-            f"{text.count(supply_anchor)}"
+            f"legacy={legacy_count} nested={nested_count}"
         )
-    text = text.replace(supply_anchor, supply_replacement, 1)
+
     HANDOFF_PATH.write_text(text, encoding="utf-8")
     print("✅ Run 34708987774 repo-owned seed handoff scoping installed")
 
