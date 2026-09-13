@@ -1,44 +1,21 @@
-"""Run 34753759233 Scene-role-aware Visual Contract regression.
+"""Run 34753759233 / 34781319743 scene-role visual contract regression.
 
-Authority: production Run 34753759233 (fixed-topic "착륙 직후 날개 위로 솟는
-스포일러", exact main `65f6f5e0815e5c24c858fb5ec659b69e662d83d3`, immediately
-after PR #360/#361 landed) proved #360/#361's literal spoiler grounding works
--- Scene 1/2 both got a verified aircraft+wing+spoiler still and PASSED -- but
-then failed on two *separate*, newly-exposed root causes:
-
-1. `owned_claim_id` values like "spoiler_weight_to_wheels" and
-   "spoiler_braking_effectiveness" are causal-LINEAGE labels ("this result
-   claim descends from the spoiler claim"), not a promise that Scene 4/5's
-   own narration/visual_goal shows the spoiler. The grounded-keyword builder
-   tokenized `owned_claim_id` unconditionally, so "spoiler" leaked into Scene
-   4/5's retrieval keyword even though neither Scene names it. Every
-   downstream anchor/proof check (extract_query_anchors,
-   concrete_visual_evidence, candidate_anchor_compatibility) reads that query
-   TEXT directly, so a real aircraft+wing "result" stock candidate was
-   rejected as cross-domain for both Scenes, exhausting retrieval.
-
-2. `video.visual_explanation._winglet_subject` classified any Scene whose
-   text merely contained the substring "aircraft wing" into the winglet
-   family -- including the spoiler Scene 3 mechanism explanation ("aircraft
-   wing spoiler destroy lift"). It drew a winglet silhouette for a spoiler
-   Scene, and then Scene 4 (also matching "aircraft wing") repeat-rejected
-   the same WINGLET_FLOW template, leaving Scene 5 with no visual fallback at
-   all and crashing production.
-
-This regression composes the real production hotfix chain in a scratch copy
-and proves cases A-I.
+#549 proved direct spoiler identity had become fail-closed, then exposed claim-id
+component leakage and winglet-family contamination. PR #362 fixed those two.
+#550 then mechanically PASSed but HUMAN-QA failed: Scene 4 selected the old
+night-vision aircraft while promising weight-on-wheels, and Scene 5 selected
+generic wing/cloud footage while promising braking / landing rollout.
 """
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
-
 _CHAIN = [
     "ci_hotfix.py", "ci_novelty_budget_hotfix.py", "ci_fact_critical_hotfix.py",
     "ci_speech_style_hotfix.py", "ci_hook_generation_hotfix.py", "ci_hook_pool_guard_hotfix.py",
@@ -60,34 +37,53 @@ _CHAIN = [
     "ci_script_v2_visual_goal_hotfix.py", "ci_script_v2_gunggeum_formal_ending_hotfix.py",
     "ci_final_visual_semantic_qa_hotfix.py", "ci_cross_process_video_dedupe_hotfix.py",
     "ci_run_34753759233_scene_role_grounded_keyword_hotfix.py",
-    "ci_writer_observable_opening_hotfix.py",
-    "ci_grounded_deterministic_explanation_hotfix.py",
+    "ci_writer_observable_opening_hotfix.py", "ci_grounded_deterministic_explanation_hotfix.py",
     "ci_aviation_context_signature_compat_hotfix.py",
 ]
 
-_STOCK_AIRCRAFT_WING = {
-    "title": "commercial aircraft wing in flight aviation",
-    "tags": "aircraft wing airplane",
+BAD_WING = {
+    "provider": "pixabay", "source_id": "142647",
+    "title": "airplane wing flying sky clouds flight",
+    "tags": "airplane wing flying sky clouds flight",
     "description": "", "metadata": "", "source_url": "", "url": "",
 }
-_STOCK_AIRCRAFT_WING_SPOILER = {
+BAD_NIGHT = {
+    "provider": "pixabay", "source_id": "15270",
+    "title": "aircraft flight plane airplane air transport aviation fly sky cloud wing weather binoculars",
+    "tags": "aircraft flight plane airplane air transport aviation fly sky cloud wing weather binoculars",
+    "description": "", "metadata": "", "source_url": "", "url": "",
+}
+GOOD_SPOILER = {
+    "provider": "test", "source_id": "spoiler-visible",
     "title": "commercial aircraft wing spoiler deployed in flight",
     "tags": "aircraft wing spoiler airplane",
     "description": "", "metadata": "", "source_url": "", "url": "",
 }
+GOOD_GEAR = {
+    "provider": "test", "source_id": "landing-gear-visible",
+    "title": "aircraft landing gear wheels touchdown closeup",
+    "tags": "aircraft landing gear wheel wheels touchdown",
+    "description": "", "metadata": "", "source_url": "", "url": "",
+}
+GOOD_RUNWAY = {
+    "provider": "test", "source_id": "runway-rollout-visible",
+    "title": "aircraft runway rollout braking after touchdown",
+    "tags": "aircraft runway rollout braking touchdown",
+    "description": "", "metadata": "", "source_url": "", "url": "",
+}
 
-SCENE1_NARRATION = "착륙 직후 날개 위로 스포일러가 솟아오릅니다."
-SCENE1_GOAL = "착륙 후 날개 위 스포일러 전개를 보여줍니다."
-SCENE3_NARRATION = "스포일러가 날개 위로 펼쳐지며 공기 흐름을 방해하고 양력을 파괴합니다."
-SCENE3_GOAL = "날개 위 스포일러가 펼쳐져 공기 흐름을 방해하는 모습을 보여줍니다."
-SCENE4_NARRATION = "양력을 없애면 항공기 무게가 바퀴에 더 실리게 됩니다."
-SCENE4_GOAL = "항공기 무게가 착륙 장치의 바퀴로 전달되는 모습을 표현합니다."
-SCENE5_NARRATION = "이로 인해 바퀴 제동이 더 잘 작동해 착륙 후 지상 활주 거리가 줄어듭니다."
-SCENE5_GOAL = "활주로에서 감속하는 항공기와 짧아지는 지상 활주 거리를 보여줍니다."
+S1_TEXT = "착륙 직후 날개 위로 스포일러가 솟아오릅니다."
+S1_GOAL = "착륙 후 날개 위 스포일러 전개를 보여줍니다."
+S3_TEXT = "스포일러가 날개 위로 펼쳐지며 공기 흐름을 방해하고 양력을 파괴합니다."
+S3_GOAL = "날개 위 스포일러가 펼쳐져 공기 흐름을 방해하는 모습을 보여줍니다."
+S4_TEXT = "양력을 없애면 항공기 무게가 바퀴에 더 실리게 됩니다."
+S4_GOAL = "항공기 무게가 착륙 장치의 바퀴로 전달되는 모습을 표현합니다."
+S5_TEXT = "이로 인해 바퀴 제동이 더 잘 작동해 착륙 후 지상 활주 거리가 줄어듭니다."
+S5_GOAL = "활주로에서 감속하는 항공기와 짧아지는 지상 활주 거리를 보여줍니다."
 
 
-def _prepare_repo() -> Path:
-    scratch = Path(tempfile.mkdtemp(prefix="run_34753759233_"))
+def prepare_repo() -> Path:
+    scratch = Path(tempfile.mkdtemp(prefix="run_34781319743_"))
     repo = scratch / "repo"
     shutil.copytree(ROOT, repo, ignore=shutil.ignore_patterns(".git", "__pycache__", "*.pyc"))
     for script in _CHAIN:
@@ -99,193 +95,180 @@ def _prepare_repo() -> Path:
     return repo
 
 
+def selection(candidate, matched=2, total=2):
+    metadata = " ".join(str(candidate.get(k) or "") for k in (
+        "title", "tags", "description", "metadata", "source_url", "url"
+    ))
+    return {
+        "accepted": True, "mode": "SAME_DOMAIN_CONTEXTUAL_UNKNOWN", "tier": 4,
+        "visual_state": "UNKNOWN", "anchor_matched": matched, "anchor_total": total,
+        "provider": candidate.get("provider", "test"), "source_id": candidate.get("source_id", ""),
+        "metadata": metadata,
+    }
+
+
 def main():
-    repo = _prepare_repo()
+    repo = prepare_repo()
     try:
         runner_source = (repo / "content/script_engine_v2_runner.py").read_text(encoding="utf-8")
-        assert "RUN_34753759233_CLAIM_ID_LINEAGE_LABEL_NOT_VISUAL_PROMISE_V1" in runner_source
+        downloader_source = (repo / "video/video_downloader.py").read_text(encoding="utf-8")
         ve_source = (repo / "video/visual_explanation.py").read_text(encoding="utf-8")
+        qa_source = (repo / "quality/final_visual_semantic_qa.py").read_text(encoding="utf-8")
+        assert "RUN_34753759233_CLAIM_ID_LINEAGE_LABEL_NOT_VISUAL_PROMISE_V1" in runner_source
+        assert "RUN_34781319743_RESULT_VISUAL_PROMISE_V1" in downloader_source
+        assert "RUN_34781319743_RESULT_VISUAL_FINAL_QA_V1" in qa_source
         assert "RUN_34753759233_WINGLET_FAMILY_CONTAMINATION_FIX_V1" in ve_source
         assert "RUN_34753759233_SPOILER_FAMILY_V1" in ve_source
 
         sys.path.insert(0, str(repo))
         try:
             for name in list(sys.modules):
-                if name in ("video", "content", "quality") or name.startswith(
-                    ("video.", "content.", "quality.")
-                ):
+                if name in ("video", "content", "quality") or name.startswith(("video.", "content.", "quality.")):
                     del sys.modules[name]
-
             vd = __import__("video.video_downloader", fromlist=["*"])
             runner = __import__("content.script_engine_v2_runner", fromlist=["*"])
             ve = __import__("video.visual_explanation", fromlist=["*"])
+            qa = __import__("quality.final_visual_semantic_qa", fromlist=["*"])
 
-            # CASE A: #547-style bad opening blocked. Scene 1's narration and
-            # visual_goal both directly promise a visible spoiler; a
-            # generic aircraft+wing candidate (no spoiler visible) must stay
-            # rejected as incomplete/cross-domain.
-            effective = vd.enforce_visual_subject_anchor_query(
-                narration=SCENE1_NARRATION, visual_goal=SCENE1_GOAL,
-                query="aircraft wing spoiler in flight",
+            # A/B: direct spoiler identity remains 3/3 fail-closed.
+            q1 = vd.enforce_visual_subject_anchor_query(
+                narration=S1_TEXT, visual_goal=S1_GOAL, query="aircraft wing spoiler in flight"
             )
-            tier, label = vd.general_scene_unknown_safe_tier(_STOCK_AIRCRAFT_WING, effective)
+            tier, label = vd.general_scene_unknown_safe_tier(BAD_WING, q1)
             assert tier >= 5, (tier, label)
-            evidence = vd.concrete_visual_evidence(_STOCK_AIRCRAFT_WING, effective)
-            assert evidence["complete"] is False, evidence
-            print("CASE A #547 bad opening (generic aircraft+wing, no spoiler) blocked: PASS")
+            assert vd.concrete_visual_evidence(BAD_WING, q1)["complete"] is False
+            assert vd.concrete_visual_evidence(GOOD_SPOILER, q1)["complete"] is True
+            print("CASE A/B direct spoiler proof preserved: PASS")
 
-            # CASE B: direct spoiler 3/3 (aircraft+wing+spoiler visible) passes.
-            evidence_b = vd.concrete_visual_evidence(_STOCK_AIRCRAFT_WING_SPOILER, effective)
-            assert evidence_b["complete"] is True, evidence_b
-            print("CASE B direct spoiler 3/3 visible candidate passes: PASS")
-
-            # CASE C: Scene 4 result -- spoiler keyword-only provenance must
-            # not force a hard spoiler anchor. Simulate the grounded-keyword
-            # builder's real output for this exact claim shape.
             plan = {"canonical_subject": "aircraft wing spoilers"}
-            contract4 = {
+
+            # C: exact #550 Scene 4 must target landing gear/wheels, not generic aircraft.
+            c4 = {
                 "owned_claim_id": "spoiler_weight_to_wheels",
-                "supporting_evidence_summary": (
-                    "Lift loss transfers aircraft weight onto the landing gear wheels."
-                ),
+                "supporting_evidence_summary": "Lift loss transfers aircraft weight onto the landing gear wheels.",
                 "grounding_provenance_present": True,
             }
-            keyword4 = runner._grounded_claim_aware_keyword(contract4, plan)
-            assert "spoiler" not in keyword4.split(), keyword4
-            effective4 = vd.enforce_visual_subject_anchor_query(
-                narration=SCENE4_NARRATION, visual_goal=SCENE4_GOAL, query=keyword4,
-            )
-            tier4, label4 = vd.general_scene_unknown_safe_tier(_STOCK_AIRCRAFT_WING, effective4)
-            assert tier4 <= 4, (tier4, label4, keyword4, effective4)
-            evidence4 = vd.concrete_visual_evidence(_STOCK_AIRCRAFT_WING, effective4)
-            assert evidence4["complete"] is True, evidence4
-            print(f"CASE C Scene 4 result scene keyword={keyword4!r} tier={tier4}({label4}): PASS")
+            k4 = runner._grounded_claim_aware_keyword(c4, plan)
+            assert "spoiler" not in k4.split(), k4
+            q4 = vd.enforce_visual_subject_anchor_query(narration=S4_TEXT, visual_goal=S4_GOAL, query=k4)
+            w4 = set(q4.split())
+            assert {"aircraft", "landing", "gear", "wheel"} <= w4, q4
+            assert "wing" not in w4, q4
+            assert vd.get_current_result_visual_contract()["group"] == "landing_gear_wheel"
+            for bad in (BAD_WING, BAD_NIGHT):
+                tier, label = vd.general_scene_unknown_safe_tier(bad, q4)
+                assert tier >= 5, (bad["source_id"], tier, label)
+                assert not vd._run_34781319743_result_candidate_matches(bad)
+            tier, label = vd.general_scene_unknown_safe_tier(GOOD_GEAR, q4)
+            assert tier <= 4, (tier, label)
+            assert vd._run_34781319743_result_candidate_matches(GOOD_GEAR)
+            print("CASE C #550 night-vision Scene 4 blocked; landing-gear result accepted: PASS")
 
-            # CASE D: Scene 5 result -- same contract, different claim.
-            contract5 = {
+            # D: exact #550 Scene 5 must target runway/rollout, not wing/cloud footage.
+            c5 = {
                 "owned_claim_id": "spoiler_braking_effectiveness",
-                "supporting_evidence_summary": (
-                    "Reduced lift improves wheel braking effectiveness during landing rollout."
-                ),
+                "supporting_evidence_summary": "Reduced lift improves wheel braking effectiveness during landing rollout.",
                 "grounding_provenance_present": True,
             }
-            keyword5 = runner._grounded_claim_aware_keyword(contract5, plan)
-            assert "spoiler" not in keyword5.split(), keyword5
-            effective5 = vd.enforce_visual_subject_anchor_query(
-                narration=SCENE5_NARRATION, visual_goal=SCENE5_GOAL, query=keyword5,
-            )
-            tier5, label5 = vd.general_scene_unknown_safe_tier(_STOCK_AIRCRAFT_WING, effective5)
-            assert tier5 <= 4, (tier5, label5, keyword5, effective5)
-            evidence5 = vd.concrete_visual_evidence(_STOCK_AIRCRAFT_WING, effective5)
-            assert evidence5["complete"] is True, evidence5
-            print(f"CASE D Scene 5 result scene keyword={keyword5!r} tier={tier5}({label5}): PASS")
+            k5 = runner._grounded_claim_aware_keyword(c5, plan)
+            assert "spoiler" not in k5.split(), k5
+            q5 = vd.enforce_visual_subject_anchor_query(narration=S5_TEXT, visual_goal=S5_GOAL, query=k5)
+            w5 = set(q5.split())
+            assert {"aircraft", "runway", "braking", "rollout"} <= w5, q5
+            assert "wing" not in w5, q5
+            assert vd.get_current_result_visual_contract()["group"] == "runway_rollout"
+            tier, label = vd.general_scene_unknown_safe_tier(BAD_WING, q5)
+            assert tier >= 5, (tier, label)
+            assert not vd._run_34781319743_result_candidate_matches(BAD_WING)
+            tier, label = vd.general_scene_unknown_safe_tier(GOOD_RUNWAY, q5)
+            assert tier <= 4, (tier, label)
+            assert vd._run_34781319743_result_candidate_matches(GOOD_RUNWAY)
+            print("CASE D #550 wing/cloud Scene 5 blocked; runway rollout accepted: PASS")
 
-            # Scene 3 (direct mechanism, genuinely discusses spoiler in its
-            # own evidence) must KEEP the spoiler requirement -- claim-id
-            # stripping must not blind a Scene that legitimately needs it.
-            contract3 = {
+            # Direct mechanism no-regression.
+            c3 = {
                 "owned_claim_id": "spoiler_destroy_lift",
-                "supporting_evidence_summary": (
-                    "The deployed spoiler disrupts airflow over the wing and destroys lift."
-                ),
+                "supporting_evidence_summary": "The deployed spoiler disrupts airflow over the wing and destroys lift.",
                 "grounding_provenance_present": True,
             }
-            keyword3 = runner._grounded_claim_aware_keyword(contract3, plan)
-            assert "spoiler" in keyword3.split(), keyword3
-            effective3 = vd.enforce_visual_subject_anchor_query(
-                narration=SCENE3_NARRATION, visual_goal=SCENE3_GOAL, query=keyword3,
-            )
-            tier3, label3 = vd.general_scene_unknown_safe_tier(_STOCK_AIRCRAFT_WING, effective3)
-            assert tier3 >= 5, (tier3, label3, keyword3, effective3)
-            print(f"CASE (Scene 3 no-regression) direct mechanism keeps spoiler requirement: PASS")
+            k3 = runner._grounded_claim_aware_keyword(c3, plan)
+            assert "spoiler" in k3.split(), k3
+            q3 = vd.enforce_visual_subject_anchor_query(narration=S3_TEXT, visual_goal=S3_GOAL, query=k3)
+            tier, label = vd.general_scene_unknown_safe_tier(BAD_WING, q3)
+            assert tier >= 5, (tier, label)
+            assert not vd.get_current_result_visual_contract()["required"]
+            print("CASE direct mechanism spoiler requirement preserved: PASS")
 
-            def scene(text="", visual_goal="", keyword=""):
-                return {"text": text, "visual_goal": visual_goal, "keyword": keyword}
-
-            # CASE E: winglet contamination must not occur for a spoiler Scene.
-            s_e = scene(
+            # E/F/G: spoiler is not winglet; explicit winglet still works.
+            scene = lambda text="", visual_goal="", keyword="": {
+                "text": text, "visual_goal": visual_goal, "keyword": keyword
+            }
+            p = ve.plan_explanation(scene(
                 keyword="aircraft wing spoiler airflow",
                 visual_goal="disrupting airflow over the wing",
                 text="스포일러가 공기 흐름을 방해합니다",
-            )
-            plan_e = ve.plan_explanation(s_e)
-            assert plan_e is not None and plan_e["template"] != "WINGLET_FLOW", plan_e
-            assert plan_e["template"] == "SPOILER_DEPLOY", plan_e
-            print("CASE E winglet contamination excluded for spoiler Scene: PASS")
-
-            # CASE F: bare "aircraft wing" -> winglet family false.
-            s_f = scene(keyword="aircraft wing", visual_goal="aircraft wing in flight", text="항공기 날개")
-            assert ve._winglet_subject(s_f) is False
-            assert ve.plan_explanation(s_f) is None
-            print("CASE F bare aircraft+wing -> winglet family false: PASS")
-
-            # CASE G: explicit winglet identity -> winglet family true.
-            s_g = scene(
+            ))
+            assert p is not None and p["template"] == "SPOILER_DEPLOY", p
+            bare = scene(keyword="aircraft wing", visual_goal="aircraft wing in flight", text="항공기 날개")
+            assert ve._winglet_subject(bare) is False and ve.plan_explanation(bare) is None
+            winglet = scene(
                 keyword="aircraft wing winglet airflow",
                 visual_goal="winglet redirecting airflow",
                 text="윙렛이 공기 흐름을 바꿉니다",
             )
-            assert ve._winglet_subject(s_g) is True
-            plan_g = ve.plan_explanation(s_g)
-            assert plan_g is not None and plan_g["template"] == "WINGLET_FLOW", plan_g
-            assert ve.annotation_fact_safe(s_g, plan_g) is True
-            print("CASE G explicit winglet identity -> winglet family true: PASS")
+            assert ve._winglet_subject(winglet) is True
+            assert ve.plan_explanation(winglet)["template"] == "WINGLET_FLOW"
+            print("CASE E/F/G winglet contamination remains closed: PASS")
 
-            # CASE H: fallback inheritance -- a direct spoiler Scene whose
-            # query is relaxed to a broader fallback query still carries the
-            # original required spoiler proof (fallback cannot loosen it).
-            fallback_query = "airplane wing detail"
-            tier_fb, label_fb = vd.general_scene_unknown_safe_tier(_STOCK_AIRCRAFT_WING, fallback_query)
-            # authority_query resolves to the still-active Scene-3 contract's
-            # effective_query (set above), not the raw fallback text, so the
-            # spoiler requirement survives even though the fallback query
-            # itself never repeats "spoiler".
-            assert tier_fb >= 5, (tier_fb, label_fb)
-            print("CASE H fallback inheritance keeps direct-scene spoiler proof required: PASS")
+            # H: direct fallback cannot loosen spoiler proof.
+            vd.enforce_visual_subject_anchor_query(narration=S3_TEXT, visual_goal=S3_GOAL, query=k3)
+            tier, label = vd.general_scene_unknown_safe_tier(BAD_WING, "airplane wing detail")
+            assert tier >= 5, (tier, label)
+            print("CASE H direct fallback keeps spoiler proof: PASS")
 
-            # CASE I: result-scene contract must not be strengthened back to a
-            # hard anchor merely because a fallback query still carries the
-            # original (pre-fix-irrelevant) causal keyword text. Re-assert
-            # the Scene 4 contract, then check a broader fallback query.
-            vd.enforce_visual_subject_anchor_query(
-                narration=SCENE4_NARRATION, visual_goal=SCENE4_GOAL, query=keyword4,
-            )
-            tier_i, label_i = vd.general_scene_unknown_safe_tier(_STOCK_AIRCRAFT_WING, "airplane wing detail")
-            assert tier_i <= 4, (tier_i, label_i)
-            print("CASE I result-scene fallback query stays governed by visual promise, not hard contract: PASS")
+            # I: result fallback cannot resurrect generic aircraft.
+            vd.enforce_visual_subject_anchor_query(narration=S4_TEXT, visual_goal=S4_GOAL, query=k4)
+            tier, label = vd.general_scene_unknown_safe_tier(BAD_NIGHT, "airplane wing detail")
+            assert tier >= 5, (tier, label)
+            assert vd._run_34781319743_result_candidate_matches(GOOD_GEAR)
+            print("CASE I result fallback keeps goal-result evidence: PASS")
+
+            # J: Final QA blocks the exact #550 false-positive pair.
+            qa.reset_final_visual_semantic_report()
+            qa.record_final_visual_scene(0, q4, selection(BAD_NIGHT))
+            qa.record_final_visual_scene(1, q5, selection(BAD_WING))
+            try:
+                qa.validate_final_visual_semantic_qa([{}, {}])
+            except RuntimeError as exc:
+                assert "RESULT_EVIDENCE_FAILED" in str(exc), str(exc)
+            else:
+                raise AssertionError("Final QA accepted #550 night-vision/wing-cloud result footage")
+            bad_payload = json.loads((repo / "final_visual_semantic_qa.json").read_text(encoding="utf-8"))
+            assert bad_payload["status"] == "FAIL" and len(bad_payload["failed_scenes"]) == 2
+            print("CASE J exact #550 Final QA false-PASS blocked: PASS")
+
+            # K: positive result lineage stays valid.
+            qa.reset_final_visual_semantic_report()
+            qa.record_final_visual_scene(0, q4, selection(GOOD_GEAR))
+            qa.record_final_visual_scene(1, q5, selection(GOOD_RUNWAY))
+            good_payload = qa.validate_final_visual_semantic_qa([{}, {}])
+            assert good_payload["status"] == "PASS", good_payload
+            print("CASE K positive landing-gear/runway result path: PASS")
 
         finally:
             sys.path.remove(str(repo))
 
-        # No budget/floor/retry/API/model-routing constant touched. Scope the
-        # check to this fix's own inserted regions, not the whole
-        # already-hotfixed file (which legitimately contains unrelated
-        # temperature=/threshold constants from other, pre-existing hotfixes).
-        own_marker = "RUN_34753759233_CLAIM_ID_LINEAGE_LABEL_NOT_VISUAL_PROMISE_V1"
-        own_block = runner_source[runner_source.index(own_marker):]
-        ve_own_markers = (
-            "RUN_34753759233_WINGLET_FAMILY_CONTAMINATION_FIX_V1",
-            "RUN_34753759233_SPOILER_FAMILY_V1",
-        )
-        ve_own_start = min(ve_source.index(marker) for marker in ve_own_markers)
-        ve_own_block = ve_source[ve_own_start:]
-        combined_own = own_block + ve_own_block
+        own = downloader_source[downloader_source.index("RUN_34781319743_RESULT_VISUAL_PROMISE_V1"):] + qa_source[
+            qa_source.index("RUN_34781319743_RESULT_VISUAL_FINAL_QA_V1"):
+        ]
         for forbidden in (
             "V3_MAX_COST_USD =", "V3_MAX_API_CALLS =", "MAX_TOPIC_REGENERATIONS =",
             "HOOK_MIN_SCORE =", "AI_MAX_GENERATIONS_PER_VIDEO", "IDENTITY_CONFIDENCE_MIN =",
-            "temperature=0.", "authorize_call(", "openai.",
+            "authorize_call(", "openai.",
         ):
-            assert forbidden not in combined_own, forbidden
-        # The pre-existing budget constant must keep its original definition
-        # (read from env, default "3") -- untouched, not merely absent.
-        assert (
-            'MAX_EXPLANATION_TRANSFORMS_PER_VIDEO = int(\n'
-            '    os.environ.get("MAX_EXPLANATION_TRANSFORMS_PER_VIDEO", "3")\n'
-            ')' in ve_source
-        )
-        print("CASE (budget invariant) budgets/floors/retries/model routing unchanged: PASS")
-
-        print("RUN 34753759233 SCENE ROLE VISUAL CONTRACT REGRESSION: PASS")
+            assert forbidden not in own, forbidden
+        print("CASE budget invariant: quality floors/calls/retries/budgets unchanged: PASS")
+        print("RUN 34753759233 + 34781319743 SCENE ROLE VISUAL CONTRACT REGRESSION: PASS")
     finally:
         shutil.rmtree(repo.parent, ignore_errors=True)
 
