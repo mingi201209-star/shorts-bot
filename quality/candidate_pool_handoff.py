@@ -21,7 +21,10 @@ from quality.canonical_subject_grounding_supply import supply_trusted_subject_gr
 from quality.candidate_pool_grounding_records import (
     CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS,
 )
-from quality.fixed_topic_seed_grounding import supply_exact_fixed_topic_seed_grounding
+from quality.fixed_topic_seed_grounding import (
+    exact_fixed_topic_seed_record,
+    supply_exact_fixed_topic_seed_grounding,
+)
 
 
 # Reuses the existing Candidate Explorer shortlist ceiling ("최대 3개").
@@ -101,13 +104,19 @@ def _validate_with_bounded_hook_repair(
     *,
     prefix: str,
     validate_candidate_fn: Callable[..., Dict[str, Any]],
+    fixed_topic: str = "",
+    trusted_records: Iterable[Dict[str, Any]] = (),
 ) -> Tuple[Dict[str, Any], str]:
     """Validate once, then repair only the exact repeated-Hook failure.
 
-    The replacement must come from one of the Candidate's own specificity fields
-    and must itself pass the unchanged candidate validator. Any other schema
-    failure remains fail-closed. Returns (validated, source_field), where an empty
-    source_field means no repair was needed.
+    For an exact repo-owned fixed topic, first try that trusted seed's already
+    supplied ``specific_observation``. This closes Run 34784063294's livelock
+    without inventing prose or weakening the unchanged validator. If the exact
+    seed observation is unavailable or invalid, the legacy candidate-owned
+    specificity-field fallback remains authoritative.
+
+    Returns (validated, source_field), where an empty source_field means no
+    repair was needed.
     """
 
     try:
@@ -120,6 +129,30 @@ def _validate_with_bounded_hook_repair(
         micro = raw.get("micro_narrative")
         if not isinstance(micro, dict):
             raise
+
+        exact_record = exact_fixed_topic_seed_record(
+            raw,
+            fixed_topic,
+            trusted_records=trusted_records,
+        )
+        if exact_record is not None:
+            seed_candidate = exact_record.get("seed_candidate")
+            seed_observation = (
+                seed_candidate.get("specific_observation")
+                if isinstance(seed_candidate, dict)
+                else None
+            )
+            if _looks_like_declarative_supplied_beat(seed_observation):
+                repaired = deepcopy(raw)
+                repaired_micro = deepcopy(micro)
+                repaired_micro["hook"] = str(seed_observation).strip()
+                repaired["micro_narrative"] = repaired_micro
+                try:
+                    validated = validate_candidate_fn(repaired, prefix=prefix)
+                except (TypeError, ValueError):
+                    pass
+                else:
+                    return validated, "exact_fixed_topic_seed.specific_observation"
 
         for field in _HOOK_REPAIR_FIELDS:
             supplied = raw.get(field)
@@ -215,6 +248,8 @@ def handoff_candidate_pool(
                 raw,
                 prefix=f"Candidate pool[{index}]",
                 validate_candidate_fn=validate_candidate_fn,
+                fixed_topic=fixed_topic,
+                trusted_records=combined_trusted_records,
             )
         except (TypeError, ValueError) as exc:
             diag.update(status="REJECT", reason=f"schema: {exc}")
