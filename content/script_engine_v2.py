@@ -57,6 +57,8 @@ def _normalize_locked_narration(text: Any, role: str) -> str:
             (r"있을까요$", "있을까요"),
             (r"할까요$", "할까요"),
             (r"될까요$", "될까요"),
+            # Preserve formal ~니까 endings while repairing ordinary informal ~까.
+            (r"(?<!니)까$", "까요"),
         )
         for pattern, replacement in replacements:
             converted, count = re.subn(pattern, replacement, value)
