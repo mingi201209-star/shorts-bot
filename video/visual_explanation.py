@@ -45,17 +45,106 @@ def _text(scene):
 
 
 def _winglet_subject(scene):
+    """True only when the Scene names an actual winglet/wingtip-device identity.
+
+    RUN_34753759233_WINGLET_FAMILY_CONTAMINATION_FIX_V1
+    A bare "aircraft wing"/"wing" mention used to be enough to classify a Scene
+    into the winglet family. Production Run 34753759233 proved that a spoiler
+    Scene's keyword ("aircraft wing spoiler destroy lift") also contains the
+    substring "aircraft wing", so it silently fell into WINGLET_FLOW and drew a
+    winglet silhouette for a spoiler explanation. Require an explicit winglet
+    identity token; a bare wing/aircraft mention is not sufficient, and an
+    explicitly named different component (spoiler/flap/landing gear/window/
+    engine) must never be reclassified as winglet.
+    """
     value = _text(scene)
-    return any(token in value for token in ("winglet", "wingtip", "윙렛", "날개 끝", "aircraft wing"))
+    if any(
+        token in value
+        for token in ("spoiler", "speedbrake", "speed brake", "스포일러", "flap", "플랩", "landing gear", "착륙 장치", "window", "창문")
+    ):
+        return False
+    return any(
+        token in value
+        for token in ("winglet", "wingtip", "윙렛", "날개 끝")
+    )
+
+
+def _spoiler_subject(scene):
+    """True when the Scene explicitly names a spoiler/speedbrake identity.
+
+    RUN_34753759233_SPOILER_FAMILY_V1
+    A discriminative sibling of the winglet family above, added so a genuine
+    direct spoiler mechanism Scene (e.g. Scene 3's airflow-disruption clue)
+    that cannot get a verified still can still fail into a spoiler-accurate
+    deterministic diagram instead of the wrong winglet template or no
+    explanation at all.
+    """
+    value = _text(scene)
+    return any(
+        token in value
+        for token in ("spoiler", "spoilers", "speedbrake", "speedbrakes", "speed brake", "스포일러", "윙 스포일러", "날개 스포일러")
+    )
+
+
+def _spoiler_explanation_plan(scene):
+    """Return a SPOILER_DEPLOY/SPOILER_RESULT plan, or None when not applicable.
+
+    Kept as a standalone helper (rather than inline in plan_explanation) so the
+    original winglet guard clause below stays byte-identical for
+    ci_grounded_explanatory_visual_supply_hotfix.py's anchored text patch.
+    """
+    if not _spoiler_subject(scene):
+        return None
+    value = _text(scene)
+    if any(token in value for token in ("destroy", "disrupt", "airflow", "lift", "양력", "공기 흐름", "흐름", "파괴", "방해")):
+        return {
+            "scene_role": "mechanism",
+            "subject": "spoiler",
+            "action": "airflow_disruption",
+            "template": "SPOILER_DEPLOY",
+            "label": "스포일러 전개",
+            "source_priority": ("annotated_verified_still", "explanatory_2d"),
+        }
+    if any(token in value for token in ("weight", "wheel", "brak", "deceleration", "rollout", "바퀴", "제동", "하중", "활주", "감속")):
+        return {
+            "scene_role": "result",
+            "subject": "spoiler",
+            "action": "weight_and_braking_result",
+            "template": "SPOILER_RESULT",
+            "label": "제동 효과의 결과",
+            "source_priority": ("annotated_verified_still", "explanatory_2d"),
+        }
+    return None
+
+
+def _spoiler_annotation_fact_safe(scene, plan):
+    """Return True/False for a spoiler template, or None when not applicable.
+
+    None means "fall through to the original winglet guard", keeping that
+    guard's anchor text byte-identical for the same hotfix patch as above.
+    """
+    template = (plan or {}).get("template")
+    if template not in ("SPOILER_DEPLOY", "SPOILER_RESULT"):
+        return None
+    if not plan or not _spoiler_subject(scene):
+        return False
+    value = _text(scene)
+    if template == "SPOILER_DEPLOY":
+        return any(token in value for token in ("destroy", "disrupt", "airflow", "lift", "양력", "공기 흐름", "흐름", "파괴", "방해"))
+    return any(token in value for token in ("weight", "wheel", "brak", "deceleration", "rollout", "바퀴", "제동", "하중", "활주", "감속"))
 
 
 def plan_explanation(scene):
     """Return a deterministic, evidence-bounded plan or None.
 
-    V1 intentionally supports only the production-proven wing/winglet family.
-    Unsupported mechanisms fail closed rather than receiving a plausible-looking
-    but ungrounded diagram.
+    V1 intentionally supports only the production-proven wing/winglet and
+    spoiler families. Unsupported mechanisms fail closed rather than
+    receiving a plausible-looking but ungrounded diagram.
     """
+    spoiler_plan = _spoiler_explanation_plan(scene)
+    if spoiler_plan is not None:
+        return spoiler_plan
+
     value = _text(scene)
     if not _winglet_subject(scene):
         return None
@@ -91,6 +180,10 @@ def plan_explanation(scene):
 
 
 def annotation_fact_safe(scene, plan):
+    spoiler_safe = _spoiler_annotation_fact_safe(scene, plan)
+    if spoiler_safe is not None:
+        return spoiler_safe
+
     if not plan or not _winglet_subject(scene):
         return False
     value = _text(scene)
@@ -166,6 +259,31 @@ def _draw_concept_panel(frame, plan, progress):
     elif template == "WINGLET_FLOW":
         for offset in (-95, -25, 45):
             _arrow(draw, (150, y + offset), (690, y + offset - 35), width=11)
+    elif template == "SPOILER_DEPLOY":
+        # wing baseline already drawn above; raise a spoiler panel out of the
+        # wing surface and show disrupted airflow breaking over it.
+        hinge = (560, y)
+        raise_angle = -0.55 - 0.35 * progress
+        tip = (
+            hinge[0] + 165 * math.cos(raise_angle),
+            hinge[1] + 165 * math.sin(raise_angle),
+        )
+        draw.line((hinge, tip), fill=(235, 235, 235, 245), width=26)
+        for offset in (-70, -10):
+            _arrow(draw, (200, y + offset), (520, y + offset), width=10)
+        _arrow(draw, (tip[0] - 10, tip[1] - 30), (tip[0] + 70, tip[1] - 90), width=9)
+    elif template == "SPOILER_RESULT":
+        # deployed spoiler panel stays up; add a downward weight/braking arrow
+        # toward the landing gear/wheel instead of an airflow arrow.
+        hinge = (560, y)
+        tip = (hinge[0] + 165 * math.cos(-0.9), hinge[1] + 165 * math.sin(-0.9))
+        draw.line((hinge, tip), fill=(235, 235, 235, 245), width=26)
+        _arrow(draw, (560, y + 20), (560, y + 150), width=12)
+        wheel_cx, wheel_cy = 560, y + 205
+        draw.ellipse(
+            (wheel_cx - 45, wheel_cy - 45, wheel_cx + 45, wheel_cy + 45),
+            outline=(255, 255, 255, 235), width=10,
+        )
     else:
         _arrow(draw, (170, 520), (900, 520), width=14)
         draw.text((300, 548), "원리 → 비행 효율의 결과", font=small, fill=(255, 255, 255, 235))
