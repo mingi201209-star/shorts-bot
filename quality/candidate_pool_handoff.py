@@ -10,6 +10,7 @@ shape consumed by the unchanged downstream Candidate Gate.
 from __future__ import annotations
 
 from copy import deepcopy
+import os
 from typing import Any, Callable, Dict, Iterable, List, Sequence, Tuple
 
 from quality.canonical_subject_grounding import (
@@ -20,6 +21,7 @@ from quality.canonical_subject_grounding_supply import supply_trusted_subject_gr
 from quality.candidate_pool_grounding_records import (
     CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS,
 )
+from quality.fixed_topic_seed_grounding import supply_exact_fixed_topic_seed_grounding
 
 
 # Reuses the existing Candidate Explorer shortlist ceiling ("최대 3개").
@@ -155,6 +157,14 @@ def handoff_candidate_pool(
     Question phrasing can survive prompt guidance. The host may repair only that
     exact malformed beat from already-supplied specificity evidence, after which
     the unchanged validator and grounding authorities run again.
+
+    Run 34753007203 exposed a fixed-topic provenance ordering gap: the Candidate
+    Pool already had the trusted spoiler record, but generic text grounding ran
+    before the later pre-Writer exact-topic resupply and rejected the exact pinned
+    topic seven times. Reuse the existing fail-closed exact fixed-topic helper here
+    before generic supply. It activates only when Candidate topic == SHORTS_TOPIC
+    == exactly one repo-owned seed_candidate.topic; otherwise the previous generic
+    grounding path remains authoritative.
     """
 
     if not candidate_pool_handoff_enabled(scope):
@@ -189,6 +199,7 @@ def handoff_candidate_pool(
     combined_trusted_records = tuple(trusted_records or ()) + tuple(
         CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS
     )
+    fixed_topic = os.environ.get("SHORTS_TOPIC", "")
 
     for index, raw in enumerate(raw_pool, start=1):
         topic = str(raw.get("topic") or "").strip() if isinstance(raw, dict) else ""
@@ -224,10 +235,23 @@ def handoff_candidate_pool(
             diagnostics.append(diag)
             continue
 
-        grounded = supply_trusted_subject_grounding(
+        exact_fixed_topic_supply = supply_exact_fixed_topic_seed_grounding(
             validated,
+            fixed_topic,
             trusted_records=combined_trusted_records,
         )
+        if exact_fixed_topic_supply is not None:
+            grounded, _exact_record = exact_fixed_topic_supply
+            diag["grounding_supply"] = {
+                "status": "EXACT_FIXED_TOPIC_SEED",
+                "canonical_subject": grounded.get("canonical_subject", ""),
+            }
+        else:
+            grounded = supply_trusted_subject_grounding(
+                validated,
+                trusted_records=combined_trusted_records,
+            )
+
         grounding = evaluate_candidate_subject_grounding(grounded)
         if grounding.get("status") != "PASS":
             diag.update(
