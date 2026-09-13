@@ -177,6 +177,14 @@ def main():
         )
         assert formalize(wing_production_counterexample) == wing_expected
 
+        # Run 34742871087 (#546): exact production Scene 1 survived all bounded
+        # repairs because the shared corpus lacked the observed rise ending.
+        assert formalize(
+            "착륙 후 항공기의 날개 위로 스포일러가 갑자기 솟아오른다."
+        ) == (
+            "착륙 후 항공기의 날개 위로 스포일러가 갑자기 솟아오릅니다."
+        )
+
         question_counterexample = (
             "비행기 날개가 휘어질 때, 공기 흐름에 미치는 영향은 무엇인지 설명해 주실 수 있나요?"
         )
