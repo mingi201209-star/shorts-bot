@@ -1,9 +1,10 @@
-"""Production HUMAN visual-QA counterexamples through Run 33976145878."""
+"""Production HUMAN visual-QA counterexamples through Run 34743843161."""
 import runpy
 
 
 base = runpy.run_path("quality/visual_subject_anchor_contract_v1_regression_test.py")
 vd = base["vd"]
+fvs = base["fvs"]
 candidate = base["candidate"]
 strengthened = base["strengthened"]
 
@@ -130,4 +131,83 @@ plain_wing_query = strengthened(
 plain_wing_anchors = vd.extract_query_anchors(plain_wing_query)
 assert "flap" not in plain_wing_anchors, plain_wing_anchors
 
-print("RUN 33248013901 + 33249110048 + 33250343057 + 33976145878 VISUAL CONTRACT REGRESSION: PASS")
+# Run 34743843161 (#547): HUMAN QA showed a mechanically GREEN spoiler video
+# made of night-vision aircraft, runway, generic wings and an aircraft belly.
+# Scene 1 had query=aircraft wing spoiler deployment but the contract required
+# only aircraft+wing. Scene 2 collapsed to `why after landing` and therefore
+# recorded required=none/0-of-0. Later Scenes entered the legacy winglet ladder.
+# All three fail-open shapes must now be impossible without relaxing thresholds.
+spoiler_scene1_query = strengthened(
+    "aircraft wing spoiler deployment",
+    narration="스포일러가 착륙 후 날개 위로 솟아오르며 비행기의 공기 흐름을 변화시킵니다.",
+    goal="착륙한 항공기의 날개 위로 스포일러가 솟는 모습을 보여줍니다.",
+)
+spoiler_scene1_anchors = vd.extract_query_anchors(spoiler_scene1_query)
+assert set(spoiler_scene1_anchors) == {"aircraft", "wing", "spoiler"}, (
+    spoiler_scene1_query,
+    spoiler_scene1_anchors,
+)
+
+spoiler_scene2_query = strengthened(
+    "why after landing",
+    narration="그런데 왜 착륙 직후 스포일러가 위로 솟아나는 걸까요?",
+    goal="위로 펼쳐진 스포일러를 가까이 보여주며 질문을 강조합니다.",
+)
+spoiler_scene2_anchors = vd.extract_query_anchors(spoiler_scene2_query)
+assert set(spoiler_scene2_anchors) == {"aircraft", "wing", "spoiler"}, (
+    spoiler_scene2_query,
+    spoiler_scene2_anchors,
+)
+assert "spoiler" in spoiler_scene2_query.split(), spoiler_scene2_query
+spoiler_contract = vd.get_current_visual_subject_anchor_contract()
+assert set(spoiler_contract.get("required_anchors") or []) == {"aircraft", "wing", "spoiler"}, spoiler_contract
+assert spoiler_contract.get("required") is True, spoiler_contract
+
+# The #547 fallback must never degrade a spoiler scene into the historical
+# aircraft+wing special-case ladder (`airplane wing winglet`).
+for fallback in vd.query_relaxation_ladder(spoiler_scene1_query):
+    fallback_words = set(fallback.split())
+    assert "spoiler" in fallback_words, (spoiler_scene1_query, fallback)
+    assert "winglet" not in fallback_words, (spoiler_scene1_query, fallback)
+
+# Exact bad #547 evidence shape: aircraft+wing is not enough anymore.
+generic_spoiler_miss = candidate(
+    15270,
+    "military aircraft airplane aviation wing runway night vision flight",
+)
+compatibility = vd.candidate_anchor_compatibility(generic_spoiler_miss, spoiler_scene1_query)
+assert compatibility["total"] == 3, compatibility
+assert compatibility["matched"] == 2, compatibility
+assert compatibility["compatible"] is False, compatibility
+assert vd.choose_best_candidate([generic_spoiler_miss], subject_filter_query=spoiler_scene1_query) is None
+
+tier, label = vd.general_scene_unknown_safe_tier(generic_spoiler_miss, spoiler_scene1_query)
+assert tier >= 5, (tier, label)
+
+actual_spoiler = candidate(
+    99701,
+    "commercial aircraft airplane wing spoiler spoilers deployed after landing closeup",
+)
+spoiler_compat = vd.candidate_anchor_compatibility(actual_spoiler, spoiler_scene1_query)
+assert spoiler_compat["compatible"] is True, spoiler_compat
+assert vd.choose_best_candidate([actual_spoiler], subject_filter_query=spoiler_scene1_query)["source_id"] == 99701
+
+# Defense in depth: even stale lineage that somehow arrives at Final QA with
+# only 2/3 spoiler proof must be treated as a missing aviation component.
+partial_final_qa = {
+    "query": spoiler_scene1_query,
+    "accepted": True,
+    "anchor_matched": 2,
+    "anchor_total": 3,
+}
+assert fvs._missing_required_aviation_component_anchor(partial_final_qa) is True
+
+# Unrelated wing footage remains an aircraft+wing contract, not spoiler-specific.
+plain_wing_after_spoiler = strengthened(
+    "aircraft wing closeup",
+    narration="비행기 날개가 공기 흐름을 만듭니다.",
+    goal="비행기 날개를 가까이 보여줍니다.",
+)
+assert "spoiler" not in vd.extract_query_anchors(plain_wing_after_spoiler)
+
+print("RUN 33248013901 + 33249110048 + 33250343057 + 33976145878 + 34743843161 VISUAL CONTRACT REGRESSION: PASS")
