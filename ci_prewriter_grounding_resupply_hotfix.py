@@ -25,7 +25,21 @@ PATCH = r'''
 # the full production hotfix composition that this does not create a competing
 # match for any existing PRODUCTION-registry subject (chevron/flap/wick): each
 # subject's own PRODUCTION record still resolves alone, exactly as before.
+#
+# Run 34742040475 (#545) exposed a second fixed-topic-only gap: the LLM winner
+# retained topic="착륙 직후 날개 위로 솟는 스포일러" and canonical="스포일러", but
+# it was not the deterministic seed object and therefore had no in-memory seed
+# record reference. Generic text matching then failed closed even though the
+# exact pinned topic is already owned by one FAA-backed repo seed record. For an
+# explicit SHORTS_TOPIC only, bind the Candidate to that record iff Candidate
+# topic == SHORTS_TOPIC == exactly one repo-owned seed_candidate.topic. The
+# record is still run through the unchanged trusted supplier using only its own
+# evidence-owned seed/feature/context data. Unknown/altered/ambiguous topics
+# continue to the unchanged generic fail-closed resolver.
+import os as _prewriter_os
+
 from quality.canonical_subject_grounding_supply import supply_trusted_subject_grounding
+from quality.fixed_topic_seed_grounding import supply_exact_fixed_topic_seed_grounding
 from quality.grounding_aware_candidate_supply import (
     REPO_OWNED_SEED_RECORD_REF_FIELD,
     all_trusted_candidate_records,
@@ -42,18 +56,39 @@ def generate_script(topic_info, candidate):
             candidate,
             trusted_records=trusted_records,
         )
-        candidate_trusted_records = (
-            (repo_seed_record,)
-            if repo_seed_record is not None
-            else trusted_records
-        )
-        supplied = supply_trusted_subject_grounding(
-            candidate,
-            trusted_records=candidate_trusted_records,
-        )
-        if repo_seed_record is not None:
-            # Keep the unforgeable exact record identity across supplier deepcopy.
-            supplied[REPO_OWNED_SEED_RECORD_REF_FIELD] = repo_seed_record
+
+        exact_fixed_topic_supply = None
+        if repo_seed_record is None:
+            exact_fixed_topic_supply = supply_exact_fixed_topic_seed_grounding(
+                candidate,
+                _prewriter_os.environ.get("SHORTS_TOPIC", ""),
+                trusted_records=trusted_records,
+            )
+
+        if exact_fixed_topic_supply is not None:
+            supplied, exact_fixed_topic_record = exact_fixed_topic_supply
+            # Host-authorized exact fixed-topic binding creates the same
+            # unforgeable in-process record capability for later wrappers.
+            supplied[REPO_OWNED_SEED_RECORD_REF_FIELD] = exact_fixed_topic_record
+            print(
+                "[PREWRITER_GROUNDING_RESUPPLY] "
+                "source=exact_fixed_topic_seed canonical="
+                f"{supplied.get('canonical_subject', '')}"
+            )
+        else:
+            candidate_trusted_records = (
+                (repo_seed_record,)
+                if repo_seed_record is not None
+                else trusted_records
+            )
+            supplied = supply_trusted_subject_grounding(
+                candidate,
+                trusted_records=candidate_trusted_records,
+            )
+            if repo_seed_record is not None:
+                # Keep the unforgeable exact record identity across supplier deepcopy.
+                supplied[REPO_OWNED_SEED_RECORD_REF_FIELD] = repo_seed_record
+
         # Preserve object identity because downstream wrappers may retain the
         # original Candidate reference. Only deterministic trusted supply data
         # is copied back; unresolved candidates remain fail-closed.
