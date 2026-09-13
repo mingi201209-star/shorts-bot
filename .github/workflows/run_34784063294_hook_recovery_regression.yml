@@ -1,0 +1,35 @@
+name: Run 34784063294 Hook Recovery Regression
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+  V3_MAX_API_CALLS: "60"
+  V3_MAX_COST_USD: "0.05"
+
+jobs:
+  exact-counterexample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Apply existing speech production composition
+        run: |
+          set -euo pipefail
+          python ci_hotfix.py
+          python ci_novelty_budget_hotfix.py
+          python ci_fact_critical_hotfix.py
+          python ci_speech_style_hotfix.py
+      - name: Run exact Run 34784063294 regression
+        run: PYTHONPATH=. python quality/run_34784063294_hook_recovery_regression_test.py
