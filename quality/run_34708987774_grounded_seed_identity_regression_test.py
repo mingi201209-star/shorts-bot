@@ -133,6 +133,11 @@ def main() -> int:
             expected_canonical,
         )
         assert winner.get("_trusted_grounding_evidence"), (topic, winner)
+        winner_record_ref = winner.get(REPO_OWNED_SEED_RECORD_REF_FIELD)
+        assert winner_record_ref is record_ref, (
+            "handoff must preserve exact host-owned seed record identity",
+            topic,
+        )
 
         observed_topics.append(topic)
         observed_canonicals.append(expected_canonical)
@@ -140,7 +145,7 @@ def main() -> int:
     assert set(observed_topics) == expected_topics, (observed_topics, expected_topics)
     print(
         "CASE A every repo-owned deterministic seed resolves to its originating "
-        f"trusted identity: PASS seeds={len(observed_topics)}"
+        f"trusted identity and preserves exact provenance: PASS seeds={len(observed_topics)}"
     )
 
     # A JSON/model candidate can imitate the private field name and even copy a
@@ -166,12 +171,20 @@ def main() -> int:
     installer_source = (
         ROOT / "ci_run_34708987774_grounded_seed_identity_hotfix.py"
     ).read_text(encoding="utf-8")
+    prewriter_source = (
+        ROOT / "ci_prewriter_grounding_resupply_hotfix.py"
+    ).read_text(encoding="utf-8")
     assert "import ci_run_34708987774_grounded_seed_identity_hotfix" in chain_source
     assert installer_source.rstrip().endswith("main()"), (
         "production-imported seed identity installer must execute main() on import"
     )
     assert 'if __name__ == "__main__":\n    main()' not in installer_source
-    print("CASE C production import actually executes seed identity installer: PASS")
+    assert "REPO_OWNED_SEED_RECORD_REF_FIELD" in installer_source
+    assert "repo_seed_record" in installer_source
+    assert "repo_owned_seed_trusted_record" in prewriter_source
+    assert "candidate_trusted_records" in prewriter_source
+    assert "REPO_OWNED_SEED_RECORD_REF_FIELD" in prewriter_source
+    print("CASE C production import and pre-Writer seed scope composition: PASS")
 
     # The patch is a narrowing operation only; it does not change retry, API,
     # cost, Candidate Gate, FACT, or quality thresholds.
