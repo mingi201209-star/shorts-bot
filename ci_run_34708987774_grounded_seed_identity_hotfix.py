@@ -135,10 +135,16 @@ def main() -> None:
     _patch_grounding_supply()
     _patch_candidate_pool_handoff()
     subprocess.run(
-        [sys.executable, "quality/run_34708987774_grounded_seed_identity_regression_test.py"],
+        [
+            sys.executable,
+            "-m",
+            "quality.run_34708987774_grounded_seed_identity_regression_test",
+        ],
         check=True,
     )
 
 
-if __name__ == "__main__":
-    main()
+# Production composition imports this installer from
+# ci_grounding_aware_candidate_supply_hotfix.py. Execute on import so the on-disk
+# runtime modules are actually patched before the generator starts.
+main()
