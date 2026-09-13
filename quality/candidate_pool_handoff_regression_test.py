@@ -18,6 +18,7 @@ GREEN authority:
 from __future__ import annotations
 
 import argparse
+from copy import deepcopy
 import os
 from pathlib import Path
 
@@ -62,6 +63,38 @@ def _window_candidate(*, editorially_weak: bool = False):
         "subject_identity_confidence": 0.0,
         "grounding_evidence": [],
     }
+
+
+def _spoiler_candidate():
+    """Production-shaped untrusted Candidate for Run 34753007203 (#548)."""
+    from quality.candidate_pool_grounding_records import (
+        CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS,
+    )
+
+    matching = [
+        record
+        for record in CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS
+        if record.get("canonical_subject") == "aircraft wing spoilers"
+    ]
+    assert len(matching) == 1, matching
+    seed = matching[0].get("seed_candidate")
+    assert isinstance(seed, dict), matching[0]
+    candidate = deepcopy(seed)
+    # Model Candidate owns no trusted provenance. This reproduces the ordering
+    # gap from #548 while keeping its exact fixed topic and ordinary prose.
+    candidate.update(
+        subject_kind="physical_entity",
+        canonical_subject="스포일러",
+        subject_identity_confidence=0.98,
+        grounding_evidence=[],
+    )
+    for field in (
+        "_trusted_grounding_evidence",
+        "_trusted_grounded_claims",
+        "_subject_grounding",
+    ):
+        candidate.pop(field, None)
+    return candidate
 
 
 def _offscope_candidate():
@@ -155,6 +188,7 @@ def _assert_candidate_gate_boundary_api_free(result):
 
 def green() -> int:
     os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
+    os.environ.pop("SHORTS_TOPIC", None)
 
     validate_explorer_output = _runtime_explorer_module().validate_explorer_output
     from quality.canonical_subject_grounding import evaluate_candidate_subject_grounding
@@ -195,6 +229,45 @@ def green() -> int:
     assert evidence and "faa.gov" in evidence[0].get("source", ""), evidence
     print("TEST E rounded-window trusted grounding: PASS")
 
+    # Run 34753007203 (#548): seven exact fixed-topic spoiler Candidates reached
+    # Candidate Pool with no trusted capability and were rejected by generic text
+    # grounding before the later pre-Writer #358 recovery could run. The host
+    # already owns exactly one FAA-backed seed record with this exact pinned topic.
+    spoiler_topic = "착륙 직후 날개 위로 솟는 스포일러"
+    os.environ["SHORTS_TOPIC"] = spoiler_topic
+    spoiler_result = validate_explorer_output(_pool([_spoiler_candidate()]))
+    assert spoiler_result["status"] == "SELECTED", spoiler_result
+    spoiler = spoiler_result["winner"]
+    spoiler_grounding = evaluate_candidate_subject_grounding(spoiler)
+    assert spoiler_grounding["status"] == "PASS", spoiler_grounding
+    assert spoiler["canonical_subject"] == "aircraft wing spoilers", spoiler
+    spoiler_evidence = spoiler.get("_trusted_grounding_evidence") or []
+    assert spoiler_evidence and "faa.gov" in spoiler_evidence[0].get("source", ""), spoiler_evidence
+    spoiler_diag = (
+        (spoiler_result.get("_candidate_pool_handoff") or {}).get("diagnostics") or []
+    )[0]
+    exact_supply = spoiler_diag.get("grounding_supply") or {}
+    assert exact_supply.get("status") == "EXACT_FIXED_TOPIC_SEED", spoiler_diag
+    assert exact_supply.get("canonical_subject") == "aircraft wing spoilers", spoiler_diag
+    print("TEST F Run 34753007203 exact fixed-topic spoiler grounding: PASS")
+
+    # The new authority must be exact-only. A modified Candidate topic must not
+    # receive the host-pinned fixed-topic capability. Existing generic grounding
+    # may independently accept/reject it; this assertion only guards the new path.
+    modified = _spoiler_candidate()
+    modified["topic"] = spoiler_topic + "?"
+    modified_result = validate_explorer_output(_pool([modified]))
+    modified_diags = (
+        (modified_result.get("_candidate_pool_handoff") or {}).get("diagnostics") or []
+    )
+    assert modified_diags, modified_result
+    assert (
+        (modified_diags[0].get("grounding_supply") or {}).get("status")
+        != "EXACT_FIXED_TOPIC_SEED"
+    ), modified_diags[0]
+    print("TEST G fixed-topic binding remains exact-only: PASS")
+    os.environ.pop("SHORTS_TOPIC", None)
+
     malformed = validate_explorer_output(_pool([_malformed_candidate()]))
     assert malformed["status"] == "REGENERATE", malformed
     print("Malformed schema: PASS (fail-close)")
@@ -212,7 +285,7 @@ def green() -> int:
         assert non_aviation_result["status"] == "REGENERATE", non_aviation_result
         assert "outside aviation scope" in non_aviation_result.get("reason", ""), non_aviation_result
         assert "winner" not in non_aviation_result, non_aviation_result
-    print("TEST F non-aviation compatibility: PASS (fail-closed REGENERATE, no crash, pool not processed)")
+    print("TEST H non-aviation compatibility: PASS (fail-closed REGENERATE, no crash, pool not processed)")
     os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
 
     explorer_source = (ROOT / "content/candidate_explorer.py").read_text(encoding="utf-8")
@@ -224,14 +297,14 @@ def green() -> int:
     recovery_source = (ROOT / "ci_candidate_supply_recovery_hotfix.py").read_text(encoding="utf-8")
     assert "CANDIDATE SUPPLY RECOVERY (1/1)" in recovery_source
     assert "_candidate_supply_recovery_used" in recovery_source
-    print("TEST G recovery bound contract: PASS (1/1)")
+    print("TEST I recovery bound contract: PASS (1/1)")
 
     _assert_new_surface_has_zero_calls()
     main_workflow = (ROOT / ".github/workflows/main.yml").read_text(encoding="utf-8")
     assert 'V3_MAX_API_CALLS: "60"' in main_workflow
     assert 'V3_MAX_COST_USD: "0.05"' in main_workflow
     assert "MAX_TOPIC_REGENERATIONS = 6" in (ROOT / "main.py").read_text(encoding="utf-8")
-    print("TEST H API/cost/retry safety: PASS (new calls=0; caps unchanged)")
+    print("TEST J API/cost/retry safety: PASS (new calls=0; caps unchanged)")
 
     print("CANDIDATE POOL HANDOFF AUTHORITY REGRESSION: PASS")
     return 0
