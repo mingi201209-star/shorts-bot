@@ -19,7 +19,16 @@ def expect_failure(scenes):
     try:
         validate_final_visual_semantic_qa(scenes)
     except RuntimeError as exc:
-        assert "FINAL_VISUAL_SEMANTIC_QA_FAILED" in str(exc)
+        # The base Final Visual QA uses FINAL_VISUAL_SEMANTIC_QA_FAILED.
+        # Run 34781319743 adds a narrower, strictly stronger result-evidence
+        # failure for machine-PASS/human-FAIL Scene 4/5 footage. Both are
+        # terminal fail-closed outcomes; accepting the specific taxonomy here
+        # does not relax candidate acceptance or any quality floor.
+        message = str(exc)
+        assert (
+            "FINAL_VISUAL_SEMANTIC_QA_FAILED" in message
+            or "FINAL_VISUAL_SEMANTIC_QA_RESULT_EVIDENCE_FAILED" in message
+        ), message
         return
     raise AssertionError("cross-domain or component-missing final scene must fail closed")
 
