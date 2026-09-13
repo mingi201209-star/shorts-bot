@@ -51,23 +51,82 @@ if "flap" not in _VISUAL_ANCHOR_ORDER:
     _anchor_order.insert(_wing_index, "flap")
     _VISUAL_ANCHOR_ORDER = tuple(_anchor_order)
 
+# Run 34743843161 Human QA: the spoiler production kept only aircraft+wing as
+# required anchors, so unrelated aircraft stock could satisfy the contract and
+# the aircraft+wing relaxation ladder drifted to winglet footage. Spoiler is a
+# discriminative physical component just like flap. Preserve it from either
+# Korean/English Scene source text or the retrieval query. This changes no
+# quality threshold, provider, retry count, API call, or generation budget.
+_QUERY_ANCHOR_GROUPS["spoiler"] = {"spoiler", "spoilers", "speedbrake", "speedbrakes"}
+_CONCRETE_COMPONENT_ANCHORS.add("spoiler")
+_VISUAL_SOURCE_ANCHOR_ALIASES["spoiler"] = (
+    "스포일러", "날개 스포일러", "윙 스포일러", "spoiler", "spoilers",
+    "wing spoiler", "wing spoilers", "flight spoiler", "flight spoilers",
+    "speed brake", "speed brakes", "speedbrake", "speedbrakes",
+)
+_VISUAL_ANCHOR_PREFERRED_TERM["spoiler"] = "spoiler"
+if "spoiler" not in _VISUAL_ANCHOR_ORDER:
+    _anchor_order = list(_VISUAL_ANCHOR_ORDER)
+    try:
+        _wing_index = _anchor_order.index("wing") + 1
+    except ValueError:
+        _wing_index = len(_anchor_order)
+    # Keep spoiler ahead of flap when both aliases appear so a spoiler Scene
+    # cannot silently collapse to a historical flap/wing contract.
+    _anchor_order.insert(_wing_index, "spoiler")
+    _VISUAL_ANCHOR_ORDER = tuple(_anchor_order)
+
 # V1 intentionally preserves historical aircraft+wing exact behavior. When a
-# flap is explicitly present, extend that pair to the concrete third component
-# instead of allowing the V1 two-anchor compatibility shortcut to erase it.
+# discriminative wing component is explicitly present, extend that pair to the
+# concrete third component instead of allowing the V1 two-anchor compatibility
+# shortcut to erase it.
 _visual_subject_anchor_v2_previous_extract_query_anchors = extract_query_anchors
 
 
 def extract_query_anchors(query):
     anchors = list(_visual_subject_anchor_v2_previous_extract_query_anchors(query))
     words = set(normalize_search_query(query).split())
-    flap_aliases = _QUERY_ANCHOR_GROUPS.get("flap", {"flap", "flaps"})
-    if words & flap_aliases and "flap" not in anchors:
-        if "wing" in anchors:
-            anchors = [anchor for anchor in anchors if anchor != "flap"]
-            anchors.append("flap")
-        else:
-            anchors.append("flap")
+    for component, aliases in (
+        ("spoiler", _QUERY_ANCHOR_GROUPS.get("spoiler", {"spoiler", "spoilers"})),
+        ("flap", _QUERY_ANCHOR_GROUPS.get("flap", {"flap", "flaps"})),
+    ):
+        if words & aliases and component not in anchors:
+            anchors.append(component)
     return _dedupe_words(anchors)[:3]
+
+
+# #547 Scene 2 carried only "착륙 직후 + 스포일러" in narration and a weak
+# keyword (`why after landing`). A bare source alias therefore produced a
+# one-anchor spoiler contract. Landing context makes this identity unambiguous:
+# bind the named spoiler to the aircraft wing it physically belongs to. Do not
+# apply this to arbitrary automotive/aero spoilers without aviation context.
+_visual_subject_anchor_v2_previous_required_scene_subject_anchors = _required_scene_subject_anchors
+
+
+def _required_scene_subject_anchors(narration, visual_goal):
+    required = list(
+        _visual_subject_anchor_v2_previous_required_scene_subject_anchors(
+            narration, visual_goal
+        )
+    )
+    raw = f"{narration or ''} {visual_goal or ''}".strip().lower()
+    spoiler_aliases = _VISUAL_SOURCE_ANCHOR_ALIASES.get("spoiler", ())
+    spoiler_named = (
+        "spoiler" in required
+        or any(str(alias).lower() in raw for alias in spoiler_aliases)
+    )
+    aviation_context = (
+        bool({"aircraft", "wing"} & set(required))
+        or any(token in raw for token in (
+            "착륙", "항공기", "비행기", "날개", "여객기",
+            "landing", "landed", "aircraft", "airplane", "airliner", "wing",
+        ))
+    )
+    if spoiler_named and aviation_context:
+        combined = _dedupe_words(["aircraft", "wing", "spoiler"] + required)
+        ordered = [anchor for anchor in _VISUAL_ANCHOR_ORDER if anchor in combined]
+        return ordered[:3]
+    return required
 
 
 def _candidate_text_for_visual_contract(candidate):
@@ -106,7 +165,21 @@ def general_scene_unknown_safe_tier(candidate, scene_query):
 ''' + "\n"
     path.write_text(text, encoding="utf-8")
 
-print("✅ Visual Subject Anchor Contract V2 applied: compound aviation identity + explicit chroma fail-close")
+# Defense in depth: Final Visual Semantic QA must classify spoiler as an
+# aviation component too. The retrieval boundary above should reject a partial
+# aircraft+wing match first; this keeps a stale/alternate lineage path from
+# turning the same 2/3 proof back into a final PASS.
+qa_path = Path("quality/final_visual_semantic_qa.py")
+qa_text = qa_path.read_text(encoding="utf-8")
+old_component = 'component = bool(words & {"wing", "winglet", "wingtip", "window"})'
+new_component = 'component = bool(words & {"wing", "winglet", "wingtip", "window", "spoiler", "spoilers"})'
+if old_component in qa_text:
+    qa_text = qa_text.replace(old_component, new_component, 1)
+elif new_component not in qa_text:
+    raise RuntimeError("Visual Subject Anchor V2: Final QA component anchor not found")
+qa_path.write_text(qa_text, encoding="utf-8")
+
+print("✅ Visual Subject Anchor Contract V2 applied: compound aviation identity + spoiler/flap component proof + explicit chroma fail-close")
 
 # Run 33249110048: physical subject contract survives specificity fallback.
 import ci_visual_subject_anchor_fallback_inheritance_hotfix  # noqa: F401,E402
