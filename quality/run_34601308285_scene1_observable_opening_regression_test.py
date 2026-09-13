@@ -215,7 +215,8 @@ def green():
             hook_out, question_out = _run_case(repo, hook)
             assert hook_out == "비행기 창문 모서리는 둥급니다.", (label, hook_out)
             assert "?" not in hook_out
-            assert question_out == "그런데 " + core_question, (label, question_out)
+            # Run 34728511332 formalizes the locked question before validation.
+            assert question_out == "그런데 왜 비행기 창문 모서리는 둥글게 디자인되었을까요?", (label, question_out)
 
         # Negative control: already-valid observable statement passes through
         # untouched (gate never triggers for a non-question hook).

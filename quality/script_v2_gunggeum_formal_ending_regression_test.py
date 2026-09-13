@@ -87,6 +87,7 @@ def main():
 
     runner_source = Path("content/script_engine_v2_runner.py").read_text(encoding="utf-8")
     engine_source = Path("content/script_engine_v2.py").read_text(encoding="utf-8")
+    source_normalize_question = _load_question_normalizer(engine_source)
     with tempfile.TemporaryDirectory() as tmpdir:
         temp_runner = Path(tmpdir) / "script_engine_v2_runner.py"
         temp_engine = Path(tmpdir) / "script_engine_v2.py"
@@ -123,6 +124,22 @@ def main():
         normalize_question = _load_question_normalizer(
             visual_engine.read_text(encoding="utf-8")
         )
+
+        # Run 34728511332 (#542): the locked Scene 2 question must be
+        # formalized locally before spending any bounded writer calls.
+        question = "그런데 왜 비행기는 착륙 직후 날개의 양력을 일부러 없앨까?"
+        expected_question = "그런데 왜 비행기는 착륙 직후 날개의 양력을 일부러 없앨까요?"
+        for normalize in (source_normalize_question, normalize_question):
+            assert normalize(question, "question") == expected_question
+            for formal in (
+                expected_question,
+                "그런데 날개에 양력이 있습니까?",
+                "그런데 이 장치는 작동합니까?",
+                "그런데 이것은 스포일러입니까?",
+            ):
+                assert normalize(formal, "question") == formal
+            embedded = "왜 없앨까 생각했지만 이유를 아십니까?"
+            assert normalize(embedded, "question") == embedded
 
         first_counterexample = (
             "비행기 엔진이 날개 아래에 장착된 모습을 보면, 그 이유가 궁금해진다."
