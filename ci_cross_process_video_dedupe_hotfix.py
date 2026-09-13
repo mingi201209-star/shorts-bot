@@ -126,6 +126,19 @@ if "FINAL_VISUAL_SEMANTIC_QA_V1" in main_text:
     import ci_noise_reduction_result_visual_hotfix as _noise_reduction_result_supply  # noqa: E402
     _noise_reduction_result_supply.main()
 
+    # Run 34786153210 HUMAN QA: workflow SUCCESS rendered generic night-vision
+    # and wing B-roll because spoiler disappeared from the final required-anchor
+    # state. Only full visual composition owns this invariant; focused provider
+    # tests intentionally stop before Final Visual QA and V1/V2 installation.
+    # Execute in a fresh interpreter so the assertion observes the composed files,
+    # not cached modules from this installer process.
+    import subprocess  # noqa: E402
+    import sys  # noqa: E402
+    subprocess.run(
+        [sys.executable, "quality/run_34786153210_spoiler_final_composition_regression_test.py"],
+        check=True,
+    )
+
 # Writer compliance is deliberately applied last in the existing production hotfix
 # chain so earlier Script V2 installers cannot overwrite the plan-first contract.
 import ci_writer_compliance_plan_hotfix  # noqa: F401,E402
@@ -135,14 +148,3 @@ import ci_grounded_causal_contrast_hotfix  # noqa: F401,E402
 import ci_live_script_blockers_hotfix  # noqa: F401,E402
 import ci_run_33245676515_script_contract_hotfix  # noqa: F401,E402
 import ci_grounded_keyword_contract_hotfix  # noqa: F401,E402
-
-# Run 34786153210 HUMAN QA: workflow SUCCESS rendered generic night-vision and
-# wing B-roll because spoiler disappeared from the final required-anchor state.
-# Execute the assertion in a fresh interpreter so it observes the files exactly
-# as this real production composition leaves them, not cached imported modules.
-import subprocess  # noqa: E402
-import sys  # noqa: E402
-subprocess.run(
-    [sys.executable, "quality/run_34786153210_spoiler_final_composition_regression_test.py"],
-    check=True,
-)
