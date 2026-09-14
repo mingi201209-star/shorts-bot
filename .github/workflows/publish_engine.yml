@@ -13,6 +13,20 @@ on:
         required: false
         default: ""
         type: string
+      youtube_upload:
+        description: "Explicitly upload the verified stable render to YouTube"
+        required: false
+        default: false
+        type: boolean
+      youtube_privacy:
+        description: "YouTube privacy when upload is explicitly enabled"
+        required: false
+        default: "private"
+        type: choice
+        options:
+          - private
+          - unlisted
+          - public
 
 permissions:
   contents: read
@@ -56,6 +70,8 @@ jobs:
           printf '%s\n' "$workflow" | grep -F 'python -m diagnostics.runner' >/dev/null
           printf '%s\n' "$workflow" | grep -F 'final_visual_semantic_qa.json' >/dev/null
           printf '%s\n' "$workflow" | grep -F 'final_director_qa.json' >/dev/null
+          printf '%s\n' "$workflow" | grep -F 'youtube_upload:' >/dev/null
+          printf '%s\n' "$workflow" | grep -F 'youtube_privacy:' >/dev/null
           echo "Stable engine workflow contract verified at $STABLE_SHA"
 
       - name: Dispatch stable engine
@@ -67,6 +83,8 @@ jobs:
           STABLE_SHA: ${{ steps.stable.outputs.stable_sha }}
           TOPIC: ${{ inputs.topic }}
           CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
+          YOUTUBE_UPLOAD: ${{ inputs.youtube_upload }}
+          YOUTUBE_PRIVACY: ${{ inputs.youtube_privacy }}
         run: |
           set -euo pipefail
           before="$(gh run list --repo "$REPO" --workflow main.yml --branch "$STABLE_REF" --event workflow_dispatch --limit 20 --json databaseId --jq '.[].databaseId')"
@@ -76,8 +94,8 @@ jobs:
             -f topic="$TOPIC" \
             -f candidate_scope="$CANDIDATE_SCOPE" \
             -f expected_sha="" \
-            -f youtube_upload=false \
-            -f youtube_privacy=private
+            -f youtube_upload="$YOUTUBE_UPLOAD" \
+            -f youtube_privacy="$YOUTUBE_PRIVACY"
 
           child_id=""
           for _ in $(seq 1 60); do
@@ -110,6 +128,8 @@ jobs:
           echo "STABLE_SHA=$STABLE_SHA"
           echo "CHECKOUT_SHA=$child_sha"
           echo "STABLE_SHA_MATCH=YES"
+          echo "YOUTUBE_UPLOAD=$YOUTUBE_UPLOAD"
+          echo "YOUTUBE_PRIVACY=$YOUTUBE_PRIVACY"
           echo "CHILD_RUN_ID=$child_id"
 
       - name: Wait for stable engine
@@ -136,6 +156,8 @@ jobs:
           STABLE_SHA: ${{ steps.stable.outputs.stable_sha }}
           CHILD_RUN_ID: ${{ steps.child.outputs.child_run_id }}
           CHILD_CONCLUSION: ${{ steps.wait.outputs.child_conclusion }}
+          YOUTUBE_UPLOAD: ${{ inputs.youtube_upload }}
+          YOUTUBE_PRIVACY: ${{ inputs.youtube_privacy }}
         run: |
           set -euo pipefail
           mkdir -p publish-artifact/verified publish-artifact/diagnostics
@@ -151,6 +173,8 @@ jobs:
             "stable_sha": "$STABLE_SHA",
             "checkout_sha": "$STABLE_SHA",
             "stable_sha_match": true,
+            "youtube_upload_requested": "$YOUTUBE_UPLOAD",
+            "youtube_privacy": "$YOUTUBE_PRIVACY",
             "source_child_run": "${CHILD_RUN_ID:-UNKNOWN}",
             "child_conclusion": "${CHILD_CONCLUSION:-UNKNOWN}",
             "captured_at": "$captured_at"
