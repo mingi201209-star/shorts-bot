@@ -83,9 +83,18 @@ def test_no_secret_values_or_engine_code_touched() -> None:
     # This fix must be workflow-only: no change to analytics/*.py, no video
     # regeneration, no printing of credential values anywhere in the diff
     # surface this test can see.
+    #
+    # Checked against THIS fix's own marker specifically, not the bare
+    # "RUN_34847558126" run-id prefix: a later, separate, independently
+    # reviewed fix (PR #375, RUN_34847558126_VIDEO_PATH_FINGERPRINT_
+    # RESOLUTION_V1) legitimately touches analytics/publish_and_persist.py
+    # -- a real code bug in video-path resolution discovered from the same
+    # evidence run, unrelated to this OAuth-wiring-only change -- so the
+    # bare run-id substring is no longer unique to this fix.
+    oauth_fix_marker = "RUN_34847558126_OAUTH_CREDENTIAL_ALIAS_FALLBACK_V1"
     for path in ("analytics/publish_and_persist.py", "analytics/youtube_upload.py"):
         text = _read(path)
-        assert "RUN_34847558126" not in text, f"{path} unexpectedly touched by an OAuth-wiring-only fix"
+        assert oauth_fix_marker not in text, f"{path} unexpectedly touched by an OAuth-wiring-only fix"
 
 
 def run() -> None:
