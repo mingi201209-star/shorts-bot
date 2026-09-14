@@ -326,9 +326,16 @@ jobs:
           SHORTS_TOPIC: ${{ inputs.topic }}
           SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
           SHORTS_ANALYTICS_HISTORY_PATH: analytics/performance_history.json
-          YOUTUBE_ANALYTICS_CLIENT_ID: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_ID }}
-          YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET }}
-          YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN }}
+          # RUN_34847558126_OAUTH_CREDENTIAL_ALIAS_FALLBACK_V1: Run 34847558126
+          # (publish-stable, youtube_upload=true) proved these three secrets
+          # resolve to empty strings under their current YOUTUBE_ANALYTICS_*
+          # names, so analytics.publish_and_persist safely no-oped with
+          # "OAuth credentials unavailable". The current name is tried first;
+          # a legacy YT_* alias is used only if the current name is unset, so
+          # this is a no-op once YOUTUBE_ANALYTICS_* is actually populated.
+          YOUTUBE_ANALYTICS_CLIENT_ID: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_ID || secrets.YT_CLIENT_ID }}
+          YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET || secrets.YT_CLIENT_SECRET }}
+          YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN || secrets.YT_REFRESH_TOKEN }}
         run: python -m analytics.publish_and_persist
 
       - name: Preserve analytics history
