@@ -1,11 +1,40 @@
 """Publish a rendered Short only when explicitly enabled and persist lineage."""
 
+import glob
 import json
 import os
 import sys
 
 from analytics.youtube_ingestion import load_history, save_history
 from analytics.youtube_upload import upload_enabled, upload_video, upsert_lineage
+
+
+def _resolve_video_path():
+    """Resolve the rendered Short's exact file path.
+
+    RUN_34847558126_VIDEO_PATH_FINGERPRINT_RESOLUTION_V1: the production
+    renderer (quality/final_render_integrity.begin_final_render_integrity)
+    always writes the final video as final_shorts_<fingerprint>.mp4, never
+    the literal "final_shorts.mp4" this function previously defaulted to.
+    main.yml's "Publish to YouTube" step never set SHORTS_VIDEO_PATH, so
+    upload_video() would raise FileNotFoundError("final_shorts.mp4") on
+    every real run -- masked until now because every prior run failed
+    earlier, at the OAuth-credential-presence check. SHORTS_VIDEO_PATH, when
+    set, is still honored first and unconditionally (no behavior change for
+    any caller that already sets it explicitly, including this module's own
+    regression tests).
+    """
+    configured = os.environ.get("SHORTS_VIDEO_PATH", "").strip()
+    if configured:
+        return configured
+    matches = sorted(glob.glob("final_shorts_*.mp4"))
+    if len(matches) == 1:
+        return matches[0]
+    # Zero or ambiguous (>1) matches: fall through to the original literal
+    # default so the failure stays an explicit, unsurprising
+    # FileNotFoundError naming exactly what was looked for, not a silent
+    # guess among multiple candidates.
+    return "final_shorts.mp4"
 
 
 def main():
@@ -22,7 +51,7 @@ def main():
         print("[youtube-upload] failed safely: OAuth credentials unavailable")
         return 1
 
-    video_path = os.environ.get("SHORTS_VIDEO_PATH", "final_shorts.mp4")
+    video_path = _resolve_video_path()
     title = os.environ.get("SHORTS_YOUTUBE_TITLE", "").strip() or "Shorts"
     description = os.environ.get("SHORTS_YOUTUBE_DESCRIPTION", "").strip()
     privacy = os.environ.get("SHORTS_YOUTUBE_PRIVACY", "private").strip() or "private"
