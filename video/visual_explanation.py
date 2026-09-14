@@ -46,7 +46,7 @@ def _text(scene):
 
 def _winglet_subject(scene):
     value = _text(scene)
-    return any(token in value for token in ("winglet", "wingtip", "윙렛", "날개 끝", "aircraft wing"))
+    return any(token in value for token in ("winglet", "wingtip", "윙렛", "날개 끝"))
 
 
 def plan_explanation(scene):
@@ -139,8 +139,6 @@ def _fit_cover(image):
 
 def _draw_concept_panel(frame, plan, progress):
     draw = ImageDraw.Draw(frame, "RGBA")
-    # Keep explanation graphics in the upper third; the existing subtitle
-    # safety selector can therefore prefer middle/bottom without overlap.
     panel = (72, 110, VIDEO_WIDTH - 72, 650)
     draw.rounded_rectangle(panel, radius=34, fill=(0, 0, 0, 145), outline=(255, 255, 255, 175), width=3)
     font = _font(54)
@@ -148,7 +146,6 @@ def _draw_concept_panel(frame, plan, progress):
     draw.text((112, 145), plan["label"], font=font, fill=(255, 255, 255, 245))
 
     y = 390
-    # simple wing + upturned winglet silhouette
     draw.line((165, y, 730, y), fill=(235, 235, 235, 245), width=32)
     draw.line((730, y, 790, y - 150), fill=(235, 235, 235, 245), width=32)
     template = plan["template"]
@@ -178,8 +175,6 @@ def _render_clip(base_image, output_path, duration, plan):
 
     def make_frame(t):
         p = min(1.0, max(0.0, t / duration))
-        # Distinct information transform: a small deterministic push-in plus
-        # a different fact-bounded panel per information beat.
         zoom = 1.0 + 0.035 * p
         w = int(VIDEO_WIDTH / zoom)
         h = int(VIDEO_HEIGHT / zoom)
@@ -240,27 +235,10 @@ def _deterministic_explanatory_asset_id(plan):
 
 
 def _explanatory_asset_id(source_id, plan):
-    # A verified cached still remains the underlying physical asset. Only the
-    # deterministic 2D branch needs a provenance identity derived from its
-    # actual render plan instead of the old renderer-family constant.
     return str(source_id) if source_id else _deterministic_explanatory_asset_id(plan)
 
 
 def _information_signature_for_plan(asset_id, plan):
-    """Return visual-information identity without hiding physical reuse.
-
-    Normally the same physical asset + template is one information state. The
-    closed AIRCRAFT_WINDOW_STRESS_V1 renderer is different: trusted grounded
-    claim ownership and presentation variants are explicit, deterministic
-    render inputs. Run 34675233154 proved that treating S4 stress-flow and S5
-    fatigue-payoff as identical merely because both annotate the same verified
-    window still falsely rejects real information progression.
-
-    Keep the physical asset id unchanged for diversity/lineage. Only the
-    information-repeat signature becomes claim/presentation aware, and only
-    when all trusted plan fields are present. Exact repeated states still map
-    to the same signature and remain rejected.
-    """
     template = str((plan or {}).get("template") or "")
     if (
         template == "AIRCRAFT_WINDOW_STRESS_V1"
