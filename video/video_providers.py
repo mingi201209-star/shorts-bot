@@ -1,12 +1,31 @@
+import html
 import os
+import re
 
 import requests
 
 
 PIXABAY_VIDEO_API = "https://pixabay.com/api/videos/"
 PIXABAY_API_KEY = os.environ.get("PIXABAY_API_KEY", "").strip()
+WIKIMEDIA_COMMONS_API = "https://commons.wikimedia.org/w/api.php"
+WIKIMEDIA_COMMONS_ENABLED = os.environ.get("WIKIMEDIA_COMMONS_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
+WIKIMEDIA_COMMONS_USER_AGENT = os.environ.get(
+    "WIKIMEDIA_COMMONS_USER_AGENT",
+    "shorts-bot/2.0 (automated educational video retrieval; GitHub: mingi201209-star/shorts-bot)",
+).strip()
 VIDEO_PROVIDER_PER_PAGE = max(3, min(12, int(os.environ.get("VIDEO_PROVIDER_PER_PAGE", "6"))))
 VIDEO_PROVIDER_POOL_MAX = max(6, min(24, int(os.environ.get("VIDEO_PROVIDER_POOL_MAX", "12"))))
+
+# The current renderer has no reliable attribution sink in the YouTube description.
+# Therefore Commons auto-use is deliberately limited to licenses that do not require
+# attribution or share-alike. CC BY / CC BY-SA metadata is preserved but rejected.
+_WIKIMEDIA_AUTO_LICENSES = {
+    "cc0",
+    "cc-zero",
+    "public domain",
+    "public-domain",
+    "pd",
+}
 
 
 def candidate_unique_key(candidate):
@@ -23,8 +42,21 @@ def candidate_metadata_text(candidate):
         candidate.get("title", ""),
         candidate.get("description", ""),
         candidate.get("tags", ""),
+        candidate.get("creator", ""),
+        candidate.get("license", ""),
     ]
     return " ".join(str(value or "") for value in values).strip()
+
+
+def _license_fields(*, license_name, license_url, attribution_required, modification_allowed=True, commercial_use=True, review_required=False):
+    return {
+        "license": str(license_name or "").strip(),
+        "license_url": str(license_url or "").strip(),
+        "commercial_use": bool(commercial_use),
+        "attribution_required": bool(attribution_required),
+        "modification_allowed": bool(modification_allowed),
+        "license_review_required": bool(review_required),
+    }
 
 
 def normalize_pexels_candidate(candidate):
@@ -38,8 +70,11 @@ def normalize_pexels_candidate(candidate):
         "source_url": source_url,
         "download_url": download_url,
         "provider_key": f"pexels:{source_id}",
-        "license": item.get("license") or "Pexels License",
-        "license_url": item.get("license_url") or "https://www.pexels.com/license/",
+        **_license_fields(
+            license_name=item.get("license") or "Pexels License",
+            license_url=item.get("license_url") or "https://www.pexels.com/license/",
+            attribution_required=False,
+        ),
     })
     return item
 
@@ -110,9 +145,126 @@ def search_pixabay_candidates(query, per_page=None, requests_module=requests, ap
             "search_position": position,
             "tags": tags,
             "metadata_text": tags,
-            "license": "Pixabay Content License",
-            "license_url": "https://pixabay.com/service/license-summary/",
             "creator": str(hit.get("user") or ""),
+            **_license_fields(
+                license_name="Pixabay Content License",
+                license_url="https://pixabay.com/service/license-summary/",
+                attribution_required=False,
+            ),
+        })
+    return candidates
+
+
+def _plain_metadata_value(extmetadata, key):
+    raw = ((extmetadata or {}).get(key) or {}).get("value", "")
+    text = html.unescape(str(raw or ""))
+    text = re.sub(r"<[^>]+>", " ", text)
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _wikimedia_license_auto_usable(license_name, *, copyrighted="", restrictions=""):
+    normalized = re.sub(r"\s+", " ", str(license_name or "").strip().lower())
+    restriction_text = f"{copyrighted} {restrictions}".strip().lower()
+    if any(token in restriction_text for token in ("noncommercial", "no derivatives", "permission required")):
+        return False
+    if normalized in _WIKIMEDIA_AUTO_LICENSES:
+        return True
+    return normalized.startswith("public domain") or normalized.startswith("cc0")
+
+
+def search_wikimedia_commons_candidates(query, per_page=None, requests_module=requests):
+    """Search Commons video files and return only attribution-free auto-usable assets.
+
+    Commons exposes file license metadata via imageinfo/extmetadata. We fail closed:
+    unclear licenses, CC BY, CC BY-SA, NC, ND, or restricted files are not inserted
+    into the production candidate pool until an attribution/share-alike pipeline exists.
+    """
+    query = str(query or "").strip()
+    if not query:
+        raise ValueError("Wikimedia Commons query is empty")
+
+    limit = VIDEO_PROVIDER_PER_PAGE if per_page is None else max(3, min(12, int(per_page)))
+    response = requests_module.get(
+        WIKIMEDIA_COMMONS_API,
+        headers={"User-Agent": WIKIMEDIA_COMMONS_USER_AGENT},
+        params={
+            "action": "query",
+            "format": "json",
+            "formatversion": "2",
+            "generator": "search",
+            "gsrsearch": query,
+            "gsrnamespace": "6",
+            "gsrlimit": limit,
+            "prop": "imageinfo",
+            "iiprop": "url|mime|size|extmetadata",
+        },
+        timeout=20,
+    )
+    if not response.ok:
+        raise RuntimeError(f"Wikimedia Commons search failed: HTTP {response.status_code}")
+
+    pages = ((response.json().get("query") or {}).get("pages") or [])
+    candidates = []
+    for position, page in enumerate(pages, start=1):
+        info_list = page.get("imageinfo") or []
+        if not info_list:
+            continue
+        info = info_list[0] or {}
+        mime = str(info.get("mime") or "").strip().lower()
+        if not mime.startswith("video/"):
+            continue
+
+        ext = info.get("extmetadata") or {}
+        license_name = _plain_metadata_value(ext, "LicenseShortName") or _plain_metadata_value(ext, "UsageTerms")
+        license_url = _plain_metadata_value(ext, "LicenseUrl")
+        copyrighted = _plain_metadata_value(ext, "Copyrighted")
+        restrictions = _plain_metadata_value(ext, "Restrictions")
+        if not _wikimedia_license_auto_usable(
+            license_name,
+            copyrighted=copyrighted,
+            restrictions=restrictions,
+        ):
+            continue
+
+        media_url = str(info.get("url") or "").strip()
+        if not media_url:
+            continue
+        title = str(page.get("title") or "").strip()
+        page_url = "https://commons.wikimedia.org/wiki/" + title.replace(" ", "_")
+        source_id = page.get("pageid") or title
+        creator = _plain_metadata_value(ext, "Artist")
+        description = _plain_metadata_value(ext, "ImageDescription")
+        credit = _plain_metadata_value(ext, "Credit")
+        metadata_text = " ".join(item for item in (title, creator, description, credit) if item)
+
+        candidates.append({
+            "id": source_id,
+            "provider": "wikimedia_commons",
+            "source_id": source_id,
+            "source_url": page_url,
+            "download_url": media_url,
+            "provider_key": f"wikimedia_commons:{source_id}",
+            "url": media_url,
+            "page_url": page_url,
+            "thumbnail": str(info.get("thumburl") or ""),
+            "width": int(info.get("width", 0) or 0),
+            "height": int(info.get("height", 0) or 0),
+            "duration": float(info.get("duration", 0) or 0),
+            "query": query,
+            "search_position": position,
+            "title": title,
+            "description": description,
+            "metadata_text": metadata_text,
+            "creator": creator,
+            "mime": mime,
+            **_license_fields(
+                license_name=license_name,
+                license_url=license_url,
+                attribution_required=False,
+                modification_allowed=True,
+                commercial_use=True,
+                review_required=False,
+            ),
         })
     return candidates
 
