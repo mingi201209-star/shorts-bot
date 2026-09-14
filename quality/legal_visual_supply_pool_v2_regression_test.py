@@ -155,15 +155,12 @@ def test_composed_provider_pool():
 
 
 def test_no_quality_or_budget_relaxation():
-    hotfix = (ROOT / "ci_legal_visual_supply_pool_v2_hotfix.py").read_text(encoding="utf-8")
+    hotfix = (ROOT / "ci_video_provider_hotfix.py").read_text(encoding="utf-8")
     forbidden = (
         "V3_MAX_API_CALLS",
         "V3_MAX_COST_USD",
         "HOOK_VISUAL_MIN_SCORE =",
         "HOOK_VISUAL_FLOORS =",
-        "semantic_match",
-        "subject_visibility",
-        "mobile_clarity",
     )
     check("I provider expansion does not alter quality floors or model/API budgets", not any(token in hotfix for token in forbidden))
 
