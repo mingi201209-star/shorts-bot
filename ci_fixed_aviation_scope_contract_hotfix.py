@@ -4,10 +4,16 @@ EXPLORER_PATH = Path("content/candidate_explorer.py")
 MARKER = "FIXED_AVIATION_SCOPE_CONTRACT_V1"
 
 
+def _apply_run_34825745612_hook_repair_if_ready():
+    from ci_run_34825745612_legacy_hook_repair_hotfix import main as patch_legacy_hook
+    patch_legacy_hook()
+
+
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
     if MARKER in text:
         print("✅ fixed aviation scope contract already applied")
+        _apply_run_34825745612_hook_repair_if_ready()
         return
 
     specificity_marker = "_aviation_specificity_previous_build_context = build_execution_context"
@@ -25,6 +31,7 @@ def main():
     text = text[:idx] + text[idx:].replace(old, new, 1)
     EXPLORER_PATH.write_text(text, encoding="utf-8")
     print("✅ fixed aviation topic now activates specificity contract with blank scope")
+    _apply_run_34825745612_hook_repair_if_ready()
 
 
 if __name__ == "__main__":
