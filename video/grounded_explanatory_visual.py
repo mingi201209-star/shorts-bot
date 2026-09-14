@@ -16,6 +16,10 @@ EXPLANATORY_TERM_GROUPS = {
     "mixing": {"mix", "mixes", "mixed", "mixing", "blend", "blends", "blended", "blending"},
     "noise": {"noise", "noisy", "sound", "sounds", "acoustic", "acoustics", "decibel", "decibels"},
     "reduction": {"reduce", "reduces", "reduced", "reduction", "decrease", "decreases", "lower", "lowering", "quieter", "quiet"},
+    "load": {"weight", "load", "loads", "loading", "force", "forces"},
+    "wheel": {"wheel", "wheels", "tire", "tires", "tyre", "tyres", "landinggear"},
+    "braking": {"brake", "brakes", "braking", "decelerate", "decelerates", "deceleration", "slow", "slowing"},
+    "effect": {"effect", "effects", "effective", "effectiveness", "result", "results", "outcome", "outcomes"},
 }
 
 _GROUP_VISIBLE_REQUIREMENTS = {
@@ -24,6 +28,10 @@ _GROUP_VISIBLE_REQUIREMENTS = {
     "mixing": "two or more visible flow regions must visibly mix, blend, or interleave; a static part close-up is not enough",
     "noise": "visible evidence must directly represent sound/noise rather than merely showing the source object",
     "reduction": "the visual must directly represent a reduction/lowering comparison or state, not merely the presence of the source object",
+    "load": "the visual must directly represent load or weight transfer to a supported contact point; a generic aircraft or wing shot is not enough",
+    "wheel": "aircraft landing gear wheels or tires must be directly visible and relevant to the represented relation",
+    "braking": "the visual must directly represent aircraft braking, deceleration, or landing rollout rather than generic flight",
+    "effect": "the claimed result/effect must be directly represented by a visible outcome or comparison; the causal subject alone is not enough",
 }
 
 

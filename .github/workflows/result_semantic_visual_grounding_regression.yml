@@ -1,0 +1,28 @@
+name: Result Semantic Visual Grounding Regression
+
+on:
+  pull_request:
+    paths:
+      - 'video/grounded_explanatory_visual.py'
+      - 'video/visual_explanation.py'
+      - 'quality/result_semantic_visual_grounding_regression_test.py'
+      - '.github/workflows/result_semantic_visual_grounding_regression.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install focused dependencies
+        run: pip install numpy pillow moviepy==1.0.3
+      - name: Compile changed runtime files
+        run: python -m py_compile video/grounded_explanatory_visual.py video/visual_explanation.py quality/result_semantic_visual_grounding_regression_test.py
+      - name: Run regression
+        env:
+          PYTHONPATH: .
+        run: python quality/result_semantic_visual_grounding_regression_test.py

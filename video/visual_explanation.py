@@ -46,6 +46,8 @@ def _text(scene):
 
 def _winglet_subject(scene):
     value = _text(scene)
+    if any(token in value for token in ("spoiler", "spoilers", "speedbrake", "speedbrakes", "flap", "flaps")):
+        return False
     return any(token in value for token in ("winglet", "wingtip", "윙렛", "날개 끝", "aircraft wing"))
 
 
