@@ -1,0 +1,54 @@
+name: OAuth Publish Closure Regression
+
+on:
+  push:
+    branches:
+      - "ops/**"
+      - "fix/**"
+    paths:
+      - "analytics/publish_and_persist.py"
+      - "analytics/youtube_upload.py"
+      - "quality/run_34847558126_publish_video_path_resolution_regression_test.py"
+      - "quality/verify_oauth_publish_existing_artifact_safety_regression_test.py"
+      - ".github/workflows/verify_oauth_publish_existing_artifact.yml"
+      - ".github/workflows/oauth_publish_closure_regression.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "analytics/publish_and_persist.py"
+      - "analytics/youtube_upload.py"
+      - "quality/run_34847558126_publish_video_path_resolution_regression_test.py"
+      - "quality/verify_oauth_publish_existing_artifact_safety_regression_test.py"
+      - ".github/workflows/verify_oauth_publish_existing_artifact.yml"
+      - ".github/workflows/oauth_publish_closure_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install production Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile touched files
+        run: |
+          python -m py_compile \
+            analytics/publish_and_persist.py \
+            analytics/youtube_upload.py \
+            quality/run_34847558126_publish_video_path_resolution_regression_test.py \
+            quality/verify_oauth_publish_existing_artifact_safety_regression_test.py
+      - name: Run video path resolution regression
+        run: python -m quality.run_34847558126_publish_video_path_resolution_regression_test
+      - name: Run existing YouTube upload lineage regression (unaffected)
+        run: python -m quality.youtube_upload_lineage_regression_test
+      - name: Run disabled-by-default safety check (unaffected)
+        run: ENABLE_YOUTUBE_UPLOAD=0 python -m analytics.publish_and_persist
+      - name: Run verify-workflow safety regression
+        run: python -m quality.verify_oauth_publish_existing_artifact_safety_regression_test
