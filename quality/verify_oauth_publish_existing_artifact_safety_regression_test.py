@@ -3,49 +3,60 @@
 This workflow performs a REAL YouTube upload using production OAuth secrets
 when dispatched, reusing an already-existing verified-shorts-* artifact (no
 new video generation). This regression statically proves its safety
-invariants hold in the committed YAML, without dispatching it or touching
-any secret value.
+invariants hold in the committed YAML text, without dispatching it, without
+touching any secret value, and without a PyYAML dependency (not in
+requirements.txt -- plain text/regex checks only, matching this repo's
+established convention for workflow-YAML regressions, e.g. PR #372's
+youtube_oauth_credential_fallback_regression_test.py).
 """
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
-
-import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = ROOT / ".github" / "workflows" / "verify_oauth_publish_existing_artifact.yml"
 
 
+def _on_block(text):
+    """Return the raw text of the top-level `on:` block (up to the next
+    top-level key), without depending on PyYAML's "on" -> True gotcha or any
+    external dependency."""
+    match = re.search(r"^on:\n(.*?)^\S", text, re.MULTILINE | re.DOTALL)
+    assert match, "top-level 'on:' block not found"
+    return match.group(1)
+
+
+def _input_block(text, name):
+    """Return the raw text of one workflow_dispatch input's block (from its
+    own line to just before the next 6-space-indented input key or the end
+    of the inputs section)."""
+    match = re.search(
+        rf"^      {re.escape(name)}:\n(.*?)(?=^      \S|\Z)",
+        text,
+        re.MULTILINE | re.DOTALL,
+    )
+    assert match, f"input block for {name!r} not found"
+    return match.group(1)
+
+
 def main():
     text = WORKFLOW_PATH.read_text(encoding="utf-8")
-    doc = yaml.safe_load(text)
-    assert isinstance(doc, dict), "workflow YAML must parse to a mapping"
-    # PyYAML (1.1 resolver) parses the bare "on:" key as the boolean True,
-    # not the string "on" -- a well-known gotcha. Normalize it back.
-    on_block = doc.get("on")
-    if on_block is None and True in doc:
-        on_block = doc[True]
-    assert isinstance(on_block, dict), "workflow must have an 'on' trigger block"
-    print("CASE A workflow YAML parses: PASS")
+    assert text.startswith("name: Verify OAuth Publish (Existing Artifact)")
+    print("CASE A workflow file has the expected name/header: PASS")
 
     # CASE B: privacy is hardcoded to "private" -- no input exposes public
     # or unlisted, and the literal string is unconditional (not driven by
-    # any input expression).
+    # any input expression). The word "public" legitimately appears in this
+    # file's own English safety-explanation comments ("post publicly"), so
+    # check narrowly for the privacy-status usage shape, not the bare
+    # substring.
     assert 'SHORTS_YOUTUBE_PRIVACY: "private"' in text, (
         "SHORTS_YOUTUBE_PRIVACY must be hardcoded private, not input-driven"
     )
-    inputs = (on_block.get("workflow_dispatch") or {}).get("inputs") or {}
-    assert "privacy" not in " ".join(inputs.keys()).lower(), (
-        "no privacy-related input may exist on this workflow"
-    )
-    # "public" as a privacy value (e.g. an options list, or a YAML value
-    # assignment) must never appear -- but the word legitimately appears in
-    # this file's own English safety-explanation comments ("post publicly"),
-    # so check narrowly for the privacy-status usage shape, not the bare
-    # substring.
+    on_text = _on_block(text)
+    assert "privacy" not in on_text.lower(), "no privacy-related input may exist on this workflow"
     assert not re.search(r"privacy_status.*public|SHORTS_YOUTUBE_PRIVACY.*public", text, re.IGNORECASE)
     assert "- public" not in text, "no options list may offer a public choice"
     print("CASE B privacy hardcoded to private, no public path exists: PASS")
@@ -70,23 +81,23 @@ def main():
 
     # CASE E: secret values are never echoed -- only presence booleans.
     assert "present={bool(value.strip())}" in text
-    assert "echo \"$YOUTUBE_ANALYTICS" not in text
+    assert 'echo "$YOUTUBE_ANALYTICS' not in text
     assert "print(value)" not in text
     print("CASE E only presence booleans are printed, no secret value ever echoed: PASS")
 
     # CASE F: required inputs exist and are all required (no accidental
     # default that could upload against the wrong artifact).
     for name in ("artifact_run_id", "artifact_name", "topic_title"):
-        assert name in inputs, f"missing required input: {name}"
-        assert inputs[name].get("required") is True, f"input {name} must be required"
-        assert "default" not in inputs[name], f"input {name} must not have a default"
+        block = _input_block(text, name)
+        assert "required: true" in block, f"input {name} must be required"
+        assert "default:" not in block, f"input {name} must not have a default"
     print("CASE F all three inputs are required with no default: PASS")
 
     # CASE G: this workflow is workflow_dispatch only -- it never runs
     # automatically on push/pull_request/schedule.
-    assert set(on_block.keys()) == {"workflow_dispatch"}, (
-        f"workflow must be workflow_dispatch only, got triggers: {list(on_block.keys())}"
-    )
+    assert "workflow_dispatch:" in on_text
+    for forbidden in ("push:", "pull_request:", "schedule:"):
+        assert forbidden not in on_text, f"workflow must not trigger on {forbidden}"
     print("CASE G workflow_dispatch only, no automatic trigger: PASS")
 
     print("VERIFY OAUTH PUBLISH EXISTING ARTIFACT SAFETY REGRESSION: PASS")
