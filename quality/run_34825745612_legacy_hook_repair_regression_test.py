@@ -10,12 +10,26 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+from quality.canonical_subject_grounding_supply import (
+    PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS,
+)
+from quality.candidate_pool_grounding_records import (
+    CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS,
+)
+from quality.legacy_selected_hook_repair import (
+    validate_legacy_selected_with_exact_hook_repair,
+)
+
+
 FIXED_TOPIC = "착륙 직후 날개 위로 솟는 스포일러"
 EXPECTED_OBSERVATION = "착륙 직후 날개 윗면의 판 모양 스포일러가 위로 솟습니다."
 EXPLORER_PATH = REPO_ROOT / "content/candidate_explorer.py"
 VISUAL_PATH = REPO_ROOT / "video/visual_explanation.py"
 MARKER = "RUN_34825745612_LEGACY_SELECTED_HOOK_REPAIR_V1"
 FINAL_READY_MARKER = "GROUNDED_DETERMINISTIC_EXPLANATION_V1"
+TRUSTED_RECORDS = tuple(PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS) + tuple(
+    CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS
+)
 
 
 def candidate(topic: str = FIXED_TOPIC) -> dict:
@@ -53,13 +67,71 @@ def repeated_hook_validator(data: dict) -> dict:
 
 
 def main() -> None:
-    original_explorer = EXPLORER_PATH.read_text(encoding="utf-8")
-    original_visual = VISUAL_PATH.read_text(encoding="utf-8")
-    previous_scope = os.environ.get("SHORTS_CANDIDATE_SCOPE")
-    previous_topic = os.environ.get("SHORTS_TOPIC")
+    # A. Exact production counterexample repairs only the Hook and reruns the
+    # unchanged validator.
+    repaired, did_repair = validate_legacy_selected_with_exact_hook_repair(
+        candidate(),
+        validate_output_fn=repeated_hook_validator,
+        scope="aviation",
+        fixed_topic=FIXED_TOPIC,
+        trusted_records=TRUSTED_RECORDS,
+    )
+    assert did_repair is True
+    assert repaired["status"] == "SELECTED"
+    assert repaired["winner"]["micro_narrative"]["hook"] == EXPECTED_OBSERVATION
+    assert repaired["winner"]["core_question"] == candidate()["winner"]["core_question"]
+
+    # B. Non-exact topic stays fail-closed.
+    try:
+        validate_legacy_selected_with_exact_hook_repair(
+            candidate("착륙 직후 다른 스포일러 주제"),
+            validate_output_fn=repeated_hook_validator,
+            scope="aviation",
+            fixed_topic=FIXED_TOPIC,
+            trusted_records=TRUSTED_RECORDS,
+        )
+    except ValueError as exc:
+        assert "Core Question" in str(exc)
+    else:
+        raise AssertionError("non-exact topic unexpectedly repaired")
+
+    # C. Outside aviation scope stays fail-closed.
+    try:
+        validate_legacy_selected_with_exact_hook_repair(
+            candidate(),
+            validate_output_fn=repeated_hook_validator,
+            scope="",
+            fixed_topic=FIXED_TOPIC,
+            trusted_records=TRUSTED_RECORDS,
+        )
+    except ValueError as exc:
+        assert "Core Question" in str(exc)
+    else:
+        raise AssertionError("non-aviation scope unexpectedly repaired")
+
+    # D. Unrelated validation failures remain authoritative.
+    def unrelated_failure(_data: dict) -> dict:
+        raise ValueError("unrelated schema failure")
 
     try:
-        # A. Installer must defer before final production composition.
+        validate_legacy_selected_with_exact_hook_repair(
+            candidate(),
+            validate_output_fn=unrelated_failure,
+            scope="aviation",
+            fixed_topic=FIXED_TOPIC,
+            trusted_records=TRUSTED_RECORDS,
+        )
+    except ValueError as exc:
+        assert str(exc) == "unrelated schema failure"
+    else:
+        raise AssertionError("unrelated validation error was swallowed")
+
+    # E. Installer wiring defers until final production composition, then appends
+    # exactly one wrapper. This checks the final-pass integration without dynamic
+    # module reload tricks.
+    original_explorer = EXPLORER_PATH.read_text(encoding="utf-8")
+    original_visual = VISUAL_PATH.read_text(encoding="utf-8")
+    try:
         EXPLORER_PATH.write_text(original_explorer.replace(MARKER, ""), encoding="utf-8")
         VISUAL_PATH.write_text(
             original_visual.replace(FINAL_READY_MARKER, "RUN348_FINAL_NOT_READY"),
@@ -69,61 +141,17 @@ def main() -> None:
         hotfix.main()
         assert MARKER not in EXPLORER_PATH.read_text(encoding="utf-8")
 
-        # B. Final composition marker enables exactly one installation.
         VISUAL_PATH.write_text(
             original_visual + f"\n# {FINAL_READY_MARKER}\n",
             encoding="utf-8",
         )
         hotfix.main()
-        patched = EXPLORER_PATH.read_text(encoding="utf-8")
-        assert patched.count(MARKER) == 1
-
-        # Reload the now-patched Explorer and replace only the captured previous
-        # validator with the exact production failure contract. This isolates the
-        # new bounded wrapper while keeping real repo-owned fixed-topic records.
-        explorer = importlib.reload(importlib.import_module("content.candidate_explorer"))
-        explorer._run34825745612_previous_validate_explorer_output = repeated_hook_validator
-
-        os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
-        os.environ["SHORTS_TOPIC"] = FIXED_TOPIC
-
-        repaired = explorer.validate_explorer_output(candidate())
-        assert repaired["status"] == "SELECTED"
-        assert repaired["winner"]["micro_narrative"]["hook"] == EXPECTED_OBSERVATION
-        assert repaired["winner"]["core_question"] == candidate()["winner"]["core_question"]
-
-        # C. A non-exact topic must not borrow the fixed-topic seed.
-        try:
-            explorer.validate_explorer_output(candidate("착륙 직후 다른 스포일러 주제"))
-        except ValueError as exc:
-            assert "Core Question" in str(exc)
-        else:
-            raise AssertionError("non-exact topic unexpectedly repaired")
-
-        # D. Non-repeat validator errors must remain authoritative.
-        def unrelated_failure(_data: dict) -> dict:
-            raise ValueError("unrelated schema failure")
-
-        explorer._run34825745612_previous_validate_explorer_output = unrelated_failure
-        try:
-            explorer.validate_explorer_output(candidate())
-        except ValueError as exc:
-            assert str(exc) == "unrelated schema failure"
-        else:
-            raise AssertionError("unrelated validation error was swallowed")
-
-        print("PASS: Run 34825745612 bounded legacy SELECTED hook repair regression")
+        assert EXPLORER_PATH.read_text(encoding="utf-8").count(MARKER) == 1
     finally:
         EXPLORER_PATH.write_text(original_explorer, encoding="utf-8")
         VISUAL_PATH.write_text(original_visual, encoding="utf-8")
-        if previous_scope is None:
-            os.environ.pop("SHORTS_CANDIDATE_SCOPE", None)
-        else:
-            os.environ["SHORTS_CANDIDATE_SCOPE"] = previous_scope
-        if previous_topic is None:
-            os.environ.pop("SHORTS_TOPIC", None)
-        else:
-            os.environ["SHORTS_TOPIC"] = previous_topic
+
+    print("PASS: Run 34825745612 bounded legacy SELECTED hook repair regression")
 
 
 if __name__ == "__main__":
