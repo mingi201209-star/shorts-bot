@@ -2,13 +2,18 @@ from __future__ import annotations
 
 import importlib
 import os
+import sys
 from pathlib import Path
 
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 FIXED_TOPIC = "착륙 직후 날개 위로 솟는 스포일러"
 EXPECTED_OBSERVATION = "착륙 직후 날개 윗면의 판 모양 스포일러가 위로 솟습니다."
-EXPLORER_PATH = Path("content/candidate_explorer.py")
-VISUAL_PATH = Path("video/visual_explanation.py")
+EXPLORER_PATH = REPO_ROOT / "content/candidate_explorer.py"
+VISUAL_PATH = REPO_ROOT / "video/visual_explanation.py"
 MARKER = "RUN_34825745612_LEGACY_SELECTED_HOOK_REPAIR_V1"
 FINAL_READY_MARKER = "GROUNDED_DETERMINISTIC_EXPLANATION_V1"
 
