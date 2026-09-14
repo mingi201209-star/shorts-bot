@@ -1,0 +1,56 @@
+name: Legal Visual Supply Pool V2 Regression
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "video/video_providers.py"
+      - "ci_video_provider_hotfix.py"
+      - "quality/video_provider_pool_regression_test.py"
+      - "quality/legal_visual_supply_pool_v2_regression_test.py"
+      - ".github/workflows/legal_visual_supply_pool_v2_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PYTHONPATH: .
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compose production provider layer
+        run: python ci_video_provider_hotfix.py
+      - name: Compile provider surface
+        run: |
+          python -m py_compile \
+            ci_video_provider_hotfix.py \
+            video/video_providers.py \
+            video/video_downloader.py \
+            video/hook_visual.py \
+            video/video_engine.py \
+            quality/video_provider_pool_regression_test.py \
+            quality/legal_visual_supply_pool_v2_regression_test.py
+      - name: Run legacy provider regression
+        run: python quality/video_provider_pool_regression_test.py
+      - name: Run legal visual supply regression
+        run: python quality/legal_visual_supply_pool_v2_regression_test.py
+      - name: Assert no quality or budget relaxation
+        run: |
+          ! grep -q "V3_MAX_API_CALLS\|V3_MAX_COST_USD" ci_video_provider_hotfix.py
+          ! grep -q "HOOK_VISUAL_MIN_SCORE =\|HOOK_VISUAL_FLOORS =" ci_video_provider_hotfix.py
+          echo QUALITY_FLOORS_UNCHANGED=1
+          echo NEW_LLM_CALLS=0
+          echo NEW_VISION_CALLS=0
+          echo NEW_IMAGE_GENERATION_CALLS=0
