@@ -5,6 +5,7 @@ on:
     paths:
       - 'ci_run_34825745612_legacy_hook_repair_hotfix.py'
       - 'ci_fixed_aviation_scope_contract_hotfix.py'
+      - 'quality/legacy_selected_hook_repair.py'
       - 'quality/run_34825745612_legacy_hook_repair_regression_test.py'
       - '.github/workflows/run_34825745612_legacy_hook_repair_regression.yml'
   workflow_dispatch:
@@ -23,6 +24,7 @@ jobs:
         run: |
           python -m py_compile ci_run_34825745612_legacy_hook_repair_hotfix.py
           python -m py_compile ci_fixed_aviation_scope_contract_hotfix.py
+          python -m py_compile quality/legacy_selected_hook_repair.py
           python -m py_compile quality/run_34825745612_legacy_hook_repair_regression_test.py
       - name: Run exact production counterexample
         run: python quality/run_34825745612_legacy_hook_repair_regression_test.py
