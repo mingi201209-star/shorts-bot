@@ -2,10 +2,21 @@ from pathlib import Path
 
 
 EXPLORER_PATH = Path("content/candidate_explorer.py")
+FINAL_VISUAL_PATH = Path("video/visual_explanation.py")
 MARKER = "RUN_34825745612_LEGACY_SELECTED_HOOK_REPAIR_V1"
+FINAL_READY_MARKER = "GROUNDED_DETERMINISTIC_EXPLANATION_V1"
 
 
 def main():
+    # The aviation compatibility installer runs once early and once after the
+    # final production composition. Install this wrapper only on the latter pass
+    # so it remains the outermost Candidate Explorer validator wrapper.
+    if not FINAL_VISUAL_PATH.exists() or FINAL_READY_MARKER not in FINAL_VISUAL_PATH.read_text(
+        encoding="utf-8"
+    ):
+        print("⏭️ Run 34825745612 legacy hook repair deferred until final production state")
+        return
+
     text = EXPLORER_PATH.read_text(encoding="utf-8")
     if MARKER in text:
         print("✅ Run 34825745612 legacy SELECTED hook repair already applied")
