@@ -145,6 +145,13 @@ jobs:
           python ci_general_scene_visual_parity_hotfix.py
           python ci_script_validation_recovery_hotfix.py
           python ci_script_v2_visual_goal_hotfix.py
+
+          # Must run immediately after ci_script_v2_visual_goal_hotfix.py: it
+          # patches build_consensus's return statement, which that hotfix's
+          # _apply_fixed_topic_soft_judges leaves untouched, and it reads the
+          # `fixed_topic` local variable that hotfix installs.
+          python ci_run_34847558126_fixed_topic_novelty_weak_domain_hotfix.py
+
           python ci_script_v2_gunggeum_formal_ending_hotfix.py
           python ci_final_visual_semantic_qa_hotfix.py
           python ci_cross_process_video_dedupe_hotfix.py
@@ -195,7 +202,9 @@ jobs:
             ci_subscriber_conversion_hotfix.py content/subscriber_conversion.py \
             ci_script_production_parity_hotfix.py ci_script_production_parity_bridge_hotfix.py \
             ci_adaptive_scene_count_hotfix.py ci_general_scene_visual_parity_hotfix.py \
-            ci_script_validation_recovery_hotfix.py ci_script_v2_visual_goal_hotfix.py ci_script_v2_gunggeum_formal_ending_hotfix.py ci_final_visual_semantic_qa_hotfix.py content/retention_structure.py \
+            ci_script_validation_recovery_hotfix.py ci_script_v2_visual_goal_hotfix.py \
+            ci_run_34847558126_fixed_topic_novelty_weak_domain_hotfix.py \
+            ci_script_v2_gunggeum_formal_ending_hotfix.py ci_final_visual_semantic_qa_hotfix.py content/retention_structure.py \
             quality/retention_structure_experiment_regression_test.py \
             quality/subscriber_conversion_regression_test.py \
             quality/fixed_topic_gate_feedback_regression_test.py \

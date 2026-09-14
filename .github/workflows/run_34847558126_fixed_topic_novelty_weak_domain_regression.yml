@@ -1,0 +1,44 @@
+name: Run 34847558126 Fixed-Topic Novelty Weak-Domain Regression
+
+on:
+  push:
+    branches:
+      - "fix/**"
+      - "ops/**"
+    paths:
+      - "main.py"
+      - "quality/consensus.py"
+      - "ci_run_34847558126_fixed_topic_novelty_weak_domain_hotfix.py"
+      - "quality/run_34847558126_fixed_topic_novelty_weak_domain_regression_test.py"
+      - ".github/workflows/run_34847558126_fixed_topic_novelty_weak_domain_regression.yml"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "main.py"
+      - "quality/consensus.py"
+      - "ci_run_34847558126_fixed_topic_novelty_weak_domain_hotfix.py"
+      - "quality/run_34847558126_fixed_topic_novelty_weak_domain_regression_test.py"
+      - ".github/workflows/run_34847558126_fixed_topic_novelty_weak_domain_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install production Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile fix and regression
+        run: |
+          python -m py_compile \
+            ci_run_34847558126_fixed_topic_novelty_weak_domain_hotfix.py \
+            quality/run_34847558126_fixed_topic_novelty_weak_domain_regression_test.py
+      - name: Run fixed-topic Novelty weak-domain regression
+        run: python quality/run_34847558126_fixed_topic_novelty_weak_domain_regression_test.py

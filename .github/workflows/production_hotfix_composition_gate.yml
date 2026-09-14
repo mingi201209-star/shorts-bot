@@ -100,6 +100,13 @@ jobs:
           python ci_general_scene_visual_parity_hotfix.py
           python ci_script_validation_recovery_hotfix.py
           python ci_script_v2_visual_goal_hotfix.py
+
+          # Must run immediately after ci_script_v2_visual_goal_hotfix.py: it
+          # patches build_consensus's return statement, which that hotfix's
+          # _apply_fixed_topic_soft_judges leaves untouched, and it reads the
+          # `fixed_topic` local variable that hotfix installs.
+          python ci_run_34847558126_fixed_topic_novelty_weak_domain_hotfix.py
+
           python ci_script_v2_gunggeum_formal_ending_hotfix.py
           python ci_final_visual_semantic_qa_hotfix.py
           python ci_cross_process_video_dedupe_hotfix.py
@@ -117,6 +124,8 @@ jobs:
             ci_run_33691170895_term_visual_subject_hotfix.py \
             ci_aviation_context_signature_compat_hotfix.py \
             ci_final_visual_semantic_qa_hotfix.py \
+            ci_run_34847558126_fixed_topic_novelty_weak_domain_hotfix.py \
+            quality/run_34847558126_fixed_topic_novelty_weak_domain_regression_test.py \
             ci_writer_observable_opening_hotfix.py \
             ci_run_33977099845_verified_still_rescue_hotfix.py \
             ci_run_34672661458_hook_floor_feedback_hotfix.py \
