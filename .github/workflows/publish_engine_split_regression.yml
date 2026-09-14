@@ -5,7 +5,9 @@ on:
     branches:
       - "feat/**"
       - "fix/**"
+      - "ops/**"
     paths:
+      - ".github/workflow-dispatch-allowlist.json"
       - ".github/workflows/development_engine.yml"
       - ".github/workflows/publish_engine.yml"
       - ".github/workflows/promote_publish_stable.yml"
@@ -17,6 +19,7 @@ on:
     branches:
       - main
     paths:
+      - ".github/workflow-dispatch-allowlist.json"
       - ".github/workflows/development_engine.yml"
       - ".github/workflows/publish_engine.yml"
       - ".github/workflows/promote_publish_stable.yml"

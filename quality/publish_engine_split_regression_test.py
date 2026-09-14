@@ -43,10 +43,29 @@ def test_publish_uses_stable_ref_not_main_runtime() -> None:
     require(text, 'commits/$STABLE_REF', "stable SHA resolution")
     require(text, '--ref "$STABLE_REF"', "stable dispatch ref")
     require(text, '-f expected_sha=""', "stable dispatch must not assert current main")
-    require(text, '-f youtube_upload=false', "publish controller no upload")
+    require(text, 'youtube_upload:', "publish explicit upload input")
+    require(text, 'youtube_privacy:', "publish explicit privacy input")
+    require(text, 'YOUTUBE_UPLOAD: ${{ inputs.youtube_upload }}', "publish upload wiring")
+    require(text, 'YOUTUBE_PRIVACY: ${{ inputs.youtube_privacy }}', "publish privacy wiring")
+    require(text, '-f youtube_upload="$YOUTUBE_UPLOAD"', "publish upload forwarding")
+    require(text, '-f youtube_privacy="$YOUTUBE_PRIVACY"', "publish privacy forwarding")
+    forbid(text, '-f youtube_upload=false', "publish must not hard-disable upload")
     forbid(text, 'commits/main', "publish must not resolve runtime from main")
     forbid(text, '\n          python ci_', "publish controller must not execute main hotfixes")
     forbid(text, '\n          python -m diagnostics.runner', "publish controller must not execute main generator")
+
+
+def test_operator_bridge_can_dispatch_publish_only_explicitly() -> None:
+    policy = json.loads((ROOT / ".github" / "workflow-dispatch-allowlist.json").read_text(encoding="utf-8"))
+    publish = policy["workflows"].get("publish_engine.yml")
+    assert isinstance(publish, dict), "publish_engine.yml must be explicitly allowlisted"
+    assert publish.get("ref") == "main"
+    assert publish.get("allowed_inputs") == [
+        "topic",
+        "candidate_scope",
+        "youtube_upload",
+        "youtube_privacy",
+    ]
 
 
 def test_publish_fail_closes_sha_and_preserves_manifest() -> None:
@@ -56,6 +75,8 @@ def test_publish_fail_closes_sha_and_preserves_manifest() -> None:
     require(text, '"engine_mode": "PUBLISH"', "publish artifact mode")
     require(text, '"stable_sha": "$STABLE_SHA"', "publish artifact stable SHA")
     require(text, '"checkout_sha": "$STABLE_SHA"', "publish artifact checkout SHA")
+    require(text, '"youtube_upload_requested": "$YOUTUBE_UPLOAD"', "publish artifact upload intent")
+    require(text, '"youtube_privacy": "$YOUTUBE_PRIVACY"', "publish artifact privacy intent")
     require(text, "production-diagnostics-*", "failure diagnostics preservation")
     require(text, "PUBLISH_FAILURE_SCOPE=STABLE_ENGINE_OR_RUNTIME", "failure scope log")
 
@@ -112,6 +133,7 @@ def run() -> None:
         test_bootstrap_baseline,
         test_development_tracks_main,
         test_publish_uses_stable_ref_not_main_runtime,
+        test_operator_bridge_can_dispatch_publish_only_explicitly,
         test_publish_fail_closes_sha_and_preserves_manifest,
         test_stable_runtime_is_self_contained,
         test_promotion_is_explicit_and_validated,
