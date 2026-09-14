@@ -8,7 +8,7 @@ import requests
 PIXABAY_VIDEO_API = "https://pixabay.com/api/videos/"
 PIXABAY_API_KEY = os.environ.get("PIXABAY_API_KEY", "").strip()
 WIKIMEDIA_COMMONS_API = "https://commons.wikimedia.org/w/api.php"
-WIKIMEDIA_COMMONS_ENABLED = os.environ.get("WIKIMEDIA_COMMONS_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
+WIKIMEDIA_COMMONS_ENABLED = os.environ.get("WIKIMEDIA_COMMONS_ENABLED", "1").strip().lower() in {"1", "true", "yes", "on"}
 WIKIMEDIA_COMMONS_USER_AGENT = os.environ.get(
     "WIKIMEDIA_COMMONS_USER_AGENT",
     "shorts-bot/2.0 (automated educational video retrieval; GitHub: mingi201209-star/shorts-bot)",
