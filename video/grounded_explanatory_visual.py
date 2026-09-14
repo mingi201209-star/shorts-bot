@@ -16,6 +16,10 @@ EXPLANATORY_TERM_GROUPS = {
     "mixing": {"mix", "mixes", "mixed", "mixing", "blend", "blends", "blended", "blending"},
     "noise": {"noise", "noisy", "sound", "sounds", "acoustic", "acoustics", "decibel", "decibels"},
     "reduction": {"reduce", "reduces", "reduced", "reduction", "decrease", "decreases", "lower", "lowering", "quieter", "quiet"},
+    "load": {"weight", "load", "loads", "loading", "force", "forces"},
+    "wheel": {"wheel", "wheels", "tire", "tires", "tyre", "tyres", "landinggear"},
+    "braking": {"brake", "brakes", "braking", "decelerate", "decelerates", "deceleration", "slow", "slowing"},
+    "effect": {"effect", "effects", "effective", "effectiveness", "result", "results", "outcome", "outcomes"},
 }
 
 _GROUP_VISIBLE_REQUIREMENTS = {
@@ -24,6 +28,10 @@ _GROUP_VISIBLE_REQUIREMENTS = {
     "mixing": "two or more visible flow regions must visibly mix, blend, or interleave; a static part close-up is not enough",
     "noise": "visible evidence must directly represent sound/noise rather than merely showing the source object",
     "reduction": "the visual must directly represent a reduction/lowering comparison or state, not merely the presence of the source object",
+    "load": "the visual must directly represent load or weight transfer to a supported contact point; a generic aircraft or wing shot is not enough",
+    "wheel": "aircraft landing gear wheels or tires must be directly visible and relevant to the represented relation",
+    "braking": "the visual must directly represent aircraft braking, deceleration, or landing rollout rather than generic flight",
+    "effect": "the claimed result/effect must be directly represented by a visible outcome or comparison; the causal subject alone is not enough",
 }
 
 
@@ -103,7 +111,6 @@ def subject_anchor_words(scene):
 
 
 def trusted_grounding_present(scene):
-    """Require the existing post-Script canonical trusted-supply provenance."""
     if not isinstance(scene, dict):
         return False
     supply = scene.get("_canonical_visual_supply") or {}
@@ -113,8 +120,6 @@ def trusted_grounding_present(scene):
     source = str(supply.get("grounding_source") or "").strip()
     if not canonical or not source:
         return False
-    # Keep this fallback limited to the already-grounded jet-engine chevron
-    # identity. A generic engine or generic serration is not enough.
     return (
         "chevron" in canonical
         and any(term in canonical for term in ("engine", "nacelle", "nozzle"))
@@ -153,8 +158,6 @@ def _noise_result_has_forbidden_expansion(scene):
         return True
     if re.search(r"\b\d+(?:\.\d+)?\s*d\s*b\b", value, flags=re.IGNORECASE):
         return True
-    # Scene 5 may refer back to "this mixing change" as a bridge, but it must
-    # not re-own or re-explain the Scene-4 mechanism itself.
     return any(
         token in value
         for token in (
@@ -167,14 +170,6 @@ def _noise_result_has_forbidden_expansion(scene):
 
 
 def chevron_flow_mixing_supported(scene):
-    """Strict eligibility for the Scene-4 deterministic mechanism visual.
-
-    Runtime Script scenes intentionally do not carry the private Grounded Claim
-    Plan object. Therefore the authoritative equivalent claim signature is the
-    deterministic grounded keyword (`jet engine chevron flow mixing`) plus the
-    trusted canonical supply profile attached after Script generation. If an
-    explicit owned_claim_id is present (fixtures/diagnostics), it must match.
-    """
     if not isinstance(scene, dict):
         return False
     explicit_claim = str(scene.get("owned_claim_id") or "").strip()
@@ -188,9 +183,6 @@ def chevron_flow_mixing_supported(scene):
         return False
     if _leaks_primary_result(scene):
         return False
-    # The complete subject + relation nucleus is produced by the existing
-    # grounded-keyword contract from the owned trusted claim. Requiring both
-    # "chevron" and "mixing" prevents a broad flow mechanism from opting in.
     words = _words(scene.get("keyword"))
     if not ({"chevron", "flow", "mixing"} <= words):
         return False
@@ -198,14 +190,6 @@ def chevron_flow_mixing_supported(scene):
 
 
 def noise_reduction_result_supported(scene):
-    """Strict eligibility for the Scene-5 deterministic primary-result visual.
-
-    This is intentionally result-only. It requires trusted jet-engine chevron
-    grounding, the complete `noise + reduction` relation nucleus, and either the
-    explicit Grounded Claim ownership/causal role or the exact runtime payoff
-    equivalent produced by the locked five-scene plan. It never promotes a
-    generic engine/noise visual and never introduces a new mechanism claim.
-    """
     if not isinstance(scene, dict):
         return False
 
