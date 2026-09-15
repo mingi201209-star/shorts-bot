@@ -110,6 +110,7 @@ jobs:
           python ci_script_v2_gunggeum_formal_ending_hotfix.py
           python ci_final_visual_semantic_qa_hotfix.py
           python ci_cross_process_video_dedupe_hotfix.py
+          python ci_run_34847558126_scene_role_grounded_keyword_hotfix.py
           python ci_writer_observable_opening_hotfix.py
           python ci_run_33977099845_verified_still_rescue_hotfix.py
           python ci_aviation_context_signature_compat_hotfix.py
@@ -126,6 +127,7 @@ jobs:
             ci_final_visual_semantic_qa_hotfix.py \
             ci_run_34847558126_fixed_topic_novelty_weak_domain_hotfix.py \
             quality/run_34847558126_fixed_topic_novelty_weak_domain_regression_test.py \
+            ci_run_34847558126_scene_role_grounded_keyword_hotfix.py \
             ci_writer_observable_opening_hotfix.py \
             ci_run_33977099845_verified_still_rescue_hotfix.py \
             ci_run_34672661458_hook_floor_feedback_hotfix.py \

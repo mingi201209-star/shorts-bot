@@ -155,6 +155,12 @@ jobs:
           python ci_script_v2_gunggeum_formal_ending_hotfix.py
           python ci_final_visual_semantic_qa_hotfix.py
           python ci_cross_process_video_dedupe_hotfix.py
+
+          # Must run after ci_cross_process_video_dedupe_hotfix.py: it chains
+          # in ci_grounded_keyword_contract_hotfix.py, and this hotfix wraps
+          # that hotfix's _owned_claim_keyword_terms function.
+          python ci_run_34847558126_scene_role_grounded_keyword_hotfix.py
+
           python ci_writer_observable_opening_hotfix.py
 
           # Must run after ci_writer_observable_opening_hotfix.py: it chains in
@@ -188,6 +194,7 @@ jobs:
             ci_hook_generation_hotfix.py ci_hook_pool_guard_hotfix.py ci_retention_hotfix.py \
             ci_first5_retention_tts_hotfix.py ci_first5_visual_contract_hotfix.py ci_video_provider_hotfix.py \
             ci_cross_process_video_dedupe_hotfix.py ci_visual_diversity_preflight_hotfix.py ci_writer_observable_opening_hotfix.py \
+            ci_run_34847558126_scene_role_grounded_keyword_hotfix.py \
             ci_topic_input_hotfix.py ci_aviation_candidate_context_hotfix.py ci_aviation_candidate_specificity_hotfix.py \
             ci_aviation_context_signature_compat_hotfix.py ci_aviation_specificity_output_repair_hotfix.py \
             ci_aviation_specificity_projection_hotfix.py ci_candidate_grounded_recovery_hotfix.py \

@@ -75,8 +75,12 @@ def main():
         original_render = vx._render_clip
         try:
             vx._render_clip = lambda base, output, duration, plan: Path(output).write_bytes(b"fixture")
+            # RUN_34847558126: a bare "aircraft wing" mention is no longer
+            # sufficient winglet-family identity (Section 3 fix below); name
+            # the wingtip explicitly so this still exercises the same
+            # verified-still-reuse/result-template behavior this case tests.
             scene8 = _scene(
-                "비행기가 더 멀리 날 수 있게 합니다.",
+                "날개 끝의 구조가 비행기를 더 멀리 날 수 있게 합니다.",
                 "aircraft wing longer flight stage 8",
             )
             out = Path(td) / "scene8.mp4"
