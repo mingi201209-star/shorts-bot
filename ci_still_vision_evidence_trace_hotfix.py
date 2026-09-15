@@ -57,10 +57,21 @@ def main():
         raise RuntimeError("Vision evidence trace consistency anchor mismatch")
     section = section.replace(consistency_anchor, consistency_replacement, 1)
 
-    pass_anchor = '''    if not result.get("pass", False):\n        return False, result\n'''
-    pass_replacement = '''    if not result.get("pass", False):\n        _vision_evidence_trace("REJECT", result.get("required_subject_groups") or [])\n        return False, result\n'''
-    if section.count(pass_anchor) != 1:
+    # Root Cause #3 may already have installed the stricter evaluator-pass gate.
+    # Accept either spelling, but never synthesize or relax the gate here.
+    pass_anchors = (
+        '''    if not result.get("pass", False):\n        return False, result\n''',
+        '''    if not bool(result.get("pass", False)):\n        return False, result\n''',
+    )
+    pass_matches = [anchor for anchor in pass_anchors if section.count(anchor) == 1]
+    if len(pass_matches) != 1:
         raise RuntimeError("Vision evidence trace pass anchor mismatch")
+    pass_anchor = pass_matches[0]
+    pass_replacement = pass_anchor.replace(
+        '        return False, result\n',
+        '        _vision_evidence_trace("REJECT", result.get("required_subject_groups") or [])\n        return False, result\n',
+        1,
+    )
     section = section.replace(pass_anchor, pass_replacement, 1)
 
     artifact_anchor = '''    if result.get("obvious_generation_artifact", False):\n        return False, result\n    if result.get("factual_visual_contradiction", False):\n        return False, result\n'''
