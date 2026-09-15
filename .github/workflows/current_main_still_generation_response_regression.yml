@@ -1,0 +1,41 @@
+name: Current Main Still Generation Response Regression
+
+on:
+  push:
+    branches:
+      - fix/current-main-still-generation-response
+    paths:
+      - "ci_run_33506951642_still_generation_response_hotfix.py"
+      - "ci_still_vision_evidence_trace_hotfix.py"
+      - "quality/run_33506951642_still_generation_response_current_main_regression_test.py"
+      - ".github/workflows/current_main_still_generation_response_regression.yml"
+  pull_request:
+    paths:
+      - "ci_run_33506951642_still_generation_response_hotfix.py"
+      - "ci_still_vision_evidence_trace_hotfix.py"
+      - "quality/run_33506951642_still_generation_response_current_main_regression_test.py"
+      - ".github/workflows/current_main_still_generation_response_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile current-main port
+        run: |
+          python -m py_compile \
+            ci_run_33506951642_still_generation_response_hotfix.py \
+            ci_still_vision_evidence_trace_hotfix.py \
+            quality/run_33506951642_still_generation_response_current_main_regression_test.py
+      - name: Run current-main response regression
+        run: python quality/run_33506951642_still_generation_response_current_main_regression_test.py
