@@ -27,5 +27,5 @@ jobs:
           python-version: "3.11"
       - name: Compile
         run: python -m py_compile quality/human_quality_floor.py quality/run_34616204901_human_quality_regression_test.py
-      - name: Run regression
+      - name: Run regression from repository root
         run: python quality/run_34616204901_human_quality_regression_test.py
