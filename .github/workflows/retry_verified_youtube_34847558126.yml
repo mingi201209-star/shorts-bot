@@ -1,0 +1,63 @@
+name: Retry Verified YouTube 34847558126
+
+on:
+  push:
+    branches:
+      - ops/retry-verified-youtube-34847558126
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  upload_verified_artifact:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout stable upload code
+        uses: actions/checkout@v4
+        with:
+          ref: 998e82e57fe0b455a62a1dd2aa10cca571dd1e20
+
+      - name: Download exact verified artifact from source run
+        uses: actions/download-artifact@v4
+        with:
+          name: verified-shorts-34847558126-91002ebcc24a8fe201f931f95def45c0a5014bf9
+          path: verified_source
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 34847558126
+
+      - name: Verify artifact contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f verified_source/final_visual_semantic_qa.json
+          test -f verified_source/final_director_qa.json
+          test -f verified_source/visual_diversity_preflight.json
+          mapfile -t videos < <(find verified_source -maxdepth 1 -type f -name 'final_shorts_*.mp4' -print)
+          test "${#videos[@]}" -eq 1
+          test -s "${videos[0]}"
+          printf 'SHORTS_VIDEO_PATH=%s\n' "${videos[0]}" >> "$GITHUB_ENV"
+          echo "Verified artifact contract: source_run=34847558126 source_sha=91002ebcc24a8fe201f931f95def45c0a5014bf9 video=$(basename "${videos[0]}")"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install upload dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-api-python-client google-auth google-auth-oauthlib
+
+      - name: Upload preserved verified MP4 to YouTube private
+        env:
+          ENABLE_YOUTUBE_UPLOAD: '1'
+          SHORTS_YOUTUBE_PRIVACY: private
+          SHORTS_YOUTUBE_TITLE: Shorts
+          SHORTS_ANALYTICS_HISTORY_PATH: analytics/performance_history.json
+          YOUTUBE_ANALYTICS_CLIENT_ID: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_ID || secrets.YT_CLIENT_ID }}
+          YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET || secrets.YT_CLIENT_SECRET }}
+          YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN || secrets.YT_REFRESH_TOKEN }}
+        run: python -m analytics.publish_and_persist
