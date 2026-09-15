@@ -228,6 +228,13 @@ main.write_text(text, encoding="utf-8")
 from ci_still_image_verifier_contract_hotfix import main as _patch_still_image_verifier_contract
 _patch_still_image_verifier_contract()
 
+# Root Cause #3 (Run 34847558126): must run after ci_still_image_verifier_
+# contract_hotfix.py above, which already rewrites _verify_motion_clip's full
+# body. Running any earlier would have this installer's own text anchor win
+# the race and break that later, more comprehensive rewrite's anchor match.
+from ci_still_action_gate_hotfix import main as _patch_still_action_gate
+_patch_still_action_gate()
+
 from ci_still_vision_evidence_groups_hotfix import main as _patch_still_vision_evidence_groups
 _patch_still_vision_evidence_groups()
 

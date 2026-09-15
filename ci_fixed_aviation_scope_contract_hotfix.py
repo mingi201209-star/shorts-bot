@@ -7,11 +7,6 @@ MARKER = "FIXED_AVIATION_SCOPE_CONTRACT_V1"
 def _apply_run_34825745612_hook_repair_if_ready():
     from ci_run_34825745612_legacy_hook_repair_hotfix import main as patch_legacy_hook
     patch_legacy_hook()
-    # Root Cause #3 is production-composed here so the existing workflow does
-    # not need a new step or permission change. This compatibility installer is
-    # already invoked by ci_aviation_context_signature_compat_hotfix.py.
-    from ci_still_action_gate_hotfix import main as patch_still_action_gate
-    patch_still_action_gate()
 
 
 def main():
