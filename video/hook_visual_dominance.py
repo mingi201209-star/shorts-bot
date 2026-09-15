@@ -30,6 +30,19 @@ _OBSERVABLE_ACTION_TERMS = {
     "yawning", "yawn",
 }
 
+# A causal/result scene can require visible temporal evidence even when its narration
+# does not contain one of the literal motion verbs above. Keep this bounded: a
+# payoff/result role alone is insufficient, and mechanism/result vocabulary alone
+# is insufficient. Both must be present, which avoids turning static identity or
+# structure scenes into action-required scenes merely because they mention brakes.
+_DYNAMIC_RESULT_ROLES = {"payoff", "result", "primary_result", "mechanism", "cause"}
+_DYNAMIC_RESULT_TERMS = {
+    "제동 효과", "제동력", "활주 거리", "하중이 더 실", "하중을 더 실",
+    "감속", "속도를 줄", "착륙 후", "전개", "펼쳐",
+    "braking effectiveness", "braking effect", "braking force", "rollout",
+    "stopping distance", "load transfer", "deployed", "deployment", "deceler",
+}
+
 
 def requires_observable_action(scene):
     combined = " ".join(
@@ -39,7 +52,20 @@ def requires_observable_action(scene):
     words = set(re.findall(r"[a-z]+", combined))
     if words & _OBSERVABLE_ACTION_TERMS:
         return True
-    return any(term in combined for term in _OBSERVABLE_ACTION_TERMS if not term.isascii())
+    if any(term in combined for term in _OBSERVABLE_ACTION_TERMS if not term.isascii()):
+        return True
+
+    role_text = " ".join(
+        str(scene.get(key, "") or "")
+        for key in ("scene_role", "claim_role", "owned_claim_id")
+    ).lower()
+    role_tokens = set(re.findall(r"[a-z_]+", role_text.replace("-", "_")))
+    has_dynamic_role = any(
+        role in role_text or role in role_tokens
+        for role in _DYNAMIC_RESULT_ROLES
+    )
+    has_dynamic_result = any(term in combined for term in _DYNAMIC_RESULT_TERMS)
+    return bool(has_dynamic_role and has_dynamic_result)
 
 
 def normalize_dominance_result(payload, *, action_required):
