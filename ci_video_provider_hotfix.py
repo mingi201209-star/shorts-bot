@@ -15,7 +15,7 @@ text = path.read_text(encoding="utf-8")
 text = replace_once(
     text,
     "import requests\n\nfrom config import (\n",
-    "import requests\n\nfrom video.video_providers import (\n    PIXABAY_API_KEY,\n    VIDEO_PROVIDER_PER_PAGE,\n    VIDEO_PROVIDER_POOL_MAX,\n    candidate_metadata_text,\n    candidate_unique_key,\n    merge_provider_candidates,\n    normalize_pexels_candidate,\n    search_pixabay_candidates,\n)\n\nfrom config import (\n",
+    "import requests\n\nfrom video.video_providers import (\n    PIXABAY_API_KEY,\n    WIKIMEDIA_COMMONS_ENABLED,\n    VIDEO_PROVIDER_PER_PAGE,\n    VIDEO_PROVIDER_POOL_MAX,\n    candidate_metadata_text,\n    candidate_unique_key,\n    merge_provider_candidates,\n    normalize_pexels_candidate,\n    search_pixabay_candidates,\n    search_wikimedia_commons_candidates,\n)\n\nfrom config import (\n",
     "provider imports",
 )
 text = replace_once(
@@ -58,6 +58,16 @@ def search_video_candidates(query, per_page=None):
     except Exception as exc:
         print(f"[VIDEO_PROVIDER_SKIP] provider=pexels reason={type(exc).__name__}")
 
+    if WIKIMEDIA_COMMONS_ENABLED:
+        try:
+            commons = search_wikimedia_commons_candidates(query, per_page=limit)
+            print(f"[VIDEO_PROVIDER] provider=wikimedia_commons candidates={len(commons)}")
+            provider_results.append(commons)
+        except Exception as exc:
+            print(f"[VIDEO_PROVIDER_SKIP] provider=wikimedia_commons reason={type(exc).__name__}")
+    else:
+        print("[VIDEO_PROVIDER_SKIP] provider=wikimedia_commons reason=disabled")
+
     if PIXABAY_API_KEY:
         try:
             pixabay = search_pixabay_candidates(query, per_page=limit)
@@ -72,8 +82,8 @@ def search_video_candidates(query, per_page=None):
 
 
 def fetch_video(query):
-    """Unified provider selection. With no extra provider key, legacy Pexels path is exact."""
-    if not PIXABAY_API_KEY:
+    """Unified provider selection. With all optional providers off, legacy Pexels path is exact."""
+    if not PIXABAY_API_KEY and not WIKIMEDIA_COMMONS_ENABLED:
         return fetch_pexels_video(query)
 
     original_query = str(query).strip()
@@ -177,4 +187,4 @@ text = text.replace("기존 Pexels 경로로 fallback", "기존 unified provider
 text = text.replace("Pexels에서 영상을 ", "video providers에서 영상을 ")
 path.write_text(text, encoding="utf-8")
 
-print("✅ Multi-provider video pool hotfix applied (Pexels + optional Pixabay)")
+print("✅ Multi-provider video pool hotfix applied (Pexels + license-gated Commons + optional Pixabay)")
