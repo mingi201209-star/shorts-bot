@@ -10,11 +10,6 @@ permissions:
   actions: read
   contents: read
 
-env:
-  YOUTUBE_ANALYTICS_CLIENT_ID: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_ID || secrets.YT_CLIENT_ID || secrets.YOUTUBE_CLIENT_ID || secrets.YT_OAUTH_CLIENT_ID || secrets.GOOGLE_CLIENT_ID }}
-  YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET || secrets.YT_CLIENT_SECRET || secrets.YOUTUBE_CLIENT_SECRET || secrets.YT_OAUTH_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET }}
-  YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN || secrets.YT_REFRESH_TOKEN || secrets.YOUTUBE_REFRESH_TOKEN || secrets.YT_OAUTH_REFRESH_TOKEN || secrets.GOOGLE_REFRESH_TOKEN }}
-
 jobs:
   upload_verified_artifact:
     runs-on: ubuntu-latest
@@ -54,24 +49,50 @@ jobs:
       - name: Install upload dependencies
         run: pip install requests
 
-      - name: OAuth refresh preflight without secret disclosure
+      - name: Resolve coherent OAuth secret family safely
+        env:
+          A_ID: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_ID }}
+          A_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET }}
+          A_REFRESH: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN }}
+          B_ID: ${{ secrets.YT_CLIENT_ID }}
+          B_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          B_REFRESH: ${{ secrets.YT_REFRESH_TOKEN }}
+          C_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          C_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          C_REFRESH: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          D_ID: ${{ secrets.YT_OAUTH_CLIENT_ID }}
+          D_SECRET: ${{ secrets.YT_OAUTH_CLIENT_SECRET }}
+          D_REFRESH: ${{ secrets.YT_OAUTH_REFRESH_TOKEN }}
+          E_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          E_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          E_REFRESH: ${{ secrets.GOOGLE_REFRESH_TOKEN }}
         run: |
           python - <<'PY'
           import os, requests, sys
-          r = requests.post('https://oauth2.googleapis.com/token', data={
-              'client_id': os.environ['YOUTUBE_ANALYTICS_CLIENT_ID'],
-              'client_secret': os.environ['YOUTUBE_ANALYTICS_CLIENT_SECRET'],
-              'refresh_token': os.environ['YOUTUBE_ANALYTICS_REFRESH_TOKEN'],
-              'grant_type': 'refresh_token',
-          }, timeout=20)
-          if not r.ok:
+          families = [('YOUTUBE_ANALYTICS', 'A'), ('YT', 'B'), ('YOUTUBE', 'C'), ('YT_OAUTH', 'D'), ('GOOGLE', 'E')]
+          chosen = None
+          for label, p in families:
+              cid, sec, ref = (os.environ.get(p+s, '') for s in ('_ID','_SECRET','_REFRESH'))
+              if not (cid and sec and ref):
+                  print(f'{label}: incomplete')
+                  continue
+              r = requests.post('https://oauth2.googleapis.com/token', data={'client_id':cid,'client_secret':sec,'refresh_token':ref,'grant_type':'refresh_token'}, timeout=20)
+              if r.ok:
+                  print(f'{label}: OAuth PASS')
+                  chosen = (cid, sec, ref)
+                  break
               try:
-                  p = r.json()
-                  print(f"OAuth preflight failed: status={r.status_code} error={p.get('error')} description={p.get('error_description')}")
+                  body = r.json()
+                  print(f"{label}: OAuth FAIL status={r.status_code} error={body.get('error')} description={body.get('error_description')}")
               except Exception:
-                  print(f"OAuth preflight failed: status={r.status_code}")
+                  print(f'{label}: OAuth FAIL status={r.status_code}')
+          if chosen is None:
               sys.exit(1)
-          print('OAuth preflight PASS: refresh token accepted')
+          envfile = os.environ['GITHUB_ENV']
+          with open(envfile, 'a', encoding='utf-8') as f:
+              f.write('YOUTUBE_ANALYTICS_CLIENT_ID='+chosen[0]+'\n')
+              f.write('YOUTUBE_ANALYTICS_CLIENT_SECRET='+chosen[1]+'\n')
+              f.write('YOUTUBE_ANALYTICS_REFRESH_TOKEN='+chosen[2]+'\n')
           PY
 
       - name: Upload preserved verified MP4 to YouTube private
