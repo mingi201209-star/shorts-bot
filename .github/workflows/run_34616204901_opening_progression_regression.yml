@@ -1,0 +1,29 @@
+name: Run 34616204901 Opening Progression Regression
+
+on:
+  pull_request:
+    paths:
+      - "content/script_engine_v2_validation.py"
+      - "quality/run_34616204901_opening_progression_regression_test.py"
+      - ".github/workflows/run_34616204901_opening_progression_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  opening-progression-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile and run counterexample regression
+        run: |
+          python -m py_compile content/script_engine_v2_validation.py quality/run_34616204901_opening_progression_regression_test.py
+          python quality/run_34616204901_opening_progression_regression_test.py
