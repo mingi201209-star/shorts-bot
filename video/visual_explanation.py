@@ -45,10 +45,24 @@ def _text(scene):
 
 
 def _winglet_subject(scene):
+    """True only when the Scene names an actual winglet/wingtip-device identity.
+
+    RUN_34847558126_WINGLET_FAMILY_CONTAMINATION_FIX_V1
+    A bare "aircraft wing" mention used to be enough to classify a Scene into
+    the winglet family. This still misfires even with the spoiler/flap
+    keyword exclusion above once a Scene's own retrieval keyword no longer
+    carries "spoiler" (e.g. after the grounded-keyword leak in
+    ci_run_34847558126_scene_role_grounded_keyword_hotfix.py is fixed): a
+    plain aircraft+wing result Scene like "무게가 바퀴에 실리는 모습" still
+    contains the substring "aircraft wing" and would otherwise still draw a
+    winglet silhouette if it ever reached this explanatory fallback. Require
+    an explicit winglet identity token instead; a bare wing/aircraft mention
+    is not sufficient.
+    """
     value = _text(scene)
     if any(token in value for token in ("spoiler", "spoilers", "speedbrake", "speedbrakes", "flap", "flaps")):
         return False
-    return any(token in value for token in ("winglet", "wingtip", "윙렛", "날개 끝", "aircraft wing"))
+    return any(token in value for token in ("winglet", "wingtip", "윙렛", "날개 끝"))
 
 
 def plan_explanation(scene):
