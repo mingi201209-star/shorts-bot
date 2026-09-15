@@ -160,6 +160,14 @@ def _install_hook_body_reuse() -> None:
     _hook_body_reuse_main()
 
 
+def _install_good_enough_present_domains() -> None:
+    from ci_good_enough_present_domains_hotfix import (
+        main as _good_enough_present_domains_main,
+    )
+
+    _good_enough_present_domains_main()
+
+
 def main() -> None:
     text = PATH.read_text(encoding="utf-8")
     patched = apply_hook_floor_feedback(text)
@@ -179,6 +187,7 @@ def main() -> None:
         )
 
     _install_hook_body_reuse()
+    _install_good_enough_present_domains()
 
 
 if __name__ == "__main__":
