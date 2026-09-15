@@ -1,0 +1,37 @@
+name: Good Enough Present Domains Regression
+
+on:
+  push:
+    branches:
+      - fix/current-main-good-enough-present-domains
+    paths:
+      - "ci_good_enough_present_domains_hotfix.py"
+      - "ci_run_34672661458_hook_floor_feedback_hotfix.py"
+      - "quality/good_enough_present_domains_regression_test.py"
+      - ".github/workflows/good_enough_present_domains_regression.yml"
+  pull_request:
+    paths:
+      - "ci_good_enough_present_domains_hotfix.py"
+      - "ci_run_34672661458_hook_floor_feedback_hotfix.py"
+      - "quality/good_enough_present_domains_regression_test.py"
+      - ".github/workflows/good_enough_present_domains_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile
+        run: |
+          python -m py_compile \
+            ci_good_enough_present_domains_hotfix.py \
+            ci_run_34672661458_hook_floor_feedback_hotfix.py \
+            quality/good_enough_present_domains_regression_test.py
+      - name: Run regression
+        run: python quality/good_enough_present_domains_regression_test.py
