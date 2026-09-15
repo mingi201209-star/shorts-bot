@@ -1,0 +1,31 @@
+name: Current Main Human Quality Regression
+
+on:
+  push:
+    branches:
+      - fix/rebase-327-human-quality-current-main
+    paths:
+      - "quality/human_quality_floor.py"
+      - "quality/run_34616204901_human_quality_regression_test.py"
+      - ".github/workflows/current_main_human_quality_regression.yml"
+  pull_request:
+    paths:
+      - "quality/human_quality_floor.py"
+      - "quality/run_34616204901_human_quality_regression_test.py"
+      - ".github/workflows/current_main_human_quality_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile
+        run: python -m py_compile quality/human_quality_floor.py quality/run_34616204901_human_quality_regression_test.py
+      - name: Run regression
+        run: python quality/run_34616204901_human_quality_regression_test.py
