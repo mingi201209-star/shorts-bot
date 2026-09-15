@@ -10,6 +10,11 @@ permissions:
   actions: read
   contents: read
 
+env:
+  YOUTUBE_ANALYTICS_CLIENT_ID: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_ID || secrets.YT_CLIENT_ID || secrets.YOUTUBE_CLIENT_ID || secrets.YT_OAUTH_CLIENT_ID || secrets.GOOGLE_CLIENT_ID }}
+  YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET || secrets.YT_CLIENT_SECRET || secrets.YOUTUBE_CLIENT_SECRET || secrets.YT_OAUTH_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET }}
+  YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN || secrets.YT_REFRESH_TOKEN || secrets.YOUTUBE_REFRESH_TOKEN || secrets.YT_OAUTH_REFRESH_TOKEN || secrets.GOOGLE_REFRESH_TOKEN }}
+
 jobs:
   upload_verified_artifact:
     runs-on: ubuntu-latest
@@ -47,9 +52,27 @@ jobs:
           python-version: '3.11'
 
       - name: Install upload dependencies
+        run: pip install requests
+
+      - name: OAuth refresh preflight without secret disclosure
         run: |
-          python -m pip install --upgrade pip
-          pip install google-api-python-client google-auth google-auth-oauthlib
+          python - <<'PY'
+          import os, requests, sys
+          r = requests.post('https://oauth2.googleapis.com/token', data={
+              'client_id': os.environ['YOUTUBE_ANALYTICS_CLIENT_ID'],
+              'client_secret': os.environ['YOUTUBE_ANALYTICS_CLIENT_SECRET'],
+              'refresh_token': os.environ['YOUTUBE_ANALYTICS_REFRESH_TOKEN'],
+              'grant_type': 'refresh_token',
+          }, timeout=20)
+          if not r.ok:
+              try:
+                  p = r.json()
+                  print(f"OAuth preflight failed: status={r.status_code} error={p.get('error')} description={p.get('error_description')}")
+              except Exception:
+                  print(f"OAuth preflight failed: status={r.status_code}")
+              sys.exit(1)
+          print('OAuth preflight PASS: refresh token accepted')
+          PY
 
       - name: Upload preserved verified MP4 to YouTube private
         env:
@@ -57,7 +80,4 @@ jobs:
           SHORTS_YOUTUBE_PRIVACY: private
           SHORTS_YOUTUBE_TITLE: Shorts
           SHORTS_ANALYTICS_HISTORY_PATH: analytics/performance_history.json
-          YOUTUBE_ANALYTICS_CLIENT_ID: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_ID || secrets.YT_CLIENT_ID || secrets.YOUTUBE_CLIENT_ID || secrets.YT_OAUTH_CLIENT_ID || secrets.GOOGLE_CLIENT_ID }}
-          YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.YOUTUBE_ANALYTICS_CLIENT_SECRET || secrets.YT_CLIENT_SECRET || secrets.YOUTUBE_CLIENT_SECRET || secrets.YT_OAUTH_CLIENT_SECRET || secrets.GOOGLE_CLIENT_SECRET }}
-          YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.YOUTUBE_ANALYTICS_REFRESH_TOKEN || secrets.YT_REFRESH_TOKEN || secrets.YOUTUBE_REFRESH_TOKEN || secrets.YT_OAUTH_REFRESH_TOKEN || secrets.GOOGLE_REFRESH_TOKEN }}
         run: python -m analytics.publish_and_persist
