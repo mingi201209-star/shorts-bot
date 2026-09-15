@@ -2,6 +2,7 @@ from pathlib import Path
 
 MARKER = "# STILL_IMAGE_VERIFIER_CONTRACT_V1"
 PASS_PROPAGATION_MARKER = "# STILL_IMAGE_PASS_PROPAGATION_V1"
+ACTION_GATE_MARKER = "# STILL_ACTION_GATE_ROOT_CAUSE_3_V1"
 
 
 def patch_hook_verifier():
@@ -10,8 +11,6 @@ def patch_hook_verifier():
     if MARKER in text:
         return
 
-    # Patch only inside normalize_dominance_result so later/earlier hotfixes may
-    # add adjacent keys without making this installer brittle.
     normalize_start = text.find("def normalize_dominance_result(")
     normalize_end = text.find("\ndef passes_dominance_gate", normalize_start)
     if normalize_start < 0 or normalize_end < 0:
@@ -61,11 +60,6 @@ def patch_still_fallback():
     if PASS_PROPAGATION_MARKER in text:
         return
 
-    # The production failure on Scene 8 showed a contract mismatch: generation
-    # could follow a broad visual_goal (aircraft touching the runway) while the
-    # fail-closed verifier correctly required every concrete keyword anchor
-    # (aircraft + wing). Align generation with that same existing verifier rule
-    # without weakening the verifier or adding calls/retries.
     if MARKER not in text:
         generation_prompt_needle = '''        "Show the exact physical subject named in the narration clearly and prominently. "
         "No text, captions, logos, diagrams with invented labels, unrelated decorative objects, or cross-domain metaphors. "
@@ -80,7 +74,7 @@ def patch_still_fallback():
             raise RuntimeError("still fallback generation prompt anchor mismatch")
         text = text.replace(generation_prompt_needle, generation_prompt_replacement, 1)
 
-        verifier_needle = '''    result = evaluate_hook_subject_dominance(candidate, scene)
+        base_verifier_needle = '''    result = evaluate_hook_subject_dominance(candidate, scene)
     if result.get("obvious_generation_artifact", False):
         return False, result
     if result.get("factual_visual_contradiction", False):
@@ -92,9 +86,9 @@ def patch_still_fallback():
 '''
         verifier_replacement = '''    result = evaluate_hook_subject_dominance(candidate, scene)
     # STILL_IMAGE_VERIFIER_CONTRACT_V1
-    # Use the verifier's real strict gate instead of a field that older
-    # normalize_dominance_result() never returned. Keep generated artifacts,
-    # factual contradictions, crop/dominance and concrete-anchor checks fail-closed.
+    # Use the verifier's real strict gate. This is intentionally idempotent
+    # with the Root Cause #3 action-gate installer when that earlier installer
+    # has already added the same fail-closed pass propagation.
     if not result.get("pass", False):
         return False, result
     if result.get("obvious_generation_artifact", False):
@@ -104,17 +98,19 @@ def patch_still_fallback():
 
     visible_words = set()
 '''
-        if text.count(verifier_needle) != 1:
+        if text.count(base_verifier_needle) == 1:
+            text = text.replace(base_verifier_needle, verifier_replacement, 1)
+        elif ACTION_GATE_MARKER in text:
+            # The action-gate installer already inserted the authoritative
+            # result["pass"] rejection. Preserve it and only add this contract
+            # marker so later composition remains deterministic.
+            action_comment = "    # STILL_ACTION_GATE_ROOT_CAUSE_3_V1\n"
+            if text.count(action_comment) != 1:
+                raise RuntimeError("still fallback action-gate marker mismatch")
+            text = text.replace(action_comment, "    # STILL_IMAGE_VERIFIER_CONTRACT_V1\n" + action_comment, 1)
+        else:
             raise RuntimeError("still fallback verifier anchor mismatch")
-        text = text.replace(verifier_needle, verifier_replacement, 1)
 
-    # Run 33254306556 Scene 2: strict Vision returned pass=True and visibly
-    # identified engine+chevron+airflow. The result was then discarded only
-    # because the post-check treated the trusted parent-domain anchor `aircraft`
-    # as a separately visible component. For a trusted canonical jet-engine
-    # physical subject, an engine+chevron close-up can prove the subassembly
-    # without requiring the rest of the aircraft in-frame. This is still-only;
-    # stock subject-anchor contracts and all Vision thresholds stay unchanged.
     anchor_loop_needle = '''    anchors = extract_query_anchors(str(scene.get("keyword", "") or ""))
     for anchor in anchors:
         aliases = set(_anchor_aliases(anchor)) | {anchor}
@@ -152,8 +148,6 @@ def patch_still_fallback():
         if _visible(anchor):
             continue
         if anchor == "aircraft" and trusted_jet_engine_parent:
-            # `aircraft` is the trusted parent domain here, not a second object
-            # that must remain visible outside the verified engine close-up.
             parent_domain_satisfied.append(anchor)
             continue
         return False, result
