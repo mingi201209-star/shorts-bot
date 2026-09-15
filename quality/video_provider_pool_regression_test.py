@@ -41,7 +41,9 @@ def candidate(provider, source_id, metadata, *, page_url=None):
 def test_pexels_only():
     original_p = vd.search_pexels_candidates
     original_x = vd.PIXABAY_API_KEY
+    original_w = vd.WIKIMEDIA_COMMONS_ENABLED
     try:
+        vd.WIKIMEDIA_COMMONS_ENABLED = False
         vd.PIXABAY_API_KEY = ""
         vd.search_pexels_candidates = lambda query, per_page=None: [
             {"id": 123, "url": "https://cdn.test/p.mp4", "page_url": "https://pexels.com/video/city-building-123/", "width": 1080, "height": 1920, "duration": 8, "search_position": 1}
@@ -51,13 +53,16 @@ def test_pexels_only():
     finally:
         vd.search_pexels_candidates = original_p
         vd.PIXABAY_API_KEY = original_x
+        vd.WIKIMEDIA_COMMONS_ENABLED = original_w
 
 
 def test_combined_and_isolation():
     original_p = vd.search_pexels_candidates
     original_x_fn = vd.search_pixabay_candidates
     original_x_key = vd.PIXABAY_API_KEY
+    original_w = vd.WIKIMEDIA_COMMONS_ENABLED
     try:
+        vd.WIKIMEDIA_COMMONS_ENABLED = False
         vd.PIXABAY_API_KEY = "test"
         vd.search_pexels_candidates = lambda query, per_page=None: [
             {"id": 123, "url": "https://cdn.test/p.mp4", "page_url": "https://pexels.com/video/city-building-123/", "width": 1080, "height": 1920, "duration": 8, "search_position": 1}
@@ -79,6 +84,7 @@ def test_combined_and_isolation():
         vd.search_pexels_candidates = original_p
         vd.search_pixabay_candidates = original_x_fn
         vd.PIXABAY_API_KEY = original_x_key
+        vd.WIKIMEDIA_COMMONS_ENABLED = original_w
 
 
 def test_provider_aware_dedupe():
