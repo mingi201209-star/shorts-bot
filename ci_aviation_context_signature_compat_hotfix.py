@@ -79,23 +79,44 @@ def _ensure_forwarded_keyword(text, function_name, callee, keyword):
     raise RuntimeError(f"{callee} forwarding anchor not found")
 
 
-def _patch_automatic_gate_feedback():
-    text = MAIN_PATH.read_text(encoding="utf-8")
-    marker = '''                if forced_topic:\n                    fixed_topic_gate_feedback = str(\n                        winner_gate.get(\n                            "reason",\n                            "",\n                        )\n                    ).strip()\n\n                print_budget_status()\n'''
-    replacement = '''                gate_reject_reason = str(\n                    winner_gate.get(\n                        "reason",\n                        "",\n                    )\n                ).strip()\n\n                if forced_topic:\n                    fixed_topic_gate_feedback = gate_reject_reason\n                elif (\n                    os.environ.get(\n                        "SHORTS_CANDIDATE_SCOPE",\n                        "",\n                    ).strip().lower() == "aviation"\n                    and gate_reject_reason\n                ):\n                    automatic_feedback = (\n                        "[AUTOMATIC AVIATION GATE FEEDBACK] "\n                        f"rejected_topic={current_topic} | "\n                        f"reason={gate_reject_reason}"\n                    )\n                    if automatic_feedback not in rejected_topics:\n                        rejected_topics.append(automatic_feedback)\n                    print(\n                        "🔁 AUTOMATIC AVIATION GATE FEEDBACK:",\n                        gate_reject_reason,\n                    )\n\n                print_budget_status()\n'''
+def apply_automatic_gate_feedback(text):
+    """Propagate Candidate Gate rejection reasons into later automatic attempts.
 
-    if "[AUTOMATIC AVIATION GATE FEEDBACK]" in text:
-        print("✅ automatic aviation Gate feedback already propagated")
-        return
+    Run 35032601740 showed seven automatic Explorer attempts selecting candidates
+    that the unchanged Candidate Gate rejected for broadness, predictable payoff,
+    weak causal specificity, or unsupported claims.  The existing feedback path
+    only ran when SHORTS_CANDIDATE_SCOPE=aviation, so default automatic discovery
+    repeated the same classes of weakness without seeing downstream feedback.
+
+    Keep fixed-topic behavior unchanged.  For every automatic scope, append the
+    Gate reason to rejected_topics so the next existing Explorer call receives it
+    in execution context.  This adds no API call, retry, recovery, or quality
+    bypass and does not change any Gate threshold.
+    """
+    marker = '''                if forced_topic:\n                    fixed_topic_gate_feedback = str(\n                        winner_gate.get(\n                            "reason",\n                            "",\n                        )\n                    ).strip()\n\n                print_budget_status()\n'''
+    replacement = '''                # RUN_35032601740_AUTOMATIC_GATE_FEEDBACK_V1\n                gate_reject_reason = " ".join(\n                    str(\n                        winner_gate.get(\n                            "reason",\n                            "",\n                        )\n                    ).split()\n                )[:900]\n\n                if forced_topic:\n                    fixed_topic_gate_feedback = gate_reject_reason\n                elif gate_reject_reason:\n                    automatic_feedback = (\n                        "[AUTOMATIC CANDIDATE GATE FEEDBACK] "\n                        f"rejected_topic={current_topic} | "\n                        f"reason={gate_reject_reason} | "\n                        "next_attempt=choose a materially different, concrete "\n                        "subject/detail and directly resolve this Gate reason; "\n                        "do not relax the Gate or invent a causal claim"\n                    )\n                    if automatic_feedback not in rejected_topics:\n                        rejected_topics.append(automatic_feedback)\n                    print(\n                        "🔁 AUTOMATIC CANDIDATE GATE FEEDBACK:",\n                        gate_reject_reason,\n                    )\n\n                print_budget_status()\n'''
+
+    if "RUN_35032601740_AUTOMATIC_GATE_FEEDBACK_V1" in text:
+        return text
 
     count = text.count(marker)
     if count != 1:
         raise RuntimeError(
-            f"automatic aviation Gate feedback marker count mismatch: {count}"
+            f"automatic Candidate Gate feedback marker count mismatch: {count}"
         )
 
-    MAIN_PATH.write_text(text.replace(marker, replacement, 1), encoding="utf-8")
-    print("✅ automatic aviation Gate feedback propagation applied")
+    return text.replace(marker, replacement, 1)
+
+
+def _patch_automatic_gate_feedback():
+    text = MAIN_PATH.read_text(encoding="utf-8")
+    patched = apply_automatic_gate_feedback(text)
+    if patched == text:
+        print("✅ automatic Candidate Gate feedback already propagated")
+        return
+
+    MAIN_PATH.write_text(patched, encoding="utf-8")
+    print("✅ automatic Candidate Gate feedback propagation applied")
 
 
 def _apply_final_script_scene_recovery_if_ready():
@@ -197,7 +218,7 @@ def main():
     _patch_script_engine_router()
     _reapply_final_run_336911_guard()
     _apply_run_526_human_visual_progression_if_ready()
-    print("✅ Aviation fixed-topic + automatic gate-feedback compatibility applied")
+    print("✅ fixed-topic + automatic gate-feedback compatibility applied")
 
 
 if __name__ == "__main__":

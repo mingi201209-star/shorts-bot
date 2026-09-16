@@ -1,0 +1,34 @@
+name: Run 35032601740 Candidate Gate Feedback Regression
+
+on:
+  push:
+    branches:
+      - "fix/run-35032601740-*"
+    paths:
+      - "ci_aviation_context_signature_compat_hotfix.py"
+      - "quality/run_35032601740_candidate_gate_feedback_regression_test.py"
+      - ".github/workflows/run_35032601740_candidate_gate_feedback_regression.yml"
+  pull_request:
+    paths:
+      - "ci_aviation_context_signature_compat_hotfix.py"
+      - "quality/run_35032601740_candidate_gate_feedback_regression_test.py"
+      - ".github/workflows/run_35032601740_candidate_gate_feedback_regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile focused regression
+        run: |
+          python -m py_compile \
+            ci_aviation_context_signature_compat_hotfix.py \
+            quality/run_35032601740_candidate_gate_feedback_regression_test.py
+      - name: Run focused regression
+        run: python quality/run_35032601740_candidate_gate_feedback_regression_test.py
