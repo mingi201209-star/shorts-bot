@@ -1,0 +1,164 @@
+from pathlib import Path
+import os
+import sys
+import types
+
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+
+def _load_explorer():
+    if "openai" not in sys.modules:
+        fake_openai = types.ModuleType("openai")
+        fake_openai.api_key = None
+        sys.modules["openai"] = fake_openai
+
+    import content.candidate_explorer as explorer_package
+    explorer = explorer_package._LEGACY
+    assert hasattr(explorer, "_run_35065228877_previous_zero_supply_reason")
+    assert hasattr(explorer, "_run_35065228877_previous_recovery_context")
+    return explorer
+
+
+def test_exact_run_reason_triggers_existing_single_recovery():
+    explorer = _load_explorer()
+    result = {
+        "status": "REGENERATE",
+        "reason": (
+            "모든 후보가 실패했습니다. 사라진 생활 기술에 대한 구체적인 질문이나 "
+            "메커니즘을 찾지 못했습니다. 또한 역사적 기술의 구체적인 사례와 그 기술이 "
+            "사라진 이유를 연결하는 데 필요한 충분한 정보가 부족했습니다."
+        ),
+    }
+    assert explorer._candidate_supply_reason_is_zero_usable(result) is True
+
+
+def test_editorial_weakness_alone_does_not_spend_recovery():
+    explorer = _load_explorer()
+    result = {
+        "status": "REGENERATE",
+        "reason": (
+            "질문이 지나치게 넓고 일반적이며 Reveal이 예상 가능한 결론이라 "
+            "흥미를 끌기 어렵습니다."
+        ),
+    }
+    assert explorer._candidate_supply_reason_is_zero_usable(result) is False
+
+
+def test_partial_candidate_failure_is_not_whole_pool_exhaustion():
+    explorer = _load_explorer()
+    result = {
+        "status": "REGENERATE",
+        "reason": "한 후보의 구체적인 메커니즘이 부족합니다.",
+    }
+    assert explorer._candidate_supply_reason_is_zero_usable(result) is False
+
+
+def test_default_automatic_recovery_delegates_editorial_quality_to_gate():
+    explorer = _load_explorer()
+    previous_scope = os.environ.get("SHORTS_CANDIDATE_SCOPE")
+    previous_topic = os.environ.get("SHORTS_TOPIC")
+    try:
+        os.environ["SHORTS_CANDIDATE_SCOPE"] = ""
+        os.environ["SHORTS_TOPIC"] = ""
+        context = explorer._build_candidate_supply_recovery_context(
+            {"category": "역사", "topic": "역사 속 사라진 생활 기술"},
+            original_reason="모든 후보가 실패했습니다. 구체적인 사례를 찾지 못했습니다.",
+        )
+        assert "DEFAULT AUTOMATIC SUPPLY RECOVERY AUTHORITY — RUN 35065228877" in context
+        assert "Candidate Gate = independent EDITORIAL authority" in context
+        assert "Do not return REGENERATE solely because" in context
+        assert "status=SELECTED" in context
+        assert "NOT CANDIDATE_POOL" in context
+        assert "no retry/API/cost ceiling changes" in context
+    finally:
+        if previous_scope is None:
+            os.environ.pop("SHORTS_CANDIDATE_SCOPE", None)
+        else:
+            os.environ["SHORTS_CANDIDATE_SCOPE"] = previous_scope
+        if previous_topic is None:
+            os.environ.pop("SHORTS_TOPIC", None)
+        else:
+            os.environ["SHORTS_TOPIC"] = previous_topic
+
+
+def test_aviation_keeps_existing_scoped_recovery_contract():
+    explorer = _load_explorer()
+    previous_scope = os.environ.get("SHORTS_CANDIDATE_SCOPE")
+    previous_topic = os.environ.get("SHORTS_TOPIC")
+    try:
+        os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
+        os.environ["SHORTS_TOPIC"] = ""
+        context = explorer._build_candidate_supply_recovery_context(
+            {"category": "항공", "topic": "날개 구조"},
+            original_reason="구체적인 후보가 부족합니다.",
+        )
+        assert "DEFAULT AUTOMATIC SUPPLY RECOVERY AUTHORITY — RUN 35065228877" not in context
+        assert "AVIATION SUPPLY RECOVERY PRECEDENCE" in context
+    finally:
+        if previous_scope is None:
+            os.environ.pop("SHORTS_CANDIDATE_SCOPE", None)
+        else:
+            os.environ["SHORTS_CANDIDATE_SCOPE"] = previous_scope
+        if previous_topic is None:
+            os.environ.pop("SHORTS_TOPIC", None)
+        else:
+            os.environ["SHORTS_TOPIC"] = previous_topic
+
+
+def test_fixed_topic_does_not_receive_default_automatic_override():
+    explorer = _load_explorer()
+    previous_scope = os.environ.get("SHORTS_CANDIDATE_SCOPE")
+    previous_topic = os.environ.get("SHORTS_TOPIC")
+    try:
+        os.environ["SHORTS_CANDIDATE_SCOPE"] = ""
+        os.environ["SHORTS_TOPIC"] = "비행기 창문은 왜 둥글까"
+        context = explorer._build_candidate_supply_recovery_context(
+            {"category": "항공", "topic": "비행기 창문은 왜 둥글까"},
+            original_reason="구체적인 후보가 부족합니다.",
+        )
+        assert "DEFAULT AUTOMATIC SUPPLY RECOVERY AUTHORITY — RUN 35065228877" not in context
+    finally:
+        if previous_scope is None:
+            os.environ.pop("SHORTS_CANDIDATE_SCOPE", None)
+        else:
+            os.environ["SHORTS_CANDIDATE_SCOPE"] = previous_scope
+        if previous_topic is None:
+            os.environ.pop("SHORTS_TOPIC", None)
+        else:
+            os.environ["SHORTS_TOPIC"] = previous_topic
+
+
+def test_existing_one_call_guard_remains_single():
+    source = (ROOT / "ci_candidate_supply_recovery_hotfix.py").read_text(encoding="utf-8")
+    assert source.count("_candidate_supply_recovery_used = True") == 1
+    new_hotfix = (
+        ROOT / "ci_run_35065228877_bounded_supply_authority_hotfix.py"
+    ).read_text(encoding="utf-8")
+    assert "authorize_call(" not in new_hotfix
+    assert "MAX_TOPIC_REGENERATIONS" not in new_hotfix
+    assert "V3_MAX_COST_USD" not in new_hotfix
+
+
+def main():
+    test_exact_run_reason_triggers_existing_single_recovery()
+    print("CASE A exact Run 35065228877 zero-supply reason: PASS")
+    test_editorial_weakness_alone_does_not_spend_recovery()
+    print("CASE B editorial weakness alone does not trigger recovery: PASS")
+    test_partial_candidate_failure_is_not_whole_pool_exhaustion()
+    print("CASE C partial failure does not trigger recovery: PASS")
+    test_default_automatic_recovery_delegates_editorial_quality_to_gate()
+    print("CASE D default bounded supplier/Gate authority separation: PASS")
+    test_aviation_keeps_existing_scoped_recovery_contract()
+    print("CASE E aviation recovery contract unchanged: PASS")
+    test_fixed_topic_does_not_receive_default_automatic_override()
+    print("CASE F fixed-topic recovery contract unchanged: PASS")
+    test_existing_one_call_guard_remains_single()
+    print("CASE G retry/API/cost ceilings unchanged: PASS")
+    print("RUN 35065228877 BOUNDED SUPPLY AUTHORITY REGRESSION: PASS")
+
+
+if __name__ == "__main__":
+    main()
