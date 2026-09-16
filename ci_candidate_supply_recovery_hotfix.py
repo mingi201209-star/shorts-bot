@@ -283,3 +283,194 @@ import ci_canonical_subject_grounding_hotfix
 # Supply trusted identity provenance only after the fail-close Gate contract is
 # installed. This layer is deterministic and adds no API call or retry.
 import ci_canonical_subject_grounding_supply_hotfix
+
+
+# Run 35063499913 exposed two composition gaps after Candidate Gate feedback
+# propagation began working in default automatic mode:
+# 1) bounded supply recovery bypassed the non-aviation prompt scoping wrapper and
+#    could therefore ask for the aviation-only CANDIDATE_POOL envelope;
+# 2) the canonical wrapper discarded otherwise self-consistent explicit identity
+#    metadata when only subject_kind was omitted by the model.
+# This compatibility layer changes neither Gate thresholds, API/retry ceilings,
+# nor trusted-grounding rules. The existing canonical evaluator remains the
+# final authority and re-validates all repaired metadata.
+POST_MARKER = "# RUN_35063499913_SUPPLY_GROUNDING_V1"
+POST_PATCH = r'''
+
+# RUN_35063499913_SUPPLY_GROUNDING_V1
+
+# Make the grounding fields visibly mandatory at the final prompt boundary.
+# This is output-shape guidance only; canonical identity still fails closed when
+# it is unknown or unsupported.
+CANDIDATE_EXPLORER_PROMPT += r"""
+
+============================================================
+RUN 35063499913 — REQUIRED GROUNDING OUTPUT CONTRACT
+============================================================
+For every SELECTED winner and runner_up, the following four fields are
+MANDATORY and must not be omitted:
+- subject_kind
+- canonical_subject
+- subject_identity_confidence
+- grounding_evidence
+
+If the subject is a named physical entity already explicit in the Candidate
+story, preserve that exact explicit name as canonical_subject and use only
+explicit_candidate_identity evidence that points back to the Candidate text.
+If physical identity is genuinely unresolved, return canonical_subject=UNKNOWN
+with confidence 0.0 and empty grounding_evidence. Never invent an identity,
+source, or mechanism merely to fill these fields.
+"""
+
+
+def _candidate_supply_recovery_system_prompt():
+    """Return the same scope-correct prompt shape used by normal exploration."""
+    prompt = CANDIDATE_EXPLORER_PROMPT
+    aviation_scope = (
+        os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower()
+        == "aviation"
+    )
+    if aviation_scope:
+        return prompt
+
+    appendix = globals().get("_AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX", "")
+    if isinstance(appendix, str) and appendix and appendix in prompt:
+        prompt = prompt.replace(appendix, "", 1)
+    return prompt
+
+
+def _run_candidate_supply_recovery(
+    topic_info,
+    *,
+    recent_topics=None,
+    recent_content=None,
+    rejected_topics=None,
+    fixed_topic=None,
+    fixed_topic_gate_feedback="",
+    model=MODEL,
+    original_reason="",
+):
+    execution_context = _build_candidate_supply_recovery_context(
+        topic_info,
+        recent_topics=recent_topics,
+        recent_content=recent_content,
+        rejected_topics=rejected_topics,
+        fixed_topic_gate_feedback=fixed_topic_gate_feedback,
+        original_reason=original_reason,
+    )
+
+    call_number = authorize_call(model)
+    print(f"💳 Candidate supply recovery API call authorized: #{call_number}")
+
+    response = openai.chat.completions.create(
+        model=model,
+        messages=[
+            {
+                "role": "system",
+                "content": _candidate_supply_recovery_system_prompt(),
+            },
+            {
+                "role": "user",
+                "content": execution_context,
+            },
+        ],
+        temperature=0.55,
+        response_format={"type": "json_object"},
+    )
+
+    usage = record_usage(model, response)
+    print(f"💰 Candidate supply recovery call: ${usage['cost_usd']:.6f}")
+    print_budget_status()
+
+    content = response.choices[0].message.content
+    if not content:
+        raise RuntimeError("Candidate supply recovery 응답이 비어 있습니다.")
+
+    parsed = extract_json(content)
+    return validate_explorer_output(parsed)
+
+
+_run_35063499913_previous_validate_candidate = validate_candidate
+
+
+def _run_35063499913_candidate_text(candidate):
+    if not isinstance(candidate, dict):
+        return ""
+    micro = candidate.get("micro_narrative")
+    if not isinstance(micro, dict):
+        micro = {}
+    values = (
+        candidate.get("topic"),
+        candidate.get("angle"),
+        candidate.get("core_question"),
+        micro.get("hook"),
+        micro.get("core_question"),
+        micro.get("reveal"),
+        micro.get("payoff"),
+    )
+    return " ".join(str(value or "").strip() for value in values).lower()
+
+
+def validate_candidate(candidate, *, prefix, runner_up=False):
+    result = _run_35063499913_previous_validate_candidate(
+        candidate,
+        prefix=prefix,
+        runner_up=runner_up,
+    )
+    if result.get("subject_kind") in (
+        "physical_entity",
+        "non_physical_concept",
+    ):
+        return result
+
+    # Recover ONLY a missing kind from model-authored metadata that already
+    # carries an explicit canonical identity. We do not invent a canonical name.
+    # The existing canonical evaluator below still rechecks confidence and
+    # explicit evidence against literal Candidate text before allowing Writer.
+    raw = normalize_candidate_subject_metadata(candidate)
+    canonical = str(raw.get("canonical_subject") or "").strip()
+    canonical_key = " ".join(canonical.lower().split())
+    confidence = float(raw.get("subject_identity_confidence") or 0.0)
+    evidence = raw.get("grounding_evidence") or []
+
+    if canonical_key == "not_applicable" and confidence >= 1.0:
+        raw["subject_kind"] = "non_physical_concept"
+        result.update(raw)
+        return result
+
+    unknown = {"", "unknown", "unresolved", "none", "null", "n/a"}
+    candidate_text = _run_35063499913_candidate_text(candidate)
+    explicit_support = any(
+        isinstance(item, dict)
+        and str(item.get("evidence_type") or "").strip().lower()
+            == "explicit_candidate_identity"
+        and " ".join(str(item.get("supports_subject") or "").strip().lower().split())
+            == canonical_key
+        for item in evidence
+    )
+
+    if (
+        canonical_key not in unknown
+        and canonical_key in candidate_text
+        and explicit_support
+    ):
+        raw["subject_kind"] = "physical_entity"
+        result.update(raw)
+        print(
+            "🧭 CANONICAL_SUBJECT_KIND normalized from explicit Candidate identity "
+            f"canonical={canonical}"
+        )
+
+    return result
+'''
+
+
+post_text = path.read_text(encoding="utf-8")
+if POST_MARKER in post_text:
+    print("ℹ️ Run 35063499913 supply/grounding compatibility already applied")
+else:
+    path.write_text(post_text.rstrip() + POST_PATCH + "\n", encoding="utf-8")
+    print(
+        "✅ Run 35063499913 non-aviation recovery prompt scoping + "
+        "explicit grounding-kind normalization applied; limits unchanged"
+    )

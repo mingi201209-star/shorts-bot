@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 import sys
 import types
 
@@ -12,6 +13,7 @@ from content.candidate_recovery import (
     recovery_eligibility,
     select_best_recovery,
 )
+from quality.canonical_subject_grounding import evaluate_candidate_subject_grounding
 
 
 def candidate(topic="날개 끝 윙렛의 실제 역할", reveal="날개 끝 와류를 줄여 유도항력을 낮춘다"):
@@ -317,6 +319,83 @@ def test_supply_recovery_only_triggers_on_zero_usable_reason():
     }) is False
 
 
+def test_run_35063499913_non_aviation_recovery_hides_aviation_pool_prompt():
+    explorer = _load_supply_module()
+    helper = getattr(explorer, "_candidate_supply_recovery_system_prompt", None)
+    assert callable(helper), "Run 35063499913 prompt scoping helper is missing"
+
+    previous_scope = os.environ.get("SHORTS_CANDIDATE_SCOPE")
+    previous_prompt = explorer.CANDIDATE_EXPLORER_PROMPT
+    had_appendix = hasattr(explorer, "_AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX")
+    previous_appendix = getattr(explorer, "_AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX", None)
+    synthetic_appendix = "\n[RUN_35063499913_SYNTHETIC_AVIATION_POOL_APPENDIX]\n"
+
+    try:
+        # This candidate-blast-radius job does not always install Candidate Pool
+        # Handoff before the focused recovery chain. Inject only the appendix
+        # fixture so the helper itself is tested independently of workflow order.
+        explorer._AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX = synthetic_appendix
+        explorer.CANDIDATE_EXPLORER_PROMPT = previous_prompt + synthetic_appendix
+
+        os.environ["SHORTS_CANDIDATE_SCOPE"] = ""
+        default_prompt = helper()
+        assert synthetic_appendix not in default_prompt
+        assert "RUN 35063499913 — REQUIRED GROUNDING OUTPUT CONTRACT" in default_prompt
+
+        os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
+        aviation_prompt = helper()
+        assert synthetic_appendix in aviation_prompt
+    finally:
+        explorer.CANDIDATE_EXPLORER_PROMPT = previous_prompt
+        if had_appendix:
+            explorer._AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX = previous_appendix
+        else:
+            delattr(explorer, "_AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX")
+        if previous_scope is None:
+            os.environ.pop("SHORTS_CANDIDATE_SCOPE", None)
+        else:
+            os.environ["SHORTS_CANDIDATE_SCOPE"] = previous_scope
+
+
+def test_run_35063499913_missing_kind_normalizes_only_explicit_identity():
+    explorer = _load_supply_module()
+    desert_ant = candidate(
+        topic="사막개미가 랜드마크 없이 둥지로 돌아오는 방법",
+        reveal="사막개미는 이동 방향과 거리를 결합해 귀환 경로를 계산합니다.",
+    )
+    desert_ant.pop("subject_kind", None)
+    desert_ant.pop("_trusted_grounding_evidence", None)
+    desert_ant["canonical_subject"] = "사막개미"
+    desert_ant["subject_identity_confidence"] = 0.95
+    desert_ant["grounding_evidence"] = [
+        {
+            "evidence_type": "explicit_candidate_identity",
+            "supports_subject": "사막개미",
+            "source": "candidate_text",
+            "detail": "topic explicitly names 사막개미",
+        }
+    ]
+
+    normalized = explorer.validate_candidate(
+        desert_ant,
+        prefix="winner",
+        runner_up=False,
+    )
+    assert normalized["subject_kind"] == "physical_entity"
+    assert normalized["canonical_subject"] == "사막개미"
+    assert evaluate_candidate_subject_grounding(normalized)["status"] == "PASS"
+
+    unresolved = explorer.validate_candidate(
+        ungrounded_candidate(topic="정체가 확인되지 않은 작은 구조"),
+        prefix="winner",
+        runner_up=False,
+    )
+    assert unresolved["subject_kind"] == "unresolved"
+    blocked = evaluate_candidate_subject_grounding(unresolved)
+    assert blocked["status"] == "BLOCK"
+    assert blocked["mechanism_inference_allowed"] is False
+
+
 def main():
     test_soft_editorial_reject_is_recoverable()
     print("CASE A soft editorial recovery: PASS")
@@ -344,6 +423,10 @@ def main():
     print("CASE J one-call bound and fail-close: PASS")
     test_supply_recovery_only_triggers_on_zero_usable_reason()
     print("CASE K trigger reason remains narrow: PASS")
+    test_run_35063499913_non_aviation_recovery_hides_aviation_pool_prompt()
+    print("CASE L Run 35063499913 non-aviation recovery prompt scope: PASS")
+    test_run_35063499913_missing_kind_normalizes_only_explicit_identity()
+    print("CASE M Run 35063499913 explicit identity kind normalization + fail-close: PASS")
     print("CANDIDATE GROUNDED RECOVERY REGRESSION: PASS")
 
 
