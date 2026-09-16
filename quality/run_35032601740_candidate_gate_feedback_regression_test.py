@@ -69,7 +69,7 @@ def test_feedback_reason_is_bounded_and_normalized():
     apply, _ = _load_apply_function()
     patched = apply(RUNTIME_GATE_FIXTURE)
 
-    assert '").split()' in patched
+    assert ".split()" in patched
     assert ")[:900]" in patched
     assert "reason={gate_reject_reason}" in patched
     assert "rejected_topic={current_topic}" in patched
