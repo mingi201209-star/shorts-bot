@@ -323,24 +323,38 @@ def test_run_35063499913_non_aviation_recovery_hides_aviation_pool_prompt():
     explorer = _load_supply_module()
     helper = getattr(explorer, "_candidate_supply_recovery_system_prompt", None)
     assert callable(helper), "Run 35063499913 prompt scoping helper is missing"
-    appendix = getattr(explorer, "_AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX", "")
-    assert appendix, "aviation Candidate Pool appendix must exist for this regression"
 
-    previous = os.environ.get("SHORTS_CANDIDATE_SCOPE")
+    previous_scope = os.environ.get("SHORTS_CANDIDATE_SCOPE")
+    previous_prompt = explorer.CANDIDATE_EXPLORER_PROMPT
+    had_appendix = hasattr(explorer, "_AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX")
+    previous_appendix = getattr(explorer, "_AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX", None)
+    synthetic_appendix = "\n[RUN_35063499913_SYNTHETIC_AVIATION_POOL_APPENDIX]\n"
+
     try:
+        # This candidate-blast-radius job does not always install Candidate Pool
+        # Handoff before the focused recovery chain. Inject only the appendix
+        # fixture so the helper itself is tested independently of workflow order.
+        explorer._AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX = synthetic_appendix
+        explorer.CANDIDATE_EXPLORER_PROMPT = previous_prompt + synthetic_appendix
+
         os.environ["SHORTS_CANDIDATE_SCOPE"] = ""
         default_prompt = helper()
-        assert appendix not in default_prompt
+        assert synthetic_appendix not in default_prompt
         assert "RUN 35063499913 — REQUIRED GROUNDING OUTPUT CONTRACT" in default_prompt
 
         os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
         aviation_prompt = helper()
-        assert appendix in aviation_prompt
+        assert synthetic_appendix in aviation_prompt
     finally:
-        if previous is None:
+        explorer.CANDIDATE_EXPLORER_PROMPT = previous_prompt
+        if had_appendix:
+            explorer._AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX = previous_appendix
+        else:
+            delattr(explorer, "_AVIATION_CANDIDATE_POOL_HANDOFF_APPENDIX")
+        if previous_scope is None:
             os.environ.pop("SHORTS_CANDIDATE_SCOPE", None)
         else:
-            os.environ["SHORTS_CANDIDATE_SCOPE"] = previous
+            os.environ["SHORTS_CANDIDATE_SCOPE"] = previous_scope
 
 
 def test_run_35063499913_missing_kind_normalizes_only_explicit_identity():
