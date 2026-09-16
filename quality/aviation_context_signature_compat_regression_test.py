@@ -58,21 +58,30 @@ def main():
     assert "fixed_topic=fixed_topic" in explorer_segment
     assert "fixed_topic_gate_feedback" in explorer_segment
 
-    # Automatic aviation rejection feedback is persisted through rejected_topics,
-    # while the exact rejected topic remains separately present for repeat blocking.
+    # Run 35032601740: automatic Gate rejection feedback is now persisted for
+    # every automatic scope, not only SHORTS_CANDIDATE_SCOPE=aviation. The
+    # exact rejected topic remains separately present for repeat blocking.
     main_text = MAIN.read_text(encoding="utf-8")
-    assert "[AUTOMATIC AVIATION GATE FEEDBACK]" in main_text
-    assert "gate_reject_reason" in main_text
-    assert "automatic_feedback not in rejected_topics" in main_text
-    assert "rejected_topics.append(automatic_feedback)" in main_text
-    assert 'SHORTS_CANDIDATE_SCOPE' in main_text
-    assert '== "aviation"' in main_text
-    assert "if forced_topic:" in main_text
-    assert "fixed_topic_gate_feedback = gate_reject_reason" in main_text
+    marker = "# RUN_35032601740_AUTOMATIC_GATE_FEEDBACK_V1"
+    assert marker in main_text
+    feedback_start = main_text.index(marker)
+    feedback_end = main_text.index("print_budget_status()", feedback_start)
+    feedback_segment = main_text[feedback_start:feedback_end]
 
-    # The aviation specificity context already serializes rejected_topics into
-    # DOWNSTREAM REJECTION FEEDBACK, so automatic Gate reason records reach the
-    # next Explorer attempt without changing Candidate Gate thresholds.
+    assert "[AUTOMATIC CANDIDATE GATE FEEDBACK]" in feedback_segment
+    assert "gate_reject_reason" in feedback_segment
+    assert "automatic_feedback not in rejected_topics" in feedback_segment
+    assert "rejected_topics.append(automatic_feedback)" in feedback_segment
+    assert "elif gate_reject_reason:" in feedback_segment
+    assert "SHORTS_CANDIDATE_SCOPE" not in feedback_segment
+    assert "if forced_topic:" in feedback_segment
+    assert "fixed_topic_gate_feedback = gate_reject_reason" in feedback_segment
+    assert "do not relax the Gate or invent a causal claim" in feedback_segment
+
+    # The aviation specificity context serializes rejected_topics into
+    # DOWNSTREAM REJECTION FEEDBACK. Aviation therefore keeps the same behavior,
+    # while the generalized main path also gives default automatic exploration
+    # the Gate-reason record through its existing rejected_topics context.
     assert "[DOWNSTREAM REJECTION FEEDBACK]" in text
     assert "rejected_feedback" in text
     assert "같은 명사만 바꾸거나" in text
@@ -81,9 +90,10 @@ def main():
     compile(text, str(EXPLORER), "exec")
     compile(main_text, str(MAIN), "exec")
 
-    print("PASS: aviation Gate-feedback compatibility")
+    print("PASS: automatic Candidate Gate-feedback compatibility")
     print("- fixed_topic + gate feedback accepted by final wrappers")
-    print("- automatic aviation Gate rejection reason retained for next attempt")
+    print("- automatic Gate rejection reason retained for every automatic scope")
+    print("- aviation downstream rejection context remains intact")
     print("- exact rejected topic repeat protection remains separate")
     print("- Candidate Gate/recovery thresholds untouched")
 
