@@ -1,0 +1,29 @@
+name: Run 35201870755 Spoiler Opening Ownership Regression
+
+on:
+  pull_request:
+    paths:
+      - "quality/candidate_pool_grounding_records.py"
+      - "content/grounded_claim_plan.py"
+      - "quality/run_35201870755_spoiler_opening_ownership_regression_test.py"
+      - ".github/workflows/run_35201870755_spoiler_opening_ownership_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  spoiler-opening-ownership:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run exact production counterexample regression
+        run: |
+          python -m py_compile \
+            quality/candidate_pool_grounding_records.py \
+            content/grounded_claim_plan.py \
+            quality/run_35201870755_spoiler_opening_ownership_regression_test.py
+          python -m quality.run_35201870755_spoiler_opening_ownership_regression_test
