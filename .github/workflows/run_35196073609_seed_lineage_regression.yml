@@ -30,4 +30,4 @@ jobs:
             ci_candidate_grounded_recovery_hotfix.py \
             ci_run_35196073609_seed_lineage_hotfix.py \
             quality/run_35196073609_seed_lineage_regression_test.py
-          python quality/run_35196073609_seed_lineage_regression_test.py
+          python -m quality.run_35196073609_seed_lineage_regression_test
