@@ -2,7 +2,9 @@ from pathlib import Path
 
 
 EXPLORER_PATH = Path("content/candidate_explorer.py")
+MAIN_PATH = Path("main.py")
 MARKER = "# RUN_35065228877_BOUNDED_SUPPLY_AUTHORITY_V1"
+MAIN_MARKER = "# RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1"
 
 PATCH = r'''
 
@@ -35,6 +37,18 @@ def _candidate_supply_reason_is_zero_usable(result):
     # Default automatic therefore requires the explicit whole-pool form below.
     if aviation_scope or forced_topic:
         return previous_match
+
+    # Run 35180822768 proved that even explicit whole-pool wording can occur on
+    # an intermediate direction. In default automatic mode the single 1/1 call
+    # is therefore eligible only on the host loop's final normal attempt.
+    # The host now always sends 0/1. Treat an absent flag as legacy/standalone
+    # final context so established focused tests and non-host callers retain
+    # their previous one-shot recovery contract.
+    final_attempt = (
+        os.environ.get("SHORTS_CANDIDATE_FINAL_ATTEMPT", "1").strip() != "0"
+    )
+    if not final_attempt:
+        return False
     if not isinstance(result, dict):
         return False
     if str(result.get("status", "")).strip().upper() != "REGENERATE":
@@ -178,18 +192,94 @@ This call remains one bounded recovery call; no retry/API/cost ceiling changes.
 '''
 
 
+MAIN_BEFORE_TRY_OLD = r'''            try:
+                explorer_result = (
+'''
+
+MAIN_BEFORE_DIRECT_OLD = r'''            explorer_result = (
+                explore_candidates(
+'''
+
+MAIN_SIGNAL = r'''            # RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1
+            # Expose only host-owned loop position. Default automatic supply
+            # recovery remains 1/1 and can spend it only on the final normal
+            # attempt.
+            _previous_final_attempt = os.environ.get(
+                "SHORTS_CANDIDATE_FINAL_ATTEMPT"
+            )
+            os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = (
+                "1"
+                if topic_attempt == total_topic_attempts
+                else "0"
+            )
+
+'''
+
+MAIN_BEFORE_TRY_NEW = MAIN_SIGNAL + r'''            try:
+                explorer_result = (
+'''
+
+MAIN_BEFORE_DIRECT_NEW = MAIN_SIGNAL + r'''            explorer_result = (
+                explore_candidates(
+'''
+
+MAIN_AFTER_OLD = r'''
+            explorer_status = (
+'''
+
+MAIN_AFTER_NEW = r'''
+            if _previous_final_attempt is None:
+                os.environ.pop(
+                    "SHORTS_CANDIDATE_FINAL_ATTEMPT",
+                    None,
+                )
+            else:
+                os.environ[
+                    "SHORTS_CANDIDATE_FINAL_ATTEMPT"
+                ] = _previous_final_attempt
+
+            explorer_status = (
+'''
+
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
-    if MARKER in text:
+    if MARKER not in text:
+        if "# CANDIDATE_SUPPLY_RECOVERY_V1" not in text:
+            print("⏭️ Run 35065228877 bounded supply authority deferred: supply recovery not installed")
+            return
+        EXPLORER_PATH.write_text(text.rstrip() + PATCH + "\n", encoding="utf-8")
+        print(
+            "✅ Run 35065228877/35180049273 bounded supply authority applied; "
+            "limits unchanged"
+        )
+    else:
         print("ℹ️ Run 35065228877 bounded supply authority already applied")
+
+    main_text = MAIN_PATH.read_text(encoding="utf-8")
+    if MAIN_MARKER in main_text:
+        print("ℹ️ Run 35180822768 final-attempt signal already applied")
         return
-    if "# CANDIDATE_SUPPLY_RECOVERY_V1" not in text:
-        print("⏭️ Run 35065228877 bounded supply authority deferred: supply recovery not installed")
-        return
-    EXPLORER_PATH.write_text(text.rstrip() + PATCH + "\n", encoding="utf-8")
+    if MAIN_AFTER_OLD not in main_text:
+        raise RuntimeError("Run 35180822768 main post-Explorer anchor not found")
+    if MAIN_BEFORE_TRY_OLD in main_text:
+        main_text = main_text.replace(
+            MAIN_BEFORE_TRY_OLD,
+            MAIN_BEFORE_TRY_NEW,
+            1,
+        )
+    elif MAIN_BEFORE_DIRECT_OLD in main_text:
+        main_text = main_text.replace(
+            MAIN_BEFORE_DIRECT_OLD,
+            MAIN_BEFORE_DIRECT_NEW,
+            1,
+        )
+    else:
+        raise RuntimeError("Run 35180822768 main pre-Explorer anchor not found")
+    main_text = main_text.replace(MAIN_AFTER_OLD, MAIN_AFTER_NEW, 1)
+    MAIN_PATH.write_text(main_text, encoding="utf-8")
     print(
-        "✅ Run 35065228877 explicit zero-supply recognition + final bounded "
-        "supplier/Gate authority separation applied; limits unchanged"
+        "✅ Run 35180822768 default automatic recovery reserved for final "
+        "host attempt; aviation/fixed-topic unchanged"
     )
 
 
