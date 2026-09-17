@@ -9,7 +9,15 @@ from zipfile import ZipFile
 import requests
 
 
-def restore_latest_history(*, repository, token, destination, transport=requests):
+def restore_latest_history(
+    *,
+    repository,
+    token,
+    destination,
+    artifact_name_prefix="analytics-history-",
+    file_suffix="performance_history.json",
+    transport=requests,
+):
     if not repository or not token:
         return {"restored": False, "reason": "missing_context"}
     headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json"}
@@ -19,7 +27,7 @@ def restore_latest_history(*, repository, token, destination, transport=requests
     payload = response.json()
     artifacts = [
         item for item in payload.get("artifacts", [])
-        if str(item.get("name", "")).startswith("analytics-history-") and not item.get("expired", False)
+        if str(item.get("name", "")).startswith(artifact_name_prefix) and not item.get("expired", False)
     ]
     if not artifacts:
         return {"restored": False, "reason": "no_history_artifact"}
@@ -31,7 +39,7 @@ def restore_latest_history(*, repository, token, destination, transport=requests
     archive = transport.get(archive_url, headers=headers, timeout=60)
     archive.raise_for_status()
     with ZipFile(BytesIO(archive.content)) as zf:
-        candidates = [name for name in zf.namelist() if name.endswith("performance_history.json")]
+        candidates = [name for name in zf.namelist() if name.endswith(file_suffix)]
         if not candidates:
             return {"restored": False, "reason": "history_file_missing_in_artifact"}
         os.makedirs(os.path.dirname(os.path.abspath(destination)), exist_ok=True)
@@ -45,6 +53,8 @@ def main():
         repository=os.environ.get("GITHUB_REPOSITORY", ""),
         token=os.environ.get("GITHUB_TOKEN", ""),
         destination=os.environ.get("SHORTS_ANALYTICS_HISTORY_PATH", "analytics/performance_history.json"),
+        artifact_name_prefix=os.environ.get("SHORTS_HISTORY_ARTIFACT_PREFIX", "analytics-history-"),
+        file_suffix=os.environ.get("SHORTS_HISTORY_ARTIFACT_FILE_SUFFIX", "performance_history.json"),
     )
     print(json.dumps(result, sort_keys=True))
     return 0
