@@ -95,6 +95,56 @@ def test_partial_candidate_failure_is_not_whole_pool_exhaustion():
     assert explorer._candidate_supply_reason_is_zero_usable(result) is False
 
 
+
+def test_default_intermediate_shortage_does_not_spend_recovery():
+    explorer = _load_explorer()
+    previous_scope = os.environ.get("SHORTS_CANDIDATE_SCOPE")
+    previous_topic = os.environ.get("SHORTS_TOPIC")
+    try:
+        os.environ["SHORTS_CANDIDATE_SCOPE"] = ""
+        os.environ["SHORTS_TOPIC"] = ""
+        result = {
+            "status": "REGENERATE",
+            "reason": "탐색 방향에 맞는 구체적인 후보가 부족합니다.",
+        }
+        assert explorer._candidate_supply_reason_is_zero_usable(result) is False
+    finally:
+        if previous_scope is None:
+            os.environ.pop("SHORTS_CANDIDATE_SCOPE", None)
+        else:
+            os.environ["SHORTS_CANDIDATE_SCOPE"] = previous_scope
+        if previous_topic is None:
+            os.environ.pop("SHORTS_TOPIC", None)
+        else:
+            os.environ["SHORTS_TOPIC"] = previous_topic
+
+
+def test_aviation_and_fixed_topic_keep_legacy_shortage_trigger():
+    explorer = _load_explorer()
+    result = {
+        "status": "REGENERATE",
+        "reason": "탐색 방향에 맞는 구체적인 후보가 부족합니다.",
+    }
+    previous_scope = os.environ.get("SHORTS_CANDIDATE_SCOPE")
+    previous_topic = os.environ.get("SHORTS_TOPIC")
+    try:
+        os.environ["SHORTS_CANDIDATE_SCOPE"] = "aviation"
+        os.environ["SHORTS_TOPIC"] = ""
+        assert explorer._candidate_supply_reason_is_zero_usable(result) is True
+
+        os.environ["SHORTS_CANDIDATE_SCOPE"] = ""
+        os.environ["SHORTS_TOPIC"] = "비행기 창문은 왜 둥글까"
+        assert explorer._candidate_supply_reason_is_zero_usable(result) is True
+    finally:
+        if previous_scope is None:
+            os.environ.pop("SHORTS_CANDIDATE_SCOPE", None)
+        else:
+            os.environ["SHORTS_CANDIDATE_SCOPE"] = previous_scope
+        if previous_topic is None:
+            os.environ.pop("SHORTS_TOPIC", None)
+        else:
+            os.environ["SHORTS_TOPIC"] = previous_topic
+
 def test_default_automatic_recovery_delegates_editorial_quality_to_gate():
     explorer = _load_explorer()
     context = _build_context_with_stubbed_previous(
@@ -157,6 +207,10 @@ def main():
     print("CASE B editorial weakness alone does not trigger recovery: PASS")
     test_partial_candidate_failure_is_not_whole_pool_exhaustion()
     print("CASE C partial failure does not trigger recovery: PASS")
+    test_default_intermediate_shortage_does_not_spend_recovery()
+    print("CASE C2 default intermediate shortage preserves recovery: PASS")
+    test_aviation_and_fixed_topic_keep_legacy_shortage_trigger()
+    print("CASE C3 aviation/fixed-topic legacy trigger unchanged: PASS")
     test_default_automatic_recovery_delegates_editorial_quality_to_gate()
     print("CASE D default bounded supplier/Gate authority separation: PASS")
     test_aviation_keeps_existing_scoped_recovery_contract()

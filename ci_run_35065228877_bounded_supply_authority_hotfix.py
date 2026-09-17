@@ -7,11 +7,13 @@ MARKER = "# RUN_35065228877_BOUNDED_SUPPLY_AUTHORITY_V1"
 PATCH = r'''
 
 # RUN_35065228877_BOUNDED_SUPPLY_AUTHORITY_V1
-# Run 35065228877 proved that default automatic exploration can exhaust all
-# seven normal attempts through model-side editorial self-withholding even when
-# a concrete, fact-reviewable subject exists. This patch changes only the
-# ALREADY-BOUNDED one-call supply-recovery path. Candidate Gate remains the
-# independent editorial authority; FACT/canonical grounding remain fail-closed.
+# Runs 35065228877 and 35180049273 proved that default automatic exploration
+# can exhaust all seven normal attempts through model-side editorial
+# self-withholding. The single recovery must not be spent on an intermediate
+# broad shortage phrase; default automatic reserves it for explicit whole-pool
+# exhaustion. Aviation/fixed-topic trigger contracts remain unchanged.
+# Candidate Gate remains the independent editorial authority and all
+# FACT/canonical grounding checks remain fail-closed.
 
 _run_35065228877_previous_zero_supply_reason = (
     _candidate_supply_reason_is_zero_usable
@@ -19,14 +21,49 @@ _run_35065228877_previous_zero_supply_reason = (
 
 
 def _candidate_supply_reason_is_zero_usable(result):
-    if _run_35065228877_previous_zero_supply_reason(result):
-        return True
+    previous_match = _run_35065228877_previous_zero_supply_reason(result)
+    aviation_scope = (
+        os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower()
+        == "aviation"
+    )
+    forced_topic = bool(os.environ.get("SHORTS_TOPIC", "").strip())
+
+    # Preserve the established trigger contract for aviation and fixed-topic
+    # production. In default automatic mode, however, the broad legacy
+    # "concrete candidate shortage" wording can appear on an intermediate
+    # direction and spend the one recovery call too early (Run 35180049273).
+    # Default automatic therefore requires the explicit whole-pool form below.
+    if aviation_scope or forced_topic:
+        return previous_match
     if not isinstance(result, dict):
         return False
     if str(result.get("status", "")).strip().upper() != "REGENERATE":
         return False
 
     reason = " ".join(str(result.get("reason", "")).strip().lower().split())
+
+    # Preserve unambiguous legacy zero-supply and all-hard-gate exhaustion
+    # signals. Only the broad intermediate "concrete candidate shortage"
+    # family is deferred in default automatic mode.
+    explicit_literal_zero = (
+        "usable grounded candidate" in reason
+        and (
+            "0개" in reason
+            or "zero" in reason
+            or "no usable" in reason
+            or "없" in reason
+        )
+    )
+    hard_gate_exhaustion = (
+        "구조·사실성 hard gate" in reason
+        and "모든 후보" in reason
+        and (
+            "통과하지 못" in reason
+            or "실패" in reason
+        )
+    )
+    if previous_match and (explicit_literal_zero or hard_gate_exhaustion):
+        return True
 
     # Recognize only explicit whole-pool supply exhaustion. Editorial weakness
     # by itself (broad/generic/predictable/weak payoff) still does NOT spend the
