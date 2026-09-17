@@ -42,6 +42,29 @@ def _candidate_supply_reason_is_zero_usable(result):
 
     reason = " ".join(str(result.get("reason", "")).strip().lower().split())
 
+    # Preserve unambiguous legacy zero-supply and all-hard-gate exhaustion
+    # signals. Only the broad intermediate "concrete candidate shortage"
+    # family is deferred in default automatic mode.
+    explicit_literal_zero = (
+        "usable grounded candidate" in reason
+        and (
+            "0개" in reason
+            or "zero" in reason
+            or "no usable" in reason
+            or "없" in reason
+        )
+    )
+    hard_gate_exhaustion = (
+        "구조·사실성 hard gate" in reason
+        and "모든 후보" in reason
+        and (
+            "통과하지 못" in reason
+            or "실패" in reason
+        )
+    )
+    if previous_match and (explicit_literal_zero or hard_gate_exhaustion):
+        return True
+
     # Recognize only explicit whole-pool supply exhaustion. Editorial weakness
     # by itself (broad/generic/predictable/weak payoff) still does NOT spend the
     # single recovery opportunity.
