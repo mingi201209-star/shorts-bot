@@ -283,3 +283,8 @@ import ci_canonical_subject_grounding_hotfix
 # Supply trusted identity provenance only after the fail-close Gate contract is
 # installed. This layer is deterministic and adds no API call or retry.
 import ci_canonical_subject_grounding_supply_hotfix
+
+# Run 35196073609: the generic outer supplier can otherwise overwrite an
+# authentic deterministic seed's exact host-owned family. Restore only that
+# unforgeable lineage after the canonical supply wrapper is fully installed.
+import ci_run_35196073609_seed_lineage_hotfix
