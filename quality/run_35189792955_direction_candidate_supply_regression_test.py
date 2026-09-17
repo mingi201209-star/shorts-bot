@@ -16,10 +16,12 @@ from candidate_recovery_production_chain_regression_test import (
 )
 
 
-# The owner supplied these exact signal fragments, but the full run log is
-# unavailable in this checkout. Keep this reconstructed fixture labeled as such.
+# Exact terminal reason captured from authoritative production Run 35189792955.
 DIRECTION_REASON = (
-    "탐색 방향인 생활 기술에서 구체적인 후보가 발견되지 않았습니다."
+    "탐색 방향인 '유명한 역사적 대상의 잘 알려지지 않은 기능'에 적합한 구체적인 "
+    "후보가 발견되지 않았습니다. 모든 후보가 예상 가능한 결론에 머물러 있거나, "
+    "질문과 Reveal이 지나치게 넓거나 일반적이어서 시청자의 호기심을 충분히 "
+    "자극하지 못했습니다."
 )
 
 
