@@ -152,10 +152,21 @@ def _candidate_supply_reason_is_zero_usable(result):
         and "주제를 찾지 못" in reason
     )
 
+    # Run 35189792955 reported final direction-scoped candidate absence.
+    # Require explicit "not found" wording so editorial weakness alone
+    # cannot spend the single recovery opportunity.
+    direction_candidate_supply_missing = (
+        final_attempt
+        and "탐색 방향인" in reason
+        and "구체적인 후보" in reason
+        and "발견되지 않았" in reason
+    )
+
     return bool(
         (all_failed and concrete_supply_missing and insufficiency)
         or compact_terminal_supply_missing
         or direction_topic_supply_missing
+        or direction_candidate_supply_missing
     )
 
 
