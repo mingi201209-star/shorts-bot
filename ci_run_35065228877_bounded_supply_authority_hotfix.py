@@ -189,11 +189,15 @@ This call remains one bounded recovery call; no retry/API/cost ceiling changes.
 '''
 
 
-MAIN_BEFORE_OLD = r'''            try:
+MAIN_BEFORE_TRY_OLD = r'''            try:
                 explorer_result = (
 '''
 
-MAIN_BEFORE_NEW = r'''            # RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1
+MAIN_BEFORE_DIRECT_OLD = r'''            explorer_result = (
+                explore_candidates(
+'''
+
+MAIN_SIGNAL = r'''            # RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1
             # Expose only host-owned loop position. Default automatic supply
             # recovery remains 1/1 and can spend it only on the final normal
             # attempt.
@@ -206,8 +210,14 @@ MAIN_BEFORE_NEW = r'''            # RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1
                 else "0"
             )
 
-            try:
+'''
+
+MAIN_BEFORE_TRY_NEW = MAIN_SIGNAL + r'''            try:
                 explorer_result = (
+'''
+
+MAIN_BEFORE_DIRECT_NEW = MAIN_SIGNAL + r'''            explorer_result = (
+                explore_candidates(
 '''
 
 MAIN_AFTER_OLD = r'''
@@ -246,11 +256,22 @@ def main():
     if MAIN_MARKER in main_text:
         print("ℹ️ Run 35180822768 final-attempt signal already applied")
         return
-    if MAIN_BEFORE_OLD not in main_text:
-        raise RuntimeError("Run 35180822768 main pre-Explorer anchor not found")
     if MAIN_AFTER_OLD not in main_text:
         raise RuntimeError("Run 35180822768 main post-Explorer anchor not found")
-    main_text = main_text.replace(MAIN_BEFORE_OLD, MAIN_BEFORE_NEW, 1)
+    if MAIN_BEFORE_TRY_OLD in main_text:
+        main_text = main_text.replace(
+            MAIN_BEFORE_TRY_OLD,
+            MAIN_BEFORE_TRY_NEW,
+            1,
+        )
+    elif MAIN_BEFORE_DIRECT_OLD in main_text:
+        main_text = main_text.replace(
+            MAIN_BEFORE_DIRECT_OLD,
+            MAIN_BEFORE_DIRECT_NEW,
+            1,
+        )
+    else:
+        raise RuntimeError("Run 35180822768 main pre-Explorer anchor not found")
     main_text = main_text.replace(MAIN_AFTER_OLD, MAIN_AFTER_NEW, 1)
     MAIN_PATH.write_text(main_text, encoding="utf-8")
     print(
