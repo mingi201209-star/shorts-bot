@@ -84,3 +84,115 @@ import ci_static_wick_canonical_grounding_hotfix
 # supply has already run. Re-supply the same repo-owned provenance immediately
 # before the existing pre-Writer fail-close gate.
 import ci_prewriter_grounding_resupply_hotfix
+
+
+# Run 35193333727 repeatedly produced otherwise concrete aviation Candidates
+# that arrived at the host canonical-grounding boundary without a complete
+# model-authored identity envelope. Backport only the already-proven PR #386
+# output contract and missing-kind normalization. This does not invent a
+# canonical subject, trust model-authored sources, relax the grounding Gate, or
+# add an API call/retry.
+POST_MARKER = "# RUN_35193333727_GROUNDING_OUTPUT_V1"
+POST_PATCH = r'''
+
+# RUN_35193333727_GROUNDING_OUTPUT_V1
+CANDIDATE_EXPLORER_PROMPT += r"""
+
+============================================================
+RUN 35193333727 — REQUIRED GROUNDING OUTPUT CONTRACT
+============================================================
+For every SELECTED winner and runner_up, the following four fields are
+MANDATORY and must not be omitted:
+- subject_kind
+- canonical_subject
+- subject_identity_confidence
+- grounding_evidence
+
+If the subject is a named physical entity already explicit in the Candidate
+story, preserve that exact explicit name as canonical_subject and use only
+explicit_candidate_identity evidence that points back to the Candidate text.
+If physical identity is genuinely unresolved, return canonical_subject=UNKNOWN
+with confidence 0.0 and empty grounding_evidence. Never invent an identity,
+source, or mechanism merely to fill these fields.
+"""
+
+_run_35193333727_previous_validate_candidate = validate_candidate
+
+
+def _run_35193333727_candidate_text(candidate):
+    if not isinstance(candidate, dict):
+        return ""
+    micro = candidate.get("micro_narrative")
+    if not isinstance(micro, dict):
+        micro = {}
+    values = (
+        candidate.get("topic"),
+        candidate.get("angle"),
+        candidate.get("core_question"),
+        micro.get("hook"),
+        micro.get("core_question"),
+        micro.get("reveal"),
+        micro.get("payoff"),
+    )
+    return " ".join(str(value or "").strip() for value in values).lower()
+
+
+def validate_candidate(candidate, *, prefix, runner_up=False):
+    result = _run_35193333727_previous_validate_candidate(
+        candidate,
+        prefix=prefix,
+        runner_up=runner_up,
+    )
+    if result.get("subject_kind") in (
+        "physical_entity",
+        "non_physical_concept",
+    ):
+        return result
+
+    raw = normalize_candidate_subject_metadata(candidate)
+    canonical = str(raw.get("canonical_subject") or "").strip()
+    canonical_key = " ".join(canonical.lower().split())
+    confidence = float(raw.get("subject_identity_confidence") or 0.0)
+    evidence = raw.get("grounding_evidence") or []
+
+    if canonical_key == "not_applicable" and confidence >= 1.0:
+        raw["subject_kind"] = "non_physical_concept"
+        result.update(raw)
+        return result
+
+    unknown = {"", "unknown", "unresolved", "none", "null", "n/a"}
+    candidate_text = _run_35193333727_candidate_text(candidate)
+    explicit_support = any(
+        isinstance(item, dict)
+        and str(item.get("evidence_type") or "").strip().lower()
+            == "explicit_candidate_identity"
+        and " ".join(str(item.get("supports_subject") or "").strip().lower().split())
+            == canonical_key
+        for item in evidence
+    )
+
+    if (
+        canonical_key not in unknown
+        and canonical_key in candidate_text
+        and explicit_support
+    ):
+        raw["subject_kind"] = "physical_entity"
+        result.update(raw)
+        print(
+            "🧭 CANONICAL_SUBJECT_KIND normalized from explicit Candidate identity "
+            f"canonical={canonical}"
+        )
+
+    return result
+'''
+
+
+post_text = EXPLORER_PATH.read_text(encoding="utf-8")
+if POST_MARKER in post_text:
+    print("ℹ️ Run 35193333727 grounding-output compatibility already applied")
+else:
+    EXPLORER_PATH.write_text(post_text.rstrip() + POST_PATCH + "\n", encoding="utf-8")
+    print(
+        "✅ Run 35193333727 explicit grounding output + missing-kind "
+        "normalization applied; Gate and limits unchanged"
+    )
