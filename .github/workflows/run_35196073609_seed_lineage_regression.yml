@@ -1,0 +1,33 @@
+name: Run 35196073609 Seed Lineage Regression
+
+on:
+  pull_request:
+    paths:
+      - "ci_candidate_grounded_recovery_hotfix.py"
+      - "ci_run_35196073609_seed_lineage_hotfix.py"
+      - "quality/run_35196073609_seed_lineage_regression_test.py"
+      - ".github/workflows/run_35196073609_seed_lineage_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seed-lineage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Run exact production counterexample regression
+        run: |
+          python -m py_compile \
+            ci_candidate_grounded_recovery_hotfix.py \
+            ci_run_35196073609_seed_lineage_hotfix.py \
+            quality/run_35196073609_seed_lineage_regression_test.py
+          python quality/run_35196073609_seed_lineage_regression_test.py
