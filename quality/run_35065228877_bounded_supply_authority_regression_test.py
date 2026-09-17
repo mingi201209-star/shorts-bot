@@ -71,7 +71,15 @@ def test_exact_run_reason_triggers_existing_single_recovery():
             "사라진 이유를 연결하는 데 필요한 충분한 정보가 부족했습니다."
         ),
     }
-    assert explorer._candidate_supply_reason_is_zero_usable(result) is True
+    previous = os.environ.get("SHORTS_CANDIDATE_FINAL_ATTEMPT")
+    try:
+        os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = "1"
+        assert explorer._candidate_supply_reason_is_zero_usable(result) is True
+    finally:
+        if previous is None:
+            os.environ.pop("SHORTS_CANDIDATE_FINAL_ATTEMPT", None)
+        else:
+            os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = previous
 
 
 def test_editorial_weakness_alone_does_not_spend_recovery():
@@ -100,14 +108,21 @@ def test_default_intermediate_shortage_does_not_spend_recovery():
     explorer = _load_explorer()
     previous_scope = os.environ.get("SHORTS_CANDIDATE_SCOPE")
     previous_topic = os.environ.get("SHORTS_TOPIC")
+    previous_final = os.environ.get("SHORTS_CANDIDATE_FINAL_ATTEMPT")
     try:
         os.environ["SHORTS_CANDIDATE_SCOPE"] = ""
         os.environ["SHORTS_TOPIC"] = ""
+        os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = "0"
         result = {
             "status": "REGENERATE",
-            "reason": "탐색 방향에 맞는 구체적인 후보가 부족합니다.",
+            "reason": (
+                "모든 후보가 실패했습니다. 탐색 방향에 맞는 구체적인 후보가 없어 "
+                "구체적인 질문이나 메커니즘을 명확히 제시할 수 없었습니다."
+            ),
         }
         assert explorer._candidate_supply_reason_is_zero_usable(result) is False
+        os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = "1"
+        assert explorer._candidate_supply_reason_is_zero_usable(result) is True
     finally:
         if previous_scope is None:
             os.environ.pop("SHORTS_CANDIDATE_SCOPE", None)
@@ -117,6 +132,10 @@ def test_default_intermediate_shortage_does_not_spend_recovery():
             os.environ.pop("SHORTS_TOPIC", None)
         else:
             os.environ["SHORTS_TOPIC"] = previous_topic
+        if previous_final is None:
+            os.environ.pop("SHORTS_CANDIDATE_FINAL_ATTEMPT", None)
+        else:
+            os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = previous_final
 
 
 def test_aviation_and_fixed_topic_keep_legacy_shortage_trigger():
@@ -198,6 +217,9 @@ def test_existing_one_call_guard_remains_single():
     assert "authorize_call(" not in new_hotfix
     assert "MAX_TOPIC_REGENERATIONS" not in new_hotfix
     assert "V3_MAX_COST_USD" not in new_hotfix
+    assert "RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1" in new_hotfix
+    assert 'topic_attempt == total_topic_attempts' in new_hotfix
+    assert 'SHORTS_CANDIDATE_FINAL_ATTEMPT' in new_hotfix
 
 
 def main():
