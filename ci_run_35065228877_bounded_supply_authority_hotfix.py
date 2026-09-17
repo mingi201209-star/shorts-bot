@@ -41,8 +41,11 @@ def _candidate_supply_reason_is_zero_usable(result):
     # Run 35180822768 proved that even explicit whole-pool wording can occur on
     # an intermediate direction. In default automatic mode the single 1/1 call
     # is therefore eligible only on the host loop's final normal attempt.
+    # The host now always sends 0/1. Treat an absent flag as legacy/standalone
+    # final context so established focused tests and non-host callers retain
+    # their previous one-shot recovery contract.
     final_attempt = (
-        os.environ.get("SHORTS_CANDIDATE_FINAL_ATTEMPT", "").strip() == "1"
+        os.environ.get("SHORTS_CANDIDATE_FINAL_ATTEMPT", "1").strip() != "0"
     )
     if not final_attempt:
         return False
