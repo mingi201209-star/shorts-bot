@@ -139,9 +139,23 @@ def _candidate_supply_reason_is_zero_usable(result):
         )
         and insufficiency
     )
+
+    # Run 35188477320 used another final 7/7 whole-pool form:
+    # "탐색 방향에 맞는 구체적인 동물 능력에 대한 주제를 찾지 못했습니다."
+    # Match the structural supply signal rather than the animal domain itself:
+    # all candidates failed + direction-scoped concrete ... topic not found.
+    # A merely broad/generic/weak candidate still cannot trigger this path.
+    direction_topic_supply_missing = (
+        final_attempt
+        and "모든 후보" in reason
+        and "탐색 방향에 맞는 구체적인" in reason
+        and "주제를 찾지 못" in reason
+    )
+
     return bool(
         (all_failed and concrete_supply_missing and insufficiency)
         or compact_terminal_supply_missing
+        or direction_topic_supply_missing
     )
 
 

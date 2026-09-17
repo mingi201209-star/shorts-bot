@@ -103,7 +103,6 @@ def test_partial_candidate_failure_is_not_whole_pool_exhaustion():
     assert explorer._candidate_supply_reason_is_zero_usable(result) is False
 
 
-
 def test_default_intermediate_shortage_does_not_spend_recovery():
     explorer = _load_explorer()
     previous_scope = os.environ.get("SHORTS_CANDIDATE_SCOPE")
@@ -176,6 +175,37 @@ def test_run_35187008225_direction_shortage_is_final_only():
             os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = previous_final
 
 
+def test_run_35188477320_direction_topic_shortage_is_final_only():
+    explorer = _load_explorer()
+    previous_final = os.environ.get("SHORTS_CANDIDATE_FINAL_ATTEMPT")
+    exact_result = {
+        "status": "REGENERATE",
+        "reason": (
+            "모든 후보가 실패했습니다. 탐색 방향에 맞는 구체적인 동물 능력에 대한 "
+            "주제를 찾지 못했습니다. 동물의 능력에 대한 질문이 지나치게 넓거나 "
+            "일반적이었고, 예상 밖의 메커니즘이나 연결이 부족했습니다."
+        ),
+    }
+    editorial_only = {
+        "status": "REGENERATE",
+        "reason": (
+            "모든 후보가 실패했습니다. 탐색 방향에 맞는 구체적인 설명이 부족했고 "
+            "질문이 지나치게 넓고 일반적이었습니다."
+        ),
+    }
+    try:
+        os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = "0"
+        assert explorer._candidate_supply_reason_is_zero_usable(exact_result) is False
+        os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = "1"
+        assert explorer._candidate_supply_reason_is_zero_usable(exact_result) is True
+        assert explorer._candidate_supply_reason_is_zero_usable(editorial_only) is False
+    finally:
+        if previous_final is None:
+            os.environ.pop("SHORTS_CANDIDATE_FINAL_ATTEMPT", None)
+        else:
+            os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = previous_final
+
+
 def test_aviation_and_fixed_topic_keep_legacy_shortage_trigger():
     explorer = _load_explorer()
     result = {
@@ -201,6 +231,7 @@ def test_aviation_and_fixed_topic_keep_legacy_shortage_trigger():
             os.environ.pop("SHORTS_TOPIC", None)
         else:
             os.environ["SHORTS_TOPIC"] = previous_topic
+
 
 def test_default_automatic_recovery_delegates_editorial_quality_to_gate():
     explorer = _load_explorer()
@@ -273,6 +304,8 @@ def main():
     print("CASE C2b compact terminal shortage is final-only: PASS")
     test_run_35187008225_direction_shortage_is_final_only()
     print("CASE C2c direction shortage is final-only: PASS")
+    test_run_35188477320_direction_topic_shortage_is_final_only()
+    print("CASE C2d Run 35188477320 direction-topic shortage is final-only: PASS")
     test_aviation_and_fixed_topic_keep_legacy_shortage_trigger()
     print("CASE C3 aviation/fixed-topic legacy trigger unchanged: PASS")
     test_default_automatic_recovery_delegates_editorial_quality_to_gate()
