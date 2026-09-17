@@ -11,6 +11,7 @@ from config import (
 from content.topic_selector import (
     choose_topic_direction,
     get_recent_topic_names,
+    remember_used_topic,
 )
 
 from content.candidate_explorer import (
@@ -1975,6 +1976,15 @@ def main():
             "scenes",
             [],
         )
+
+        # RECENT_TOPIC_MEMORY_WIRING_V1: remember_used_topic() existed but was
+        # never called from production, so the Candidate Explorer's "recent
+        # content" context was always empty and kept re-proposing the same
+        # well-known aviation topics (winglet, spoiler, static wick, ...) that
+        # the Novelty Judge then correctly rejects as over-covered. Recording
+        # the actually-used topic here closes that gap; no threshold, budget,
+        # or retry behavior changes.
+        remember_used_topic(script_data)
 
         print("")
         print("=" * 64)
