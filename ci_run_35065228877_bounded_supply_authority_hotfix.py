@@ -189,19 +189,14 @@ This call remains one bounded recovery call; no retry/API/cost ceiling changes.
 '''
 
 
-MAIN_OLD = r'''            explorer_result = (
-                explore_candidates(
-                    topic_info,
-                    recent_topics=recent_topics,
-                    rejected_topics=rejected_topics,
-                )
-            )
+MAIN_BEFORE_OLD = r'''            try:
+                explorer_result = (
 '''
 
-MAIN_NEW = r'''            # RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1
+MAIN_BEFORE_NEW = r'''            # RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1
             # Expose only host-owned loop position. Default automatic supply
             # recovery remains 1/1 and can spend it only on the final normal
-            # attempt. Restore the process environment after every call.
+            # attempt.
             _previous_final_attempt = os.environ.get(
                 "SHORTS_CANDIDATE_FINAL_ATTEMPT"
             )
@@ -210,26 +205,28 @@ MAIN_NEW = r'''            # RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1
                 if topic_attempt == total_topic_attempts
                 else "0"
             )
+
             try:
                 explorer_result = (
-                    explore_candidates(
-                        topic_info,
-                        recent_topics=recent_topics,
-                        rejected_topics=rejected_topics,
-                    )
-                )
-            finally:
-                if _previous_final_attempt is None:
-                    os.environ.pop(
-                        "SHORTS_CANDIDATE_FINAL_ATTEMPT",
-                        None,
-                    )
-                else:
-                    os.environ[
-                        "SHORTS_CANDIDATE_FINAL_ATTEMPT"
-                    ] = _previous_final_attempt
 '''
 
+MAIN_AFTER_OLD = r'''
+            explorer_status = (
+'''
+
+MAIN_AFTER_NEW = r'''
+            if _previous_final_attempt is None:
+                os.environ.pop(
+                    "SHORTS_CANDIDATE_FINAL_ATTEMPT",
+                    None,
+                )
+            else:
+                os.environ[
+                    "SHORTS_CANDIDATE_FINAL_ATTEMPT"
+                ] = _previous_final_attempt
+
+            explorer_status = (
+'''
 
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
@@ -249,12 +246,13 @@ def main():
     if MAIN_MARKER in main_text:
         print("ℹ️ Run 35180822768 final-attempt signal already applied")
         return
-    if MAIN_OLD not in main_text:
-        raise RuntimeError("Run 35180822768 main Candidate Explorer anchor not found")
-    MAIN_PATH.write_text(
-        main_text.replace(MAIN_OLD, MAIN_NEW, 1),
-        encoding="utf-8",
-    )
+    if MAIN_BEFORE_OLD not in main_text:
+        raise RuntimeError("Run 35180822768 main pre-Explorer anchor not found")
+    if MAIN_AFTER_OLD not in main_text:
+        raise RuntimeError("Run 35180822768 main post-Explorer anchor not found")
+    main_text = main_text.replace(MAIN_BEFORE_OLD, MAIN_BEFORE_NEW, 1)
+    main_text = main_text.replace(MAIN_AFTER_OLD, MAIN_AFTER_NEW, 1)
+    MAIN_PATH.write_text(main_text, encoding="utf-8")
     print(
         "✅ Run 35180822768 default automatic recovery reserved for final "
         "host attempt; aviation/fixed-topic unchanged"
