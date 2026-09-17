@@ -17,12 +17,12 @@ PATCH = r'''
 # that is literally one of the active trusted registry records may narrow this
 # late resupply. Model/JSON candidates cannot forge Python object identity.
 # Ordinary candidates keep the previous generic supply behavior unchanged.
+#
+# Some focused grounding regressions intentionally install canonical supply
+# without installing Candidate Pool Handoff. Keep that supported composition:
+# if the repo-owned seed capability is absent, this wrapper is a strict no-op.
 from quality.canonical_subject_grounding_supply import supply_trusted_subject_grounding
-from quality.grounding_aware_candidate_supply import (
-    REPO_OWNED_SEED_RECORD_REF_FIELD,
-    all_trusted_candidate_records,
-    repo_owned_seed_trusted_record,
-)
+import quality.grounding_aware_candidate_supply as _run_35196073609_grounding_supply
 
 _run_35196073609_previous_validate_explorer_output = validate_explorer_output
 
@@ -31,8 +31,26 @@ def _run_35196073609_restore_seed_identity(candidate):
     if not isinstance(candidate, dict):
         return candidate
 
-    trusted_records = all_trusted_candidate_records()
-    repo_seed_record = repo_owned_seed_trusted_record(
+    all_records_fn = getattr(
+        _run_35196073609_grounding_supply,
+        "all_trusted_candidate_records",
+        None,
+    )
+    repo_record_fn = getattr(
+        _run_35196073609_grounding_supply,
+        "repo_owned_seed_trusted_record",
+        None,
+    )
+    ref_field = getattr(
+        _run_35196073609_grounding_supply,
+        "REPO_OWNED_SEED_RECORD_REF_FIELD",
+        "_repo_owned_seed_record_ref",
+    )
+    if not callable(all_records_fn) or not callable(repo_record_fn):
+        return candidate
+
+    trusted_records = all_records_fn()
+    repo_seed_record = repo_record_fn(
         candidate,
         trusted_records=trusted_records,
     )
@@ -43,7 +61,7 @@ def _run_35196073609_restore_seed_identity(candidate):
         candidate,
         trusted_records=(repo_seed_record,),
     )
-    supplied[REPO_OWNED_SEED_RECORD_REF_FIELD] = repo_seed_record
+    supplied[ref_field] = repo_seed_record
     print(
         "[RUN_35196073609_SEED_LINEAGE] "
         "restored_exact_record canonical="
@@ -77,15 +95,9 @@ def main() -> None:
     if MARKER in text:
         print("ℹ️ Run 35196073609 seed-lineage preservation already applied")
         return
-    required = (
-        "CANONICAL_SUBJECT_GROUNDING_SUPPLY_V1",
-        "CANDIDATE_POOL_HANDOFF_V1",
-    )
-    missing = [item for item in required if item not in text]
-    if missing:
+    if "CANONICAL_SUBJECT_GROUNDING_SUPPLY_V1" not in text:
         raise RuntimeError(
-            "Run 35196073609 seed-lineage hotfix requires existing contracts: "
-            + ", ".join(missing)
+            "Run 35196073609 seed-lineage hotfix requires canonical supply first"
         )
     EXPLORER_PATH.write_text(text.rstrip() + PATCH + "\n", encoding="utf-8")
     print(
