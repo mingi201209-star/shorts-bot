@@ -118,9 +118,10 @@ def _candidate_supply_reason_is_zero_usable(result):
             "unable to find",
         )
     )
-    # Run 35186253060 used a compact terminal form on host attempt 7/7:
-    # "구체적인 대상이나 연결이 부족". At the final host attempt this is the
-    # Explorer's whole-pool terminal result even when it omits "모든 후보".
+    # Runs 35186253060 and 35187008225 used compact terminal forms on host
+    # attempt 7/7: "구체적인 대상이나 연결이 부족" and "탐색 방향에 맞는
+    # 구체적인 후보가 부족". At the final host attempt these are the
+    # Explorer's whole-pool terminal result even when they omit "모든 후보".
     # Keep the recognition narrow to concrete subject/observable-phenomenon
     # supply, so ordinary editorial weakness still cannot spend recovery.
     compact_terminal_supply_missing = (
@@ -130,6 +131,7 @@ def _candidate_supply_reason_is_zero_usable(result):
             for marker in (
                 "구체적인 대상",
                 "구체적인 실제 대상",
+                "탐색 방향에 맞는 구체적인 후보",
                 "관찰 가능한 현상",
                 "concrete subject",
                 "observable phenomenon",
