@@ -118,7 +118,29 @@ def _candidate_supply_reason_is_zero_usable(result):
             "unable to find",
         )
     )
-    return bool(all_failed and concrete_supply_missing and insufficiency)
+    # Run 35186253060 used a compact terminal form on host attempt 7/7:
+    # "구체적인 대상이나 연결이 부족". At the final host attempt this is the
+    # Explorer's whole-pool terminal result even when it omits "모든 후보".
+    # Keep the recognition narrow to concrete subject/observable-phenomenon
+    # supply, so ordinary editorial weakness still cannot spend recovery.
+    compact_terminal_supply_missing = (
+        final_attempt
+        and any(
+            marker in reason
+            for marker in (
+                "구체적인 대상",
+                "구체적인 실제 대상",
+                "관찰 가능한 현상",
+                "concrete subject",
+                "observable phenomenon",
+            )
+        )
+        and insufficiency
+    )
+    return bool(
+        (all_failed and concrete_supply_missing and insufficiency)
+        or compact_terminal_supply_missing
+    )
 
 
 _run_35065228877_previous_recovery_context = (
