@@ -80,6 +80,7 @@ def _apply_production_candidate_wiring():
     explorer_source = Path("content/candidate_explorer.py").read_text(encoding="utf-8")
     assert "# CANONICAL_SUBJECT_GROUNDING_GATE_V1" in explorer_source
     assert "# CANONICAL_SUBJECT_GROUNDING_SUPPLY_V1" in explorer_source
+    assert "# RUN_35193333727_GROUNDING_OUTPUT_V1" in explorer_source
 
 
 def run():
@@ -205,6 +206,54 @@ def run():
     gate_result = evaluate_candidate_subject_grounding(winner)
     assert gate_result["status"] == "PASS", gate_result
     print("CASE G production repair/normalization path preserves trusted grounding to Gate: PASS")
+
+    # Run 35193333727: the model may already provide a literal canonical
+    # identity and matching explicit_candidate_identity evidence but omit only
+    # subject_kind. Normalize only that missing kind; do not invent identity.
+    explicit = _production_candidate("비행기 날개 플랩의 작동 원리")
+    explicit["angle"] = "비행기 날개 플랩이 움직이는 구체적인 구조 설명"
+    explicit["core_question"] = "비행기 날개 플랩은 어떻게 움직일까?"
+    explicit["micro_narrative"] = {
+        "hook": "비행기 날개 플랩은 실제로 움직이는 구조입니다.",
+        "core_question": "비행기 날개 플랩은 어떻게 움직일까?",
+        "reveal": "플랩의 구체적인 작동 구조를 확인합니다.",
+        "payoff": "눈에 보이는 플랩 자체가 검증 대상입니다.",
+    }
+    explicit["canonical_subject"] = "비행기 날개 플랩"
+    explicit["subject_identity_confidence"] = 0.95
+    explicit["grounding_evidence"] = [
+        {
+            "evidence_type": "explicit_candidate_identity",
+            "supports_subject": "비행기 날개 플랩",
+            "source": "candidate_text",
+            "detail": "topic explicitly names 비행기 날개 플랩",
+        }
+    ]
+    explicit.pop("subject_kind", None)
+
+    normalized = candidate_explorer["validate_candidate"](
+        explicit,
+        prefix="winner",
+        runner_up=False,
+    )
+    assert normalized["subject_kind"] == "physical_entity", normalized
+    assert normalized["canonical_subject"] == "비행기 날개 플랩", normalized
+    assert evaluate_candidate_subject_grounding(normalized)["status"] == "PASS"
+    assert (
+        "RUN 35193333727 — REQUIRED GROUNDING OUTPUT CONTRACT"
+        in candidate_explorer["CANDIDATE_EXPLORER_PROMPT"]
+    )
+    print("CASE H run-35193333727 explicit identity missing-kind normalization: PASS")
+
+    unresolved = _production_candidate("정체가 확인되지 않은 작은 구조")
+    blocked = candidate_explorer["validate_candidate"](
+        unresolved,
+        prefix="winner",
+        runner_up=False,
+    )
+    assert blocked["subject_kind"] == "unresolved", blocked
+    assert evaluate_candidate_subject_grounding(blocked)["status"] == "BLOCK"
+    print("CASE I unresolved identity remains fail-closed: PASS")
 
     print("CANONICAL SUBJECT GROUNDING SUPPLY V1 REGRESSION: PASS")
 
