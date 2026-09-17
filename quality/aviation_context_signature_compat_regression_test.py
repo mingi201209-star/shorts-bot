@@ -70,6 +70,14 @@ def main():
     assert "if forced_topic:" in main_text
     assert "fixed_topic_gate_feedback = gate_reject_reason" in main_text
 
+    # Run 35191054615: retain the unchanged Gate reason, but make the next
+    # aviation attempt resolve it by changing to a materially different,
+    # concrete subject/detail. This remains guidance only; Gate authority and
+    # all retry/API/cost limits stay unchanged.
+    assert "next_attempt=choose a materially different, concrete" in main_text
+    assert "subject/detail inside aviation" in main_text
+    assert "do not relax the Gate or invent a causal claim" in main_text
+
     # The aviation specificity context already serializes rejected_topics into
     # DOWNSTREAM REJECTION FEEDBACK, so automatic Gate reason records reach the
     # next Explorer attempt without changing Candidate Gate thresholds.
@@ -84,6 +92,7 @@ def main():
     print("PASS: aviation Gate-feedback compatibility")
     print("- fixed_topic + gate feedback accepted by final wrappers")
     print("- automatic aviation Gate rejection reason retained for next attempt")
+    print("- next aviation attempt must materially change concrete subject/detail")
     print("- exact rejected topic repeat protection remains separate")
     print("- Candidate Gate/recovery thresholds untouched")
 
