@@ -1,6 +1,13 @@
 from pathlib import Path
 
 
+# Production runs this hotfix immediately after ci_candidate_grounded_recovery_hotfix.py,
+# whose chain installs the bounded Candidate supply recovery layer. Compose the
+# Run 35065228877 fix here so normal production receives it without changing the
+# workflow order or any retry/API/cost ceiling.
+import ci_run_35065228877_bounded_supply_authority_hotfix
+
+
 MAIN_PATH = Path("main.py")
 
 
