@@ -2,7 +2,9 @@ from pathlib import Path
 
 
 EXPLORER_PATH = Path("content/candidate_explorer.py")
+MAIN_PATH = Path("main.py")
 MARKER = "# RUN_35065228877_BOUNDED_SUPPLY_AUTHORITY_V1"
+MAIN_MARKER = "# RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1"
 
 PATCH = r'''
 
@@ -35,6 +37,15 @@ def _candidate_supply_reason_is_zero_usable(result):
     # Default automatic therefore requires the explicit whole-pool form below.
     if aviation_scope or forced_topic:
         return previous_match
+
+    # Run 35180822768 proved that even explicit whole-pool wording can occur on
+    # an intermediate direction. In default automatic mode the single 1/1 call
+    # is therefore eligible only on the host loop's final normal attempt.
+    final_attempt = (
+        os.environ.get("SHORTS_CANDIDATE_FINAL_ATTEMPT", "").strip() == "1"
+    )
+    if not final_attempt:
+        return False
     if not isinstance(result, dict):
         return False
     if str(result.get("status", "")).strip().upper() != "REGENERATE":
@@ -178,18 +189,75 @@ This call remains one bounded recovery call; no retry/API/cost ceiling changes.
 '''
 
 
+MAIN_OLD = r'''            explorer_result = (
+                explore_candidates(
+                    topic_info,
+                    recent_topics=recent_topics,
+                    rejected_topics=rejected_topics,
+                )
+            )
+'''
+
+MAIN_NEW = r'''            # RUN_35180822768_FINAL_ATTEMPT_RECOVERY_V1
+            # Expose only host-owned loop position. Default automatic supply
+            # recovery remains 1/1 and can spend it only on the final normal
+            # attempt. Restore the process environment after every call.
+            _previous_final_attempt = os.environ.get(
+                "SHORTS_CANDIDATE_FINAL_ATTEMPT"
+            )
+            os.environ["SHORTS_CANDIDATE_FINAL_ATTEMPT"] = (
+                "1"
+                if topic_attempt == total_topic_attempts
+                else "0"
+            )
+            try:
+                explorer_result = (
+                    explore_candidates(
+                        topic_info,
+                        recent_topics=recent_topics,
+                        rejected_topics=rejected_topics,
+                    )
+                )
+            finally:
+                if _previous_final_attempt is None:
+                    os.environ.pop(
+                        "SHORTS_CANDIDATE_FINAL_ATTEMPT",
+                        None,
+                    )
+                else:
+                    os.environ[
+                        "SHORTS_CANDIDATE_FINAL_ATTEMPT"
+                    ] = _previous_final_attempt
+'''
+
+
 def main():
     text = EXPLORER_PATH.read_text(encoding="utf-8")
-    if MARKER in text:
+    if MARKER not in text:
+        if "# CANDIDATE_SUPPLY_RECOVERY_V1" not in text:
+            print("⏭️ Run 35065228877 bounded supply authority deferred: supply recovery not installed")
+            return
+        EXPLORER_PATH.write_text(text.rstrip() + PATCH + "\n", encoding="utf-8")
+        print(
+            "✅ Run 35065228877/35180049273 bounded supply authority applied; "
+            "limits unchanged"
+        )
+    else:
         print("ℹ️ Run 35065228877 bounded supply authority already applied")
+
+    main_text = MAIN_PATH.read_text(encoding="utf-8")
+    if MAIN_MARKER in main_text:
+        print("ℹ️ Run 35180822768 final-attempt signal already applied")
         return
-    if "# CANDIDATE_SUPPLY_RECOVERY_V1" not in text:
-        print("⏭️ Run 35065228877 bounded supply authority deferred: supply recovery not installed")
-        return
-    EXPLORER_PATH.write_text(text.rstrip() + PATCH + "\n", encoding="utf-8")
+    if MAIN_OLD not in main_text:
+        raise RuntimeError("Run 35180822768 main Candidate Explorer anchor not found")
+    MAIN_PATH.write_text(
+        main_text.replace(MAIN_OLD, MAIN_NEW, 1),
+        encoding="utf-8",
+    )
     print(
-        "✅ Run 35065228877 explicit zero-supply recognition + final bounded "
-        "supplier/Gate authority separation applied; limits unchanged"
+        "✅ Run 35180822768 default automatic recovery reserved for final "
+        "host attempt; aviation/fixed-topic unchanged"
     )
 
 
