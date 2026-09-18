@@ -14,6 +14,8 @@ PATCH = r'''
 # zero usable grounded candidates. This is supply recovery only: the recovered
 # payload must still satisfy the normal Explorer output validator and all
 # downstream Candidate Gate / fact / quality checks remain unchanged.
+import inspect
+
 _candidate_supply_recovery_used = False
 _original_explore_candidates_before_supply_recovery = explore_candidates
 
@@ -83,30 +85,29 @@ def _build_candidate_supply_recovery_context(
     fixed_topic_gate_feedback="",
     original_reason="",
 ):
-    # Production normally installs ci_topic_input_hotfix first, whose
-    # build_execution_context accepts fixed_topic. Some focused regressions
-    # intentionally install this supply layer in isolation against the legacy
-    # signature, so preserve compatibility without dropping the explicit
-    # fixed-topic recovery contract below.
-    try:
-        base = build_execution_context(
-            topic_info,
-            recent_topics=recent_topics,
-            recent_content=recent_content,
-            rejected_topics=rejected_topics,
-            fixed_topic=fixed_topic,
-            fixed_topic_gate_feedback=fixed_topic_gate_feedback,
-        )
-    except TypeError as exc:
-        if "unexpected keyword argument 'fixed_topic'" not in str(exc):
-            raise
-        base = build_execution_context(
-            topic_info,
-            recent_topics=recent_topics,
-            recent_content=recent_content,
-            rejected_topics=rejected_topics,
-            fixed_topic_gate_feedback=fixed_topic_gate_feedback,
-        )
+    # Production normally installs ci_topic_input_hotfix first, but focused
+    # regressions intentionally compose this layer against several older
+    # build_execution_context signatures. Forward every supported field without
+    # forcing legacy compositions to accept newer keyword arguments.
+    context_kwargs = {
+        "recent_topics": recent_topics,
+        "recent_content": recent_content,
+        "rejected_topics": rejected_topics,
+    }
+    parameters = inspect.signature(build_execution_context).parameters
+    accepts_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+    if accepts_kwargs or "fixed_topic" in parameters:
+        context_kwargs["fixed_topic"] = fixed_topic
+    if accepts_kwargs or "fixed_topic_gate_feedback" in parameters:
+        context_kwargs["fixed_topic_gate_feedback"] = fixed_topic_gate_feedback
+
+    base = build_execution_context(
+        topic_info,
+        **context_kwargs,
+    )
 
     fixed_topic = str(fixed_topic or "").strip()
     fixed_topic_precedence = ""
