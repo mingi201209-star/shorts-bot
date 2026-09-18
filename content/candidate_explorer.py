@@ -1763,6 +1763,107 @@ JSON 객체 하나만 반환하라.
 """
 
 
+_SELF_CRITIQUE_PROMPT = """
+[SYSTEM PROMPT: NARROWNESS SELF-CRITIQUE]
+
+너는 Candidate Explorer가 방금 고른 Winner 하나를
+제출 직전에 검사하는 엄격한 자기 비평가다.
+
+새 Candidate를 만들지 마라.
+대본을 쓰지 마라.
+
+딱 하나만 판단하라:
+
+이 Core Question의 답을,
+시청자가 질문 문장만 읽고도
+이미 예상할 수 있는가?
+
+또는 Reveal이
+
+- 영향을 준다
+- 적응했다
+- 화학물질/메커니즘을 사용한다
+- 방법을 찾았다
+
+같은 일반 상식 수준의 설명으로 끝나는가?
+
+둘 중 하나라도 그렇다면 NARROW하지 않다.
+
+아래 JSON 하나만 반환하라:
+
+{
+  "verdict": "NARROW_ENOUGH" | "TOO_BROAD",
+  "reason": "판단 이유를 한 문장으로"
+}
+"""
+
+
+def _self_critique_narrowness(winner, *, model=MODEL):
+    """Cheap pre-filter before the independent, more expensive Winner Gate.
+
+    Prompt examples alone (worked bad/good cases in section 8) were not
+    enough to stop gpt-4o-mini from repeatedly submitting broad-question /
+    generic-reveal candidates that the Winner Gate then rejects after a
+    full round-trip (run 607, run 608 -- same failure mode both times even
+    after the examples were added). This adds a second, narrowly-scoped
+    self-critique call that asks the model to judge ONLY narrowness on its
+    own already-selected Winner, separate from the generative act of
+    picking one. Judging a fixed candidate is an easier task than
+    generating a good one, so this catches some cases the single-pass
+    generation missed -- it is a cheap supplement to the Explorer's own
+    Hard Gate, not a replacement for the independent Winner Gate.
+    """
+
+    micro = winner.get("micro_narrative")
+    if not isinstance(micro, dict):
+        micro = {}
+
+    summary = (
+        f"Topic: {winner.get('topic', '')}\n"
+        f"Core Question: {winner.get('core_question', '')}\n"
+        f"Hook: {micro.get('hook', '')}\n"
+        f"Reveal: {micro.get('reveal', '')}\n"
+        f"Payoff: {micro.get('payoff', '')}"
+    )
+
+    call_number = authorize_call(model)
+    print(f"💳 Narrowness self-critique API call authorized: #{call_number}")
+
+    response = openai.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": _SELF_CRITIQUE_PROMPT},
+            {"role": "user", "content": summary},
+        ],
+        temperature=0.0,
+        response_format={"type": "json_object"},
+    )
+
+    usage = record_usage(model, response)
+    print(f"💰 Narrowness self-critique call: ${usage['cost_usd']:.6f}")
+    print_budget_status()
+
+    content = response.choices[0].message.content
+    if not content:
+        # Fail open: an empty self-critique response should not block a
+        # candidate the Explorer already selected. The independent Winner
+        # Gate remains the real backstop either way.
+        return {"verdict": "NARROW_ENOUGH", "reason": "self-critique response empty"}
+
+    try:
+        parsed = extract_json(content)
+    except Exception:
+        return {"verdict": "NARROW_ENOUGH", "reason": "self-critique response unparsable"}
+
+    if not isinstance(parsed, dict) or parsed.get("verdict") not in (
+        "NARROW_ENOUGH",
+        "TOO_BROAD",
+    ):
+        return {"verdict": "NARROW_ENOUGH", "reason": "self-critique response malformed"}
+
+    return parsed
+
+
 # ============================================================
 # Explorer
 # ============================================================
@@ -1952,6 +2053,29 @@ def explore_candidates(
             print(
                 "Runner-up: 없음"
             )
+
+        print("=" * 64)
+
+        critique = _self_critique_narrowness(winner, model=model)
+
+        if critique.get("verdict") == "TOO_BROAD":
+
+            print("")
+            print("=" * 64)
+            print("🔎 NARROWNESS SELF-CRITIQUE: TOO_BROAD")
+            print("=" * 64)
+            print("이유:", critique.get("reason", ""))
+            print("=" * 64)
+
+            return {
+                "status": "REGENERATE",
+                "reason": (
+                    "Narrowness self-critique: "
+                    f"{critique.get('reason', '')}"
+                ),
+            }
+
+        return result
 
     print("=" * 64)
 
