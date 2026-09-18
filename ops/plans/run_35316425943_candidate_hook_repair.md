@@ -73,6 +73,13 @@ hook and topic untouched and fail closed for question-form or unknown text.
 3. The focused CASE 10, all existing Script Human Quality cases, both adjacent
    marker/guidance regressions, and the exact production composition compile
    pass in isolated worktrees.
+4. PR #409 landed as `b84a567382720909aee80131812495a822f2ff5b` after
+   21/21 exact-head checks passed. Canary Run 35317646493 then produced the
+   same bare shape statement with `설계되어` on attempts 2-6 and `만들어져` on
+   attempt 7, proving the two-string allowlist was narrower than the diagnosed
+   morphology family. Attempt 1 reached Candidate Gate, but was rejected there.
+5. Final bounded adjustment recognizes only that plain predicate family under
+   the exact topic/subject; unrelated predicates still fail closed.
 
 ### Outcome
 

@@ -277,8 +277,22 @@ _RUN_35316425943_MARKERLESS_HOOKS = {
 }
 
 
+def _is_run_35316425943_markerless_hook(hook):
+    normalized = str(hook or "").strip().rstrip(".?!？")
+    if normalized in _RUN_35316425943_MARKERLESS_HOOKS:
+        return True
+    # Canary Run 35317646493 used the same bare shape statement with natural
+    # 설계/만들어져 inflections. Bound the family to the exact subject and a
+    # plain rounded-design predicate; hooks with any different claim remain
+    # under the unchanged general validator.
+    return bool(re.fullmatch(
+        r"비행기 창문 모서리는 둥글게 (?:디자인|설계|제작|만들)[가-힣\s]*있습니다",
+        normalized,
+    ))
+
+
 def _repair_run_35316425943_fixed_topic_hook(candidate_result):
-    """Repair only the two production-observed markerless fixed-topic hooks."""
+    """Repair only the production-observed markerless fixed-topic family."""
     fixed_topic = str(os.environ.get("SHORTS_TOPIC") or "").strip().rstrip(".?!？")
     if fixed_topic != _RUN_35316425943_FIXED_TOPIC:
         return False
@@ -287,7 +301,7 @@ def _repair_run_35316425943_fixed_topic_hook(candidate_result):
     hook = str(micro.get("hook") or "").strip()
     normalized_hook = hook.rstrip(".?!？")
     if (
-        normalized_hook not in _RUN_35316425943_MARKERLESS_HOOKS
+        not _is_run_35316425943_markerless_hook(hook)
         or _hook_makes_explicit_claim(hook)
         or re.search(r"[?？]\\s*$", hook)
     ):
