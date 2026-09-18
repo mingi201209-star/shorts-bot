@@ -22,6 +22,12 @@ assert set(workflows["main.yml"]["allowed_inputs"]) == {
     "youtube_upload",
     "youtube_privacy",
 }
+assert workflows["shorts_codex_failure_analysis.yml"]["ref"] == "main"
+assert set(workflows["shorts_codex_failure_analysis.yml"]["allowed_inputs"]) == {
+    "failed_run_id",
+    "failed_run_attempt",
+    "failed_run_sha",
+}
 assert "shorts_operator_dispatch.yml" not in workflows
 
 required_guards = (
