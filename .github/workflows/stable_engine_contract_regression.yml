@@ -1,0 +1,69 @@
+name: Stable Engine Contract Regression
+
+on:
+  push:
+    branches:
+      - "feat/**"
+      - "fix/**"
+      - "ops/**"
+      - "stabilization/**"
+    paths:
+      - ".github/workflows/main.yml"
+      - ".github/workflows/publish_engine.yml"
+      - ".github/workflows/promote_publish_stable.yml"
+      - ".github/workflows/stable_engine_contract_regression.yml"
+      - "quality/production_hotfix_chain.py"
+      - "quality/verify_stable_engine_contract.py"
+      - "quality/stable_engine_contract_regression_test.py"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/main.yml"
+      - ".github/workflows/publish_engine.yml"
+      - ".github/workflows/promote_publish_stable.yml"
+      - ".github/workflows/stable_engine_contract_regression.yml"
+      - "quality/production_hotfix_chain.py"
+      - "quality/verify_stable_engine_contract.py"
+      - "quality/stable_engine_contract_regression_test.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile regression
+        run: |
+          python -m py_compile \
+            quality/verify_stable_engine_contract.py \
+            quality/stable_engine_contract_regression_test.py
+      - name: Verify stable engine contract accepts current main
+        run: python quality/stable_engine_contract_regression_test.py
+      - name: Verify the live stable pointer still passes the publish gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          stable_sha="$(gh api "repos/$REPO/commits/publish-stable" --jq .sha)"
+          base="https://raw.githubusercontent.com/$REPO/$stable_sha"
+          curl -fsSL "$base/.github/workflows/main.yml" -o stable_main.yml
+          curl -fsSL "$base/quality/production_hotfix_chain.py" -o stable_chain.py \
+            || rm -f stable_chain.py
+          python quality/verify_stable_engine_contract.py \
+            --workflow stable_main.yml \
+            --chain stable_chain.py \
+            --require 'inputs.expected_sha || github.sha' \
+            --require 'python -m diagnostics.runner' \
+            --require 'final_visual_semantic_qa.json' \
+            --require 'final_director_qa.json' \
+            --require 'youtube_upload:' \
+            --require 'youtube_privacy:'
+          echo "LIVE_PUBLISH_STABLE_SHA=$stable_sha"

@@ -24,6 +24,9 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out gate tooling
+        uses: actions/checkout@v4
+
       - name: Validate explicit stable promotion
         id: validate
         env:
@@ -56,12 +59,23 @@ jobs:
           gh api "repos/$REPO/commits/$NEW_SHA" >/dev/null
 
           # The promoted commit must remain directly runnable as a stable engine.
-          workflow="$(curl -fsSL "https://raw.githubusercontent.com/$REPO/$NEW_SHA/.github/workflows/main.yml")"
-          printf '%s\n' "$workflow" | grep -F 'inputs.expected_sha || github.sha' >/dev/null
-          printf '%s\n' "$workflow" | grep -F 'if [ -z "$EXPECTED_SHA" ]' >/dev/null
-          printf '%s\n' "$workflow" | grep -F 'python ci_final_visual_semantic_qa_hotfix.py' >/dev/null
-          printf '%s\n' "$workflow" | grep -F 'python -m diagnostics.runner' >/dev/null
-          printf '%s\n' "$workflow" | grep -F 'final_director_qa.json' >/dev/null
+          # The hotfix-chain assertion lives in
+          # quality/verify_stable_engine_contract.py so this gate and
+          # publish_engine.yml cannot drift apart, and so it reads the SSOT
+          # chain list instead of a main.yml literal Phase 0 removed.
+          base="https://raw.githubusercontent.com/$REPO/$NEW_SHA"
+          curl -fsSL "$base/.github/workflows/main.yml" -o candidate_main.yml
+          # Absent on every pre-Phase-0 commit; the verifier treats that as
+          # "no SSOT proof available" rather than as a pass.
+          curl -fsSL "$base/quality/production_hotfix_chain.py" -o candidate_chain.py \
+            || rm -f candidate_chain.py
+          python3 quality/verify_stable_engine_contract.py \
+            --workflow candidate_main.yml \
+            --chain candidate_chain.py \
+            --require 'inputs.expected_sha || github.sha' \
+            --require 'if [ -z "$EXPECTED_SHA" ]' \
+            --require 'python -m diagnostics.runner' \
+            --require 'final_director_qa.json'
 
           echo "previous_sha=$previous" >> "$GITHUB_OUTPUT"
           echo "PREVIOUS_STABLE_SHA=$previous"
