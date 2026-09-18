@@ -1,6 +1,11 @@
 """Regression for Run 35324930986 strict first-scene visual routing."""
 
 from pathlib import Path
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 from ci_run_35324930986_strict_first_scene_visual_hotfix import (
     ENGINE_MARKER,
