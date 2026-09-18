@@ -209,17 +209,38 @@ def _load_supply_module():
 def test_run_35312999908_fixed_topic_recovery_context_keeps_exact_subject_and_quality_contract():
     explorer = _load_supply_module()
     fixed_topic = "비행기 날개는 왜 비행 중에 휘어질까"
+    original_builder = explorer.build_execution_context
+    captured = {}
 
-    context = explorer._build_candidate_supply_recovery_context(
-        {"category": "지정 주제", "topic": fixed_topic},
-        recent_topics=[],
-        rejected_topics=[],
-        fixed_topic=fixed_topic,
-        fixed_topic_gate_feedback="질문과 Reveal이 예상 가능한 수준입니다.",
-        original_reason="모든 후보가 구조·사실성 Hard Gate를 통과하지 못했습니다.",
-    )
+    def fixed_topic_aware_builder(
+        topic_info,
+        *,
+        recent_topics=None,
+        recent_content=None,
+        rejected_topics=None,
+        fixed_topic=None,
+        fixed_topic_gate_feedback="",
+    ):
+        captured["fixed_topic"] = fixed_topic
+        captured["feedback"] = fixed_topic_gate_feedback
+        return "[TEST FIXED-TOPIC BASE CONTEXT]"
 
-    assert "[EXECUTION CONTEXT - FIXED PRODUCTION TOPIC]" in context
+    explorer.build_execution_context = fixed_topic_aware_builder
+    try:
+        context = explorer._build_candidate_supply_recovery_context(
+            {"category": "지정 주제", "topic": fixed_topic},
+            recent_topics=[],
+            rejected_topics=[],
+            fixed_topic=fixed_topic,
+            fixed_topic_gate_feedback="질문과 Reveal이 예상 가능한 수준입니다.",
+            original_reason="모든 후보가 구조·사실성 Hard Gate를 통과하지 못했습니다.",
+        )
+    finally:
+        explorer.build_execution_context = original_builder
+
+    assert captured["fixed_topic"] == fixed_topic
+    assert captured["feedback"] == "질문과 Reveal이 예상 가능한 수준입니다."
+    assert "[TEST FIXED-TOPIC BASE CONTEXT]" in context
     assert "[FIXED-TOPIC SUPPLY RECOVERY — RUN 35312999908]" in context
     assert fixed_topic in context
     assert "MUST preserve that exact subject and exact winner.topic string" in context
