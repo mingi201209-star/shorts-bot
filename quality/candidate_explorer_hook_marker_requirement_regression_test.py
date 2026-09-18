@@ -31,20 +31,33 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 
-_VALIDATOR_MARKERS = (
-    "일부러", "의도적으로", "고의로",
-    "아니다", "아닙니다", "아니라", "않습니다", "않는다",
-    "사실은", "실제로는", "오히려", "대신",
-)
+# The prompt still shows fully-inflected worked-example forms; the
+# validator (since the stem-matching fix below) matches on each one's bound
+# stem, so every full form here must literally contain its stem.
+_PROMPT_MARKER_FORMS_TO_STEM = {
+    "일부러": "일부러",
+    "의도적으로": "의도적",
+    "고의로": "고의",
+    "아니다": "아니",
+    "아닙니다": "아닙",
+    "아니라": "아니",
+    "않습니다": "않",
+    "않는다": "않",
+    "사실은": "사실",
+    "실제로는": "실제",
+    "오히려": "오히려",
+    "대신": "대신",
+}
 
 
-def case_a_full_marker_allowlist_present_and_matches_validator():
+def case_a_full_marker_allowlist_present_and_matches_validator_stems():
     text = (ROOT / "content" / "candidate_explorer.py").read_text(encoding="utf-8")
     hotfix_text = (ROOT / "ci_writer_observable_opening_hotfix.py").read_text(encoding="utf-8")
-    for marker in _VALIDATOR_MARKERS:
-        assert marker in text, f"prompt missing marker: {marker}"
-        assert marker in hotfix_text, f"validator missing marker: {marker}"
-    print("CASE A complete 12-marker allowlist present and matches validator: PASS")
+    for full_form, stem in _PROMPT_MARKER_FORMS_TO_STEM.items():
+        assert full_form in text, f"prompt missing full form: {full_form}"
+        assert stem in full_form, f"stem {stem} not contained in its own full form {full_form}"
+        assert stem in hotfix_text, f"validator missing stem: {stem}"
+    print("CASE A complete marker allowlist present in prompt and matches validator stems: PASS")
 
 
 def case_b_rule_is_stated_as_unconditional_requirement():
@@ -86,7 +99,7 @@ def case_e_no_threshold_budget_retry_or_validator_logic_touched():
 
 
 def main():
-    case_a_full_marker_allowlist_present_and_matches_validator()
+    case_a_full_marker_allowlist_present_and_matches_validator_stems()
     case_b_rule_is_stated_as_unconditional_requirement()
     case_c_degenerate_marker_only_case_still_warned_against()
     case_d_original_worked_examples_still_present()

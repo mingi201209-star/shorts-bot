@@ -286,6 +286,33 @@ def test_case8_grounded_question_form_hook_is_not_banned() -> None:
     assert result is False
 
 
+def test_case9_marker_stem_matches_natural_conjugation_not_just_one_fixed_form() -> None:
+    """CASE 9: Run 35312695957 (Development Engine, fixed topic) produced the
+    real hook "비행기 창문 모서리는 사실 둥글게 만들어집니다." -- the model reached
+    for the "사실" (in fact) claim marker but wrote it without the "은" topic
+    particle, so the old exact-form-only "사실은" entry in
+    _MICRO_HOOK_CLAIM_MARKERS never matched and this hook was wrongly
+    rejected as a bare restatement. Matching by bound stem instead of one
+    fixed inflected form fixes this without changing the validator's
+    condition or any threshold/retry/budget constant."""
+    explorer = _explorer_namespace()
+    hook_makes_explicit_claim = explorer["_hook_makes_explicit_claim"]
+
+    # The exact real hook text from run 35312695957 attempt 1.
+    assert hook_makes_explicit_claim("비행기 창문 모서리는 사실 둥글게 만들어집니다.") is True
+
+    # Other natural conjugations of the same marker stems must also match.
+    assert hook_makes_explicit_claim("비행기 창문 모서리는 사실이에요.") is True
+    assert hook_makes_explicit_claim("비행기 창문 모서리는 실제 원인이 다릅니다.") is True
+    assert hook_makes_explicit_claim("비행기 창문 모서리는 각진 모양이 아니에요.") is True
+    assert hook_makes_explicit_claim("비행기 창문 모서리는 그냥 둥글지 않았습니다.") is True
+    assert hook_makes_explicit_claim("비행기 창문 모서리는 의도적인 설계입니다.") is True
+
+    # The real marker-free hook from that same run's attempts 2-7 must still
+    # not be treated as an explicit claim.
+    assert hook_makes_explicit_claim("비행기 창문 모서리는 둥글게 설계되어 있습니다.") is False
+
+
 def test_writer_and_rewrite_prompts_carry_human_quality_contract() -> None:
     runner = (ROOT / "content" / "script_engine_v2_runner.py").read_text(encoding="utf-8")
     rewrite = (ROOT / "quality" / "rewrite_engine.py").read_text(encoding="utf-8")
@@ -311,6 +338,7 @@ def main() -> None:
     test_case6_payoff_repeating_reveal_mechanism_fails()
     test_case7_full_causal_ladder_progresses_cleanly()
     test_case8_grounded_question_form_hook_is_not_banned()
+    test_case9_marker_stem_matches_natural_conjugation_not_just_one_fixed_form()
     test_writer_and_rewrite_prompts_carry_human_quality_contract()
     print("SCRIPT HUMAN QUALITY V1 REGRESSION: PASS")
 

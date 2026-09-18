@@ -220,10 +220,27 @@ def _micro_content_tokens(value):
 # Run 34625637738's own counterexample hook ("비행기 창문 모서리는 둥급니다.")
 # carries none of these; the task's own worked GOOD examples ("일부러 ...",
 # "... 장식이 아닙니다") do.
+#
+# Stems, not fully-inflected forms: Run 35312695957 (Development Engine,
+# fixed topic) produced the hook "비행기 창문 모서리는 사실 둥글게 만들어집니다."
+# -- the model reached for exactly this marker family ("사실" = "actually/in
+# fact") but wrote it without the "은" topic particle, so the old exact-form
+# entry "사실은" never matched and the hook was rejected as a bare restatement
+# even though it genuinely commits to a claim. The same gap applies to any
+# other inflection of "아니다"/"않다" the old hardcoded 3-4 conjugations each
+# didn't enumerate (e.g. "아니에요", "않았습니다"). Matching each marker's bound
+# stem instead of one fixed inflected form catches the intended semantic
+# category regardless of the sentence-final ending the model chooses.
+#
+# "아니다"'s formal ending fuses the stem itself ("아니" + "ㅂ니다" ->
+# "아닙니다", where "니" absorbs "ㅂ" into "닙"), so "아니" alone does not
+# match that one conjugation class; "아닙" is kept alongside it to cover
+# "아닙니다"/"아닙디다" the same way "않" alone already covers every "않다"
+# conjugation without a separate entry.
 _MICRO_HOOK_CLAIM_MARKERS = (
-    "일부러", "의도적으로", "고의로",
-    "아니다", "아닙니다", "아니라", "않습니다", "않는다",
-    "사실은", "실제로는", "오히려", "대신",
+    "일부러", "의도적", "고의",
+    "아니", "아닙", "않",
+    "사실", "실제", "오히려", "대신",
 )
 
 

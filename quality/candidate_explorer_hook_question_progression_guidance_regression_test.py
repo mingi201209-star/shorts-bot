@@ -58,9 +58,18 @@ def case_b_worked_bad_and_good_examples_match_the_locked_in_regression_cases():
 def case_c_marker_words_named_match_the_validators_own_allowlist():
     text = (ROOT / "content" / "candidate_explorer.py").read_text(encoding="utf-8")
     hotfix_text = (ROOT / "ci_writer_observable_opening_hotfix.py").read_text(encoding="utf-8")
-    for marker in ("일부러", "의도적으로", "사실은", "실제로는", "오히려", "대신"):
-        assert marker in text, marker
-        assert marker in hotfix_text, marker
+    # Prompt keeps the fully-inflected worked-example forms; the validator
+    # (since PR #407's stem-matching fix) matches each one's bound stem.
+    for full_form, stem in (
+        ("일부러", "일부러"),
+        ("의도적으로", "의도적"),
+        ("사실은", "사실"),
+        ("실제로는", "실제"),
+        ("오히려", "오히려"),
+        ("대신", "대신"),
+    ):
+        assert full_form in text, full_form
+        assert stem in hotfix_text, stem
     print("CASE C named marker words match the deterministic validator's own allowlist: PASS")
 
 
