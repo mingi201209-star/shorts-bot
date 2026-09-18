@@ -72,7 +72,11 @@ def apply_fixed_topic_hook_body_reuse(text: str) -> str:
                 )
             except RuntimeError as exc:
                 message = str(exc)
-                if "Script Generator가 유효한 대본 생성에 실패했습니다" not in message:
+                if (
+                    "Script Generator가 유효한 대본 생성에 실패했습니다"
+                    not in message
+                    and "Script Engine V2 validation failed" not in message
+                ):
                     raise
 
                 if current_topic not in rejected_topics:
@@ -196,7 +200,11 @@ def apply_fixed_topic_hook_body_reuse(text: str) -> str:
                     )
                 except RuntimeError as exc:
                     message = str(exc)
-                    if "Script Generator가 유효한 대본 생성에 실패했습니다" not in message:
+                    if (
+                        "Script Generator가 유효한 대본 생성에 실패했습니다"
+                        not in message
+                        and "Script Engine V2 validation failed" not in message
+                    ):
                         raise
 
                     if current_topic not in rejected_topics:

@@ -311,7 +311,11 @@ script_call_replacement = """            try:
                 )
             except RuntimeError as exc:
                 message = str(exc)
-                if "Script Generator가 유효한 대본 생성에 실패했습니다" not in message:
+                if (
+                    "Script Generator가 유효한 대본 생성에 실패했습니다"
+                    not in message
+                    and "Script Engine V2 validation failed" not in message
+                ):
                     raise
 
                 if current_topic not in rejected_topics:
