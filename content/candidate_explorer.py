@@ -1825,6 +1825,132 @@ _SELF_CRITIQUE_PROMPT = """
 """
 
 
+# NARROWNESS_BOUNDED_RECOVERY_V1
+# Run 618: the Narrowness self-critique gate above correctly rejected every
+# SELECTED Winner it saw (generic Reveals with no specific mechanism), but
+# once rejected, Explorer discarded the whole subject and moved to a brand
+# new, unrelated topic direction. Across 20 attempts this meant every
+# TOO_BROAD verdict cost the Explorer its remaining attempt budget instead
+# of being fixed. This does NOT change the self-critique's own pass/fail
+# logic or threshold in any way -- a recovered candidate goes back through
+# the exact same, unmodified _self_critique_narrowness() a normal candidate
+# would. It only gives a rejected candidate a small, bounded number of
+# chances to become narrower on the SAME subject before Explorer gives up
+# on it and moves to a new direction, same as before.
+MAX_NARROWNESS_REWRITES = 2
+
+
+_NARROWNESS_REWRITE_PROMPT = """
+[SYSTEM PROMPT: NARROWNESS TARGETED REWRITE]
+
+너는 Candidate Explorer가 이미 고른 Winner 하나를
+같은 소재, 같은 대상 안에서
+더 좁고 구체적인 버전으로 다시 쓰는 역할이다.
+
+새로운 대상이나 다른 방향으로 바꾸지 마라.
+같은 대상(subject)을 유지한 채,
+아래 [REJECTION REASON]에서 지적된
+일반적인/예상 가능한 설명 대신
+
+- 수치
+- 임계값
+- 예외
+- 조건
+- 순서
+
+중 하나 이상이 들어간
+더 좁은 Core Question과 Reveal로 다시 써라.
+
+예:
+넓음: "비행기 날개는 왜 공기 흐름을 최적화할까?"
+좁음: "비행기 날개 끝은 왜 위로 꺾여 있을까?"
+
+OUTPUT CONTRACT의 winner 객체와
+동일한 형식의 JSON 객체 하나만 반환하라
+(status 필드 없이 winner 필드 내용만):
+
+{
+  "topic": "",
+  "angle": "",
+  "core_question": "",
+  "micro_narrative": {
+    "hook": "",
+    "core_question": "",
+    "reveal": "",
+    "payoff": ""
+  },
+  "fact_check_focus": [],
+  "visual_proof": [""],
+  "selection_reason": ""
+}
+"""
+
+
+def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
+    """Targeted, same-subject rewrite of a Winner the narrowness self-critique
+    rejected as TOO_BROAD.
+
+    Feeds the critique's own rejection reason back in and asks for a
+    narrower version of the SAME subject (never a new topic direction).
+    The rewritten candidate is validated with the same
+    ``validate_candidate`` schema check every normal Winner goes through,
+    and it is NOT treated as accepted here -- the caller must still run it
+    back through the unmodified ``_self_critique_narrowness`` gate.
+
+    Returns the rewritten winner dict, or ``None`` if the rewrite call
+    failed or produced an unusable/malformed candidate (in which case the
+    caller should treat this rewrite attempt as spent and move on).
+    """
+
+    micro = winner.get("micro_narrative")
+    if not isinstance(micro, dict):
+        micro = {}
+
+    original_summary = (
+        f"Topic: {winner.get('topic', '')}\n"
+        f"Angle: {winner.get('angle', '')}\n"
+        f"Core Question: {winner.get('core_question', '')}\n"
+        f"Hook: {micro.get('hook', '')}\n"
+        f"Reveal: {micro.get('reveal', '')}\n"
+        f"Payoff: {micro.get('payoff', '')}\n"
+        f"\n[REJECTION REASON]\n{reason}"
+    )
+
+    call_number = authorize_call(model)
+    print(f"💳 Narrowness rewrite API call authorized: #{call_number}")
+
+    try:
+        response = openai.chat.completions.create(
+            model=model,
+            messages=[
+                {"role": "system", "content": _NARROWNESS_REWRITE_PROMPT},
+                {"role": "user", "content": original_summary},
+            ],
+            temperature=0.4,
+            response_format={"type": "json_object"},
+        )
+    except Exception:
+        return None
+
+    usage = record_usage(model, response)
+    print(f"💰 Narrowness rewrite call: ${usage['cost_usd']:.6f}")
+    print_budget_status()
+
+    content = response.choices[0].message.content
+    if not content:
+        return None
+
+    try:
+        parsed = extract_json(content)
+    except Exception:
+        return None
+
+    try:
+        return validate_candidate(parsed, prefix="winner", runner_up=False)
+    except Exception:
+        return None
+
+
 def _self_critique_narrowness(winner, *, model=MODEL):
     """Cheap pre-filter before the independent, more expensive Winner Gate.
 
@@ -2085,6 +2211,43 @@ def explore_candidates(
 
         critique = _self_critique_narrowness(winner, model=model)
 
+        rewrite_attempts = 0
+
+        while (
+            critique.get("verdict") == "TOO_BROAD"
+            and rewrite_attempts < MAX_NARROWNESS_REWRITES
+        ):
+
+            print("")
+            print("=" * 64)
+            print(
+                "🔧 NARROWNESS BOUNDED RECOVERY: "
+                f"rewrite {rewrite_attempts + 1}/{MAX_NARROWNESS_REWRITES}"
+            )
+            print("=" * 64)
+            print("이유:", critique.get("reason", ""))
+            print("=" * 64)
+
+            rewritten = _rewrite_narrower_candidate(
+                winner,
+                critique.get("reason", ""),
+                model=model,
+            )
+
+            rewrite_attempts += 1
+
+            if rewritten is None:
+                # Rewrite itself failed or was unusable -- this attempt is
+                # spent. Keep the original (still TOO_BROAD) winner/critique
+                # so the loop condition above can still try again if
+                # attempts remain, and so the final REGENERATE below (if
+                # attempts run out) reports the real last critique reason.
+                continue
+
+            winner = rewritten
+
+            critique = _self_critique_narrowness(winner, model=model)
+
         if critique.get("verdict") == "TOO_BROAD":
 
             print("")
@@ -2101,6 +2264,8 @@ def explore_candidates(
                     f"{critique.get('reason', '')}"
                 ),
             }
+
+        result["winner"] = winner
 
         return result
 

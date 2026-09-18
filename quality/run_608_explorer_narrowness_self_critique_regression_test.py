@@ -62,6 +62,21 @@ _WINNER_PAYLOAD = {
     "runner_up": None,
 }
 
+_REWRITTEN_CANDIDATE_PAYLOAD = {
+    "topic": "테스트 주제",
+    "angle": "더 좁은 테스트 앵글",
+    "core_question": "왜 정확히 테스트 조건에서만 발생할까요?",
+    "micro_narrative": {
+        "hook": "테스트 hook",
+        "core_question": "왜 그런가요?",
+        "reveal": "테스트 조건부 reveal",
+        "payoff": "테스트 payoff",
+    },
+    "fact_check_focus": [],
+    "visual_proof": ["테스트 증거"],
+    "selection_reason": "테스트 이유",
+}
+
 _FAKE_USAGE = {"cost_usd": 0.0001, "over_budget": False}
 _TOPIC_INFO = {"category": "과학", "topic": "테스트 방향"}
 
@@ -76,16 +91,30 @@ def _patched(ce, side_effect):
 
 
 def test_too_broad_verdict_becomes_regenerate():
+    # Since run 618's bounded-recovery fix, a TOO_BROAD verdict is no longer
+    # an immediate REGENERATE -- Explorer gets MAX_NARROWNESS_REWRITES (2)
+    # targeted same-subject rewrite attempts first. Only after every rewrite
+    # attempt is fed back through the SAME unmodified self-critique gate and
+    # still comes back TOO_BROAD does explore_candidates() return
+    # REGENERATE. This mocks all rewrite attempts as also TOO_BROAD to
+    # verify the exhausted-recovery path still ends in REGENERATE.
     ce = _load_legacy_module()
     critique = {"verdict": "TOO_BROAD", "reason": "질문이 너무 넓음 (test)"}
-    side_effect = [_make_response(_WINNER_PAYLOAD), _make_response(critique)]
+    side_effect = [
+        _make_response(_WINNER_PAYLOAD),
+        _make_response(critique),
+        _make_response(_REWRITTEN_CANDIDATE_PAYLOAD),  # rewrite attempt 1
+        _make_response(critique),  # re-critique of rewrite 1: still broad
+        _make_response(_REWRITTEN_CANDIDATE_PAYLOAD),  # rewrite attempt 2
+        _make_response(critique),  # re-critique of rewrite 2: still broad
+    ]
 
     p1, p2, p3, p4 = _patched(ce, side_effect)
     with p1, p2, p3, p4 as mock_create:
         result = ce.explore_candidates(_TOPIC_INFO)
         assert result["status"] == "REGENERATE"
         assert "Narrowness self-critique" in result["reason"]
-        assert mock_create.call_count == 2
+        assert mock_create.call_count == 6
 
 
 def test_narrow_enough_verdict_preserves_original_result():
