@@ -163,6 +163,7 @@ jobs:
           # Run 35324930986: must be last among Hook/video selection patches so
           # the final composed renderer cannot bypass strict first-scene evidence.
           python ci_run_35324930986_strict_first_scene_visual_hotfix.py
+          python ci_run_35327208962_first5_payoff_visual_progression_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
@@ -179,6 +180,7 @@ jobs:
           grep -n "dominance_gate\|HOOK_DOMINANCE_MAX_CANDIDATES\|HOOK_CONCRETE_VISUAL_EVIDENCE\|DIRECT_VERIFIED\|UNVERIFIED_CONTEXTUAL_FALLBACK\|HOOK_FALLBACK_QUALITY_FLOOR\|AI_VISUAL_SORA_FALLBACK" video/hook_visual.py
           grep -n "VISUAL_TRACE\|VISUAL_CONTRACT" video/video_engine.py
           grep -n "RUN_35324930986_STRICT_FIRST_SCENE_VISUAL_V1\|RUN_35324930986_HOOK_FALLBACK_FAIL_CLOSED_V1\|HOOK_VISUAL_STRICTNESS" video/video_engine.py video/hook_visual.py
+          grep -n "RUN_35327208962_VERIFIED_SCENE2_VISUAL_V1\|RUN_35327208962_BOUNDED_STILL_NOVELTY_V1\|STILL_NOVELTY" video/video_engine.py video/still_image_fallback.py
           grep -n "search_video_candidates\|VIDEO_SELECTED\|VIDEO_PROVIDER\|CURRENT_NARRATION_SEMANTIC_MATCH\|VISUAL_SPECIFICITY\|QUERY_SEMANTIC_INTEGRITY\|CONCRETE_VISUAL_EVIDENCE_SAFE_REUSE\|VISIBLE_EVIDENCE_PROVENANCE_GATE\|AI_VISUAL_GENERAL_SELECTION_TRACE\|GENERAL_SCENE_VISUAL_PARITY_UNKNOWN_SAFE" video/video_downloader.py video/hook_visual.py
           grep -n "VISUAL_DIVERSITY_PREFLIGHT_V1" main.py
 
@@ -190,6 +192,7 @@ jobs:
             ci_topic_input_hotfix.py ci_aviation_candidate_context_hotfix.py ci_aviation_candidate_specificity_hotfix.py \
             ci_aviation_context_signature_compat_hotfix.py ci_aviation_specificity_output_repair_hotfix.py \
             ci_run_35324930986_strict_first_scene_visual_hotfix.py \
+            ci_run_35327208962_first5_payoff_visual_progression_hotfix.py \
             ci_aviation_specificity_projection_hotfix.py ci_candidate_grounded_recovery_hotfix.py \
             ci_growth_candidate_shadow_hotfix.py content/growth_candidate_ranker.py \
             ci_final_render_content_integrity_hotfix.py ci_output_quality_hotfix.py \
@@ -212,6 +215,7 @@ jobs:
             quality/visual_diversity_preflight.py quality/visual_diversity_context.py \
             quality/visual_diversity_preflight_regression_test.py quality/qa_render_artifact_regression_test.py \
             quality/run_35324930986_strict_first_scene_visual_regression_test.py \
+            quality/run_35327208962_first5_payoff_visual_progression_regression_test.py \
             main.py config.py content/candidate_explorer.py content/candidate_recovery.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py quality/final_render_integrity.py \
@@ -230,6 +234,7 @@ jobs:
           python quality/visual_diversity_preflight_regression_test.py
           python quality/qa_render_artifact_regression_test.py
           python quality/run_35324930986_strict_first_scene_visual_regression_test.py
+          python quality/run_35327208962_first5_payoff_visual_progression_regression_test.py
           python -m quality.growth_candidate_shadow_regression_test
           python -m quality.retention_structure_experiment_regression_test
           python -m quality.subscriber_conversion_regression_test
