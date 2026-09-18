@@ -42,6 +42,8 @@ def _is_placeholder_regenerate(result):
     compact = reason.replace(" ", "")
     return (
         "재탐색이필요한구체적인이유" in compact
+        or "여기에이번탐색에서" in compact
+        or "그대로복사하지말것" in compact
         or reason.lower() in {"reason", "specific reason"}
     )
 
