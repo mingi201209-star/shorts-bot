@@ -1,0 +1,42 @@
+name: Run 35330135555 Payoff Presentation Diversity Regression
+
+on:
+  push:
+    branches:
+      - "fix/**"
+    paths:
+      - "ci_run_35330135555_payoff_presentation_diversity_hotfix.py"
+      - "quality/run_35330135555_payoff_presentation_diversity_regression_test.py"
+      - ".github/workflows/run_35330135555_payoff_presentation_diversity_regression.yml"
+  pull_request:
+    branches:
+      - publish-stable
+    paths:
+      - "ci_run_35330135555_payoff_presentation_diversity_hotfix.py"
+      - "quality/run_35330135555_payoff_presentation_diversity_regression_test.py"
+      - ".github/workflows/run_35330135555_payoff_presentation_diversity_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version | head -1
+      - name: Compile regression surface
+        run: |
+          python -m py_compile \
+            ci_run_35330135555_payoff_presentation_diversity_hotfix.py \
+            quality/run_35330135555_payoff_presentation_diversity_regression_test.py
+      - name: Run exact pixel-motion regression
+        run: python quality/run_35330135555_payoff_presentation_diversity_regression_test.py
