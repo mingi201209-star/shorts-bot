@@ -80,11 +80,21 @@ def _pool(round_scores):
     }
 
 
+CHAIN_RUNNER = "python quality/apply_production_hotfix_chain.py"
+
+
 def _load_hotfix_chain() -> list[str]:
     """Extract the real "Apply production hotfixes" step's script order.
 
-    Read directly from main.yml rather than hardcoded, so this regression can
-    never silently drift out of sync with the actual production composition.
+    Read from the workflow rather than hardcoded, so this regression can never
+    silently drift out of sync with the actual production composition.
+
+    Two shapes are accepted. Before the Phase 0 SSOT change, main.yml listed
+    every `python ci_*_hotfix.py` line inline. After it, main.yml delegates to
+    `quality/apply_production_hotfix_chain.py` and the order lives in
+    `quality/production_hotfix_chain.py`; parsing main.yml alone then yields
+    zero scripts, which is what made this test fail on every commit after the
+    SSOT change rather than on any real regression.
     """
     text = MAIN_YML.read_text(encoding="utf-8")
     step_start = text.index("Apply production hotfixes")
@@ -92,6 +102,15 @@ def _load_hotfix_chain() -> list[str]:
     end = step_text.index("\n          grep -n")
     step_text = step_text[:end]
     scripts = re.findall(r"python (ci_[A-Za-z0-9_]+\.py)", step_text)
+
+    if not scripts and CHAIN_RUNNER in step_text:
+        if str(ROOT) not in sys.path:
+            sys.path.insert(0, str(ROOT))
+
+        from quality.production_hotfix_chain import PRODUCTION_HOTFIX_CHAIN
+
+        scripts = list(PRODUCTION_HOTFIX_CHAIN)
+
     if len(scripts) < 40:
         raise AssertionError(
             f"unexpectedly short hotfix chain extracted from main.yml: {len(scripts)} scripts"
