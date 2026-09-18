@@ -8,43 +8,28 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from ci_run_35327208962_first5_payoff_visual_progression_hotfix import (
-    ENGINE_MARKER,
+    HOOK_MARKER,
     STILL_MARKER,
+    patch_hook_visual,
     patch_still_fallback,
-    patch_video_engine,
 )
 
 
-ENGINE_FIXTURE = r'''
-def create_scene(idx, item, create_voice):
-        elif idx == 1:
+HOOK_FIXTURE = r'''
+_LAST = {}
 
-            try:
+def get_last_hook_selection():
+    return dict(_LAST)
 
-                from video.hook_visual import (
-                    fetch_early_retention_pexels_video,
-                )
+def fetch_hook_pexels_video(scene):
+    if scene.get("raise"):
+        raise RuntimeError("synthetic verifier failure")
+    return scene.get("verified_url")
 
-                video_url = (
-                    fetch_early_retention_pexels_video(
-                        item
-                    )
-                )
+def fetch_early_retention_pexels_video(scene):
+    return "legacy-unverified.mp4"
 
-            except Exception as e:
-
-                print(
-                    "⚠️ First-5s strict visual selector 실패, "
-                    "기존 Pexels 경로로 fallback: "
-                    f"{e}"
-                )
-
-                video_url = (
-                    fetch_pexels_video(
-                        keyword
-                    )
-                )
-
+# RUN_35324930986_HOOK_FALLBACK_FAIL_CLOSED_V1
 '''
 
 STILL_FIXTURE = r'''
@@ -64,46 +49,62 @@ def _source_reuse_allowed(source_id, scene):
 
 
 def run():
-    engine = patch_video_engine(ENGINE_FIXTURE)
-    assert ENGINE_MARKER in engine
-    assert engine == patch_video_engine(engine)
-    assert "fetch_hook_pexels_video" in engine
-    assert "fetch_early_retention_pexels_video" not in engine
-    assert "fetch_pexels_video(\n                        keyword" not in engine
-    assert "video_url = None" in engine
-    print("CASE A Scene 2 uses bounded frame verifier and cannot reopen generic stock: PASS")
+    hook = patch_hook_visual(HOOK_FIXTURE)
+    assert HOOK_MARKER in hook
+    assert hook == patch_hook_visual(hook)
+    ns = {}
+    exec(compile(hook, "synthetic-hook.py", "exec"), ns)
+
+    ns["_LAST"].update({
+        "selection_mode": "DIRECT_VERIFIED",
+        "visual_evidence": "TRUE",
+    })
+    assert ns["fetch_early_retention_pexels_video"](
+        {"verified_url": "verified-scene2.mp4"}
+    ) == "verified-scene2.mp4"
+
+    assert ns["fetch_early_retention_pexels_video"](
+        {"verified_url": None}
+    ) is None
+    assert ns["fetch_early_retention_pexels_video"](
+        {"raise": True}
+    ) is None
+    assert "legacy-unverified.mp4" != ns["fetch_early_retention_pexels_video"](
+        {"verified_url": None}
+    )
+    print("CASE A Scene 2 delegates to bounded frame verifier and cannot reopen legacy stock: PASS")
 
     still = patch_still_fallback(STILL_FIXTURE)
     assert STILL_MARKER in still
     assert still == patch_still_fallback(still)
-    ns = {}
-    exec(compile(still, "synthetic-still.py", "exec"), ns)
+    ns2 = {}
+    exec(compile(still, "synthetic-still.py", "exec"), ns2)
 
     # One existing use + one free generation slot: question/payoff prefer a new
     # verified still rather than repeating the opening physical asset.
-    assert ns["_source_reuse_allowed"](
+    assert ns2["_source_reuse_allowed"](
         "still-a", {"role": "question", "id": 2}
     ) is False
-    assert ns["_source_reuse_allowed"](
+    assert ns2["_source_reuse_allowed"](
         "still-a", {"role": "payoff", "id": 5}
     ) is False
-    assert ns["_source_reuse_allowed"](
+    assert ns2["_source_reuse_allowed"](
         "still-a", {"causal_role": "primary_result", "id": 5}
     ) is False
     print("CASE B question/payoff prefer fresh still while existing budget remains: PASS")
 
     # Mechanism/setup behavior stays unchanged.
-    assert ns["_source_reuse_allowed"](
+    assert ns2["_source_reuse_allowed"](
         "still-a", {"role": "mechanism", "id": 3}
     ) is True
 
     # Never trade reliability for novelty after the existing generation budget
     # is exhausted: verified reuse becomes available exactly as before.
-    ns["_GENERATION_COUNT"] = 2
-    assert ns["_source_reuse_allowed"](
+    ns2["_GENERATION_COUNT"] = 2
+    assert ns2["_source_reuse_allowed"](
         "still-a", {"role": "question", "id": 2}
     ) is True
-    assert ns["_source_reuse_allowed"](
+    assert ns2["_source_reuse_allowed"](
         "still-a", {"role": "payoff", "id": 5}
     ) is True
     print("CASE C budget-exhausted verified reuse remains available: PASS")
@@ -119,11 +120,7 @@ def run():
         "HOOK_SUBJECT_DOMINANCE_MIN =",
     )
     for token in forbidden:
-        # The constant name may be read, but this installer must not assign it.
-        if token == "STILL_IMAGE_MAX_PER_VIDEO =":
-            assert token not in source
-        else:
-            assert token not in source, token
+        assert token not in source, token
 
     print("RUN 35327208962 FIRST5/PAYOFF VISUAL PROGRESSION REGRESSION: PASS")
 
