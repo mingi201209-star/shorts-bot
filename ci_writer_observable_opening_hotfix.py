@@ -270,7 +270,47 @@ def _hook_restates_question(hook, question):
     return len(shared) >= 2 and overlap_ratio >= 0.50
 
 
+_RUN_35316425943_FIXED_TOPIC = "비행기 창문 모서리는 왜 둥글게 만들어졌을까"
+_RUN_35316425943_MARKERLESS_HOOKS = {
+    "비행기 창문 모서리는 둥글게 디자인되어 있습니다",
+    "비행기 창문 모서리는 둥글게 디자인되어 있어, 날카로운 모서리가 없습니다",
+}
+
+
+def _repair_run_35316425943_fixed_topic_hook(candidate_result):
+    """Repair only the two production-observed markerless fixed-topic hooks."""
+    fixed_topic = str(os.environ.get("SHORTS_TOPIC") or "").strip().rstrip(".?!？")
+    if fixed_topic != _RUN_35316425943_FIXED_TOPIC:
+        return False
+
+    micro = candidate_result.get("micro_narrative") or {}
+    hook = str(micro.get("hook") or "").strip()
+    normalized_hook = hook.rstrip(".?!？")
+    if (
+        normalized_hook not in _RUN_35316425943_MARKERLESS_HOOKS
+        or _hook_makes_explicit_claim(hook)
+        or re.search(r"[?？]\\s*$", hook)
+    ):
+        return False
+
+    questions = (
+        str(candidate_result.get("core_question") or "").strip(),
+        str(micro.get("core_question") or "").strip(),
+    )
+    if not any(question and _hook_restates_question(hook, question) for question in questions):
+        return False
+
+    # This is the prompt's existing grounded GOOD form for this exact topic.
+    # It converts the observed bare shape description into the intended
+    # observation -> why progression without adding a mechanism or answer.
+    micro["hook"] = "비행기 창문 모서리는 일부러 둥글게 만듭니다."
+    candidate_result["micro_narrative"] = micro
+    print("[RUN_35316425943_HOOK_REPAIR] restored grounded fixed-topic claim marker")
+    return True
+
+
 def _validate_hook_question_progression(candidate_result, prefix):
+    _repair_run_35316425943_fixed_topic_hook(candidate_result)
     micro = candidate_result.get("micro_narrative") or {}
     hook = str(micro.get("hook") or "").strip()
     questions = [

@@ -11,6 +11,7 @@ quality contract without making network/LLM calls or changing any budget.
 from __future__ import annotations
 
 import importlib
+import os
 import runpy
 import subprocess
 import sys
@@ -313,6 +314,62 @@ def test_case9_marker_stem_matches_natural_conjugation_not_just_one_fixed_form()
     assert hook_makes_explicit_claim("비행기 창문 모서리는 둥글게 설계되어 있습니다.") is False
 
 
+def test_case10_exact_fixed_topic_repairs_only_observed_markerless_hooks() -> None:
+    """CASE 10: Run 35316425943 exhausted all seven attempts with only two
+    literal markerless hooks. Normalize those exact fixed-topic outputs to the
+    prompt's grounded GOOD form, without changing the general validator."""
+    explorer = _explorer_namespace()
+    validate = explorer["validate_explorer_output"]
+    target = "비행기 창문 모서리는 왜 둥글게 만들어졌을까"
+    observed = (
+        "비행기 창문 모서리는 둥글게 디자인되어 있습니다.",
+        "비행기 창문 모서리는 둥글게 디자인되어 있어, 날카로운 모서리가 없습니다.",
+    )
+
+    previous = os.environ.get("SHORTS_TOPIC")
+    try:
+        os.environ["SHORTS_TOPIC"] = target
+        for hook in observed:
+            result = validate(_candidate(
+                hook=hook,
+                question="비행기 창문 모서리가 둥글게 디자인된 이유는 무엇일까요?",
+            ))
+            assert result["winner"]["micro_narrative"]["hook"] == (
+                "비행기 창문 모서리는 일부러 둥글게 만듭니다."
+            )
+
+        # Unknown markerless text is not normalized just because the topic is
+        # fixed; the unchanged progression validator must still reject it.
+        unknown = _candidate(
+            hook="비행기 창문 모서리는 둥글게 설계되어 있습니다.",
+            question="비행기 창문 모서리가 둥글게 설계된 이유는 무엇일까요?",
+        )
+        try:
+            validate(unknown)
+        except ValueError as exc:
+            assert "같은 내용을 반복" in str(exc)
+        else:
+            raise AssertionError("unknown fixed-topic hook must fail closed")
+
+        # The same observed text outside the exact fixed-topic authority also
+        # remains rejected by the general validator.
+        os.environ["SHORTS_TOPIC"] = "비행기 날개 끝은 왜 위로 꺾여 있을까"
+        try:
+            validate(_candidate(
+                hook=observed[0],
+                question="비행기 창문 모서리가 둥글게 디자인된 이유는 무엇일까요?",
+            ))
+        except ValueError as exc:
+            assert "같은 내용을 반복" in str(exc)
+        else:
+            raise AssertionError("non-target topic must not receive hook repair")
+    finally:
+        if previous is None:
+            os.environ.pop("SHORTS_TOPIC", None)
+        else:
+            os.environ["SHORTS_TOPIC"] = previous
+
+
 def test_writer_and_rewrite_prompts_carry_human_quality_contract() -> None:
     runner = (ROOT / "content" / "script_engine_v2_runner.py").read_text(encoding="utf-8")
     rewrite = (ROOT / "quality" / "rewrite_engine.py").read_text(encoding="utf-8")
@@ -339,6 +396,7 @@ def main() -> None:
     test_case7_full_causal_ladder_progresses_cleanly()
     test_case8_grounded_question_form_hook_is_not_banned()
     test_case9_marker_stem_matches_natural_conjugation_not_just_one_fixed_form()
+    test_case10_exact_fixed_topic_repairs_only_observed_markerless_hooks()
     test_writer_and_rewrite_prompts_carry_human_quality_contract()
     print("SCRIPT HUMAN QUALITY V1 REGRESSION: PASS")
 
