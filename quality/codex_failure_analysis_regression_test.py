@@ -32,7 +32,8 @@ required_analysis_guards = (
     "effort: low",
     "sandbox: read-only",
     "safety-strategy: drop-sudo",
-    "allow-bots: github-actions[bot]",
+    "allow-bots: true",
+    "allow-bot-users: github-actions[bot]",
     "timeout-minutes: 12",
     "shorts-codex-analysis:",
 )
