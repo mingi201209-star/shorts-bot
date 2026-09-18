@@ -83,14 +83,29 @@ def _build_candidate_supply_recovery_context(
     fixed_topic_gate_feedback="",
     original_reason="",
 ):
-    base = build_execution_context(
-        topic_info,
-        recent_topics=recent_topics,
-        recent_content=recent_content,
-        rejected_topics=rejected_topics,
-        fixed_topic=fixed_topic,
-        fixed_topic_gate_feedback=fixed_topic_gate_feedback,
-    )
+    # Production normally installs ci_topic_input_hotfix first, whose
+    # build_execution_context accepts fixed_topic. Some focused regressions
+    # intentionally install this supply layer in isolation against the legacy
+    # signature, so preserve compatibility without dropping the explicit
+    # fixed-topic recovery contract below.
+    try:
+        base = build_execution_context(
+            topic_info,
+            recent_topics=recent_topics,
+            recent_content=recent_content,
+            rejected_topics=rejected_topics,
+            fixed_topic=fixed_topic,
+            fixed_topic_gate_feedback=fixed_topic_gate_feedback,
+        )
+    except TypeError as exc:
+        if "unexpected keyword argument 'fixed_topic'" not in str(exc):
+            raise
+        base = build_execution_context(
+            topic_info,
+            recent_topics=recent_topics,
+            recent_content=recent_content,
+            rejected_topics=rejected_topics,
+        )
 
     fixed_topic = str(fixed_topic or "").strip()
     fixed_topic_precedence = ""
