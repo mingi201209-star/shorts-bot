@@ -21,7 +21,7 @@ def set_regex(path, pattern, replacement, label):
 set_regex(
     Path("main.py"),
     r"^MAX_TOPIC_REGENERATIONS\s*=\s*\d+\s*$",
-    "MAX_TOPIC_REGENERATIONS = 6",
+    "MAX_TOPIC_REGENERATIONS = 19",
     "main.py MAX_TOPIC_REGENERATIONS",
 )
 set_regex(
