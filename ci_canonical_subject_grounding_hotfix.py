@@ -45,6 +45,24 @@ coli). Do NOT return UNKNOWN or leave subject_kind unresolved merely because
 the mechanism is biological/chemical rather than mechanical -- the organism
 itself is still a concrete, nameable subject.
 
+physical_entity ALSO includes large-scale built/civil infrastructure and
+engineered structures -- a sewer/drainage system, aqueduct, road, bridge,
+canal, tunnel, dam, building, or other constructed system is just as concrete
+and nameable as a small manufactured part, even though it is large, made of
+many components, or built long ago. Use the specific named structure as
+canonical_subject (e.g. "고대 로마의 하수도 시스템" for Ancient Rome's sewer
+system). Do NOT return UNKNOWN merely because the object is large-scale
+infrastructure rather than a single small part.
+
+physical_entity ALSO includes a specific geometric/design feature of a
+manufactured object -- e.g. the rounded corner of an airplane window, the
+curvature of a blade, the taper of a pin -- when that shape/feature is itself
+the concrete, identifiable subject whose design rationale is being explained.
+Use the object plus the specific feature as canonical_subject (e.g. "비행기
+창문의 둥근 모서리" for an airplane window's rounded corner). Do NOT return
+UNKNOWN merely because the subject is a design feature/shape of an object
+rather than the whole object.
+
 Do NOT infer its canonical identity from its appearance or from a plausible
 mechanism. Appearance-only descriptions are not identities.
 
