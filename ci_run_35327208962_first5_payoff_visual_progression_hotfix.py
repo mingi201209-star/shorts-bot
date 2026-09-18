@@ -58,7 +58,7 @@ def fetch_early_retention_pexels_video(scene):
 _STILL_APPEND = r'''
 
 # RUN_35327208962_BOUNDED_STILL_NOVELTY_V1
-# Prefer a distinct still for the question/payoff when one of the existing
+# Prefer a distinct still for the payoff/result when one of the existing
 # generation slots is still unused. This changes neither the max generation
 # count nor the fail-closed verifier. If the budget is already exhausted,
 # the original verified reuse policy remains authoritative.
@@ -81,8 +81,7 @@ def _source_reuse_allowed(source_id, scene):
     prior_uses = verified_source_use_count(source_id)
     role = _run_35327208962_scene_role(scene)
     progression_role = (
-        "question" in role
-        or "payoff" in role
+        "payoff" in role
         or "primary_result" in role
         or "conclusion" in role
         or role.strip() == "result"
