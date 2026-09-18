@@ -121,6 +121,103 @@ def supply_exact_fixed_topic_seed_grounding(
     return result, record
 
 
+# RUN_35323852030_FIXED_TOPIC_TRUSTED_OPENING_V1
+_WEAK_FIXED_TOPIC_OPENING_MARKERS = (
+    "관찰됩니다",
+    "볼 수 있습니다",
+    "볼 수 있습니다.",
+    "모습을 볼 수",
+    "모습이 보입니다",
+    "보이는 모습을",
+)
+
+
+def project_exact_fixed_topic_seed_opening(
+    candidate: Dict[str, Any],
+    fixed_topic: Any,
+    *,
+    trusted_records: Sequence[Dict[str, Any]],
+) -> Tuple[Dict[str, Any], Dict[str, Any] | None]:
+    """Replace only a weak descriptive opening with the repo-owned seed opening.
+
+    Run 35323852030 reached the correct NASA-backed wing subject and passed
+    FACT/Visual at 8/10, but Script V2 locked an LLM-authored Scene 1 that merely
+    said the bending was "observed". The bounded Rewrite repeated the same
+    descriptive opening and Hook stayed 6/10.
+
+    This is intentionally narrow:
+    * exact pinned topic must resolve to exactly one repo-owned seed;
+    * current Hook must contain an observed weak-description marker;
+    * replacement Hook + Question come only from that trusted seed;
+    * the existing opening-human contract must accept the pair;
+    * no fact/reveal/payoff/body text, threshold, retry, API call, or budget changes.
+    """
+
+    result = deepcopy(candidate)
+    record = exact_fixed_topic_seed_record(
+        result,
+        fixed_topic,
+        trusted_records=trusted_records,
+    )
+    if record is None:
+        return result, None
+
+    micro = result.get("micro_narrative")
+    seed = record.get("seed_candidate")
+    seed_micro = (seed or {}).get("micro_narrative") if isinstance(seed, dict) else None
+    if not isinstance(micro, dict) or not isinstance(seed_micro, dict):
+        return result, record
+
+    current_hook = _text(micro.get("hook"))
+    if not current_hook:
+        return result, record
+    if not any(marker in current_hook for marker in _WEAK_FIXED_TOPIC_OPENING_MARKERS):
+        return result, record
+
+    trusted_hook = _text(seed_micro.get("hook"))
+    trusted_question = _text(seed_micro.get("core_question")) or _text(
+        (seed or {}).get("core_question")
+    )
+    if not trusted_hook or not trusted_question:
+        return result, record
+
+    # Reuse the existing deterministic first-5 progression validator rather
+    # than inventing a weaker opening rule. The seed's grounded reveal provides
+    # the causal-clue probe; no generated text or model call is introduced.
+    from content.retention_structure import validate_first5_progression
+
+    trusted_clue = _text(seed_micro.get("reveal"))
+    if not trusted_clue:
+        return result, record
+
+    first5_ok, _ = validate_first5_progression([
+        {
+            "retention_role": "phenomenon",
+            "text": trusted_hook,
+            "visual_goal": "trusted fixed-topic observable subject",
+        },
+        {
+            "retention_role": "question",
+            "text": trusted_question,
+            "visual_goal": "trusted fixed-topic causal question",
+        },
+        {
+            "retention_role": "causal_clue",
+            "text": trusted_clue,
+            "visual_goal": "trusted fixed-topic causal clue",
+        },
+    ])
+    if not first5_ok:
+        return result, record
+
+    updated_micro = deepcopy(micro)
+    updated_micro["hook"] = trusted_hook
+    updated_micro["core_question"] = trusted_question
+    result["micro_narrative"] = updated_micro
+    result["core_question"] = trusted_question
+    return result, record
+
+
 # RUN_35320620429_FIXED_TOPIC_GROUNDING_SCOPE_V1
 _TRUSTED_GROUNDING_FIELDS = (
     "grounding_evidence",
