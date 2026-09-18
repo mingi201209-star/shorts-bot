@@ -9,6 +9,10 @@
       "ref": "main",
       "allowed_inputs": ["topic", "candidate_scope", "youtube_upload", "youtube_privacy"]
     },
+    "shorts_codex_failure_analysis.yml": {
+      "ref": "main",
+      "allowed_inputs": ["failed_run_id", "failed_run_attempt", "failed_run_sha"]
+    },
     "adaptive_scene_count_regression.yml": {
       "ref": "main",
       "allowed_inputs": []
