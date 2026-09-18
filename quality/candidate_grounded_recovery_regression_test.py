@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 import sys
 import types
 
@@ -204,6 +205,140 @@ def _load_supply_module():
     return explorer
 
 
+
+def test_run_35312999908_fixed_topic_recovery_context_keeps_exact_subject_and_quality_contract():
+    explorer = _load_supply_module()
+    fixed_topic = "비행기 날개는 왜 비행 중에 휘어질까"
+    original_builder = explorer.build_execution_context
+    captured = {}
+
+    def fixed_topic_aware_builder(
+        topic_info,
+        *,
+        recent_topics=None,
+        recent_content=None,
+        rejected_topics=None,
+        fixed_topic=None,
+        fixed_topic_gate_feedback="",
+    ):
+        captured["fixed_topic"] = fixed_topic
+        captured["feedback"] = fixed_topic_gate_feedback
+        return "[TEST FIXED-TOPIC BASE CONTEXT]"
+
+    explorer.build_execution_context = fixed_topic_aware_builder
+    try:
+        context = explorer._build_candidate_supply_recovery_context(
+            {"category": "지정 주제", "topic": fixed_topic},
+            recent_topics=[],
+            rejected_topics=[],
+            fixed_topic=fixed_topic,
+            fixed_topic_gate_feedback="질문과 Reveal이 예상 가능한 수준입니다.",
+            original_reason="모든 후보가 구조·사실성 Hard Gate를 통과하지 못했습니다.",
+        )
+    finally:
+        explorer.build_execution_context = original_builder
+
+    assert captured["fixed_topic"] == fixed_topic
+    assert captured["feedback"] == "질문과 Reveal이 예상 가능한 수준입니다."
+    assert "[TEST FIXED-TOPIC BASE CONTEXT]" in context
+    assert "[FIXED-TOPIC SUPPLY RECOVERY — RUN 35312999908]" in context
+    assert fixed_topic in context
+    assert "MUST preserve that exact subject and exact winner.topic string" in context
+    assert "silently compare at least 4 materially distinct" in context
+    assert "constraint -> mechanism ->" in context
+    assert "VISUAL PROOF" in context
+    assert "PAYOFF" in context
+
+
+def _run_fixed_topic_recovery_with_payload(explorer, payload, fixed_topic):
+    original_authorize = explorer.authorize_call
+    original_record_usage = explorer.record_usage
+    original_print_budget_status = explorer.print_budget_status
+    original_chat = getattr(explorer.openai, "chat", None)
+
+    fake_response = types.SimpleNamespace(
+        choices=[
+            types.SimpleNamespace(
+                message=types.SimpleNamespace(
+                    content=json.dumps(payload, ensure_ascii=False)
+                )
+            )
+        ]
+    )
+
+    explorer.authorize_call = lambda model: 1
+    explorer.record_usage = lambda model, response: {"cost_usd": 0.0}
+    explorer.print_budget_status = lambda: None
+    explorer.openai.chat = types.SimpleNamespace(
+        completions=types.SimpleNamespace(
+            create=lambda **kwargs: fake_response
+        )
+    )
+
+    try:
+        return explorer._run_candidate_supply_recovery(
+            {"category": "지정 주제", "topic": fixed_topic},
+            recent_topics=[],
+            rejected_topics=[],
+            fixed_topic=fixed_topic,
+            fixed_topic_gate_feedback="",
+            model="gpt-4o-mini",
+            original_reason="usable grounded Candidate가 0개",
+        )
+    finally:
+        explorer.authorize_call = original_authorize
+        explorer.record_usage = original_record_usage
+        explorer.print_budget_status = original_print_budget_status
+        if original_chat is None:
+            try:
+                delattr(explorer.openai, "chat")
+            except AttributeError:
+                pass
+        else:
+            explorer.openai.chat = original_chat
+
+
+def test_run_35312999908_neighbor_subject_recovery_fails_closed():
+    explorer = _load_supply_module()
+    fixed_topic = "비행기 날개는 왜 비행 중에 휘어질까"
+
+    payload = {
+        "status": "SELECTED",
+        "winner": candidate(topic="비행기 날개 끝의 윙렛이 휘어지는 이유"),
+        "runner_up": None,
+    }
+
+    result = _run_fixed_topic_recovery_with_payload(
+        explorer,
+        payload,
+        fixed_topic,
+    )
+    assert result["status"] == "REGENERATE"
+    assert "FIXED_TOPIC_RECOVERY_TOPIC_MISMATCH" in result["reason"]
+    assert fixed_topic in result["reason"]
+    assert "윙렛" in result["reason"]
+
+
+def test_run_35312999908_exact_topic_recovery_remains_selected():
+    explorer = _load_supply_module()
+    fixed_topic = "비행기 날개는 왜 비행 중에 휘어질까"
+
+    payload = {
+        "status": "SELECTED",
+        "winner": candidate(topic=fixed_topic),
+        "runner_up": None,
+    }
+
+    result = _run_fixed_topic_recovery_with_payload(
+        explorer,
+        payload,
+        fixed_topic,
+    )
+    assert result["status"] == "SELECTED"
+    assert result["winner"]["topic"] == fixed_topic
+    assert result["runner_up"] is None
+
+
 def test_supply_recovery_does_not_run_for_normal_selected():
     explorer = _load_supply_module()
     explorer._reset_candidate_supply_recovery_for_tests()
@@ -336,14 +471,20 @@ def main():
     print("CASE F deterministic strongest selection: PASS")
     test_no_recoverable_candidate_stays_terminal()
     print("CASE G terminal without recoverable candidate: PASS")
+    test_run_35312999908_fixed_topic_recovery_context_keeps_exact_subject_and_quality_contract()
+    print("CASE H Run 35312999908 fixed-topic context + quality contract: PASS")
+    test_run_35312999908_neighbor_subject_recovery_fails_closed()
+    print("CASE I Run 35312999908 neighboring subject fails closed: PASS")
+    test_run_35312999908_exact_topic_recovery_remains_selected()
+    print("CASE J exact-topic recovery remains selectable: PASS")
     test_supply_recovery_does_not_run_for_normal_selected()
-    print("CASE H normal SELECTED spends zero supply calls: PASS")
+    print("CASE K normal SELECTED spends zero supply calls: PASS")
     test_zero_supply_gets_exactly_one_recovery_and_stays_validated()
-    print("CASE I zero supply gets one validated recovery: PASS")
+    print("CASE L zero supply gets one validated recovery: PASS")
     test_supply_recovery_is_one_per_generation_and_fails_closed_after_spend()
-    print("CASE J one-call bound and fail-close: PASS")
+    print("CASE M one-call bound and fail-close: PASS")
     test_supply_recovery_only_triggers_on_zero_usable_reason()
-    print("CASE K trigger reason remains narrow: PASS")
+    print("CASE N trigger reason remains narrow: PASS")
     print("CANDIDATE GROUNDED RECOVERY REGRESSION: PASS")
 
 

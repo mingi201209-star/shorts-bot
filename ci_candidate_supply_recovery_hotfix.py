@@ -14,6 +14,8 @@ PATCH = r'''
 # zero usable grounded candidates. This is supply recovery only: the recovered
 # payload must still satisfy the normal Explorer output validator and all
 # downstream Candidate Gate / fact / quality checks remain unchanged.
+import inspect
+
 _candidate_supply_recovery_used = False
 _original_explore_candidates_before_supply_recovery = explore_candidates
 
@@ -79,16 +81,68 @@ def _build_candidate_supply_recovery_context(
     recent_topics=None,
     recent_content=None,
     rejected_topics=None,
+    fixed_topic=None,
     fixed_topic_gate_feedback="",
     original_reason="",
 ):
+    # Production normally installs ci_topic_input_hotfix first, but focused
+    # regressions intentionally compose this layer against several older
+    # build_execution_context signatures. Forward every supported field without
+    # forcing legacy compositions to accept newer keyword arguments.
+    context_kwargs = {
+        "recent_topics": recent_topics,
+        "recent_content": recent_content,
+        "rejected_topics": rejected_topics,
+    }
+    parameters = inspect.signature(build_execution_context).parameters
+    accepts_kwargs = any(
+        parameter.kind == inspect.Parameter.VAR_KEYWORD
+        for parameter in parameters.values()
+    )
+    if accepts_kwargs or "fixed_topic" in parameters:
+        context_kwargs["fixed_topic"] = fixed_topic
+    if accepts_kwargs or "fixed_topic_gate_feedback" in parameters:
+        context_kwargs["fixed_topic_gate_feedback"] = fixed_topic_gate_feedback
+
     base = build_execution_context(
         topic_info,
-        recent_topics=recent_topics,
-        recent_content=recent_content,
-        rejected_topics=rejected_topics,
-        fixed_topic_gate_feedback=fixed_topic_gate_feedback,
+        **context_kwargs,
     )
+
+    fixed_topic = str(fixed_topic or "").strip()
+    fixed_topic_precedence = ""
+    if fixed_topic:
+        fixed_topic_precedence = f"""
+[FIXED-TOPIC SUPPLY RECOVERY — RUN 35312999908]
+This generation is locked to the exact production topic below:
+{fixed_topic}
+
+The recovery call MUST preserve that exact subject and exact winner.topic string.
+Do not replace it with a neighboring component, subtype, related mechanism,
+broader category, narrower substitute subject, or "better" aviation topic.
+If the exact subject cannot produce a grounded Candidate, return REGENERATE
+instead of substituting another subject.
+
+Within the exact topic only, silently compare at least 4 materially distinct
+evidence-supported Story Angles before selecting one. Prefer the angle with the
+strongest complete causal and visual chain, not the first plausible wording.
+
+QUALITY CONTRACT FOR THIS RECOVERY:
+- HOOK: make a concrete, non-trivial claim or reversal; do not merely restate
+  the Core Question and do not hide the subject.
+- CORE QUESTION: ask the causal why/how that the Hook creates; it must advance
+  information rather than paraphrase the Hook.
+- REVEAL: carry a specific causal chain such as constraint -> mechanism ->
+  observable effect/result. A generic benefit-only explanation is insufficient.
+- VISUAL PROOF: name the exact physical feature plus an observable state,
+  comparison, motion, or consequence that can appear on screen.
+- PAYOFF: resolve the opening with a concrete reinterpretation, trade-off, or
+  design consequence; generic "safer", "more efficient", or "better performance"
+  language alone is insufficient.
+
+Do not invent facts to satisfy this contract. Quality gates, grounding authority,
+retry ceilings, API ceilings, and cost ceilings remain unchanged.
+"""
 
     aviation_scope = (
         os.environ.get("SHORTS_CANDIDATE_SCOPE", "").strip().lower()
@@ -132,6 +186,7 @@ Original reason:
 This is the only supply-recovery opportunity for this generation run.
 Do NOT relax any Candidate Explorer structural/factual hard gate,
 anti-fabrication rule, or fact-safety rule.
+{fixed_topic_precedence}
 {aviation_precedence}
 Before deciding REGENERATE, silently explore at least 6 materially distinct
 concrete observations or mechanisms inside the assigned direction. Do not emit
@@ -180,6 +235,7 @@ def _run_candidate_supply_recovery(
         recent_topics=recent_topics,
         recent_content=recent_content,
         rejected_topics=rejected_topics,
+        fixed_topic=fixed_topic,
         fixed_topic_gate_feedback=fixed_topic_gate_feedback,
         original_reason=original_reason,
     )
@@ -212,7 +268,28 @@ def _run_candidate_supply_recovery(
         raise RuntimeError("Candidate supply recovery 응답이 비어 있습니다.")
 
     parsed = extract_json(content)
-    return validate_explorer_output(parsed)
+    result = validate_explorer_output(parsed)
+
+    fixed_topic = str(fixed_topic or "").strip()
+    if fixed_topic and result.get("status") == "SELECTED":
+        winner_topic = str(
+            (result.get("winner") or {}).get("topic", "")
+        ).strip()
+
+        if winner_topic != fixed_topic:
+            return {
+                "status": "REGENERATE",
+                "reason": (
+                    "FIXED_TOPIC_RECOVERY_TOPIC_MISMATCH: "
+                    f"expected={fixed_topic!r} actual={winner_topic!r}; "
+                    "recovery must stay on the exact production topic"
+                ),
+            }
+
+        # Fixed-topic production never promotes a neighboring backup subject.
+        result["runner_up"] = None
+
+    return result
 
 
 def explore_candidates(
