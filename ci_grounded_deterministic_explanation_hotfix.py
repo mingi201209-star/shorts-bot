@@ -7,7 +7,7 @@ STILL_FALLBACK_PATH = ROOT / "video/still_image_fallback.py"
 MARKER = "# GROUNDED_DETERMINISTIC_EXPLANATION_V1"
 WINDOW_STOCK_MARKER = "# WINDOW_HUMAN_VISUAL_QUALITY_V1"
 LINEAGE_MARKER = '        "presentation_variant": plan.get("presentation_variant", ""),\n'
-COMPARISON_SKIP_MARKER = "# WINDOW_COMPARISON_INTENT_SKIP_V1"
+COMPARISON_SKIP_MARKER = "# WINDOW_COMPARISON_FRESH_STILL_V2"
 
 # Grounded deterministic aircraft-window explanation.  Run 34625637738 proved
 # that semantic correctness alone was not enough for human viewing quality:
@@ -383,35 +383,79 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
     return None
 '''
 
-# Run 34663907508 (HUMAN QA FAILURE B): skip both existing single-state
-# reuse paths (verified-question-subject reuse and generic anchor-based
-# still reuse) for exactly the scenes now eligible for the neutral
-# SHAPE_CONTRAST_INTRO deterministic render above, so a single reused photo
-# can no longer silently satisfy a comparison visual_goal. Reuses the same
-# eligibility function as the single source of truth for "this scene needs
-# an actual two-shape comparison, not one photo" -- no duplicated
-# condition, no new Vision/API call, no still-generation budget change
-# (the deterministic render below draws with Pillow only, using the
-# existing independent MAX_EXPLANATION_TRANSFORMS_PER_VIDEO ceiling, not
-# STILL_IMAGE_MAX_PER_VIDEO).
+# Run 35314305498 proved the original Run 34663907508 fix was too broad: it
+# skipped the entire still path, not just the two unsafe single-state reuse
+# paths. That forced the neutral Scene-2 question to spend deterministic
+# explanation transform 1/3, leaving only two transforms for the three closed
+# causal claims in Scenes 3-5. Keep both reuse paths blocked, but allow one
+# fresh still through the already-bounded generator and existing Vision gate.
+# The copied goal explicitly asks for the already-grounded neutral two-shape
+# comparison, so a one-state image cannot silently satisfy the contract.
 _STILL_FALLBACK_APPEND = r'''
 
-# WINDOW_COMPARISON_INTENT_SKIP_V1
+# WINDOW_COMPARISON_FRESH_STILL_V2
 from video.aircraft_window_stress_grounding import (
     supports_aircraft_window_shape_contrast_intro_from_grounding,
 )
 
-_window_comparison_original_generate_still_motion_fallback = generate_still_motion_fallback
+_window_comparison_v2_original_generate = globals().get(
+    "_window_comparison_original_generate_still_motion_fallback",
+    generate_still_motion_fallback,
+)
+_window_comparison_v2_original_question_reuse = _reuse_verified_question_subject
+_window_comparison_v2_original_generic_reuse = _reuse_verified_still
+
+
+def _window_comparison_requires_fresh_still(scene):
+    return bool(
+        isinstance(scene, dict)
+        and scene.get("_window_comparison_fresh_still_v2")
+    )
+
+
+def _reuse_verified_question_subject(scene, *, output_path, duration, trigger_reason):
+    if _window_comparison_requires_fresh_still(scene):
+        return None
+    return _window_comparison_v2_original_question_reuse(
+        scene,
+        output_path=output_path,
+        duration=duration,
+        trigger_reason=trigger_reason,
+    )
+
+
+def _reuse_verified_still(scene, *, output_path, duration, trigger_reason):
+    if _window_comparison_requires_fresh_still(scene):
+        return None
+    return _window_comparison_v2_original_generic_reuse(
+        scene,
+        output_path=output_path,
+        duration=duration,
+        trigger_reason=trigger_reason,
+    )
 
 
 def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reason="semantic_scarcity"):
     if supports_aircraft_window_shape_contrast_intro_from_grounding(scene):
+        comparison_scene = dict(scene)
+        comparison_scene["_window_comparison_fresh_still_v2"] = True
+        comparison_scene["visual_goal"] = (
+            "초기 여객기의 각진 창문 모서리와 현대 여객기의 둥근 창문 "
+            "모서리를 한 화면에 나란히 보여주는 중립적 형태 비교입니다. "
+            "응력, 균열, 파열 또는 원인 설명은 표시하지 않습니다."
+        )
         print(
-            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} status=comparison_intent_skip "
+            f"[STILL_IMAGE_FALLBACK] scene={_scene_id(scene)} "
+            "status=comparison_fresh_generation_required "
             f"trigger={trigger_reason}"
         )
-        return None
-    return _window_comparison_original_generate_still_motion_fallback(
+        return _window_comparison_v2_original_generate(
+            comparison_scene,
+            output_path=output_path,
+            duration=duration,
+            trigger_reason=trigger_reason,
+        )
+    return _window_comparison_v2_original_generate(
         scene,
         output_path=output_path,
         duration=duration,
@@ -471,17 +515,23 @@ def main():
 
     still_fallback = STILL_FALLBACK_PATH.read_text(encoding="utf-8")
     if COMPARISON_SKIP_MARKER not in still_fallback:
-        if "def generate_still_motion_fallback(" not in still_fallback:
+        required = (
+            "def generate_still_motion_fallback(",
+            "def _scene_id(scene):",
+            "def _reuse_verified_question_subject(",
+            "def _reuse_verified_still(",
+        )
+        missing = [item for item in required if item not in still_fallback]
+        if missing:
             raise RuntimeError(
-                "window comparison-intent skip requires still_image_fallback.generate_still_motion_fallback"
+                "window comparison fresh still requires final still contracts: "
+                + ", ".join(missing)
             )
-        if "def _scene_id(scene):" not in still_fallback:
-            raise RuntimeError("window comparison-intent skip requires still_image_fallback._scene_id")
         STILL_FALLBACK_PATH.write_text(
             still_fallback.rstrip() + "\n" + _STILL_FALLBACK_APPEND + "\n",
             encoding="utf-8",
         )
-        print("✅ Comparison-intent question scenes no longer satisfied by single-state reuse")
+        print("✅ Comparison-intent question scenes require a fresh verified still")
     else:
         print("ℹ️ Window comparison-intent reuse skip already installed")
 
