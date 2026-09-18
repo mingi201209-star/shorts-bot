@@ -262,9 +262,14 @@ def _validate_hook_question_progression(candidate_result, prefix):
     ]
     for question in questions:
         if question and _hook_restates_question(hook, question):
+            # DIAGNOSTIC_ONLY: surface the actual rejected hook/question text
+            # in the reason string so it reaches the CI job log (already
+            # readable) without needing a diagnostics artifact download.
+            # Validator condition/type and all other logic unchanged.
             raise ValueError(
                 f"{prefix}.micro_narrative hook이 Core Question과 같은 내용을 반복합니다. "
-                "첫 두 beat는 새 정보를 전진시켜야 합니다."
+                "첫 두 beat는 새 정보를 전진시켜야 합니다. "
+                f"[DEBUG hook={hook!r} question={question!r}]"
             )
 
 '''
