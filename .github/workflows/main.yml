@@ -103,74 +103,12 @@ jobs:
             exit 1
           fi
 
+      - name: Verify production hotfix chain structure
+        run: python -m quality.production_hotfix_chain_structure_regression_test
+
       - name: Apply production hotfixes
         run: |
-          python ci_hotfix.py
-          python ci_novelty_budget_hotfix.py
-          python ci_fact_critical_hotfix.py
-          python ci_speech_style_hotfix.py
-          python ci_hook_generation_hotfix.py
-          python ci_hook_pool_guard_hotfix.py
-          python ci_retention_hotfix.py
-          python ci_first5_retention_tts_hotfix.py
-          python ci_first5_visual_contract_hotfix.py
-          python ci_video_provider_hotfix.py
-          python ci_topic_input_hotfix.py
-          python ci_aviation_candidate_context_hotfix.py
-          python ci_aviation_candidate_specificity_hotfix.py
-          python ci_aviation_context_signature_compat_hotfix.py
-          python ci_aviation_specificity_output_repair_hotfix.py
-          python ci_aviation_specificity_projection_hotfix.py
-          python ci_candidate_grounded_recovery_hotfix.py
-          python ci_growth_candidate_shadow_hotfix.py
-          python ci_final_render_content_integrity_hotfix.py
-          python ci_output_quality_hotfix.py
-          python ci_curiosity_retention_hotfix.py
-          python ci_visual_specificity_hotfix.py
-          python ci_design_causality_hotfix.py
-          python ci_query_semantic_integrity_hotfix.py
-          python ci_concrete_visual_evidence_hotfix.py
-          python ci_visible_evidence_provenance_hotfix.py
-          python ci_hook_production_parity_hotfix.py
-          python ci_hook_fallback_quality_floor_hotfix.py
-          python ci_ai_visual_fallback_hotfix.py
-          python ci_ai_visual_mechanism_fallback_hotfix.py
-          python ci_problem_solution_narrative_hotfix.py
-          python ci_causal_information_progression_hotfix.py
-          python ci_retention_structure_experiment_hotfix.py
-          python ci_subscriber_conversion_hotfix.py
-          python ci_script_production_parity_hotfix.py
-          python ci_script_production_parity_bridge_hotfix.py
-          python ci_adaptive_scene_count_hotfix.py
-          python ci_general_scene_visual_parity_hotfix.py
-          python ci_script_validation_recovery_hotfix.py
-          python ci_script_v2_visual_goal_hotfix.py
-
-          # Must run immediately after ci_script_v2_visual_goal_hotfix.py: it
-          # patches build_consensus's return statement, which that hotfix's
-          # _apply_fixed_topic_soft_judges leaves untouched, and it reads the
-          # `fixed_topic` local variable that hotfix installs.
-          python ci_run_34847558126_fixed_topic_novelty_weak_domain_hotfix.py
-
-          python ci_script_v2_gunggeum_formal_ending_hotfix.py
-          python ci_final_visual_semantic_qa_hotfix.py
-          python ci_cross_process_video_dedupe_hotfix.py
-
-          # Must run after ci_cross_process_video_dedupe_hotfix.py: it chains
-          # in ci_grounded_keyword_contract_hotfix.py, and this hotfix wraps
-          # that hotfix's _owned_claim_keyword_terms function.
-          python ci_run_34847558126_scene_role_grounded_keyword_hotfix.py
-
-          python ci_writer_observable_opening_hotfix.py
-
-          # Must run after ci_writer_observable_opening_hotfix.py: it chains in
-          # the last upstream video/visual_explanation.py wrapper layer
-          # (STATIC_WICK_VISUAL_EXPLANATION_V1) that this hotfix wraps.
-          python ci_grounded_deterministic_explanation_hotfix.py
-
-          # Some later production hotfixes rewrite candidate_explorer wrappers.
-          # Re-apply the compatibility patch against the FINAL production state.
-          python ci_aviation_context_signature_compat_hotfix.py
+          python quality/apply_production_hotfix_chain.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
@@ -190,6 +128,8 @@ jobs:
           grep -n "VISUAL_DIVERSITY_PREFLIGHT_V1" main.py
 
           python -m py_compile \
+            quality/production_hotfix_chain.py quality/apply_production_hotfix_chain.py \
+            quality/production_hotfix_chain_structure_regression_test.py \
             ci_hotfix.py ci_novelty_budget_hotfix.py ci_fact_critical_hotfix.py ci_speech_style_hotfix.py \
             ci_hook_generation_hotfix.py ci_hook_pool_guard_hotfix.py ci_retention_hotfix.py \
             ci_first5_retention_tts_hotfix.py ci_first5_visual_contract_hotfix.py ci_video_provider_hotfix.py \

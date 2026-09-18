@@ -13,17 +13,9 @@ AUTHORITY_ASSET = "still-5862de56784dd83b"
 
 def _compose_exact_production_hotfixes() -> None:
     text = MAIN_WORKFLOW.read_text(encoding="utf-8")
-    start = text.index("      - name: Apply production hotfixes\n")
-    end = text.index("      - name: Run Shorts Generator V3.2\n", start)
-    block = text[start:end]
-    commands = []
-    for raw in block.splitlines():
-        command = raw.strip()
-        if command.startswith("python ci_") and command.endswith(".py"):
-            commands.append(command)
-    assert commands, "production hotfix command sequence missing"
-    for command in commands:
-        subprocess.run(command.split(), cwd=ROOT, check=True)
+    runner_call = "python quality/apply_production_hotfix_chain.py"
+    assert runner_call in text, "main.yml no longer invokes the shared hotfix chain runner"
+    subprocess.run([sys.executable, "quality/apply_production_hotfix_chain.py"], cwd=ROOT, check=True)
 
 
 def _scene(role: str) -> dict:

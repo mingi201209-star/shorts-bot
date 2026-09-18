@@ -1,9 +1,15 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from quality.production_hotfix_chain import PRODUCTION_HOTFIX_CHAIN  # noqa: E402
+
 WF = ROOT / ".github" / "workflows"
 
 
@@ -90,7 +96,10 @@ def test_stable_runtime_is_self_contained() -> None:
     require(publish, "Verify stable workflow is self-contained", "stable contract probe")
     require(stable_main, 'ref: ${{ inputs.expected_sha || github.sha }}', "stable checkout authority")
     require(stable_main, 'if [ -z "$EXPECTED_SHA" ]', "blank expected SHA contract")
-    require(stable_main, "python ci_final_visual_semantic_qa_hotfix.py", "stable hotfix composition")
+    require(stable_main, "python quality/apply_production_hotfix_chain.py", "stable hotfix composition")
+    assert "ci_final_visual_semantic_qa_hotfix.py" in PRODUCTION_HOTFIX_CHAIN, (
+        "stable hotfix composition: missing ci_final_visual_semantic_qa_hotfix.py"
+    )
     require(stable_main, "python -m diagnostics.runner", "stable generator")
     require(stable_main, "final_visual_semantic_qa.json", "stable final semantic QA")
     require(stable_main, "final_director_qa.json", "stable Director QA")

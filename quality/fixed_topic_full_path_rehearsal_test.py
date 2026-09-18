@@ -6,6 +6,7 @@ from pathlib import Path
 
 from content.grounded_claim_plan import build_grounded_claim_plan, validate_grounded_claim_usage
 from quality.candidate_pool_grounding_records import CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS
+from quality.production_hotfix_chain import PRODUCTION_HOTFIX_CHAIN
 
 TOPIC = "비행기는 착륙할 때 왜 날개 뒤쪽을 펼칠까?"
 CANONICAL = "aircraft trailing-edge wing flaps deployed for landing"
@@ -22,8 +23,8 @@ print("FULL A grounding + four claims: PASS")
 # Critical parity rule: rehearsal may only install the opening fix through the
 # same installer that production main.yml actually invokes.
 workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
-assert "python ci_writer_observable_opening_hotfix.py" in workflow
-assert "python ci_fixed_topic_flap_opening_hotfix.py" not in workflow
+assert "ci_writer_observable_opening_hotfix.py" in PRODUCTION_HOTFIX_CHAIN
+assert "ci_fixed_topic_flap_opening_hotfix.py" not in PRODUCTION_HOTFIX_CHAIN
 subprocess.run([sys.executable, "ci_writer_observable_opening_hotfix.py"], check=True)
 from content.script_engine_v2 import _question_hook_to_observation
 opening = _question_hook_to_observation(TOPIC, TOPIC)
