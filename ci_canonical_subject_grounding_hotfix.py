@@ -33,7 +33,17 @@ Rules:
 1. physical_entity
 A concrete object, component, visible part, hole, mark, protrusion, plate, pin,
 rod, structure, device, etc. whose function/purpose/mechanism is part of the
-story.
+story. This also includes a living organism, animal, insect, plant,
+microorganism, organ, or other biological structure -- a species or organism
+is just as concrete an entity as a manufactured part.
+
+A living organism or its biological structure IS a physical_entity even when
+the mechanism being explained is a biological or chemical process internal to
+it (e.g. digestion, an enzyme reaction, a gut microbiome). Use the organism's
+common name as canonical_subject (e.g. "흰개미" for termite, "대장균" for E.
+coli). Do NOT return UNKNOWN or leave subject_kind unresolved merely because
+the mechanism is biological/chemical rather than mechanical -- the organism
+itself is still a concrete, nameable subject.
 
 Do NOT infer its canonical identity from its appearance or from a plausible
 mechanism. Appearance-only descriptions are not identities.
