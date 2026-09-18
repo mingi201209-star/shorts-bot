@@ -25,11 +25,13 @@ if str(ROOT) not in sys.path:
 from quality.fixed_topic_seed_grounding import (
     exact_fixed_topic_seed_record,
     supply_exact_fixed_topic_seed_grounding,
+    supply_fixed_topic_scoped_trusted_grounding,
 )
 from quality.grounding_aware_candidate_supply import all_trusted_candidate_records
 
 
 SPOILER_TOPIC = "착륙 직후 날개 위로 솟는 스포일러"
+WING_FLEX_TOPIC = "비행기 날개는 왜 비행 중에 휘어질까"
 
 
 def _run_34742040475_llm_candidate():
@@ -109,6 +111,93 @@ def run():
     ) is None
     print("CASE exact-topic bridge remains unique and fail-closed: PASS")
 
+    # Run 35320620429: this exact fixed topic reached pre-Writer with trusted
+    # static-wick identity/claims even though the operator pinned wing bending.
+    # The repo now owns one NASA-backed exact seed for the wing-flex subject.
+    wing_candidate = {
+        "topic": WING_FLEX_TOPIC,
+        "angle": "비행 중 주날개의 탄성 굽힘과 공력 결합",
+        "core_question": "왜 비행기 날개는 비행 중에 휘어지는 걸까?",
+        "micro_narrative": {
+            "hook": "비행기 날개는 비행 중 실제로 탄성 굽힘을 일으킵니다.",
+            "core_question": "단단한 날개가 왜 비행 중 휘어질까요?",
+            "reveal": "비행 하중을 받는 유연한 구조에는 탄성 굽힘이 생깁니다.",
+            "payoff": "그 변형은 공력과 다시 맞물리는 에어로엘라스틱 반응의 일부입니다.",
+        },
+        "fact_check_focus": ["wing bending flexibility"],
+        "visual_proof": ["비행 중 위로 휘어진 주날개"],
+        "selection_reason": "Run 35320620429 exact fixed-topic regression",
+        "subject_kind": "physical_entity",
+        "canonical_subject": "aircraft static discharger (static wick)",
+        "subject_identity_confidence": 0.99,
+        "grounding_evidence": [],
+        "_trusted_grounding_evidence": [
+            {
+                "evidence_type": "source_backed_identity",
+                "supports_subject": "aircraft static discharger (static wick)",
+                "source": "stale-wrong-trust",
+                "detail": "Run 35320620429 contamination fixture",
+            }
+        ],
+        "_trusted_grounded_claims": [
+            {"claim_id": "static_charge_dissipation"}
+        ],
+    }
+
+    wing_record = exact_fixed_topic_seed_record(
+        wing_candidate,
+        WING_FLEX_TOPIC,
+        trusted_records=records,
+    )
+    assert wing_record is not None
+    assert wing_record.get("canonical_subject") == "flexible aircraft main wing"
+
+    wing_supply = supply_exact_fixed_topic_seed_grounding(
+        wing_candidate,
+        WING_FLEX_TOPIC,
+        trusted_records=records,
+    )
+    assert wing_supply is not None
+    wing_supplied, wing_supplied_record = wing_supply
+    assert wing_supplied_record is wing_record
+    assert wing_supplied.get("canonical_subject") == "flexible aircraft main wing"
+    claim_ids = {
+        str(item.get("claim_id") or "")
+        for item in (wing_supplied.get("_trusted_grounded_claims") or [])
+        if isinstance(item, dict)
+    }
+    assert {
+        "flight_load_bending_response",
+        "elastic_flapwise_bending",
+        "aeroelastic_deflection_coupling",
+    }.issubset(claim_ids)
+    assert "static_charge_dissipation" not in claim_ids
+    print("CASE Run 35320620429 exact wing-flex topic replaces static-wick trust: PASS")
+
+    # Systemic safety: even when Candidate details resemble another registered
+    # component, an unrelated fixed topic cannot inherit that component's
+    # private trust merely from downstream prose overlap.
+    unrelated_topic = "비행기 날개 표면은 왜 햇빛에 반짝일까"
+    misleading = deepcopy(wing_candidate)
+    misleading["topic"] = unrelated_topic
+    misleading["angle"] = "날개 뒤 가느다란 정전기 방전기와 무전 간섭"
+    misleading["core_question"] = "날개 뒤 작은 막대는 왜 달려 있을까?"
+    misleading["micro_narrative"] = {
+        "hook": "날개 뒤쪽에는 가느다란 스태틱 윅이 있습니다.",
+        "core_question": "왜 이런 막대를 달아둘까요?",
+        "reveal": "정전기를 공기 중으로 방전합니다.",
+        "payoff": "무선 간섭을 줄이는 데 도움이 됩니다.",
+    }
+    scoped = supply_fixed_topic_scoped_trusted_grounding(
+        misleading,
+        unrelated_topic,
+        trusted_records=records,
+    )
+    assert not scoped.get("_trusted_grounding_evidence")
+    assert not scoped.get("_trusted_grounded_claims")
+    assert not scoped.get("_repo_owned_seed_record_ref")
+    print("CASE fixed-topic scope strips unrelated trusted-subject contamination: PASS")
+
     subprocess.run([sys.executable, "ci_candidate_grounded_recovery_hotfix.py"], check=True)
 
     main_source = Path("main.py").read_text(encoding="utf-8")
@@ -117,6 +206,8 @@ def run():
     assert "supply_exact_fixed_topic_seed_grounding(" in main_source
     assert '_prewriter_os.environ.get("SHORTS_TOPIC", "")' in main_source
     assert "source=exact_fixed_topic_seed" in main_source
+    assert "source=fixed_topic_scoped" in main_source
+    assert "supply_fixed_topic_scoped_trusted_grounding(" in main_source
     assert "candidate.clear()" in main_source
     assert "candidate.update(supplied)" in main_source
     assert main_source.index("# CANONICAL_SUBJECT_GROUNDING_GATE_V1") < main_source.index(
@@ -156,6 +247,8 @@ def run():
     assert "seed_candidate" in helper_source
     assert "len(matches) != 1" in helper_source
     assert "supply_trusted_subject_grounding(" in helper_source
+    assert "supply_fixed_topic_scoped_trusted_grounding" in helper_source
+    assert "_TRUSTED_GROUNDING_FIELDS" in helper_source
 
     print("PREWRITER TRUSTED GROUNDING RESUPPLY REGRESSION: PASS")
 

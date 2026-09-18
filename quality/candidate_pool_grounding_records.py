@@ -27,6 +27,12 @@ FAA_PHAK_CH8_SOURCE = (
 NASA_WINGLETS_SOURCE = (
     "https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/winglets/"
 )
+NASA_FLEXIBLE_WING_DYNAMICS_SOURCE = (
+    "https://ntrs.nasa.gov/citations/20100023415"
+)
+NASA_WING_BENDING_GUST_SOURCE = (
+    "https://ntrs.nasa.gov/citations/19930084886"
+)
 
 
 CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
@@ -481,4 +487,128 @@ CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
             "concrete_condition": "양력을 만드는 날개 끝에서 팁 와류가 생기는 비행 상태입니다."
         },
     },
+    {
+        "record_type": "trusted_subject_identity",
+        "subject_kind": "physical_entity",
+        "canonical_subject": "flexible aircraft main wing",
+        "identity_confidence": 0.99,
+        "seed_priority": 92,
+        "feature_descriptions": [
+            "flexible aircraft main wing undergoing elastic flapwise bending in flight",
+            "비행기 날개는 비행 중 실제로 탄성 굽힘을 일으킵니다",
+            "비행 중 하중을 받아 위아래 방향으로 탄성 굽힘을 보이는 비행기 주날개",
+        ],
+        "context_descriptions": [
+            "aircraft main wing exposed to aerodynamic and inertial loads in flight",
+            "비행기 날개는 비행 중 공력과 관성 하중을 받습니다",
+            "비행 중 하중을 받는 항공기 주날개",
+        ],
+        "source": NASA_FLEXIBLE_WING_DYNAMICS_SOURCE,
+        "detail": (
+            "NASA describes flexible-aircraft structural dynamics with wing elastic motion "
+            "including flapwise bending, chordwise bending, and torsion, and couples those "
+            "deflections with aerodynamic and inertial-force effects in flight."
+        ),
+        "supported_claims": [
+            {
+                "claim_id": "flight_load_bending_response",
+                "claim_type": "mechanism_input",
+                "evidence_summary": (
+                    "비행 중 날개에는 공력·관성 하중과 돌풍 하중이 작용하며, "
+                    "실제 비행 시험에서는 이런 하중에 대한 날개 굽힘 변형률 반응이 측정됐습니다."
+                ),
+                "source": NASA_WING_BENDING_GUST_SOURCE,
+                "detail": (
+                    "NACA/NASA flight tests reported wing bending strains and their response "
+                    "to gust disturbances on flexible aircraft wings."
+                ),
+                "allowed_paraphrase_scope": [
+                    "비행 하중과 돌풍은 유연한 날개에 굽힘 반응을 만듭니다.",
+                    "실제 비행 시험에서도 돌풍에 따른 날개 굽힘 변형률이 측정됐습니다.",
+                    "flight and gust loads produce measurable wing-bending response",
+                ],
+            },
+            {
+                "claim_id": "elastic_flapwise_bending",
+                "claim_type": "mechanism_change",
+                "evidence_summary": (
+                    "유연한 항공기 날개는 탄성 때문에 위아래 방향 굽힘과 비틀림 같은 "
+                    "구조 변형을 일으킬 수 있습니다."
+                ),
+                "source": NASA_FLEXIBLE_WING_DYNAMICS_SOURCE,
+                "detail": (
+                    "NASA's flexible-aircraft model represents wing elasticity with flapwise "
+                    "bending, chordwise bending, and torsion."
+                ),
+                "allowed_paraphrase_scope": [
+                    "유연한 날개는 하중을 받으면 탄성 굽힘과 비틀림을 보입니다.",
+                    "날개의 위아래 굽힘은 유연한 구조의 탄성 운동입니다.",
+                    "wing elasticity includes flapwise bending and torsion",
+                ],
+            },
+            {
+                "claim_id": "aeroelastic_deflection_coupling",
+                "claim_type": "primary_result",
+                "evidence_summary": (
+                    "날개 구조의 변형은 유효 공력 상태를 바꾸므로, 설계·해석에서는 "
+                    "날개 변형과 공력의 상호작용을 함께 다뤄야 합니다."
+                ),
+                "source": NASA_FLEXIBLE_WING_DYNAMICS_SOURCE,
+                "detail": (
+                    "NASA reports that structural deflections create an effective aeroelastic "
+                    "angle of attack and couple wing elasticity with aircraft aerodynamic response."
+                ),
+                "allowed_paraphrase_scope": [
+                    "날개 변형은 공력과 다시 맞물리는 에어로엘라스틱 반응의 일부입니다.",
+                    "설계에서는 날개를 완전한 강체로만 보지 않고 구조 변형과 공력을 함께 계산합니다.",
+                    "structural deflection couples wing elasticity back into aerodynamic response",
+                ],
+            },
+        ],
+        "seed_candidate": {
+            "topic": "비행기 날개는 왜 비행 중에 휘어질까",
+            "angle": (
+                "날개가 공력·관성 하중을 받는 유연한 구조라서 실제 탄성 굽힘을 보이고, "
+                "그 변형이 다시 공력과 맞물리는 에어로엘라스틱 반응이라는 점"
+            ),
+            "core_question": "왜 단단한 비행기 주날개가 비행 중에는 눈에 띄게 휘어질까?",
+            "micro_narrative": {
+                "hook": "비행기 날개는 비행 중 실제로 탄성 굽힘을 일으킵니다.",
+                "core_question": "단단한 주날개가 왜 하중을 받으면 눈에 띄게 휘어질까요?",
+                "reveal": (
+                    "날개는 공력과 관성·돌풍 하중을 받는 유연한 구조라서, "
+                    "하중에 따라 위아래 굽힘과 비틀림 같은 탄성 변형이 생깁니다."
+                ),
+                "payoff": (
+                    "그래서 항공기 해석에서는 날개를 완전한 강체로만 보지 않고, "
+                    "그 변형이 공력과 다시 맞물리는 에어로엘라스틱 반응까지 함께 계산합니다."
+                ),
+            },
+            "fact_check_focus": [
+                "비행 하중과 돌풍에 대한 날개 굽힘 반응",
+                "유연한 날개의 flapwise bending과 torsion",
+                "구조 변형과 공력의 에어로엘라스틱 결합",
+            ],
+            "visual_proof": [
+                "비행 중 여객기 주날개가 위쪽으로 휘어 곡률이 생긴 모습",
+                "지상 상태와 비행 중 하중 상태의 날개 끝 높이와 곡률 비교",
+            ],
+            "selection_reason": (
+                "눈으로 바로 확인되는 날개 굽힘을 단순한 '유연함'에서 끝내지 않고 "
+                "비행 하중 → 탄성 변형 → 공력과의 재결합까지 이어서 설명할 수 있습니다."
+            ),
+            "specific_observation": "비행 중인 비행기 주날개가 위쪽으로 휘어 곡률이 생깁니다.",
+            "constraint": "주날개는 비행 중 공력과 관성·돌풍 하중을 받아야 합니다.",
+            "counterintuitive_result": (
+                "날개의 휘어짐은 하중을 받는 유연한 구조의 탄성 운동이며 "
+                "그 변형 자체가 다시 공력 상태에 영향을 줍니다."
+            ),
+            "tradeoff": (
+                "날개 유연성은 구조 하중과 공력 응답이 서로 영향을 주는 "
+                "에어로엘라스틱 설계를 필요로 합니다."
+            ),
+            "concrete_condition": "순항·기동·돌풍처럼 비행 하중이 주날개에 작용하는 상태입니다.",
+        },
+    },
+
 )

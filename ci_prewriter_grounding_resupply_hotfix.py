@@ -39,7 +39,10 @@ PATCH = r'''
 import os as _prewriter_os
 
 from quality.canonical_subject_grounding_supply import supply_trusted_subject_grounding
-from quality.fixed_topic_seed_grounding import supply_exact_fixed_topic_seed_grounding
+from quality.fixed_topic_seed_grounding import (
+    supply_exact_fixed_topic_seed_grounding,
+    supply_fixed_topic_scoped_trusted_grounding,
+)
 from quality.grounding_aware_candidate_supply import (
     REPO_OWNED_SEED_RECORD_REF_FIELD,
     all_trusted_candidate_records,
@@ -57,11 +60,12 @@ def generate_script(topic_info, candidate):
             trusted_records=trusted_records,
         )
 
+        fixed_topic = _prewriter_os.environ.get("SHORTS_TOPIC", "").strip()
         exact_fixed_topic_supply = None
         if repo_seed_record is None:
             exact_fixed_topic_supply = supply_exact_fixed_topic_seed_grounding(
                 candidate,
-                _prewriter_os.environ.get("SHORTS_TOPIC", ""),
+                fixed_topic,
                 trusted_records=trusted_records,
             )
 
@@ -81,13 +85,35 @@ def generate_script(topic_info, candidate):
                 if repo_seed_record is not None
                 else trusted_records
             )
-            supplied = supply_trusted_subject_grounding(
-                candidate,
-                trusted_records=candidate_trusted_records,
-            )
             if repo_seed_record is not None:
+                supplied = supply_trusted_subject_grounding(
+                    candidate,
+                    trusted_records=candidate_trusted_records,
+                )
                 # Keep the unforgeable exact record identity across supplier deepcopy.
                 supplied[REPO_OWNED_SEED_RECORD_REF_FIELD] = repo_seed_record
+            elif fixed_topic:
+                supplied = supply_fixed_topic_scoped_trusted_grounding(
+                    candidate,
+                    fixed_topic,
+                    trusted_records=trusted_records,
+                )
+                if supplied.get("_trusted_grounding_evidence"):
+                    print(
+                        "[PREWRITER_GROUNDING_RESUPPLY] "
+                        "source=fixed_topic_scoped canonical="
+                        f"{supplied.get('canonical_subject', '')}"
+                    )
+                else:
+                    print(
+                        "[PREWRITER_GROUNDING_RESUPPLY] "
+                        "source=fixed_topic_scoped status=unresolved_fail_closed"
+                    )
+            else:
+                supplied = supply_trusted_subject_grounding(
+                    candidate,
+                    trusted_records=trusted_records,
+                )
 
         # Preserve object identity because downstream wrappers may retain the
         # original Candidate reference. Only deterministic trusted supply data
