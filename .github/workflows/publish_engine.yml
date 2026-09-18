@@ -40,6 +40,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out gate tooling
+        uses: actions/checkout@v4
+
       - name: Resolve stable production pointer
         id: stable
         env:
@@ -63,15 +66,22 @@ jobs:
           STABLE_SHA: ${{ steps.stable.outputs.stable_sha }}
         run: |
           set -euo pipefail
-          raw_url="https://raw.githubusercontent.com/$REPO/$STABLE_SHA/.github/workflows/main.yml"
-          workflow="$(curl -fsSL "$raw_url")"
-          printf '%s\n' "$workflow" | grep -F 'inputs.expected_sha || github.sha' >/dev/null
-          printf '%s\n' "$workflow" | grep -F 'python ci_final_visual_semantic_qa_hotfix.py' >/dev/null
-          printf '%s\n' "$workflow" | grep -F 'python -m diagnostics.runner' >/dev/null
-          printf '%s\n' "$workflow" | grep -F 'final_visual_semantic_qa.json' >/dev/null
-          printf '%s\n' "$workflow" | grep -F 'final_director_qa.json' >/dev/null
-          printf '%s\n' "$workflow" | grep -F 'youtube_upload:' >/dev/null
-          printf '%s\n' "$workflow" | grep -F 'youtube_privacy:' >/dev/null
+          # Shared with promote_publish_stable.yml; see
+          # quality/verify_stable_engine_contract.py for why both chain shapes
+          # are accepted (the live stable pointer is still pre-Phase-0).
+          base="https://raw.githubusercontent.com/$REPO/$STABLE_SHA"
+          curl -fsSL "$base/.github/workflows/main.yml" -o candidate_main.yml
+          curl -fsSL "$base/quality/production_hotfix_chain.py" -o candidate_chain.py \
+            || rm -f candidate_chain.py
+          python3 quality/verify_stable_engine_contract.py \
+            --workflow candidate_main.yml \
+            --chain candidate_chain.py \
+            --require 'inputs.expected_sha || github.sha' \
+            --require 'python -m diagnostics.runner' \
+            --require 'final_visual_semantic_qa.json' \
+            --require 'final_director_qa.json' \
+            --require 'youtube_upload:' \
+            --require 'youtube_privacy:'
           echo "Stable engine workflow contract verified at $STABLE_SHA"
 
       - name: Dispatch stable engine
