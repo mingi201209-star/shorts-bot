@@ -167,7 +167,8 @@ jobs:
             quality/final_visual_semantic_qa_regression_test.py quality/aviation_specificity_projection_regression_test.py \
             video/video_providers.py video/hook_visual.py video/hook_visual_dominance.py video/video_downloader.py \
             video/video_engine.py video/subtitle_engine.py video/ai_visual_provider.py \
-            diagnostics/failure_diagnostics.py diagnostics/runner.py quality/failure_diagnostics_regression_test.py
+            diagnostics/failure_diagnostics.py diagnostics/runner.py quality/failure_diagnostics_regression_test.py \
+            content/topic_selector.py quality/recent_topic_memory_wiring_regression_test.py
 
           python quality/final_render_integrity_regression_test.py
           python quality/final_visual_semantic_qa_regression_test.py
@@ -181,6 +182,15 @@ jobs:
           python -m quality.retention_structure_experiment_regression_test
           python -m quality.subscriber_conversion_regression_test
           python quality/failure_diagnostics_regression_test.py
+          python quality/recent_topic_memory_wiring_regression_test.py
+
+      - name: Restore recent-topics memory
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SHORTS_ANALYTICS_HISTORY_PATH: recent_topics.json
+          SHORTS_HISTORY_ARTIFACT_PREFIX: recent-topics-
+          SHORTS_HISTORY_ARTIFACT_FILE_SUFFIX: recent_topics.json
+        run: python -m analytics.restore_history_artifact
 
       - name: Run Shorts Generator V3.2
         env:
@@ -298,4 +308,12 @@ jobs:
         with:
           name: analytics-history-${{ github.run_id }}
           path: analytics/performance_history.json
+          retention-days: 90
+
+      - name: Preserve recent-topics memory
+        if: ${{ always() && hashFiles('recent_topics.json') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: recent-topics-${{ github.run_id }}
+          path: recent_topics.json
           retention-days: 90
