@@ -80,18 +80,20 @@ def run():
     ns2 = {}
     exec(compile(still, "synthetic-still.py", "exec"), ns2)
 
-    # One existing use + one free generation slot: question/payoff prefer a new
-    # verified still rather than repeating the opening physical asset.
+    # Preserve the established question-beat verified-reuse contract.
     assert ns2["_source_reuse_allowed"](
         "still-a", {"role": "question", "id": 2}
-    ) is False
+    ) is True
+
+    # One existing use + one free generation slot: payoff/result prefer a new
+    # verified still rather than repeating the opening physical asset.
     assert ns2["_source_reuse_allowed"](
         "still-a", {"role": "payoff", "id": 5}
     ) is False
     assert ns2["_source_reuse_allowed"](
         "still-a", {"causal_role": "primary_result", "id": 5}
     ) is False
-    print("CASE B question/payoff prefer fresh still while existing budget remains: PASS")
+    print("CASE B question reuse preserved; payoff/result prefer fresh while budget remains: PASS")
 
     # Mechanism/setup behavior stays unchanged.
     assert ns2["_source_reuse_allowed"](
