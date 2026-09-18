@@ -119,3 +119,61 @@ def supply_exact_fixed_topic_seed_grounding(
     if not result.get("_trusted_grounding_evidence"):
         return None
     return result, record
+
+
+# RUN_35320620429_FIXED_TOPIC_GROUNDING_SCOPE_V1
+_TRUSTED_GROUNDING_FIELDS = (
+    "grounding_evidence",
+    "_trusted_grounding_evidence",
+    "_trusted_grounded_claims",
+    "_subject_grounding",
+    "_repo_owned_seed_record_ref",
+)
+
+
+def supply_fixed_topic_scoped_trusted_grounding(
+    candidate: Dict[str, Any],
+    fixed_topic: Any,
+    *,
+    trusted_records: Sequence[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Re-supply trust only from records the pinned topic itself can support.
+
+    A Candidate can contain downstream details that accidentally resemble a
+    different trusted component. Fixed-topic production must not let those
+    details redefine the subject selected by the operator. Existing trusted
+    metadata is stripped before resupply so a prior false match cannot survive.
+    """
+
+    if not isinstance(candidate, dict):
+        raise TypeError("candidate must be a dict")
+
+    fixed = _text(fixed_topic)
+    result = deepcopy(candidate)
+    if not fixed or _text(result.get("topic")) != fixed:
+        return supply_trusted_subject_grounding(
+            result,
+            trusted_records=trusted_records,
+        )
+
+    for field in _TRUSTED_GROUNDING_FIELDS:
+        result.pop(field, None)
+
+    scoped_records = []
+    for record in trusted_records or ():
+        if not isinstance(record, dict):
+            continue
+        topic_probe = supply_trusted_subject_grounding(
+            {"topic": fixed},
+            trusted_records=(record,),
+        )
+        if topic_probe.get("_trusted_grounding_evidence"):
+            scoped_records.append(record)
+
+    if not scoped_records:
+        return result
+
+    return supply_trusted_subject_grounding(
+        result,
+        trusted_records=tuple(scoped_records),
+    )
