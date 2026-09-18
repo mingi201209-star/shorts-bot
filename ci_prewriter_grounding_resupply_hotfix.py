@@ -40,6 +40,7 @@ import os as _prewriter_os
 
 from quality.canonical_subject_grounding_supply import supply_trusted_subject_grounding
 from quality.fixed_topic_seed_grounding import (
+    project_exact_fixed_topic_seed_opening,
     supply_exact_fixed_topic_seed_grounding,
     supply_fixed_topic_scoped_trusted_grounding,
 )
@@ -71,6 +72,24 @@ def generate_script(topic_info, candidate):
 
         if exact_fixed_topic_supply is not None:
             supplied, exact_fixed_topic_record = exact_fixed_topic_supply
+            supplied, opening_record = project_exact_fixed_topic_seed_opening(
+                supplied,
+                fixed_topic,
+                trusted_records=trusted_records,
+            )
+            if opening_record is exact_fixed_topic_record:
+                seed_micro = (
+                    (exact_fixed_topic_record.get("seed_candidate") or {})
+                    .get("micro_narrative") or {}
+                )
+                if (
+                    str((supplied.get("micro_narrative") or {}).get("hook") or "").strip()
+                    == str(seed_micro.get("hook") or "").strip()
+                ):
+                    print(
+                        "[PREWRITER_TRUSTED_OPENING] "
+                        "source=exact_fixed_topic_seed status=projected"
+                    )
             # Host-authorized exact fixed-topic binding creates the same
             # unforgeable in-process record capability for later wrappers.
             supplied[REPO_OWNED_SEED_RECORD_REF_FIELD] = exact_fixed_topic_record
