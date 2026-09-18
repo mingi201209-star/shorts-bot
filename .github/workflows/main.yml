@@ -209,6 +209,11 @@ jobs:
           echo "✅ SHORTS GENERATOR V3.2 FINISHED"
           echo "========================================"
 
+      - name: Publish generator diagnosis to job summary
+        if: always()
+        continue-on-error: true
+        run: python -m diagnostics.step_summary
+
       - name: Preserve production diagnostics
         if: always()
         uses: actions/upload-artifact@v4
