@@ -181,16 +181,33 @@ def project_exact_fixed_topic_seed_opening(
     if not trusted_hook or not trusted_question:
         return result, record
 
-    # Reuse the existing opening validator rather than inventing a weaker rule.
-    from content.script_engine_v2_validation import (
-        opening_human_contract_violation_reason,
-    )
+    # Reuse the existing deterministic first-5 progression validator rather
+    # than inventing a weaker opening rule. The seed's grounded reveal provides
+    # the causal-clue probe; no generated text or model call is introduced.
+    from content.retention_structure import validate_first5_progression
 
-    violation = opening_human_contract_violation_reason(
-        trusted_hook,
-        trusted_question,
-    )
-    if violation:
+    trusted_clue = _text(seed_micro.get("reveal"))
+    if not trusted_clue:
+        return result, record
+
+    first5_ok, _ = validate_first5_progression([
+        {
+            "retention_role": "phenomenon",
+            "text": trusted_hook,
+            "visual_goal": "trusted fixed-topic observable subject",
+        },
+        {
+            "retention_role": "question",
+            "text": trusted_question,
+            "visual_goal": "trusted fixed-topic causal question",
+        },
+        {
+            "retention_role": "causal_clue",
+            "text": trusted_clue,
+            "visual_goal": "trusted fixed-topic causal clue",
+        },
+    ])
+    if not first5_ok:
         return result, record
 
     updated_micro = deepcopy(micro)
