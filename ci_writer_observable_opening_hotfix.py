@@ -267,7 +267,14 @@ def _hook_restates_question(hook, question):
         # only flag it if the hook is otherwise almost nothing but the
         # question's own words (a degenerate near-duplicate).
         return len(shared) == len(hook_tokens) and overlap_ratio >= 0.90
-    return len(shared) >= 2 and overlap_ratio >= 0.50
+    # Hook without explicit claim marker is stricter: require >80% overlap
+    # to be considered a restatement. This acknowledges that markerless hooks
+    # may share subject tokens while still providing substantive information
+    # via their descriptive content. Combined with the unconditional marker
+    # requirement from PR #403, this gives Explorer gradual feedback: hooks
+    # without markers are on thin ice, but not impossible if they add real
+    # information (e.g. "is designed X-shaped" vs "why is it X-shaped?").
+    return len(shared) >= 2 and overlap_ratio >= 0.80
 
 
 _RUN_35316425943_FIXED_TOPIC = "비행기 창문 모서리는 왜 둥글게 만들어졌을까"
