@@ -294,7 +294,12 @@ PRODUCTION_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
                 ],
             },
         ],
-        "seed_priority": 70,
+        # RUN_35283712910_CHEVRON_NOVELTY_PROBE_V1: raised above every existing
+        # CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS seed_priority (100 at
+        # most) so the grounded-seed fallback tries chevron FIRST instead of it
+        # being crowded out by higher-priority seeds for an entire 7-attempt
+        # budget (observed in Run 35283712910: chevron was never selected).
+        "seed_priority": 110,
         "seed_candidate": {
             "topic": "비행기 엔진 뒤쪽의 톱니 모양 가장자리",
             "angle": "장식처럼 보이는 톱니 모양이 실제로는 배기 흐름이 섞이는 방식을 바꿔 소음을 줄이는 설계라는 점",
