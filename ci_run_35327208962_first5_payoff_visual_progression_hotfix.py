@@ -59,7 +59,7 @@ _STILL_APPEND = r'''
 
 # RUN_35327208962_BOUNDED_STILL_NOVELTY_V1
 # Prefer a distinct still for the payoff/result when one of the existing
-# generation slots is still unused. This changes neither the max generation
+# generation slots is still unused. Question-beat verified reuse is preserved. This changes neither the max generation
 # count nor the fail-closed verifier. If the budget is already exhausted,
 # the original verified reuse policy remains authoritative.
 _run_35327208962_original_source_reuse_allowed = _source_reuse_allowed
