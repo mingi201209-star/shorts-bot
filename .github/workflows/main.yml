@@ -166,6 +166,7 @@ jobs:
           python ci_run_35327208962_first5_payoff_visual_progression_hotfix.py
           python ci_run_35329140827_abstract_unknown_general_visual_hotfix.py
           python ci_run_35330135555_payoff_presentation_diversity_hotfix.py
+          python ci_run_35333010543_fixed_topic_opening_projection_hotfix.py
 
           grep -n "MAX_TOPIC_REGENERATIONS\|NOVELTY_HARD_REGENERATE_SCORE" main.py
           grep -n "Novelty 조기 차단" main.py
@@ -186,6 +187,7 @@ jobs:
           grep -n "RUN_35329140827_ABSTRACT_UNKNOWN_FAIL_CLOSED_V1\|GENERAL_VISUAL_ABSTRACT_REJECT" video/video_downloader.py
           grep -n "RUN_35330135555_PAYOFF_PRESENTATION_DIVERSITY_V1\|STILL_PRESENTATION" video/still_image_fallback.py
           grep -n "RUN_35330135555_PRESENTATION_LINEAGE_V1" quality/visual_diversity_preflight.py
+          grep -n "RUN_35333010543_FIXED_TOPIC_OPENING_PROJECTION_V1\|FIXED_TOPIC_OPENING_PROJECTION" content/candidate_explorer.py
           grep -n "search_video_candidates\|VIDEO_SELECTED\|VIDEO_PROVIDER\|CURRENT_NARRATION_SEMANTIC_MATCH\|VISUAL_SPECIFICITY\|QUERY_SEMANTIC_INTEGRITY\|CONCRETE_VISUAL_EVIDENCE_SAFE_REUSE\|VISIBLE_EVIDENCE_PROVENANCE_GATE\|AI_VISUAL_GENERAL_SELECTION_TRACE\|GENERAL_SCENE_VISUAL_PARITY_UNKNOWN_SAFE" video/video_downloader.py video/hook_visual.py
           grep -n "VISUAL_DIVERSITY_PREFLIGHT_V1" main.py
 
@@ -200,6 +202,7 @@ jobs:
             ci_run_35327208962_first5_payoff_visual_progression_hotfix.py \
             ci_run_35329140827_abstract_unknown_general_visual_hotfix.py \
             ci_run_35330135555_payoff_presentation_diversity_hotfix.py \
+            ci_run_35333010543_fixed_topic_opening_projection_hotfix.py \
             ci_aviation_specificity_projection_hotfix.py ci_candidate_grounded_recovery_hotfix.py \
             ci_growth_candidate_shadow_hotfix.py content/growth_candidate_ranker.py \
             ci_final_render_content_integrity_hotfix.py ci_output_quality_hotfix.py \
@@ -225,6 +228,7 @@ jobs:
             quality/run_35327208962_first5_payoff_visual_progression_regression_test.py \
             quality/run_35329140827_abstract_unknown_general_visual_regression_test.py \
             quality/run_35330135555_payoff_presentation_diversity_regression_test.py \
+            quality/run_35333010543_fixed_topic_opening_projection_regression_test.py \
             main.py config.py content/candidate_explorer.py content/candidate_recovery.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py quality/final_render_integrity.py \
@@ -246,6 +250,7 @@ jobs:
           python quality/run_35327208962_first5_payoff_visual_progression_regression_test.py
           python quality/run_35329140827_abstract_unknown_general_visual_regression_test.py
           python quality/run_35330135555_payoff_presentation_diversity_regression_test.py
+          python quality/run_35333010543_fixed_topic_opening_projection_regression_test.py
           python -m quality.growth_candidate_shadow_regression_test
           python -m quality.retention_structure_experiment_regression_test
           python -m quality.subscriber_conversion_regression_test
