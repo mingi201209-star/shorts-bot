@@ -1,6 +1,11 @@
+import sys
 from pathlib import Path
 
-from quality.production_hotfix_chain import PRODUCTION_HOTFIX_CHAIN
+_ROOT = Path(__file__).resolve().parents[1]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
+
+from quality.production_hotfix_chain import PRODUCTION_HOTFIX_CHAIN  # noqa: E402
 
 hotfix = Path("ci_script_validation_recovery_hotfix.py").read_text(encoding="utf-8")
 workflow = Path(".github/workflows/main.yml").read_text(encoding="utf-8")
