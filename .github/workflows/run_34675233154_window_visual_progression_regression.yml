@@ -7,6 +7,7 @@ on:
       - 'video/visual_explanation.py'
       - 'ci_grounded_deterministic_explanation_hotfix.py'
       - 'quality/run_34675233154_window_visual_progression_regression_test.py'
+      - 'quality/run_35314305498_window_question_supply_reservation_regression_test.py'
       - '.github/workflows/run_34675233154_window_visual_progression_regression.yml'
   workflow_dispatch:
 
@@ -23,6 +24,9 @@ jobs:
           python -m py_compile \
             video/aircraft_window_stress_grounding.py \
             video/visual_explanation.py \
-            quality/run_34675233154_window_visual_progression_regression_test.py
+            quality/run_34675233154_window_visual_progression_regression_test.py \
+            quality/run_35314305498_window_question_supply_reservation_regression_test.py
       - name: Run Run-524 authority regression
         run: python quality/run_34675233154_window_visual_progression_regression_test.py
+      - name: Run Run-35314305498 supply reservation regression
+        run: python quality/run_35314305498_window_question_supply_reservation_regression_test.py
