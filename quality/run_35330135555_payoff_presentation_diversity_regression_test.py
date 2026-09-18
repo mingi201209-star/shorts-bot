@@ -167,10 +167,17 @@ def run():
 
         initial_reframe = abs(payoff_early_x - baseline_x)
         payoff_motion = abs(payoff_late_x - payoff_early_x)
+        print(
+            "PIXEL_MOTION "
+            f"baseline={baseline_x:.2f} early={payoff_early_x:.2f} "
+            f"late={payoff_late_x:.2f} initial={initial_reframe:.2f} "
+            f"motion={payoff_motion:.2f}"
+        )
         assert initial_reframe >= 8.0, initial_reframe
         assert payoff_motion >= 8.0, payoff_motion
-        # Zooming out moves the left marker outward, toward smaller x.
-        assert payoff_late_x < payoff_early_x
+        # With a centered crop, zooming out reveals more context. A marker left
+        # of center therefore moves rightward toward its uncropped source x.
+        assert payoff_late_x > payoff_early_x
         print(
             "CASE A budget-exhausted payoff reuse is visibly reverse-presented: "
             f"PASS initial={initial_reframe:.2f}px motion={payoff_motion:.2f}px"
