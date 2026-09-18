@@ -1,0 +1,37 @@
+name: Run 35327208962 First5 Payoff Visual Progression Regression
+
+on:
+  push:
+    branches:
+      - "fix/**"
+    paths:
+      - "ci_run_35327208962_first5_payoff_visual_progression_hotfix.py"
+      - "quality/run_35327208962_first5_payoff_visual_progression_regression_test.py"
+      - ".github/workflows/run_35327208962_first5_payoff_visual_progression_regression.yml"
+  pull_request:
+    branches:
+      - publish-stable
+    paths:
+      - "ci_run_35327208962_first5_payoff_visual_progression_hotfix.py"
+      - "quality/run_35327208962_first5_payoff_visual_progression_regression_test.py"
+      - ".github/workflows/run_35327208962_first5_payoff_visual_progression_regression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Compile regression surface
+        run: |
+          python -m py_compile \
+            ci_run_35327208962_first5_payoff_visual_progression_hotfix.py \
+            quality/run_35327208962_first5_payoff_visual_progression_regression_test.py
+      - name: Run exact regression
+        run: python quality/run_35327208962_first5_payoff_visual_progression_regression_test.py
