@@ -303,6 +303,8 @@ def test_case10_exact_fixed_topic_repairs_only_observed_markerless_hooks() -> No
     observed = (
         "비행기 창문 모서리는 둥글게 디자인되어 있습니다.",
         "비행기 창문 모서리는 둥글게 디자인되어 있어, 날카로운 모서리가 없습니다.",
+        "비행기 창문 모서리는 둥글게 설계되어 있습니다.",
+        "비행기 창문 모서리는 둥글게 만들어져 있습니다.",
     )
 
     previous = os.environ.get("SHORTS_TOPIC")
@@ -320,7 +322,7 @@ def test_case10_exact_fixed_topic_repairs_only_observed_markerless_hooks() -> No
         # Unknown markerless text is not normalized just because the topic is
         # fixed; the unchanged progression validator must still reject it.
         unknown = _candidate(
-            hook="비행기 창문 모서리는 둥글게 설계되어 있습니다.",
+            hook="비행기 창문 모서리는 둥글게 보입니다.",
             question="비행기 창문 모서리가 둥글게 설계된 이유는 무엇일까요?",
         )
         try:
