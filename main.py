@@ -1649,73 +1649,13 @@ def main():
             # =================================================
             # Winner Script
             # =================================================
-            #
-            # Script Engine 실패(예: Writer가 Scene 간 중복 주장을
-            # 만들어 validation에서 소진되는 경우)는 이 Winner 소재
-            # 자체의 문제로 취급한다. Explorer/Gate 반려와 동일하게
-            # 다음 Candidate로 재탐색하고, 마지막 시도에서만 전체
-            # 실행을 중단시킨다.
-            # =================================================
 
-            try:
-
-                script_data = (
-                    generate_script(
-                        topic_info,
-                        winner,
-                    )
+            script_data = (
+                generate_script(
+                    topic_info,
+                    winner,
                 )
-
-            except RuntimeError as script_error:
-
-                if (
-                    current_topic
-                    not in rejected_topics
-                ):
-
-                    rejected_topics.append(
-                        current_topic
-                    )
-
-                print("")
-                print("=" * 64)
-
-                print(
-                    "🚫 SCRIPT GENERATION FAILED"
-                )
-
-                print("=" * 64)
-
-                print(
-                    "폐기 소재:",
-                    current_topic,
-                )
-
-                print(
-                    "이유:",
-                    str(script_error),
-                )
-
-                print_budget_status()
-
-                if (
-                    topic_attempt
-                    < total_topic_attempts
-                ):
-
-                    print("")
-
-                    print(
-                        "➡️ Candidate Explorer 재탐색"
-                    )
-
-                    continue
-
-                raise RuntimeError(
-                    "Script Engine이 제작 가능한 "
-                    "대본을 확보하지 못했습니다. "
-                    f"마지막 이유: {script_error}"
-                ) from script_error
+            )
 
             if not isinstance(
                 script_data,
