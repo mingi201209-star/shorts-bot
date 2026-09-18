@@ -24,6 +24,7 @@ if str(ROOT) not in sys.path:
 
 from quality.fixed_topic_seed_grounding import (
     exact_fixed_topic_seed_record,
+    project_exact_fixed_topic_seed_opening,
     supply_exact_fixed_topic_seed_grounding,
     supply_fixed_topic_scoped_trusted_grounding,
 )
@@ -174,6 +175,76 @@ def run():
     assert "static_charge_dissipation" not in claim_ids
     print("CASE Run 35320620429 exact wing-flex topic replaces static-wick trust: PASS")
 
+    # Run 35323852030: after grounding was fixed, FACT=8 and Visual=8 passed,
+    # but Scene 1 stayed a bare observation ("...관찰됩니다" / "...볼 수 있습니다")
+    # before and after the one allowed Rewrite, keeping Hook at 6/10. Exact
+    # fixed-topic production may replace only that weak opening with the same
+    # record's repo-owned, source-backed opening pair.
+    weak_opening = deepcopy(wing_supplied)
+    weak_opening["core_question"] = "비행 중 날개가 휘어지는 이유는 무엇일까?"
+    weak_opening["micro_narrative"] = deepcopy(
+        weak_opening.get("micro_narrative") or {}
+    )
+    weak_opening["micro_narrative"]["hook"] = (
+        "비행 중 비행기 날개가 아래로 휘어지는 모습을 볼 수 있습니다."
+    )
+    weak_opening["micro_narrative"]["core_question"] = (
+        "비행 중 날개가 휘어지는 이유는 무엇일까요?"
+    )
+
+    projected, projected_record = project_exact_fixed_topic_seed_opening(
+        weak_opening,
+        WING_FLEX_TOPIC,
+        trusted_records=records,
+    )
+    assert projected_record is wing_record
+    assert (
+        projected["micro_narrative"]["hook"]
+        == "비행기 날개는 완전한 강체가 아니라, 비행 중 탄성으로 휘어지는 구조입니다."
+    )
+    assert (
+        projected["core_question"]
+        == "그런데 어떤 비행 하중이 이 날개를 실제로 휘게 만들까요?"
+    )
+    assert projected["micro_narrative"]["core_question"] == projected["core_question"]
+    # Trusted claims and body locks remain exactly the supplied authority.
+    assert projected.get("_trusted_grounded_claims") == wing_supplied.get(
+        "_trusted_grounded_claims"
+    )
+    assert projected["micro_narrative"]["reveal"] == weak_opening[
+        "micro_narrative"
+    ]["reveal"]
+    assert projected["micro_narrative"]["payoff"] == weak_opening[
+        "micro_narrative"
+    ]["payoff"]
+
+    strong_opening = deepcopy(projected)
+    strong_opening["micro_narrative"]["hook"] = (
+        "비행기 날개는 하중을 받으면 탄성으로 휘어집니다."
+    )
+    untouched, untouched_record = project_exact_fixed_topic_seed_opening(
+        strong_opening,
+        WING_FLEX_TOPIC,
+        trusted_records=records,
+    )
+    assert untouched_record is wing_record
+    assert untouched["micro_narrative"]["hook"] == strong_opening[
+        "micro_narrative"
+    ]["hook"]
+
+    unrelated_opening = deepcopy(weak_opening)
+    unrelated_opening["topic"] = "등록되지 않은 다른 고정 주제"
+    unrelated_projected, unrelated_record = project_exact_fixed_topic_seed_opening(
+        unrelated_opening,
+        unrelated_opening["topic"],
+        trusted_records=records,
+    )
+    assert unrelated_record is None
+    assert unrelated_projected["micro_narrative"]["hook"] == weak_opening[
+        "micro_narrative"
+    ]["hook"]
+    print("CASE Run 35323852030 weak Hook gets trusted exact-topic opening only: PASS")
+
     # Systemic safety: even when Candidate details resemble another registered
     # component, an unrelated fixed topic cannot inherit that component's
     # private trust merely from downstream prose overlap.
@@ -204,6 +275,8 @@ def run():
     assert main_source.count("# PREWRITER_TRUSTED_GROUNDING_RESUPPLY_V1") == 1
     assert "supply_trusted_subject_grounding(" in main_source
     assert "supply_exact_fixed_topic_seed_grounding(" in main_source
+    assert "project_exact_fixed_topic_seed_opening(" in main_source
+    assert "source=exact_fixed_topic_seed status=projected" in main_source
     assert '_prewriter_os.environ.get("SHORTS_TOPIC", "")' in main_source
     assert "source=exact_fixed_topic_seed" in main_source
     assert "source=fixed_topic_scoped" in main_source
@@ -248,6 +321,8 @@ def run():
     assert "len(matches) != 1" in helper_source
     assert "supply_trusted_subject_grounding(" in helper_source
     assert "supply_fixed_topic_scoped_trusted_grounding" in helper_source
+    assert "project_exact_fixed_topic_seed_opening" in helper_source
+    assert "RUN_35323852030_FIXED_TOPIC_TRUSTED_OPENING_V1" in helper_source
     assert "_TRUSTED_GROUNDING_FIELDS" in helper_source
 
     print("PREWRITER TRUSTED GROUNDING RESUPPLY REGRESSION: PASS")
