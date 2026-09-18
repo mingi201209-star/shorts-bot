@@ -105,6 +105,7 @@ def _build_candidate_supply_recovery_context(
             recent_topics=recent_topics,
             recent_content=recent_content,
             rejected_topics=rejected_topics,
+            fixed_topic_gate_feedback=fixed_topic_gate_feedback,
         )
 
     fixed_topic = str(fixed_topic or "").strip()
