@@ -153,7 +153,7 @@ def runtime_instruction(plan):
 
 
 def first5_prompt_contract():
-    return """[FIRST 5 SEC MINI NARRATIVE — REQUIRED]\n첫 3 Scene은 같은 말을 반복하지 않고 정보를 전진시킨다.\n- Scene 1 retention_role=phenomenon: 0.0~1.5초. 화면에서 바로 확인 가능한 이상한 현상/상태를 대상 이름과 함께 격식체로 단정한다. 질문으로 시작하지 않는다.\n- Scene 2 retention_role=question: 1.5~3.0초. 반드시 '그런데'로 시작해 Scene 1의 관찰을 왜 그런지 묻는다. 자연스러운 질문형은 ~까요?만 사용한다. ~나요?/~어요?/~예요?는 금지한다.\n- Scene 3 retention_role=causal_clue: 3.0~5.0초. 최종 정답을 공개하지 말고 원인의 첫 단서 또는 물리적 제약을 한 단계만 공개한다.\nScene 1~3은 서로 다른 visual_goal/keyword로 시각 정보도 전진시킨다.\n"""
+    return """[FIRST 5 SEC MINI NARRATIVE — REQUIRED]\n첫 3 Scene은 같은 말을 반복하지 않고 정보를 전진시킨다.\n- Scene 1 retention_role=phenomenon: 0.0~1.5초. 화면에서 바로 확인 가능한 이상한 현상/상태를 대상 이름과 함께 격식체로 단정한다. 질문으로 시작하지 않는다. 그 형태/현상이 왜 존재하는지, 무엇을 위한 것인지, 어떤 효과(소음/효율/성능/안정성 등)를 내는지는 절대 언급하지 않는다 — 순수하게 "무엇이 보이는가"만 말하고, "왜/무엇을 위해/어떤 효과"는 이후 Scene(원인 단서, Reveal, Payoff)의 몫으로 남겨둔다.\n- Scene 2 retention_role=question: 1.5~3.0초. 반드시 '그런데'로 시작해 Scene 1의 관찰을 왜 그런지 묻는다. 자연스러운 질문형은 ~까요?만 사용한다. ~나요?/~어요?/~예요?는 금지한다.\n- Scene 3 retention_role=causal_clue: 3.0~5.0초. 최종 정답을 공개하지 말고 원인의 첫 단서 또는 물리적 제약을 한 단계만 공개한다.\nScene 1~3은 서로 다른 visual_goal/keyword로 시각 정보도 전진시킨다.\n"""
 
 
 def density_prompt_contract():
