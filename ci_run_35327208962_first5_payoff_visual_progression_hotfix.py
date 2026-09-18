@@ -13,77 +13,46 @@ available.
 """
 from pathlib import Path
 
-ENGINE = Path("video/video_engine.py")
+HOOK = Path("video/hook_visual.py")
 STILL = Path("video/still_image_fallback.py")
 
-ENGINE_MARKER = "# RUN_35327208962_VERIFIED_SCENE2_VISUAL_V1"
+HOOK_MARKER = "# RUN_35327208962_VERIFIED_SCENE2_VISUAL_V1"
 STILL_MARKER = "# RUN_35327208962_BOUNDED_STILL_NOVELTY_V1"
 
-_ENGINE_OLD = '''        elif idx == 1:
+_HOOK_APPEND = r'''
 
-            try:
+# RUN_35327208962_VERIFIED_SCENE2_VISUAL_V1
+# Keep the existing video_engine shape untouched. Its Scene 2 path already calls
+# fetch_early_retention_pexels_video(). Make that final helper delegate to the
+# bounded frame-level Hook verifier instead of metadata-only/legacy stock.
+_run_35327208962_original_early_retention = fetch_early_retention_pexels_video
 
-                from video.hook_visual import (
-                    fetch_early_retention_pexels_video,
-                )
 
-                video_url = (
-                    fetch_early_retention_pexels_video(
-                        item
-                    )
-                )
+def fetch_early_retention_pexels_video(scene):
+    try:
+        video_url = fetch_hook_pexels_video(scene)
+    except Exception as exc:
+        print(
+            "[RETENTION5] scene2_verified_stock=false "
+            "fallback=verified_scene_fallback "
+            f"reason={type(exc).__name__}"
+        )
+        return None
 
-            except Exception as e:
+    if not video_url:
+        print(
+            "[RETENTION5] scene2_verified_stock=false "
+            "fallback=verified_scene_fallback"
+        )
+        return None
 
-                print(
-                    "⚠️ First-5s strict visual selector 실패, "
-                    "기존 Pexels 경로로 fallback: "
-                    f"{e}"
-                )
-
-                video_url = (
-                    fetch_pexels_video(
-                        keyword
-                    )
-                )
-
-'''
-
-_ENGINE_NEW = '''        elif idx == 1:
-
-            # RUN_35327208962_VERIFIED_SCENE2_VISUAL_V1
-            # The second first-5 beat must use the same bounded frame-level
-            # verifier as Scene 1. Never reopen generic stock after verification
-            # fails; None intentionally falls through to the existing verified
-            # still/explanatory path.
-            try:
-
-                from video.hook_visual import (
-                    fetch_hook_pexels_video,
-                )
-
-                video_url = (
-                    fetch_hook_pexels_video(
-                        item
-                    )
-                )
-
-                if not video_url:
-                    print(
-                        "[RETENTION5] scene2_verified_stock=false "
-                        "fallback=verified_scene_fallback"
-                    )
-
-            except Exception as e:
-
-                print(
-                    "[RETENTION5] scene2_verified_stock=false "
-                    "fallback=verified_scene_fallback "
-                    f"reason={type(e).__name__}"
-                )
-
-                video_url = None
-
+    trace = get_last_hook_selection() or {}
+    print(
+        "[RETENTION5] scene2_verified_stock=true "
+        f"mode={trace.get('selection_mode') or 'UNKNOWN'} "
+        f"visual={trace.get('visual_evidence') or 'UNKNOWN'}"
+    )
+    return video_url
 '''
 
 _STILL_APPEND = r'''
@@ -134,16 +103,20 @@ def _source_reuse_allowed(source_id, scene):
 '''
 
 
-def patch_video_engine(text: str) -> str:
-    if ENGINE_MARKER in text:
+def patch_hook_visual(text: str) -> str:
+    if HOOK_MARKER in text:
         return text
-    count = text.count(_ENGINE_OLD)
-    if count != 1:
+    required = (
+        "def fetch_early_retention_pexels_video(",
+        "def fetch_hook_pexels_video(",
+        "def get_last_hook_selection(",
+        "RUN_35324930986_HOOK_FALLBACK_FAIL_CLOSED_V1",
+    )
+    if not all(token in text for token in required):
         raise RuntimeError(
-            f"Run 35327208962 scene2 visual anchor mismatch: {count}"
+            "Run 35327208962 Hook composition prerequisites missing"
         )
-    return text.replace(_ENGINE_OLD, _ENGINE_NEW, 1)
-
+    return text.rstrip() + _HOOK_APPEND + "\n"
 
 def patch_still_fallback(text: str) -> str:
     if STILL_MARKER in text:
@@ -160,8 +133,8 @@ def patch_still_fallback(text: str) -> str:
 
 
 def main() -> None:
-    ENGINE.write_text(
-        patch_video_engine(ENGINE.read_text(encoding="utf-8")),
+    HOOK.write_text(
+        patch_hook_visual(HOOK.read_text(encoding="utf-8")),
         encoding="utf-8",
     )
     STILL.write_text(
