@@ -54,7 +54,15 @@ def scene_v2_to_v1_item(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
             f"VisualPlanV2 for scene {scene.scene_index} has no usable keyword "
             f"(search_queries={plan.search_queries!r}, subject={plan.subject!r})"
         )
-    visual_goal = ", ".join(plan.required_observable_state) or scene.narration
+    visual_goal_parts = [
+        *[str(v).strip() for v in plan.required_observable_state if str(v).strip()],
+        *[
+            str(v).strip()
+            for v in plan.required_relation_or_mechanism
+            if str(v).strip()
+        ],
+    ]
+    visual_goal = ", ".join(visual_goal_parts) or scene.narration
     visual_type = (
         "ai_generated" if plan.preferred_source_type == "generated" else "real_world_broll"
     )
@@ -63,6 +71,12 @@ def scene_v2_to_v1_item(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
         "keyword": keyword,
         "visual_goal": visual_goal,
         "visual_type": visual_type,
+        # Private V2-only hints. create_scene ignores unknown keys, while
+        # V2-aware fallbacks/diagnostics may use them. V1 callers never set them.
+        "_v2_required_visible_components": list(plan.required_visible_components),
+        "_v2_required_observable_state": list(plan.required_observable_state),
+        "_v2_required_relation_or_mechanism": list(plan.required_relation_or_mechanism),
+        "_v2_forbidden_visuals": list(plan.forbidden_visuals),
     }
 
 
