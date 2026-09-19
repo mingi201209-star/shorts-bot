@@ -33,28 +33,52 @@ def test_full_control_flow_candidate_to_render_handoff():
             "visual_requirement": "wingtip bending",
         }),
         SceneV2.from_dict({
-            "scene_index": 2, "narration": "이것은 의도된 설계입니다", "causal_role": "payoff",
-            "owned_claim_id": "payoff", "new_information": "의도된 설계다",
-            "visual_requirement": "wide shot of flexing wing",
+            "scene_index": 2, "narration": "왜 날개는 이렇게 휘어질까요?", "causal_role": "why_question",
+            "owned_claim_id": "why", "new_information": "휘어지는 이유를 묻는다",
+            "visual_requirement": "flexing wing",
+        }),
+        SceneV2.from_dict({
+            "scene_index": 3, "narration": "양력이 날개에 하중을 만듭니다", "causal_role": "mechanism_input",
+            "owned_claim_id": "load", "new_information": "양력이 하중을 만든다",
+            "visual_requirement": "wing under aerodynamic load",
+        }),
+        SceneV2.from_dict({
+            "scene_index": 4, "narration": "날개 구조는 하중을 받으며 탄성 변형됩니다", "causal_role": "mechanism_change",
+            "owned_claim_id": "elastic", "new_information": "날개 구조가 탄성 변형된다",
+            "visual_requirement": "elastic wing deformation",
+        }),
+        SceneV2.from_dict({
+            "scene_index": 5, "narration": "그래서 날개 끝의 위쪽 변위가 보입니다", "causal_role": "observable_result",
+            "owned_claim_id": "displacement", "new_information": "날개 끝이 위쪽으로 이동한다",
+            "visual_requirement": "wingtip upward displacement",
+        }),
+        SceneV2.from_dict({
+            "scene_index": 6, "narration": "핵심은 하중을 받는 동안 탄성 변형으로 힘을 나눠 받는다는 점입니다", "causal_role": "payoff",
+            "owned_claim_id": "payoff", "new_information": "탄성 변형이 하중을 나눠 받게 한다",
+            "visual_requirement": "loaded flexing wing",
         }),
     ]
     script_verdict = evaluate_script_plan_v2(scenes)
     assert script_verdict.passed
 
     # 3. VisualPlanV2 per scene
+    queries = [
+        "airplane wing flexing in flight",
+        "aircraft wing flex bending in flight",
+        "aircraft wing lift load bending",
+        "aircraft wing elastic deformation bending",
+        "aircraft wingtip upward bending flex",
+        "aircraft wing load flex deformation",
+    ]
     plans = [
         VisualPlanV2.from_dict({
-            "scene_index": 1, "subject": "aircraft main wing",
+            "scene_index": index,
+            "subject": "aircraft main wing",
             "required_visible_components": ["aircraft", "main wing"],
             "required_observable_state": ["visible upward elastic bending"],
-            "search_queries": ["airplane wing flexing in flight"],
-        }),
-        VisualPlanV2.from_dict({
-            "scene_index": 2, "subject": "aircraft main wing",
-            "required_visible_components": ["aircraft", "main wing"],
-            "required_observable_state": ["visible upward elastic bending"],
-            "search_queries": ["airplane wing flex bending wide shot"],
-        }),
+            "search_queries": [query],
+        })
+        for index, query in enumerate(queries, start=1)
     ]
     for plan in plans:
         assert evaluate_visual_plan_v2(plan).passed
@@ -88,7 +112,7 @@ def test_full_control_flow_candidate_to_render_handoff():
 
     def fake_generate_scenes(scene_items):
         calls["scene_items"] = scene_items
-        return ["clip1", "clip2"]
+        return ["clip1", "clip2", "clip3", "clip4", "clip5", "clip6"]
 
     def fake_render_final_video(scene_clips):
         calls["scene_clips"] = scene_clips
@@ -104,7 +128,7 @@ def test_full_control_flow_candidate_to_render_handoff():
     )
     assert result == "final_shorts.mp4"
     assert calls["scene_items"] == items
-    assert calls["scene_clips"] == ["clip1", "clip2"]
+    assert calls["scene_clips"] == ["clip1", "clip2", "clip3", "clip4", "clip5", "clip6"]
 
 
 def test_scene_v2_to_v1_item_skips_blank_first_search_query():
