@@ -69,6 +69,13 @@ Machine contract:
   예: aircraft wing flex 주제라면 "aircraft wing flex bending in flight"처럼 flex/bending을 보존한다.
 - "aircraft wing", "wing", "airplane"처럼 현상이 빠진 검색어는 반환하지 않는다.
 - forbidden_visuals에는 같은 도메인이어도 의미를 증명하지 못하는 generic B-roll을 명시한다.
+- user JSON에 candidate_context가 있으면 그것이 이 영상의 identity lock이다.
+  subject / required_visible_components / search_queries 중 적어도 하나는
+  canonical_subject / concrete_subject의 구체 부품 정체성을 반드시 유지한다.
+- 같은 상위 도메인이라고 다른 대상/부품/사용자 결과로 바꾸지 마라.
+  예: aircraft main wing을 passenger/cabin/interior/seat/comfort 장면으로 바꾸면 안 된다.
+- Scene payoff도 Candidate의 mechanism/reveal을 시각적으로 증명해야 하며,
+  편안함/안전성/성능 같은 새로운 결과를 임의로 발명하지 마라.
 
 정확히 아래 JSON만 반환한다:
 
@@ -141,7 +148,12 @@ def call_writer(candidate: CandidateV2, *, client: Any = None) -> str:
     return response.choices[0].message.content
 
 
-def call_visual_planner(scene: SceneV2, *, client: Any = None) -> str:
+def call_visual_planner(
+    scene: SceneV2,
+    candidate: CandidateV2 | None = None,
+    *,
+    client: Any = None,
+) -> str:
     if client is None:
         import openai
 
@@ -153,10 +165,27 @@ def call_visual_planner(scene: SceneV2, *, client: Any = None) -> str:
     from quality.budget_guard import authorize_call, record_usage
 
     authorize_call(VISUAL_PLANNER_MODEL)
-    user_prompt = json.dumps(
-        {"narration": scene.narration, "visual_requirement": scene.visual_requirement},
-        ensure_ascii=False,
-    )
+    payload = {
+        "scene": {
+            "scene_index": scene.scene_index,
+            "narration": scene.narration,
+            "causal_role": scene.causal_role,
+            "owned_claim_id": scene.owned_claim_id,
+            "new_information": scene.new_information,
+            "visual_requirement": scene.visual_requirement,
+        }
+    }
+    if candidate is not None:
+        payload["candidate_context"] = {
+            "topic": candidate.topic,
+            "concrete_subject": candidate.concrete_subject,
+            "observable_phenomenon": candidate.observable_phenomenon,
+            "core_question": candidate.core_question,
+            "mechanism": candidate.mechanism,
+            "reveal": candidate.reveal,
+            "canonical_subject": candidate.canonical_subject,
+        }
+    user_prompt = json.dumps(payload, ensure_ascii=False)
     response = client.chat.completions.create(
         model=VISUAL_PLANNER_MODEL,
         messages=[
