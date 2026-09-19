@@ -30,6 +30,9 @@ Retention contract:
 - Scene 3은 mechanism_input, Scene 4는 mechanism_change를 구체적으로 설명한다.
 - Scene 5는 앞의 메커니즘으로 생기는 observable_result를 보여준다.
 - Scene 6 payoff는 메커니즘의 의미를 설명한다. "안전성/성능/효율에 도움" 같은 추상적 효익 문장으로 끝내지 않는다.
+- Candidate의 mechanism/reveal에 없는 새로운 결과나 혜택을 발명하지 않는다.
+  특히 Candidate에 없는 passenger/cabin/comfort/seat, 승객/객실/편안함/좌석 같은 결과로
+  payoff를 바꾸지 않는다.
 - 첫 5초 안에 concrete_subject와 observable_phenomenon이 둘 다 대사에 직접 등장해야 한다.
 - 문장은 짧고 자연스러운 한국어 존댓말로 쓴다.
 - visual_requirement는 추상어가 아니라 화면에서 확인 가능한 물리적 증거를 적는다.
@@ -133,6 +136,9 @@ def call_writer(candidate: CandidateV2, *, client: Any = None) -> str:
             "core_question": candidate.core_question,
             "mechanism": candidate.mechanism,
             "reveal": candidate.reveal,
+            "canonical_subject": candidate.canonical_subject,
+            "visual_proof": list(candidate.visual_proof),
+            "evidence_refs": list(candidate.evidence_refs),
         },
         ensure_ascii=False,
     )
