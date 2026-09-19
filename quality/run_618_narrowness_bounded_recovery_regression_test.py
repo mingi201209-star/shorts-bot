@@ -424,9 +424,10 @@ def test_exact_repo_owned_wing_flex_seed_is_used_before_llm_rewrite():
 
     assert direct is not None
     assert direct["topic"] == fixed_topic
-    assert direct["core_question"] == "같은 날개에서 왜 휨과 비틀림이 함께 생길까?"
+    assert direct["core_question"] == "양력은 위로 작용하는데 왜 날개 끝 휨과 단면 비틀림이 같이 생길까?"
     assert "리브와 스파" in direct["micro_narrative"]["reveal"]
-    assert "휨과 비틀림" in direct["micro_narrative"]["reveal"]
+    assert "flapwise/chordwise bending" in direct["micro_narrative"]["reveal"]
+    assert "torsion" in direct["micro_narrative"]["reveal"]
     # Model-authored authority fields remain authoritative; the exact seed only
     # supplies grounded editorial specificity for another real gate decision.
     assert direct["fact_check_focus"] == broad["winner"]["fact_check_focus"]
