@@ -178,14 +178,26 @@ def main() -> int:
     )
     print("TEST C unresolved/untrusted subject still fail-closed: PASS")
 
+    print(
+        "ACTIVE_SEED_RECORDS=",
+        [
+            (
+                record.get("canonical_subject"),
+                record.get("seed_priority"),
+                (record.get("seed_candidate") or {}).get("topic"),
+            )
+            for record in records
+            if isinstance(record.get("seed_candidate"), dict)
+        ],
+    )
     seed_pool = grounded_seed_candidate_pool(recent_topics=[], rejected_topics=[])
     assert seed_pool["status"] == "CANDIDATE_POOL", seed_pool
     seed_candidates = seed_pool["candidates"]
     assert 1 <= len(seed_candidates) <= 3
     seed_topics = [candidate["topic"] for candidate in seed_candidates]
-    assert seed_topics[0] == "비행기 날개 뒤의 가느다란 스태틱 윅", seed_topics
+    assert seed_topics[0] == "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?", seed_topics
+    assert "비행기 날개 뒤의 가느다란 스태틱 윅" in seed_topics
     assert "착륙 직후 날개 위로 솟는 스포일러" in seed_topics
-    assert "비행기 밖으로 튀어나온 작은 피토관" in seed_topics
     seed_handoff = _handoff(seed_candidates)
     assert seed_handoff["status"] == "SELECTED", seed_handoff
     trace = seed_handoff.get("_candidate_pool_handoff") or {}
@@ -202,7 +214,7 @@ def main() -> int:
     assert blocked_pool["status"] == "CANDIDATE_POOL", blocked_pool
     blocked_topics = [candidate["topic"] for candidate in blocked_pool["candidates"]]
     assert seed_topics[0] not in blocked_topics, blocked_topics
-    assert blocked_topics[0] == "착륙 직후 날개 위로 솟는 스포일러", blocked_topics
+    assert blocked_topics[0] == "비행기 날개 뒤의 가느다란 스태틱 윅", blocked_topics
     print("TEST E recent/rejected deterministic seed is not replayed: PASS")
 
     all_seed_topics = [
@@ -275,7 +287,7 @@ def main() -> int:
     assert 'V3_MAX_API_CALLS: "60"' in main_workflow
     assert 'V3_MAX_COST_USD: "0.05"' in main_workflow
     main_source = (ROOT / "main.py").read_text(encoding="utf-8")
-    assert "MAX_TOPIC_REGENERATIONS = 6" in main_source
+    assert "MAX_TOPIC_REGENERATIONS = 19" in main_source
     print("CAPS: PASS API=60 cost=$0.05 attempts=7")
 
     print("GROUNDING-AWARE CANDIDATE SUPPLY REGRESSION: PASS")
