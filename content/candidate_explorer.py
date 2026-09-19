@@ -1853,20 +1853,27 @@ _NARROWNESS_REWRITE_PROMPT = """
 아래 [REJECTION REASON]에서 지적된
 일반적인/예상 가능한 설명 대신
 
-- 수치
-- 임계값
-- 예외
+- 구체적인 구조/부품
+- 힘이나 변화가 전달되는 경로
+- 위치/방향의 차이
 - 조건
 - 순서
+- 예외
+- 관찰 가능한 변화
+- 이미 근거에 있는 구체적인 메커니즘
 
-중 하나 이상이 들어간
+중 하나 이상을 사용해
 더 좁은 Core Question과 Reveal로 다시 써라.
 
-가능하면 아래 [FACT CHECK FOCUS]와 [VISUAL PROOF]에
-이미 들어 있는 구체적인 사실·관찰·메커니즘을 먼저 사용하라.
-그 근거에 없는 새로운 수치, 원인, 메커니즘을 지어내지 마라.
-근거가 비어 있거나 불충분하면 없는 사실을 만들지 말고
-Core Question의 조건·범위·관찰 포인트만 더 좁혀라.
+아래 [FACT CHECK FOCUS]와 [VISUAL PROOF], 그리고 기존 Candidate에
+이미 들어 있는 사실·관찰·메커니즘을 최우선으로 사용하라.
+이 단계는 Fact discovery가 아니다.
+
+수치·퍼센트·각도·힘·질량·거리·시간 같은 정량 정보는
+기존 Candidate 또는 근거에 같은 값이 이미 있을 때만 사용할 수 있다.
+없는 숫자를 만들어 구체적으로 보이게 하지 마라.
+근거가 비어 있거나 불충분하면 숫자를 만들지 말고
+구조/위치/조건/순서/관찰 포인트를 더 좁혀라.
 
 예:
 넓음: "비행기 날개는 왜 공기 흐름을 최적화할까?"
@@ -2042,13 +2049,33 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
     print(f"💳 Narrowness rewrite API call authorized: #{call_number}")
 
     try:
+        allowed_numbers = sorted(
+            _numeric_claim_tokens(_rewrite_candidate_text(winner))
+        )
+        if allowed_numbers:
+            numeric_policy = (
+                "\n\n[NUMERIC AUTHORITY]\n"
+                "사용 가능한 기존 정량 토큰은 다음뿐이다: "
+                + ", ".join(allowed_numbers)
+                + "\n이 목록에 없는 새 숫자/단위/퍼센트/각도는 절대 추가하지 마라."
+            )
+        else:
+            numeric_policy = (
+                "\n\n[NUMERIC AUTHORITY]\n"
+                "기존 Candidate와 근거에는 승인된 정량 값이 없다. "
+                "숫자, 퍼센트, 각도, 힘, 질량, 거리, 시간 값을 새로 만들지 마라."
+            )
+
         response = openai.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": _NARROWNESS_REWRITE_PROMPT},
+                {
+                    "role": "system",
+                    "content": _NARROWNESS_REWRITE_PROMPT + numeric_policy,
+                },
                 {"role": "user", "content": original_summary},
             ],
-            temperature=0.4,
+            temperature=0.2,
             response_format={"type": "json_object"},
         )
     except Exception:
