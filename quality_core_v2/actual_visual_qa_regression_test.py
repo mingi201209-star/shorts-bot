@@ -2,7 +2,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from quality_core_v2.actual_visual_qa import validate_actual_v2_visuals
+from quality_core_v2.actual_visual_qa import inspect_v2_item_clip, validate_actual_v2_visuals
 from quality_core_v2.schemas import SceneV2, VisualPlanV2
 
 
@@ -37,6 +37,36 @@ def main():
         "keyword": "aircraft wing flex",
         "visual_goal": "visible upward elastic bending",
     }
+
+
+    v2_item = {
+        "text": scene.narration,
+        "keyword": "aircraft wing flex",
+        "visual_goal": "visible upward elastic bending",
+        "_v2_scene_index": 1,
+        "_v2_subject": "aircraft main wing",
+        "_v2_required_visible_components": ["aircraft", "wing"],
+        "_v2_required_observable_state": ["visible upward elastic bending"],
+        "_v2_required_relation_or_mechanism": [
+            "wing deformation under aerodynamic load"
+        ],
+        "_v2_forbidden_visuals": ["generic cruising aircraft"],
+    }
+    asset_fail = inspect_v2_item_clip(
+        v2_item,
+        "fixture.mp4",
+        inspect_fn=lambda *_args: {
+            "visible_components": ["aircraft", "wing"],
+            "observable_states": ["static wing"],
+            "visible_relations_or_mechanisms": [],
+            "forbidden_visuals_present": [],
+            "components_satisfied": True,
+            "observable_state_satisfied": False,
+            "relation_or_mechanism_satisfied": False,
+            "reason": "Wing is visible but the required bending is not visible.",
+        },
+    )
+    assert asset_fail["passed"] is False
 
     with tempfile.TemporaryDirectory() as tmp:
         old = os.getcwd()
