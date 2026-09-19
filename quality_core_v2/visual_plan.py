@@ -13,9 +13,51 @@ Two responsibilities, kept separate:
 
 from __future__ import annotations
 
+import re
 from typing import List
 
 from quality_core_v2.schemas import CandidateVisualV2, VisualPlanV2, Verdict
+
+
+_QUERY_TOKEN_RE = re.compile(r"[a-z0-9]+")
+
+_STATE_STOPWORDS = {
+    "visible", "visibly", "clear", "clearly", "actual", "state", "show",
+    "showing", "shown", "in", "on", "of", "the", "a", "an", "during",
+    "under", "with", "and", "aircraft", "airplane", "wing", "main",
+    "flight", "view", "close", "closeup",
+}
+
+
+def _semantic_query_terms(text: str) -> set:
+    terms = set()
+    for token in _QUERY_TOKEN_RE.findall(str(text or "").lower()):
+        if token in _STATE_STOPWORDS:
+            continue
+        if token.startswith(("bend", "flex", "deform", "deflect")):
+            terms.add("flex_bend")
+        elif token.startswith(("twist", "torsion")):
+            terms.add("twist_torsion")
+        elif token.startswith(("vibr", "flutter")):
+            terms.add("vibration_flutter")
+        elif token.startswith(("deploy", "extend", "retract")):
+            terms.add("deployment")
+        else:
+            terms.add(token)
+    return terms
+
+
+def _state_bearing_query_exists(plan: VisualPlanV2) -> bool:
+    state_terms = set()
+    for state in plan.required_observable_state:
+        state_terms |= _semantic_query_terms(state)
+    if not state_terms:
+        return False
+    for query in plan.search_queries:
+        query_terms = _semantic_query_terms(query)
+        if query_terms & state_terms:
+            return True
+    return False
 
 
 def evaluate_visual_plan_v2(plan: VisualPlanV2) -> Verdict:
@@ -35,7 +77,24 @@ def evaluate_visual_plan_v2(plan: VisualPlanV2) -> Verdict:
             "observable phenomenon the visual must show",
             "visual_plan",
         )
-    return Verdict(True, "plan has subject, required components, and observable state", "visual_plan")
+    if not plan.search_queries:
+        return Verdict(
+            False,
+            "no search_queries -- the observable state cannot survive into retrieval",
+            "visual_plan",
+        )
+    if not _state_bearing_query_exists(plan):
+        return Verdict(
+            False,
+            "search_queries lost the required observable phenomenon; "
+            f"states={plan.required_observable_state!r} queries={plan.search_queries!r}",
+            "visual_plan",
+        )
+    return Verdict(
+        True,
+        "plan has subject, required components, observable state, and a state-bearing search query",
+        "visual_plan",
+    )
 
 
 def _contains_any(haystack_items: List[str], needle: str) -> bool:
