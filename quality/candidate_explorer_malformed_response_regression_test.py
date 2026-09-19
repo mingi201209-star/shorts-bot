@@ -216,6 +216,12 @@ def test_exact_fixed_topic_malformed_hook_recovers_from_repo_seed():
     recovery = result.get("_exact_fixed_topic_seed_recovery") or {}
     assert recovery.get("status") == "USED", recovery
     assert recovery.get("api_calls_added") == 1, recovery
+    assert result["winner"].get("subject_kind") == "physical_entity", result
+    assert (
+        result["winner"].get("canonical_subject")
+        == "aircraft wing structure under aerodynamic load"
+    ), result
+    assert result["winner"].get("_trusted_grounding_evidence"), result
 
 
 def test_exact_fixed_topic_seed_failure_is_diagnostic_not_silent():

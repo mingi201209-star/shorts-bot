@@ -148,6 +148,58 @@ def _recover_exact_fixed_topic_seed(kwargs, malformed_response_error):
         )
         return None
 
+    # The schema validator intentionally strips optional authority fields.
+    # Restore only fields owned by the exact repo seed, then let the existing
+    # trusted grounding supplier perform its normal feature+context match.
+    # This is supply, not a gate bypass: if the record does not actually match,
+    # no private trust metadata is attached and the host grounding gate remains
+    # fail-closed.
+    repo_seed = matches[0]
+    for field in (
+        "specific_observation",
+        "mechanism",
+        "constraint",
+        "counterintuitive_result",
+        "tradeoff",
+        "concrete_condition",
+    ):
+        if field in repo_seed:
+            validated["winner"][field] = deepcopy(repo_seed[field])
+
+    try:
+        from quality.canonical_subject_grounding_supply import (
+            supply_trusted_subject_grounding,
+        )
+
+        matched_records = []
+        for record in all_trusted_candidate_records():
+            if not isinstance(record, dict):
+                continue
+            seed = record.get("seed_candidate")
+            if not isinstance(seed, dict):
+                continue
+            if str(seed.get("topic") or "").strip() == fixed_topic:
+                matched_records.append(record)
+
+        if len(matched_records) == 1:
+            validated["winner"] = supply_trusted_subject_grounding(
+                validated["winner"],
+                trusted_records=matched_records,
+            )
+            canonical = str(
+                validated["winner"].get("canonical_subject") or ""
+            ).strip()
+            if canonical:
+                print(
+                    "🧭 EXACT FIXED-TOPIC SEED GROUNDING: "
+                    f"trusted canonical={canonical}"
+                )
+    except Exception as exc:
+        print(
+            "⚠️ EXACT FIXED-TOPIC SEED GROUNDING SUPPLY SKIPPED: "
+            f"{exc}"
+        )
+
     validated["_exact_fixed_topic_seed_recovery"] = {
         "status": "USED",
         "reason": str(malformed_response_error),

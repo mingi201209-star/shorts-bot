@@ -435,7 +435,8 @@ CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
                 "claim_id": "wing_bending_torsion_modes",
                 "claim_type": "mechanism_change",
                 "evidence_summary": (
-                    "유연한 날개 구조는 하중에 따라 휨뿐 아니라 비틀림 변형도 함께 나타낼 수 있습니다."
+                    "NASA 유연 항공기 모델에서는 공력·관성력이 날개의 flapwise bending, "
+                    "chordwise bending, torsion 탄성 운동과 결합됩니다."
                 ),
                 "source": NASA_FLEXIBLE_AIRCRAFT_SOURCE,
                 "detail": (
@@ -445,6 +446,7 @@ CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
                 "allowed_paraphrase_scope": [
                     "날개는 하중을 받을 때 휨과 비틀림이라는 서로 다른 탄성 변형을 함께 보일 수 있습니다.",
                     "유연한 항공기 날개에는 bending과 torsion 변형이 함께 나타날 수 있습니다.",
+                    "공력·관성력은 날개의 flapwise/chordwise bending과 torsion 탄성 운동과 결합됩니다.",
                 ],
             },
             {
@@ -467,17 +469,17 @@ CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
         "seed_candidate": {
             "topic": "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?",
             "angle": "날개가 단단한 판이 아니라 양력 하중을 표면에서 리브·스파·동체로 전달하면서 flapwise/chordwise bending과 torsion을 함께 겪는 탄성 구조라는 점",
-            "core_question": "양력은 위로 작용하는데 왜 날개 끝 휨과 단면 비틀림이 같이 생길까?",
+            "core_question": "날개 끝은 위로 휘는데, 왜 같은 비행 하중에서 단면 비틀림까지 별도 탄성 모드로 나타날까?",
             "micro_narrative": {
                 "hook": "비행 중 날개 끝이 위로 들리는 flex는 하중이 날개 구조 안으로 흘러간다는 신호입니다.",
-                "core_question": "양력은 위로 작용하는데 왜 날개는 위로만 휘지 않고 단면 비틀림까지 보일까요?",
-                "reveal": "양력 하중이 표면·스트링거에서 리브와 스파를 거쳐 동체로 전달되는 동안, 유연한 날개는 flapwise/chordwise bending과 torsion 모드로 함께 변형될 수 있습니다.",
+                "core_question": "날개 끝은 위로 휘는데 왜 같은 비행 하중에서 단면 비틀림까지 함께 나타날까요?",
+                "reveal": "양력 하중은 표면·스트링거에서 리브와 스파를 거쳐 동체로 전달되고, NASA의 유연 항공기 모델에서는 공력·관성력이 flapwise/chordwise bending과 torsion 세 탄성 운동과 결합됩니다. 그래서 날개 거동은 위쪽 휨 하나로만 끝나지 않습니다.",
                 "payoff": "그래서 설계와 해석은 날개를 고정된 판이 아니라 하중 경로를 따라 휘고 비트는 탄성 구조로 다룹니다."
             },
             "fact_check_focus": [
                 "양력 하중이 날개 표면·리브·스파를 거쳐 동체로 전달되는 경로",
                 "비행 중 날개 끝이 위로 휘는 현상",
-                "유연한 날개 구조에서 flapwise/chordwise bending과 torsion 변형이 함께 나타날 수 있다는 점"
+                "공력·관성력이 유연한 날개의 flapwise/chordwise bending과 torsion 탄성 운동과 결합된다는 점"
             ],
             "visual_proof": [
                 "비행 중 같은 주날개의 날개 끝이 동체 대비 위아래로 휘는 장면",

@@ -424,7 +424,7 @@ def test_exact_repo_owned_wing_flex_seed_is_used_before_llm_rewrite():
 
     assert direct is not None
     assert direct["topic"] == fixed_topic
-    assert direct["core_question"] == "양력은 위로 작용하는데 왜 날개 끝 휨과 단면 비틀림이 같이 생길까?"
+    assert direct["core_question"] == "날개 끝은 위로 휘는데, 왜 같은 비행 하중에서 단면 비틀림까지 별도 탄성 모드로 나타날까?"
     assert "리브와 스파" in direct["micro_narrative"]["reveal"]
     assert "flapwise/chordwise bending" in direct["micro_narrative"]["reveal"]
     assert "torsion" in direct["micro_narrative"]["reveal"]
