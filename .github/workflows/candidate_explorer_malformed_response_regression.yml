@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
       - name: Compile
-        run: python -m py_compile content/candidate_explorer/__init__.py content/candidate_gate.py quality/candidate_explorer_malformed_response_regression_test.py quality/run_618_narrowness_bounded_recovery_regression_test.py quality/run_620_candidate_gate_bounded_recovery_regression_test.py
+        run: python -m py_compile content/candidate_explorer.py content/candidate_explorer/__init__.py content/candidate_gate.py quality/candidate_explorer_malformed_response_regression_test.py quality/run_618_narrowness_bounded_recovery_regression_test.py quality/run_620_candidate_gate_bounded_recovery_regression_test.py
       - name: Run Candidate Explorer malformed-response regression (deterministic fuzz-found)
         run: python quality/candidate_explorer_malformed_response_regression_test.py
       - name: Run bounded narrowness recovery regression
