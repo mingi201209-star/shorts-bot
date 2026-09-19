@@ -57,11 +57,18 @@ def generate_script(topic_info, candidate):
             trusted_records=trusted_records,
         )
 
+        fixed_topic = _prewriter_os.environ.get("SHORTS_TOPIC", "").strip()
+        candidate_topic = str(candidate.get("topic") or "").strip()
+        fixed_topic_candidate = bool(
+            fixed_topic
+            and candidate_topic == fixed_topic
+        )
+
         exact_fixed_topic_supply = None
         if repo_seed_record is None:
             exact_fixed_topic_supply = supply_exact_fixed_topic_seed_grounding(
                 candidate,
-                _prewriter_os.environ.get("SHORTS_TOPIC", ""),
+                fixed_topic,
                 trusted_records=trusted_records,
             )
 
@@ -73,6 +80,20 @@ def generate_script(topic_info, candidate):
             print(
                 "[PREWRITER_GROUNDING_RESUPPLY] "
                 "source=exact_fixed_topic_seed canonical="
+                f"{supplied.get('canonical_subject', '')}"
+            )
+        elif fixed_topic_candidate and repo_seed_record is None:
+            # RUN_35413574652_FIXED_TOPIC_FALSE_GROUNDING_GUARD
+            # A pinned topic that is not owned by an exact repo seed must never
+            # be rebound to an unrelated trusted record merely because generic
+            # words overlap (e.g. a wing-flex topic becoming a static wick).
+            # Preserve the Candidate's existing identity metadata exactly as-is;
+            # the already-installed canonical pre-Writer gate below either
+            # validates that explicit identity or fails closed.
+            supplied = dict(candidate)
+            print(
+                "[PREWRITER_GROUNDING_RESUPPLY] "
+                "source=fixed_topic_existing_grounding_only canonical="
                 f"{supplied.get('canonical_subject', '')}"
             )
         else:
