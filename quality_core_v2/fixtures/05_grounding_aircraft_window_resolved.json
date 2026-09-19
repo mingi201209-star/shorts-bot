@@ -1,0 +1,13 @@
+{
+  "name": "aircraft_window_rounded_corner_resolved",
+  "category": "aircraft window",
+  "provenance": "V2 fix target for the run 620 case: a design feature (window's rounded corner) must resolve to physical_entity once the grounding prompt covers this category (V1's fix was ci_canonical_subject_grounding_hotfix.py's CANDIDATE_PATCH; V2 must reach the same outcome without that patch file).",
+  "stage": "grounding",
+  "input": {
+    "subject_kind": "physical_entity",
+    "identity_confidence": 0.9,
+    "evidence_refs": ["aircraft-window-design-spec"]
+  },
+  "expected_pass": true,
+  "expected_reason_contains": "grounded"
+}

@@ -1,0 +1,18 @@
+{
+  "name": "aircraft_wing_flex_good_candidate",
+  "category": "aircraft wing flex",
+  "provenance": "Golden Topic candidate under consideration (execution order section 7).",
+  "stage": "candidate",
+  "input": {
+    "topic": "aircraft wing flex",
+    "concrete_subject": "aircraft main wing",
+    "observable_phenomenon": "visible upward elastic bending in flight",
+    "core_question": "왜 비행 중 날개 끝이 위로 휘어지는가",
+    "mechanism": "양력이 날개를 위로 밀어 올리며 탄성 변형이 일어남",
+    "reveal": "날개는 부러지지 않도록 일부러 휘어지게 설계되었다",
+    "canonical_subject": "aircraft main wing",
+    "evidence_refs": ["faa-wing-flex-cert-note"]
+  },
+  "expected_pass": true,
+  "expected_reason_contains": "concrete subject"
+}

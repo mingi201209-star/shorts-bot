@@ -1,0 +1,17 @@
+{
+  "name": "broad_generic_reveal_efficiency",
+  "category": "broad/generic reveal",
+  "provenance": "Execution order section 3: Candidate whose Reveal ends at 'efficiency improvement' level must reject, no rewrite-to-life.",
+  "stage": "candidate",
+  "input": {
+    "topic": "winglet design",
+    "concrete_subject": "aircraft winglet",
+    "observable_phenomenon": "upward-curved wingtip",
+    "core_question": "why do wingtips curve upward",
+    "mechanism": "reduces wingtip vortex drag",
+    "reveal": "그래서 연료 효율을 향상시킵니다",
+    "canonical_subject": "aircraft winglet"
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "vague-benefit"
+}

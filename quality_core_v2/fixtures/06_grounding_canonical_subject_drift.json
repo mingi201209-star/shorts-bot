@@ -1,0 +1,13 @@
+{
+  "name": "canonical_subject_drift_low_confidence",
+  "category": "canonical subject drift",
+  "provenance": "Candidate proposes a subject but grounding resolves a different/uncertain identity mid-pipeline (drift), modeled as sub-threshold confidence per quality/canonical_subject_grounding.py's IDENTITY_CONFIDENCE_MIN=0.80.",
+  "stage": "grounding",
+  "input": {
+    "subject_kind": "physical_entity",
+    "identity_confidence": 0.55,
+    "evidence_refs": ["low-confidence-visual-match"]
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "identity_confidence"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "static_wick_no_evidence",
+  "category": "static wick",
+  "provenance": "ci_static_wick_fallback_provenance_hotfix.py exists because static wick candidates repeatedly lost provenance during fallback; modeled here as a grounding with a subject_kind resolved but zero evidence_refs.",
+  "stage": "grounding",
+  "input": {
+    "subject_kind": "physical_entity",
+    "identity_confidence": 0.85,
+    "evidence_refs": []
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "evidence_refs"
+}

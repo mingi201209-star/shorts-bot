@@ -1,0 +1,24 @@
+{
+  "name": "chevron_shape_visible_mixing_not_visible",
+  "category": "subject correct but mechanism not visible",
+  "provenance": "jet-engine chevron: the sawtooth SHAPE being visible is not the same as the airflow-mixing MECHANISM being visible; run 612 class of confusion.",
+  "stage": "visual_match",
+  "input": {
+    "plan": {
+      "scene_index": 4,
+      "subject": "jet engine nozzle chevron",
+      "required_visible_components": ["engine nozzle", "chevron edge"],
+      "required_observable_state": ["visible airflow mixing at chevron edge"],
+      "forbidden_visuals": []
+    },
+    "visual": {
+      "source_type": "stock",
+      "description": "close-up still of a chevron-edged jet engine nozzle, engine off, no airflow",
+      "visible_components": ["engine nozzle", "chevron edge"],
+      "observable_state": ["stationary", "engine off"],
+      "tags": ["stock", "chevron"]
+    }
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "observable state"
+}

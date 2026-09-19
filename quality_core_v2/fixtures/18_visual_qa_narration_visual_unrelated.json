@@ -1,0 +1,42 @@
+{
+  "name": "narration_visual_no_shared_vocabulary",
+  "category": "narration <-> visual direct match failure",
+  "provenance": "Guards against a visual that passes plan-matching on paper (right tags) but whose description has drifted entirely from what the scene actually says -- a composition bug distinct from visual_plan's own checks.",
+  "stage": "visual_qa",
+  "input": {
+    "scene": {
+      "scene_index": 1,
+      "narration": "날개 끝이 비행 중 위로 휘어집니다",
+      "causal_role": "phenomenon",
+      "owned_claim_id": "phenomenon",
+      "new_information": "날개 끝이 위로 휜다",
+      "visual_requirement": "wingtip bending upward in flight"
+    },
+    "plan": {
+      "scene_index": 1,
+      "subject": "aircraft main wing",
+      "required_visible_components": [
+        "aircraft",
+        "main wing"
+      ],
+      "required_observable_state": [
+        "visible upward elastic bending"
+      ],
+      "forbidden_visuals": []
+    },
+    "visual": {
+      "source_type": "stock",
+      "description": "aircraft main wing bending",
+      "visible_components": [
+        "aircraft",
+        "main wing"
+      ],
+      "observable_state": [
+        "visible upward elastic bending"
+      ],
+      "tags": []
+    }
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "share no vocabulary"
+}

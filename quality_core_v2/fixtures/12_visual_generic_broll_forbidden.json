@@ -1,0 +1,24 @@
+{
+  "name": "generic_cruising_airplane_forbidden",
+  "category": "generic aircraft B-roll",
+  "provenance": "Execution order's own worked example: wing bending VisualPlan explicitly forbids 'generic cruising airplane' even though subject (aircraft) matches.",
+  "stage": "visual_match",
+  "input": {
+    "plan": {
+      "scene_index": 1,
+      "subject": "aircraft main wing",
+      "required_visible_components": ["aircraft", "main wing"],
+      "required_observable_state": ["visible upward elastic bending"],
+      "forbidden_visuals": ["generic cruising airplane", "straight static wing", "winglet-only shot", "cockpit interior"]
+    },
+    "visual": {
+      "source_type": "stock",
+      "description": "wide shot of a generic cruising airplane at altitude",
+      "visible_components": ["aircraft", "main wing"],
+      "observable_state": [],
+      "tags": ["stock", "generic cruising airplane"]
+    }
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "forbidden pattern"
+}

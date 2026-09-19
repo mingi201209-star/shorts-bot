@@ -1,0 +1,15 @@
+{
+  "name": "all_providers_miss_no_visual",
+  "category": "provider miss/failure (exhausted)",
+  "provenance": "When every provider misses, the adapter must report no-visual rather than fabricating one; caller is responsible for the next step (generated/grounded_explanatory fallback), not this adapter.",
+  "stage": "retrieval",
+  "input": {
+    "attempts": [
+      {"provider": "pexels", "status": "miss"},
+      {"provider": "pixabay", "status": "miss"},
+      {"provider": "grounded_generation", "status": "error"}
+    ]
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "no visual available"
+}

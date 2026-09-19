@@ -1,0 +1,24 @@
+{
+  "name": "generated_fallback_proves_same_meaning",
+  "category": "stock fallback semantic degradation (positive control: allowed fallback)",
+  "provenance": "Execution order's allowed fallback list: 'verified generated wing bending visual' / 'grounded explanatory visual' are acceptable substitutes when stock doesn't exist.",
+  "stage": "visual_match",
+  "input": {
+    "plan": {
+      "scene_index": 1,
+      "subject": "aircraft main wing",
+      "required_visible_components": ["aircraft", "main wing"],
+      "required_observable_state": ["visible upward elastic bending"],
+      "forbidden_visuals": ["generic cruising airplane"]
+    },
+    "visual": {
+      "source_type": "grounded_explanatory",
+      "description": "generated diagram of an aircraft main wing bending upward under load, annotated with flex arrows",
+      "visible_components": ["aircraft", "main wing"],
+      "observable_state": ["visible upward elastic bending"],
+      "tags": ["generated", "grounded_explanatory"]
+    }
+  },
+  "expected_pass": true,
+  "expected_reason_contains": "satisfies required components"
+}

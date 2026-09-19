@@ -1,0 +1,24 @@
+{
+  "name": "spoiler_plan_matched_to_flap_visual",
+  "category": "cross-domain visual contamination",
+  "provenance": "spoiler / flap confusion is a recurring aviation seed-pool issue (ci_flap_canonical_grounding_hotfix.py, ci_fixed_topic_flap_opening_hotfix.py exist for adjacent reasons); modeled here as a visual retrieved for the wrong wing control surface.",
+  "stage": "visual_match",
+  "input": {
+    "plan": {
+      "scene_index": 2,
+      "subject": "wing spoiler",
+      "required_visible_components": ["wing", "spoiler panel raised"],
+      "required_observable_state": ["spoiler panel deployed upward from wing surface"],
+      "forbidden_visuals": ["flap extended from trailing edge"]
+    },
+    "visual": {
+      "source_type": "stock",
+      "description": "wing with flap extended downward from the trailing edge during landing",
+      "visible_components": ["wing", "flap"],
+      "observable_state": ["flap extended"],
+      "tags": ["stock", "flap extended from trailing edge"]
+    }
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "forbidden pattern"
+}

@@ -1,0 +1,35 @@
+{
+  "name": "stock_fallback_no_observable_state",
+  "category": "stock fallback semantic degradation",
+  "provenance": "Execution order section 4: fallback must always 'prove the same meaning a different way', never substitute a generic shot just because a real one wasn't found.",
+  "stage": "visual_match",
+  "input": {
+    "plan": {
+      "scene_index": 3,
+      "subject": "static wick",
+      "required_visible_components": [
+        "wing trailing edge",
+        "static wick"
+      ],
+      "required_observable_state": [
+        "visible discharge point at wick tip"
+      ],
+      "forbidden_visuals": []
+    },
+    "visual": {
+      "source_type": "stock",
+      "description": "wing trailing edge with a small static wick visible, no discharge shown",
+      "visible_components": [
+        "wing trailing edge",
+        "static wick"
+      ],
+      "observable_state": [],
+      "tags": [
+        "stock",
+        "fallback"
+      ]
+    }
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "observable state"
+}

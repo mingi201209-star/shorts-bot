@@ -1,0 +1,28 @@
+{
+  "name": "adjacent_scene_repeats_phenomenon",
+  "category": "adjacent scene semantic duplication",
+  "provenance": "Distinct from claim-id collision: two scenes can use different owned_claim_id labels but restate the same fact in new_information, which is the actual bug retention_structure guards against.",
+  "stage": "script_plan",
+  "input": {
+    "scenes": [
+      {
+        "scene_index": 1,
+        "narration": "날개 끝이 비행 중 위로 휘어진다",
+        "causal_role": "phenomenon",
+        "owned_claim_id": "phenomenon",
+        "new_information": "날개 끝이 비행 중 위로 휘어진다",
+        "visual_requirement": "wingtip bending in flight"
+      },
+      {
+        "scene_index": 2,
+        "narration": "날개 끝이 비행 중 위로 휘어진다는 것이 보입니다",
+        "causal_role": "why_question",
+        "owned_claim_id": "why_question",
+        "new_information": "날개 끝이 비행 중 위로 휘어진다",
+        "visual_requirement": "wingtip bending in flight, closer angle"
+      }
+    ]
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "repeats scene 1"
+}

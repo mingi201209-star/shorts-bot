@@ -1,0 +1,24 @@
+{
+  "name": "subject_correct_phenomenon_not_visible",
+  "category": "observable phenomenon missing",
+  "provenance": "Execution order section 4: 'subject가 맞는 stock이라도 FAIL이다' when the plan's required_observable_state isn't met.",
+  "stage": "visual_match",
+  "input": {
+    "plan": {
+      "scene_index": 1,
+      "subject": "aircraft main wing",
+      "required_visible_components": ["aircraft", "main wing"],
+      "required_observable_state": ["visible upward elastic bending"],
+      "forbidden_visuals": ["generic cruising airplane"]
+    },
+    "visual": {
+      "source_type": "stock",
+      "description": "aircraft main wing, straight and static, parked on tarmac",
+      "visible_components": ["aircraft", "main wing"],
+      "observable_state": ["static", "stationary"],
+      "tags": ["stock", "wing"]
+    }
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "observable state"
+}

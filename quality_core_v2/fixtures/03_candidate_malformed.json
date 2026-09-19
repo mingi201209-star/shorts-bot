@@ -1,0 +1,17 @@
+{
+  "name": "malformed_candidate_missing_fields",
+  "category": "malformed Candidate",
+  "provenance": "Explorer occasionally returns partial JSON on REGENERATE parse failures (ci_hotfix.py placeholder-echo class of bug).",
+  "stage": "candidate",
+  "input": {
+    "topic": "spoiler",
+    "concrete_subject": "",
+    "observable_phenomenon": "",
+    "core_question": "왜 스포일러가 움직이는가",
+    "mechanism": "",
+    "reveal": "",
+    "canonical_subject": ""
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "missing one or more required Candidate fields"
+}

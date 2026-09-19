@@ -1,0 +1,14 @@
+{
+  "name": "duplicate_claims_scene1_scene5",
+  "category": "duplicate claims",
+  "provenance": "run 612/613 (jet-engine chevron): Scene 1 stated the chevron's noise-reduction purpose, Scene 5's payoff owned the same claim -> retention_structure.validate_new_information() crashed with no recovery. V2 catches this at plan time, before a Writer produces prose.",
+  "stage": "script_plan",
+  "input": {
+    "scenes": [
+      {"scene_index": 1, "narration": "엔진 뒤쪽 노즐 가장자리가 톱니 모양으로 물결친다", "causal_role": "phenomenon", "owned_claim_id": "shape", "new_information": "노즐 가장자리가 톱니 모양 물결 형태다", "visual_requirement": "close-up of chevron nozzle edge"},
+      {"scene_index": 5, "narration": "이 톱니 모양은 배기음을 줄여준다", "causal_role": "payoff", "owned_claim_id": "noise_reduction", "new_information": "톱니 모양이 배기음을 줄여준다", "visual_requirement": "engine running with visible airflow mixing"}
+    ]
+  },
+  "expected_pass": true,
+  "expected_reason_contains": "each owns a distinct claim"
+}

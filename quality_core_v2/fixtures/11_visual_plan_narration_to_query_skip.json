@@ -1,0 +1,17 @@
+{
+  "name": "visual_plan_no_required_components",
+  "category": "malformed VisualPlan (Narration -> query skip)",
+  "provenance": "Execution order section 3 explicitly forbids Narration -> search query directly; this fixture is what that failure looks like as a plan object: no decomposition happened.",
+  "stage": "visual_plan",
+  "input": {
+    "plan": {
+      "scene_index": 1,
+      "subject": "aircraft wing",
+      "required_visible_components": [],
+      "required_observable_state": [],
+      "search_queries": ["airplane wing flying"]
+    }
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "not decomposed"
+}

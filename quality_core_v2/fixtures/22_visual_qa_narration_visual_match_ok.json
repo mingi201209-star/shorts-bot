@@ -1,0 +1,32 @@
+{
+  "name": "narration_visual_shared_vocabulary_ok",
+  "category": "narration <-> visual direct match (positive control)",
+  "provenance": "Positive control for evaluate_scene_visual_qa so the vocabulary-overlap floor isn't just always failing.",
+  "stage": "visual_qa",
+  "input": {
+    "scene": {
+      "scene_index": 1,
+      "narration": "aircraft main wing bends upward during flight",
+      "causal_role": "phenomenon",
+      "owned_claim_id": "phenomenon",
+      "new_information": "wing bends upward",
+      "visual_requirement": "wingtip bending upward in flight"
+    },
+    "plan": {
+      "scene_index": 1,
+      "subject": "aircraft main wing",
+      "required_visible_components": ["aircraft", "main wing"],
+      "required_observable_state": ["visible upward elastic bending"],
+      "forbidden_visuals": []
+    },
+    "visual": {
+      "source_type": "stock",
+      "description": "aircraft main wing bending upward",
+      "visible_components": ["aircraft", "main wing"],
+      "observable_state": ["visible upward elastic bending"],
+      "tags": []
+    }
+  },
+  "expected_pass": true,
+  "expected_reason_contains": "correspondence holds"
+}

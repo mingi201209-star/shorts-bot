@@ -1,0 +1,13 @@
+{
+  "name": "aircraft_window_rounded_corner_unresolved",
+  "category": "aircraft window",
+  "provenance": "run 620 (main.yml, 2026-09-18): '비행기 창문 모서리가 둥글게 디자인된 이유' false-blocked -- subject_kind left unresolved because a design feature of a manufactured object wasn't recognized as physical_entity.",
+  "stage": "grounding",
+  "input": {
+    "subject_kind": "unresolved",
+    "identity_confidence": 0.0,
+    "evidence_refs": []
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "unresolved"
+}

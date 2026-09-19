@@ -1,0 +1,14 @@
+{
+  "name": "stale_cache_hit_not_accepted_as_fresh",
+  "category": "stale/cache-dependent selection",
+  "provenance": "A cache hit from a previous, possibly-invalidated run must not be silently reused as if freshly retrieved -- this was never an explicit V1 check, which is exactly why it's named in the execution order's fixture list.",
+  "stage": "retrieval",
+  "input": {
+    "attempts": [
+      {"provider": "local_cache", "status": "stale_cache_hit"},
+      {"provider": "pexels", "status": "miss"}
+    ]
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "stale cache hit"
+}

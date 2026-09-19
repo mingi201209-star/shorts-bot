@@ -1,0 +1,15 @@
+{
+  "name": "provider_miss_falls_through_to_next",
+  "category": "provider miss/failure",
+  "provenance": "Retrieval must try the next provider on a miss/error rather than giving up or silently degrading.",
+  "stage": "retrieval",
+  "input": {
+    "attempts": [
+      {"provider": "pexels", "status": "miss"},
+      {"provider": "pixabay", "status": "error"},
+      {"provider": "grounded_generation", "status": "hit", "visual": {"source_type": "grounded_explanatory"}}
+    ]
+  },
+  "expected_pass": true,
+  "expected_reason_contains": "grounded_generation"
+}

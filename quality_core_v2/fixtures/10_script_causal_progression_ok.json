@@ -1,0 +1,18 @@
+{
+  "name": "causal_progression_wing_flex",
+  "category": "causal progression (positive control)",
+  "provenance": "Golden Topic candidate script skeleton -- positive control so the duplicate-detector isn't just always failing.",
+  "stage": "script_plan",
+  "input": {
+    "scenes": [
+      {"scene_index": 1, "narration": "비행 중 날개 끝이 위로 휩니다", "causal_role": "phenomenon", "owned_claim_id": "phenomenon", "new_information": "날개 끝이 위로 휜다", "visual_requirement": "wingtip visibly bending upward in flight"},
+      {"scene_index": 2, "narration": "왜 날개는 부러지지 않고 휘어지기만 할까요", "causal_role": "why_question", "owned_claim_id": "why_question", "new_information": "부러지지 않고 휘는 이유가 궁금하다", "visual_requirement": "same wing, wider shot showing whole span"},
+      {"scene_index": 3, "narration": "날개는 탄소섬유 복합재로 만들어져 탄성을 가집니다", "causal_role": "mechanism_input", "owned_claim_id": "material", "new_information": "탄소섬유 복합재가 탄성을 준다", "visual_requirement": "wing structure cutaway or material close-up"},
+      {"scene_index": 4, "narration": "양력을 받으면 이 탄성 덕분에 날개가 휘며 하중을 분산시킵니다", "causal_role": "mechanism_change", "owned_claim_id": "load_distribution", "new_information": "탄성이 하중을 분산시킨다", "visual_requirement": "wing flexing under load, load path visualization"},
+      {"scene_index": 5, "narration": "그 결과 날개는 강한 돌풍에도 부러지지 않습니다", "causal_role": "observable_result", "owned_claim_id": "result", "new_information": "돌풍에도 부러지지 않는다", "visual_requirement": "wing flexing dramatically in turbulence"},
+      {"scene_index": 6, "narration": "휘어짐은 약점이 아니라 의도된 안전장치입니다", "causal_role": "payoff", "owned_claim_id": "payoff", "new_information": "휘어짐은 의도된 설계다", "visual_requirement": "wide shot of aircraft in flight with flexing wings"}
+    ]
+  },
+  "expected_pass": true,
+  "expected_reason_contains": "each owns a distinct claim"
+}
