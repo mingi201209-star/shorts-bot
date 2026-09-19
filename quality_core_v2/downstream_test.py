@@ -94,3 +94,56 @@ def test_full_control_flow_candidate_to_render_handoff():
     assert result == "final_shorts.mp4"
     assert calls["scene_items"] == items
     assert calls["scene_clips"] == ["clip1", "clip2"]
+
+
+def test_scene_v2_to_v1_item_skips_blank_first_search_query():
+    # Golden E2E #2 regression (run 35430296847, scene 2): search_queries[0]
+    # was blank even though the list was non-empty; picking index 0 blindly
+    # produced an empty keyword and create_scene raised ValueError.
+    scene = SceneV2.from_dict({
+        "scene_index": 2, "narration": "n", "causal_role": "payoff",
+        "owned_claim_id": "payoff", "new_information": "i", "visual_requirement": "v",
+    })
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 2, "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft"],
+        "required_observable_state": ["bending"],
+        "search_queries": ["", "  ", "airplane wing wide shot"],
+    })
+    item = scene_v2_to_v1_item(scene, plan)
+    assert item["keyword"] == "airplane wing wide shot"
+
+
+def test_scene_v2_to_v1_item_falls_back_to_subject_when_all_queries_blank():
+    scene = SceneV2.from_dict({
+        "scene_index": 1, "narration": "n", "causal_role": "phenomenon",
+        "owned_claim_id": "a", "new_information": "i", "visual_requirement": "v",
+    })
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 1, "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft"],
+        "required_observable_state": ["bending"],
+        "search_queries": ["", ""],
+    })
+    item = scene_v2_to_v1_item(scene, plan)
+    assert item["keyword"] == "aircraft main wing"
+
+
+def test_scene_v2_to_v1_item_rejects_when_no_keyword_available():
+    scene = SceneV2.from_dict({
+        "scene_index": 1, "narration": "n", "causal_role": "phenomenon",
+        "owned_claim_id": "a", "new_information": "i", "visual_requirement": "v",
+    })
+    # subject is required non-blank by VisualPlanV2's own gate, so this shape
+    # (blank subject) only happens if a plan is used without that gate --
+    # this test guards scene_v2_to_v1_item's OWN fail-closed behavior
+    # independent of that gate having already run.
+    plan = VisualPlanV2(
+        scene_index=1, subject="", required_visible_components=["aircraft"],
+        required_observable_state=["bending"], search_queries=["", ""],
+    )
+    try:
+        scene_v2_to_v1_item(scene, plan)
+        assert False, "should have raised ValueError"
+    except ValueError as exc:
+        assert "no usable keyword" in str(exc)

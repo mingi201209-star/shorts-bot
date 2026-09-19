@@ -20,12 +20,40 @@ from typing import Any, Dict, List
 from quality_core_v2.schemas import SceneV2, VisualPlanV2
 
 
+def _first_nonempty(*candidates: Any) -> str:
+    """Deterministic: first non-blank string across search_queries (in
+    order) then subject. Never a generic placeholder -- an empty result
+    means the plan itself carried no usable keyword, which is a
+    fail-closed error, not something to paper over.
+    """
+    for candidate in candidates:
+        items = candidate if isinstance(candidate, list) else [candidate]
+        for item in items:
+            text = str(item or "").strip()
+            if text:
+                return text
+    return ""
+
+
 def scene_v2_to_v1_item(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
     """Pure: map a validated (SceneV2, VisualPlanV2) pair to the exact
     dict shape video/video_engine.create_scene expects (text/keyword/
     visual_goal/visual_type). No network, no rendering.
+
+    create_scene requires a non-empty `keyword`
+    (video/video_engine.py:create_scene). Run 35430296847 (Golden E2E #2)
+    crashed on scene 2 with an empty keyword because search_queries[0] can
+    itself be a blank string even when the list is non-empty -- picking
+    index 0 blindly let that through. Fixed here by taking the first
+    genuinely non-blank entry across search_queries then subject, and
+    failing closed (not a generic fallback string) if none exists.
     """
-    keyword = (plan.search_queries or [plan.subject])[0]
+    keyword = _first_nonempty(plan.search_queries, plan.subject)
+    if not keyword:
+        raise ValueError(
+            f"VisualPlanV2 for scene {scene.scene_index} has no usable keyword "
+            f"(search_queries={plan.search_queries!r}, subject={plan.subject!r})"
+        )
     visual_goal = ", ".join(plan.required_observable_state) or scene.narration
     visual_type = (
         "ai_generated" if plan.preferred_source_type == "generated" else "real_world_broll"
