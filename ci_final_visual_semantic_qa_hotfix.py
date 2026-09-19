@@ -101,6 +101,7 @@ if "FINAL_VISUAL_SCENE_RECORD_V1" not in text:
             keyword,
             get_last_final_visual_selection(),
             hook_verified=hook_scene_enabled,
+            duration=duration,
         )
 
 ''' + selection_needle
@@ -143,6 +144,10 @@ if "STILL_IMAGE_MOTION_FALLBACK_V1" not in text:
                     "anchor_total": int(still_result.get("anchor_total", 1)),
                     "provider": still_result.get("provider", "openai_image"),
                     "source_id": still_result.get("source_id", "generated-still"),
+                    "source_asset_id": still_result.get("source_asset_id", still_result.get("source_id", "generated-still")),
+                    "template_type": still_result.get("template_type", ""),
+                    "presentation_variant": still_result.get("presentation_variant", ""),
+                    "motion_profile": still_result.get("motion_profile", ""),
                     "metadata": "verified generated still animated with slow zoom/pan and fade",
                 })
                 print(f"🖼️ STILL IMAGE MOTION FALLBACK scene={idx + 1}: {vertical_video_path}")

@@ -131,6 +131,73 @@ def measure_text(
 # 자막 이미지 생성
 # ============================================================
 
+SUBTITLE_SAFE_WIDTH_RATIO = 0.84
+SUBTITLE_SAFE_X_MIN_RATIO = 0.07
+SUBTITLE_SAFE_X_MAX_RATIO = 0.93
+SUBTITLE_MAX_LINES = 2
+SUBTITLE_LINE_GAP = 10
+
+
+def subtitle_image_bbox(image):
+    arr = np.asarray(image)
+    if arr.ndim != 3 or arr.shape[2] < 4:
+        return None
+    alpha = arr[:, :, 3]
+    ys, xs = np.where(alpha > 0)
+    if not len(xs):
+        return None
+    return (
+        int(xs.min()),
+        int(ys.min()),
+        int(xs.max()) + 1,
+        int(ys.max()) + 1,
+    )
+
+
+def _line_width(line, font):
+    return measure_text(line, font)[0]
+
+
+def _split_long_word(word, font, max_width):
+    pieces = []
+    current = ""
+    for char in str(word):
+        candidate = current + char
+        if current and _line_width(candidate, font) > max_width:
+            pieces.append(current)
+            current = char
+        else:
+            current = candidate
+    if current:
+        pieces.append(current)
+    return pieces
+
+
+def _wrap_subtitle_lines(text, font, max_width):
+    words = str(text or "").split()
+    if not words:
+        return []
+
+    lines = []
+    current = ""
+    for word in words:
+        word_parts = (
+            _split_long_word(word, font, max_width)
+            if _line_width(word, font) > max_width
+            else [word]
+        )
+        for part in word_parts:
+            candidate = f"{current} {part}".strip() if current else part
+            if current and _line_width(candidate, font) > max_width:
+                lines.append(current)
+                current = part
+            else:
+                current = candidate
+    if current:
+        lines.append(current)
+    return lines
+
+
 def render_subtitle_image(text):
 
     text = str(text).strip()
@@ -154,27 +221,35 @@ def render_subtitle_image(text):
         font_size
     )
 
-    padding_x = 50
-    padding_y = 30
-
-    max_width = (
+    max_width = int(
         VIDEO_WIDTH
-        - padding_x * 2
+        * SUBTITLE_SAFE_WIDTH_RATIO
     )
 
-    while True:
+    padding_y = 30
 
-        (
-            text_width,
-            text_height,
-            bbox,
-        ) = measure_text(
+    while True:
+        lines = _wrap_subtitle_lines(
             text,
             font,
+            max_width,
+        )
+        if not lines:
+            lines = [text]
+
+        line_metrics = [
+            measure_text(line, font)
+            for line in lines
+        ]
+        text_width = max(width for width, _, _ in line_metrics)
+        text_height = (
+            sum(height for _, height, _ in line_metrics)
+            + SUBTITLE_LINE_GAP * max(0, len(lines) - 1)
         )
 
         if (
             text_width <= max_width
+            and len(lines) <= SUBTITLE_MAX_LINES
             or font_size <= 42
         ):
             break
@@ -183,6 +258,19 @@ def render_subtitle_image(text):
 
         font = get_korean_font(
             font_size
+        )
+
+    if len(lines) > SUBTITLE_MAX_LINES:
+        merged_tail = " ".join(lines[SUBTITLE_MAX_LINES - 1:])
+        lines = lines[:SUBTITLE_MAX_LINES - 1] + [merged_tail]
+        line_metrics = [
+            measure_text(line, font)
+            for line in lines
+        ]
+        text_width = max(width for width, _, _ in line_metrics)
+        text_height = (
+            sum(height for _, height, _ in line_metrics)
+            + SUBTITLE_LINE_GAP * max(0, len(lines) - 1)
         )
 
     img_h = max(
@@ -204,32 +292,32 @@ def render_subtitle_image(text):
         img
     )
 
-    x = int(
-        (
-            VIDEO_WIDTH
-            - text_width
-        )
-        / 2
-        - bbox[0]
-    )
-
     y = int(
         (
             img_h
             - text_height
         )
         / 2
-        - bbox[1]
     )
 
-    draw.text(
-        (x, y),
-        text,
-        font=font,
-        fill=SUBTITLE_TEXT_COLOR,
-        stroke_width=SUBTITLE_STROKE_WIDTH,
-        stroke_fill=SUBTITLE_STROKE_COLOR,
-    )
+    for line, (line_width, line_height, bbox) in zip(lines, line_metrics):
+        x = int(
+            (
+                VIDEO_WIDTH
+                - line_width
+            )
+            / 2
+            - bbox[0]
+        )
+        draw.text(
+            (x, y - bbox[1]),
+            line,
+            font=font,
+            fill=SUBTITLE_TEXT_COLOR,
+            stroke_width=SUBTITLE_STROKE_WIDTH,
+            stroke_fill=SUBTITLE_STROKE_COLOR,
+        )
+        y += line_height + SUBTITLE_LINE_GAP
 
     return np.array(
         img

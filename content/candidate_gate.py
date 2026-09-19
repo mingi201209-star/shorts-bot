@@ -682,16 +682,28 @@ Gate가 지적한 문제를 해결한 버전으로 다시 쓰는 역할이다.
 너무 넓거나 일반적인 질문, 또는
 구체적인 메커니즘/예상 밖 연결이 없는 Reveal 대신
 
-- 수치
-- 임계값
+- 구체적인 구조/부품
+- 힘이나 변화가 전달되는 경로
+- 위치/방향의 차이
 - 예외
 - 조건
 - 순서
-- 구체적인 메커니즘
-- 예상 밖의 연결
+- 관찰 가능한 변화
+- 기존 근거에 있는 구체적인 메커니즘
+- 기존 근거에 있는 예상 밖의 연결
 
-중 하나 이상이 들어간
+중 하나 이상을 사용해
 더 좁고 구체적인 Core Question과 Reveal로 다시 써라.
+
+가능하면 아래 [FACT CHECK FOCUS]와 [VISUAL PROOF]에
+이미 들어 있는 구체적인 사실·관찰·메커니즘을 먼저 사용하라.
+이 단계는 Fact discovery가 아니다.
+기존 근거에 없는 새로운 원인, 메커니즘, 기술적 정체성을 지어내지 마라.
+
+수치·퍼센트·각도·힘·질량·거리·시간 같은 정량 정보는
+기존 Candidate 또는 근거에 같은 값이 이미 있을 때만 사용할 수 있다.
+근거가 부족하면 숫자를 만들지 말고 질문의 구조/위치/조건/순서/
+관찰 포인트를 더 좁혀라.
 
 OUTPUT CONTRACT의 winner 객체와
 동일한 형식의 JSON 객체 하나만 반환하라
@@ -750,6 +762,26 @@ def _rewrite_candidate_for_gate_feedback(candidate, reason, *, model=MODEL):
     if not isinstance(micro, dict):
         micro = {}
 
+    fact_check_focus = candidate.get("fact_check_focus")
+    if not isinstance(fact_check_focus, list):
+        fact_check_focus = []
+
+    visual_proof = candidate.get("visual_proof")
+    if not isinstance(visual_proof, list):
+        visual_proof = []
+
+    fact_focus_text = "\n".join(
+        f"- {str(item).strip()}"
+        for item in fact_check_focus
+        if str(item).strip()
+    ) or "- 없음"
+
+    visual_proof_text = "\n".join(
+        f"- {str(item).strip()}"
+        for item in visual_proof
+        if str(item).strip()
+    ) or "- 없음"
+
     original_summary = (
         f"Topic: {candidate.get('topic', '')}\n"
         f"Angle: {candidate.get('angle', '')}\n"
@@ -757,6 +789,8 @@ def _rewrite_candidate_for_gate_feedback(candidate, reason, *, model=MODEL):
         f"Hook: {micro.get('hook', '')}\n"
         f"Reveal: {micro.get('reveal', '')}\n"
         f"Payoff: {micro.get('payoff', '')}\n"
+        f"\n[FACT CHECK FOCUS]\n{fact_focus_text}\n"
+        f"\n[VISUAL PROOF]\n{visual_proof_text}\n"
         f"\n[GATE REJECTION REASON]\n{reason}"
     )
 
@@ -764,13 +798,45 @@ def _rewrite_candidate_for_gate_feedback(candidate, reason, *, model=MODEL):
     print(f"💳 Candidate Gate rewrite API call authorized: #{call_number}")
 
     try:
+        preserve_authority = getattr(
+            _ce_pkg._LEGACY,
+            "_numeric_claim_tokens",
+            None,
+        )
+        candidate_text = getattr(
+            _ce_pkg._LEGACY,
+            "_rewrite_candidate_text",
+            None,
+        )
+        if callable(preserve_authority) and callable(candidate_text):
+            allowed_numbers = sorted(preserve_authority(candidate_text(candidate)))
+        else:
+            allowed_numbers = []
+
+        if allowed_numbers:
+            numeric_policy = (
+                "\n\n[NUMERIC AUTHORITY]\n"
+                "사용 가능한 기존 정량 토큰은 다음뿐이다: "
+                + ", ".join(allowed_numbers)
+                + "\n이 목록에 없는 새 숫자/단위/퍼센트/각도는 절대 추가하지 마라."
+            )
+        else:
+            numeric_policy = (
+                "\n\n[NUMERIC AUTHORITY]\n"
+                "기존 Candidate와 근거에는 승인된 정량 값이 없다. "
+                "숫자, 퍼센트, 각도, 힘, 질량, 거리, 시간 값을 새로 만들지 마라."
+            )
+
         response = openai.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": _CANDIDATE_GATE_REWRITE_PROMPT},
+                {
+                    "role": "system",
+                    "content": _CANDIDATE_GATE_REWRITE_PROMPT + numeric_policy,
+                },
                 {"role": "user", "content": original_summary},
             ],
-            temperature=0.4,
+            temperature=0.2,
             response_format={"type": "json_object"},
         )
     except Exception:
@@ -790,9 +856,19 @@ def _rewrite_candidate_for_gate_feedback(candidate, reason, *, model=MODEL):
         return None
 
     try:
-        return validate_candidate(parsed, prefix="winner", runner_up=False)
+        rewritten = validate_candidate(parsed, prefix="winner", runner_up=False)
     except Exception:
         return None
+
+    preserve_authority = getattr(
+        _ce_pkg._LEGACY,
+        "_preserve_rewrite_authority",
+        None,
+    )
+    if callable(preserve_authority):
+        return preserve_authority(candidate, rewritten)
+
+    return rewritten
 
 
 def _narrowness_recheck_ok(candidate, *, model):

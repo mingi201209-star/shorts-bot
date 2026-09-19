@@ -214,14 +214,27 @@ if qa_marker not in text:
     lineage = metadata_line + '''            "subject_anchor_contract_required": bool(selection.get("subject_anchor_contract_required", False)),\n            "required_subject_anchors": list(selection.get("required_subject_anchors") or []),\n            "subject_anchor_original_query": str(selection.get("subject_anchor_original_query") or ""),\n            "subject_anchor_effective_query": str(selection.get("subject_anchor_effective_query") or ""),\n            "subject_anchor_contract_reason": str(selection.get("subject_anchor_contract_reason") or ""),\n'''
     text = text.replace(metadata_line, lineage, 1)
 
-    failure_clause = '        if not item.get("accepted") or _missing_required_aviation_component_anchor(item)\n'
-    if failure_clause not in text:
+    loop_failure_clause = '''        if not item.get("accepted") or _missing_required_aviation_component_anchor(item):
+            failed = True
+'''
+    loop_failure_replacement = '''        if (
+            not item.get("accepted")
+            or _missing_required_subject_anchor(item)
+            or _missing_required_aviation_component_anchor(item)
+        ):
+            failed = True
+'''
+    legacy_failure_clause = '        if not item.get("accepted") or _missing_required_aviation_component_anchor(item)\n'
+    if loop_failure_clause in text:
+        text = text.replace(loop_failure_clause, loop_failure_replacement, 1)
+    elif legacy_failure_clause in text:
+        text = text.replace(
+            legacy_failure_clause,
+            '        if (not item.get("accepted")\n            or _missing_required_subject_anchor(item)\n            or _missing_required_aviation_component_anchor(item))\n',
+            1,
+        )
+    else:
         raise RuntimeError("Visual Subject Anchor Contract: final QA failure clause not found")
-    text = text.replace(
-        failure_clause,
-        '        if (not item.get("accepted")\n            or _missing_required_subject_anchor(item)\n            or _missing_required_aviation_component_anchor(item))\n',
-        1,
-    )
 
     text = text.rstrip() + r'''
 

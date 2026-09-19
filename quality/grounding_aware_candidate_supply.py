@@ -109,10 +109,16 @@ def grounding_candidate_capabilities(
             continue
         seen.add(key)
         claim_types = []
+        claim_hints = []
         for claim in record.get("supported_claims") or []:
-            claim_type = _text((claim or {}).get("claim_type")) if isinstance(claim, dict) else ""
+            if not isinstance(claim, dict):
+                continue
+            claim_type = _text(claim.get("claim_type"))
             if claim_type and claim_type not in claim_types:
                 claim_types.append(claim_type)
+            claim_hint = _text(claim.get("evidence_summary"))
+            if claim_hint and claim_hint not in claim_hints:
+                claim_hints.append(claim_hint)
         capabilities.append(
             {
                 "canonical_subject": canonical,
@@ -120,6 +126,7 @@ def grounding_candidate_capabilities(
                 "feature_hints": tuple(features[:3]),
                 "context_hints": tuple(contexts[:3]),
                 "supported_claim_types": tuple(claim_types),
+                "claim_hints": tuple(claim_hints[:4]),
             }
         )
     return tuple(capabilities)
@@ -155,6 +162,7 @@ def grounding_capability_context(
         features = " | ".join(capability["feature_hints"])
         contexts = " | ".join(capability["context_hints"])
         claim_types = ", ".join(capability["supported_claim_types"]) or "identity-only"
+        claim_hints = " | ".join(capability.get("claim_hints") or ()) or "identity-only"
         lines.extend(
             [
                 f"CAPABILITY {index}:",
@@ -163,6 +171,7 @@ def grounding_capability_context(
                 f"- observable feature hints: {features}",
                 f"- aviation context hints: {contexts}",
                 f"- evidence-supported semantic roles: {claim_types}",
+                f"- evidence-supported claim hints: {claim_hints}",
             ]
         )
     lines.extend(
