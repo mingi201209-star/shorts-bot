@@ -195,23 +195,76 @@ def _classify_hit(
     )
 
 
+def _generation_state_proof_constraints(plan: VisualPlanV2) -> List[str]:
+    """Deterministic, visible-only constraints for phenomena that still-image
+    generation commonly under-expresses. These tighten composition; they never
+    invent a new claim outside the VisualPlan.
+    """
+    text = " ".join([
+        *plan.required_observable_state,
+        *plan.required_relation_or_mechanism,
+    ]).lower()
+    constraints = []
+    if any(term in text for term in (
+        "bend", "bending", "flex", "flexing", "deform", "deformation",
+        "deflection", "휘", "굽힘", "변형", "처짐",
+    )):
+        constraints.append(
+            "Show the full main wing root-to-tip with unmistakable upward elastic "
+            "curvature; the wingtip must sit visibly higher than the wing root plane. "
+            "A straight or merely banked wing is invalid. Use an angle where the "
+            "curvature is obvious without captions."
+        )
+    if any(term in text for term in (
+        "twist", "twisting", "torsion", "비틀", "뒤틀",
+    )):
+        constraints.append(
+            "Make spanwise twist visibly distinguishable from simple camera perspective; "
+            "show root and tip orientation in the same frame."
+        )
+    if any(term in text for term in (
+        "vibration", "flutter", "진동", "플러터",
+    )):
+        constraints.append(
+            "Show an unmistakable oscillating/deformed wing state rather than a static "
+            "cruising-aircraft pose."
+        )
+    return constraints
+
+
 def _generation_scene_payload(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
+    proof_constraints = _generation_state_proof_constraints(plan)
     visual_goal_parts = [
         *plan.required_observable_state,
         *plan.required_relation_or_mechanism,
         *plan.generation_prompt_constraints,
+        *proof_constraints,
     ]
     query = next(
         (str(q).strip() for q in plan.search_queries if str(q).strip()),
         plan.subject,
     )
+    canonical_terms = [
+        plan.subject,
+        *plan.required_visible_components,
+    ]
     return {
         "scene_id": f"v2-{scene.scene_index}",
         "index": scene.scene_index,
         "text": scene.narration,
-        "visual_goal": "; ".join(str(v).strip() for v in visual_goal_parts if str(v).strip()),
+        "visual_goal": "; ".join(
+            str(v).strip() for v in visual_goal_parts if str(v).strip()
+        ),
         "keyword": str(query or plan.subject).strip(),
         "visual_type": "ai_generated",
+        "_canonical_visual_supply": {
+            "canonical_subject": plan.subject,
+            "canonical_terms": canonical_terms,
+            "visual_discriminators": [
+                *plan.required_visible_components,
+                *plan.required_observable_state,
+            ],
+        },
     }
 
 
@@ -333,6 +386,75 @@ def _default_classify_stock_video(
     )
 
 
+def _try_generated_visual(
+    scene: SceneV2,
+    plan: VisualPlanV2,
+    *,
+    generate_fn,
+    classify_generated_fn,
+    used_asset_keys: Optional[set],
+) -> Tuple[Optional[CandidateVisualV2], Verdict]:
+    generated = generate_fn(scene, plan)
+    if not generated:
+        return None, Verdict(
+            False,
+            "V2 generated visual supply returned no exact asset",
+            "visual_qa",
+        )
+
+    path = str(generated.get("path") or "").strip()
+    if not path:
+        return None, Verdict(
+            False,
+            "V2 generated visual supply returned no path",
+            "visual_qa",
+        )
+
+    identity_visual = CandidateVisualV2.from_dict({
+        "source_type": "generated",
+        "description": "",
+        "visible_components": [],
+        "observable_state": [],
+        "visible_relations_or_mechanisms": [],
+        "forbidden_visuals_present": [],
+        "provider": str(generated.get("provider") or "generated"),
+        "source_id": str(generated.get("source_id") or ""),
+        "media_url": path,
+        "search_query": next(
+            (str(q).strip() for q in plan.search_queries if str(q).strip()),
+            plan.subject,
+        ),
+    })
+    actual_visual = classify_generated_fn(
+        scene,
+        plan,
+        identity_visual,
+        path,
+    )
+    verdict = evaluate_scene_visual_qa(scene, plan, actual_visual)
+    print(
+        "[V2_VISUAL_SELECT] "
+        f"scene={scene.scene_index} provider={actual_visual.provider or 'generated'} "
+        f"source_id={actual_visual.source_id or 'unknown'} "
+        f"status={'PASS' if verdict.passed else 'FAIL'} mode=generated"
+    )
+    if not verdict.passed:
+        return None, verdict
+
+    generated_key = (
+        f"{actual_visual.provider}:{actual_visual.source_id}"
+        if actual_visual.source_id
+        else actual_visual.media_url
+    )
+    if used_asset_keys and generated_key in used_asset_keys:
+        return None, Verdict(
+            False,
+            f"generated exact asset already used: {generated_key}",
+            "visual_qa",
+        )
+    return actual_visual, verdict
+
+
 def _default_provider_searches():
     from video.video_downloader import search_pexels_candidates
     from video.video_providers import search_pixabay_candidates
@@ -373,15 +495,28 @@ def select_visual_for_scene(
         queries = [plan.subject.strip()]
 
     preferred = str(plan.preferred_source_type or "").strip().lower()
-    # "generated" and "grounded_explanatory" both permit one bounded
-    # verified generated fallback after exact stock proof fails. This does not
-    # relax semantics: the generated clip must pass the same full V2 visual QA.
-    allow_generated_fallback = preferred in {"generated", "grounded_explanatory"}
-    grounded_only_after_stock = False
+    generate_first = preferred in {"generated", "grounded_explanatory"}
     download_stock_fn = download_stock_fn or _default_download_stock
-    classify_stock_video_fn = (
-        classify_stock_video_fn or _default_classify_stock_video
-    )
+    classify_stock_video_fn = classify_stock_video_fn or _default_classify_stock_video
+    generate_fn = generate_fn or _default_generate_visual
+    classify_generated_fn = classify_generated_fn or _default_classify_generated
+
+    generated_failure = None
+    if generate_first:
+        generated_visual, generated_verdict = _try_generated_visual(
+            scene,
+            plan,
+            generate_fn=generate_fn,
+            classify_generated_fn=classify_generated_fn,
+            used_asset_keys=used_asset_keys,
+        )
+        if generated_visual is not None:
+            return generated_visual, generated_verdict
+        generated_failure = generated_verdict
+        print(
+            "[V2_GENERATED_FALLBACK_TO_STOCK] "
+            f"scene={scene.scene_index} reason={generated_verdict.reason}"
+        )
 
     attempts = 0
     last_verdict = Verdict(False, "no exact stock video was inspected", "visual_qa")
@@ -504,74 +639,10 @@ def select_visual_for_scene(
         if attempts >= limit:
             break
 
-    if allow_generated_fallback:
-        generate_fn = generate_fn or _default_generate_visual
-        classify_generated_fn = classify_generated_fn or _default_classify_generated
-        generated = generate_fn(scene, plan)
-        if generated:
-            path = str(generated.get("path") or "").strip()
-            if path:
-                identity_visual = CandidateVisualV2.from_dict({
-                    "source_type": "generated",
-                    "description": "",
-                    "visible_components": [],
-                    "observable_state": [],
-                    "visible_relations_or_mechanisms": [],
-                    "forbidden_visuals_present": [],
-                    "provider": str(generated.get("provider") or "generated"),
-                    "source_id": str(generated.get("source_id") or ""),
-                    "media_url": path,
-                    "search_query": next(
-                        (str(q).strip() for q in plan.search_queries if str(q).strip()),
-                        plan.subject,
-                    ),
-                })
-                actual_visual = classify_generated_fn(
-                    scene,
-                    plan,
-                    identity_visual,
-                    path,
-                )
-                generated_verdict = evaluate_scene_visual_qa(
-                    scene,
-                    plan,
-                    actual_visual,
-                )
-                print(
-                    "[V2_VISUAL_SELECT] "
-                    f"scene={scene.scene_index} "
-                    f"provider={actual_visual.provider or 'generated'} "
-                    f"source_id={actual_visual.source_id or 'unknown'} "
-                    f"status={'PASS' if generated_verdict.passed else 'FAIL'} "
-                    "mode=generated_fallback"
-                )
-                if generated_verdict.passed:
-                    generated_key = (
-                        f"{actual_visual.provider}:{actual_visual.source_id}"
-                        if actual_visual.source_id
-                        else actual_visual.media_url
-                    )
-                    if used_asset_keys and generated_key in used_asset_keys:
-                        last_verdict = Verdict(
-                            False,
-                            f"generated exact asset already used: {generated_key}",
-                            "visual_qa",
-                        )
-                        print(
-                            "[V2_VISUAL_SKIP] "
-                            f"scene={scene.scene_index} asset={generated_key} "
-                            "reason=already_used"
-                        )
-                    else:
-                        return actual_visual, generated_verdict
-                else:
-                    last_verdict = generated_verdict
-
-    return None, Verdict(
-        False,
-        f"no exact visual passed V2 QA; last={last_verdict.reason}",
-        "visual_qa",
-    )
+    reason = f"no exact visual passed V2 QA; stock_last={last_verdict.reason}"
+    if generated_failure is not None:
+        reason += f"; generated_first={generated_failure.reason}"
+    return None, Verdict(False, reason, "visual_qa")
 
 
 def search_and_classify(
