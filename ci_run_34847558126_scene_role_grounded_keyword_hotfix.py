@@ -53,11 +53,25 @@ _RUN_34847558126_PHYSICAL_COMPONENT_TERMS = {
 
 _run_34847558126_previous_owned_claim_keyword_terms = _owned_claim_keyword_terms
 
+# A claim id is lineage metadata, not automatically a literal stock-search
+# phrase. This exact trusted result claim is about visible elastic wing flex
+# under load; tokens such as "not rigid plate" describe the conclusion but
+# are poor visual promises and repeatedly produced generic static wing shots.
+# Keep the correction bounded to the repo-owned claim id and use only
+# observable terms already entailed by its trusted evidence.
+_RUN_34847558126_CLAIM_VISUAL_TERMS = {
+    "wing_flex_not_rigid_plate": ["flex", "bending", "load"],
+}
+
 
 def _owned_claim_keyword_terms(contract):
     contract = contract if isinstance(contract, dict) else {}
+    claim_id = str(contract.get("owned_claim_id") or "").strip()
+    if claim_id in _RUN_34847558126_CLAIM_VISUAL_TERMS:
+        return list(_RUN_34847558126_CLAIM_VISUAL_TERMS[claim_id])
+
     id_terms = _grounded_keyword_terms(
-        str(contract.get("owned_claim_id") or "").replace("_", " ")
+        claim_id.replace("_", " ")
     )
     content_values = [str(contract.get("supporting_evidence_summary") or "")]
     content_values.extend(

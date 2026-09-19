@@ -171,6 +171,31 @@ def main():
             assert ve._winglet_subject(bare_scene) is False
             print("CASE F bare aircraft+wing -> winglet family false: PASS")
 
+            # CASE G: the wing-flex payoff claim must retrieve observable
+            # flex/bending-under-load evidence, not literal claim-id prose such
+            # as "not rigid plate" that produces static generic wing shots.
+            flex_plan = {
+                "canonical_subject": "aircraft wing structure under aerodynamic load",
+            }
+            flex_contract = {
+                "owned_claim_id": "wing_flex_not_rigid_plate",
+                "supporting_evidence_summary": (
+                    "항공기 날개는 완전히 움직이지 않는 판이 아니라 "
+                    "하중 아래에서 탄성 변형하는 구조입니다."
+                ),
+                "grounding_provenance_present": True,
+            }
+            flex_keyword = runner._grounded_claim_aware_keyword(
+                flex_contract, flex_plan
+            )
+            flex_words = set(flex_keyword.split())
+            assert {"aircraft", "wing", "flex", "bending", "load"} <= flex_words, flex_keyword
+            assert not ({"not", "rigid", "plate"} & flex_words), flex_keyword
+            print(
+                f"CASE G wing-flex payoff uses observable retrieval terms: "
+                f"{flex_keyword!r}: PASS"
+            )
+
         finally:
             sys.path.remove(str(repo))
 
