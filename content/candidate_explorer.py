@@ -1993,6 +1993,99 @@ def _preserve_rewrite_authority(original, rewritten):
     return rewritten
 
 
+_NARROWNESS_FIXED_TOPIC_LLM_BLOCKED = set()
+
+
+def _exact_fixed_topic_for_candidate(candidate):
+    fixed_topic = str(os.environ.get("SHORTS_TOPIC") or "").strip()
+    candidate_topic = str((candidate or {}).get("topic") or "").strip()
+    if fixed_topic and candidate_topic == fixed_topic:
+        return fixed_topic
+    return ""
+
+
+def _deterministic_grounded_narrowness_rewrite(winner):
+    """One no-API narrowing attempt using only evidence already on Winner.
+
+    This is deliberately conservative: it never changes topic/identity and it
+    never invents a mechanism.  It only promotes an already-present mechanism
+    or fact-check claim into the Reveal, then lets the normal narrowness
+    self-critique decide whether that is specific enough.
+    """
+
+    if not isinstance(winner, dict):
+        return None
+
+    micro = winner.get("micro_narrative")
+    if not isinstance(micro, dict):
+        return None
+
+    evidence = []
+
+    for field in (
+        "mechanism",
+        "constraint",
+        "concrete_condition",
+        "specific_observation",
+        "counterintuitive_result",
+        "tradeoff",
+    ):
+        value = str(winner.get(field) or "").strip()
+        if value and value not in evidence:
+            evidence.append(value)
+
+    for field in ("fact_check_focus", "visual_proof"):
+        values = winner.get(field)
+        if isinstance(values, list):
+            for value in values:
+                text = str(value or "").strip()
+                if text and text not in evidence:
+                    evidence.append(text)
+
+    # A deterministic rewrite is only useful when there is real grounded
+    # specificity to promote.  Otherwise return None and preserve fail-close.
+    if not evidence:
+        return None
+
+    rewritten = deepcopy(winner)
+    rewritten_micro = deepcopy(micro)
+
+    # Prefer mechanism/fact authority over a generic generated Reveal.
+    grounded_reveal = ""
+    for field in ("mechanism",):
+        value = str(winner.get(field) or "").strip()
+        if value:
+            grounded_reveal = value
+            break
+
+    if not grounded_reveal:
+        fact_focus = winner.get("fact_check_focus")
+        if isinstance(fact_focus, list):
+            grounded_reveal = next(
+                (str(item).strip() for item in fact_focus if str(item or "").strip()),
+                "",
+            )
+
+    if not grounded_reveal:
+        grounded_reveal = evidence[0]
+
+    if not grounded_reveal:
+        return None
+
+    rewritten_micro["reveal"] = grounded_reveal
+    rewritten["micro_narrative"] = rewritten_micro
+
+    preserved = _preserve_rewrite_authority(winner, rewritten)
+    if preserved is None:
+        return None
+
+    print(
+        "🧭 NARROWNESS DETERMINISTIC GROUNDED REWRITE: "
+        "promoted existing evidence without API call"
+    )
+    return preserved
+
+
 def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
     """Targeted, same-subject rewrite of a Winner the narrowness self-critique
     rejected as TOO_BROAD.
@@ -2362,12 +2455,47 @@ def explore_candidates(
 
         critique = _self_critique_narrowness(winner, model=model)
 
+        fixed_topic_key = _exact_fixed_topic_for_candidate(winner)
+
+        # Run 35415019612: before spending another model rewrite call, make one
+        # deterministic attempt that can only promote evidence already present
+        # on the Winner.  Acceptance still requires the unchanged narrowness
+        # self-critique to return NARROW_ENOUGH.
+        if (
+            critique.get("verdict") == "TOO_BROAD"
+            and not (
+                fixed_topic_key
+                and fixed_topic_key in _NARROWNESS_FIXED_TOPIC_LLM_BLOCKED
+            )
+        ):
+            deterministic_rewrite = _deterministic_grounded_narrowness_rewrite(
+                winner
+            )
+            if deterministic_rewrite is not None:
+                deterministic_critique = _self_critique_narrowness(
+                    deterministic_rewrite,
+                    model=model,
+                )
+                winner = deterministic_rewrite
+                critique = deterministic_critique
+
         rewrite_attempts = 0
 
         while (
             critique.get("verdict") == "TOO_BROAD"
             and rewrite_attempts < MAX_NARROWNESS_REWRITES
         ):
+
+            if (
+                fixed_topic_key
+                and fixed_topic_key in _NARROWNESS_FIXED_TOPIC_LLM_BLOCKED
+            ):
+                print(
+                    "🛑 NARROWNESS LLM REWRITE SKIPPED: "
+                    "exact fixed topic already produced an unusable rewrite "
+                    "in this process"
+                )
+                break
 
             print("")
             print("=" * 64)
@@ -2388,11 +2516,21 @@ def explore_candidates(
             rewrite_attempts += 1
 
             if rewritten is None:
-                # Rewrite itself failed or was unusable -- this attempt is
-                # spent. Keep the original (still TOO_BROAD) winner/critique
-                # so the loop condition above can still try again if
-                # attempts remain, and so the final REGENERATE below (if
-                # attempts run out) reports the real last critique reason.
+                # For an exact fixed topic, repeating a model rewrite after an
+                # unusable result recreated the same unsupported-precision loop
+                # across production attempts.  Remember that one failure for
+                # this process and let later raw Explorer candidates try to
+                # pass the real gate without spending more rewrite calls.
+                if fixed_topic_key:
+                    _NARROWNESS_FIXED_TOPIC_LLM_BLOCKED.add(fixed_topic_key)
+                    print(
+                        "🛑 NARROWNESS FIXED-TOPIC REWRITE BLOCKED: "
+                        "later attempts must pass without another LLM rewrite"
+                    )
+                    break
+
+                # Automatic-topic paths retain the original bounded retry
+                # behavior.  No threshold or retry limit is relaxed.
                 continue
 
             winner = rewritten
