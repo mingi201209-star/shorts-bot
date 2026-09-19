@@ -2050,6 +2050,56 @@ def _deterministic_grounded_narrowness_rewrite(winner):
     rewritten = deepcopy(winner)
     rewritten_micro = deepcopy(micro)
 
+    # If this exact fixed topic is owned by exactly one repo-trusted seed,
+    # prefer that seed's already-grounded editorial question/reveal before
+    # asking a model to invent specificity.  The normal narrowness
+    # self-critique still decides PASS/TOO_BROAD afterwards, so this is supply,
+    # not a gate bypass.
+    fixed_topic = _exact_fixed_topic_for_candidate(winner)
+    if fixed_topic:
+        try:
+            from quality.grounding_aware_candidate_supply import (
+                all_trusted_candidate_records,
+            )
+
+            exact_seed_records = []
+            for record in all_trusted_candidate_records():
+                if not isinstance(record, dict):
+                    continue
+                seed = record.get("seed_candidate")
+                if not isinstance(seed, dict):
+                    continue
+                if str(seed.get("topic") or "").strip() == fixed_topic:
+                    exact_seed_records.append(record)
+
+            if len(exact_seed_records) == 1:
+                seed = exact_seed_records[0].get("seed_candidate") or {}
+                seed_micro = seed.get("micro_narrative")
+                if isinstance(seed_micro, dict):
+                    seed_question = str(seed.get("core_question") or "").strip()
+                    seed_reveal = str(seed_micro.get("reveal") or "").strip()
+                    if seed_question and seed_reveal:
+                        rewritten["angle"] = str(
+                            seed.get("angle") or rewritten.get("angle") or ""
+                        ).strip()
+                        rewritten["core_question"] = seed_question
+                        rewritten_micro = deepcopy(seed_micro)
+                        rewritten["micro_narrative"] = rewritten_micro
+                        preserved = _preserve_rewrite_authority(
+                            winner,
+                            rewritten,
+                        )
+                        if preserved is not None:
+                            print(
+                                "🧭 NARROWNESS DETERMINISTIC GROUNDED REWRITE: "
+                                "used exact repo-owned fixed-topic seed"
+                            )
+                            return preserved
+        except Exception:
+            # Exact-seed assistance is optional. Any lookup/composition problem
+            # falls back to the existing winner-owned evidence path below.
+            pass
+
     # Prefer mechanism/fact authority over a generic generated Reveal.
     grounded_reveal = ""
     for field in ("mechanism",):
