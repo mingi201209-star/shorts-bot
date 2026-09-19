@@ -6,6 +6,7 @@ on:
       - 'ci_final_render_content_integrity_hotfix.py'
       - 'quality/final_render_integrity.py'
       - 'quality/final_render_integrity_regression_test.py'
+      - 'quality/visual_quality_production_gate_regression_test.py'
       - '.github/workflows/main.yml'
       - '.github/workflows/final_render_content_integrity_regression.yml'
   workflow_dispatch:
@@ -23,7 +24,8 @@ jobs:
           python ci_final_render_content_integrity_hotfix.py
       - name: Compile
         run: |
-          python -m py_compile ci_final_render_content_integrity_hotfix.py quality/final_render_integrity.py quality/final_render_integrity_regression_test.py main.py
+          python -m py_compile ci_final_render_content_integrity_hotfix.py quality/final_render_integrity.py quality/final_render_integrity_regression_test.py quality/visual_quality_production_gate_regression_test.py main.py
       - name: Run regression
         run: |
           python quality/final_render_integrity_regression_test.py
+          python quality/visual_quality_production_gate_regression_test.py

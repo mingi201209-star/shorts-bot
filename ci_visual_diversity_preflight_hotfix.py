@@ -60,20 +60,26 @@ still_path.write_text(still, encoding="utf-8")
 
 engine_path = Path("video/video_engine.py")
 engine = engine_path.read_text(encoding="utf-8")
-engine = replace_once(
-    engine,
-    '''                    "source_id": still_result.get("source_id", "generated-still"),
+if not (
+    '"source_asset_id": still_result.get("source_asset_id", still_result.get("source_id", "generated-still"))'
+    in engine
+    and '"template_type": still_result.get("template_type", "")' in engine
+    and '"motion_profile": still_result.get("motion_profile", "")' in engine
+):
+    engine = replace_once(
+        engine,
+        '''                    "source_id": still_result.get("source_id", "generated-still"),
                     "metadata": " | ".join(part for part in metadata_parts if part),
 ''',
-    '''                    "source_id": still_result.get("source_id", "generated-still"),
+        '''                    "source_id": still_result.get("source_id", "generated-still"),
                     "source_asset_id": still_result.get("source_asset_id", still_result.get("source_id", "generated-still")),
                     "template_type": still_result.get("template_type", ""),
                     "presentation_variant": still_result.get("presentation_variant", ""),
                     "motion_profile": still_result.get("motion_profile", ""),
                     "metadata": " | ".join(part for part in metadata_parts if part),
 ''',
-    "visual explanation physical/presentation lineage",
-)
+        "visual explanation physical/presentation lineage",
+    )
 engine_path.write_text(engine, encoding="utf-8")
 
 director_path = Path("quality/final_visual_director.py")
