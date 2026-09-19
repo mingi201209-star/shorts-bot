@@ -23,6 +23,20 @@ def reset_final_visual_semantic_report():
         pass
 
 
+def _evidence_metadata(selection):
+    evidence = []
+    for key in (
+        "visible_components",
+        "visible_subject_groups",
+        "verification_evidence",
+        "current_scene_verification",
+    ):
+        value = selection.get(key)
+        if value:
+            evidence.append(f"{key}={value}")
+    return " ".join(evidence)
+
+
 def record_final_visual_scene(scene_index, query, selection, *, hook_verified=False, duration=None):
     if hook_verified:
         entry = {
@@ -33,6 +47,13 @@ def record_final_visual_scene(scene_index, query, selection, *, hook_verified=Fa
         }
     else:
         selection = dict(selection or {})
+        metadata = " ".join(
+            part for part in (
+                str(selection.get("metadata") or ""),
+                _evidence_metadata(selection),
+            )
+            if part
+        )
         entry = {
             "scene_index": int(scene_index),
             "query": str(query or "").strip(),
@@ -49,7 +70,11 @@ def record_final_visual_scene(scene_index, query, selection, *, hook_verified=Fa
             "template_type": str(selection.get("template_type") or ""),
             "presentation_variant": str(selection.get("presentation_variant") or ""),
             "motion_profile": str(selection.get("motion_profile") or ""),
-            "metadata": str(selection.get("metadata") or "")[:500],
+            "metadata": metadata[:900],
+            "visible_components": list(selection.get("visible_components") or []),
+            "visible_subject_groups": dict(selection.get("visible_subject_groups") or {}),
+            "verification_evidence": dict(selection.get("verification_evidence") or {}),
+            "current_scene_verification": dict(selection.get("current_scene_verification") or {}),
         }
     if duration is not None:
         try:
