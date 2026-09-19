@@ -1347,7 +1347,7 @@ def main():
     if quality_core_v2.is_enabled():
         from quality_core_v2.runner import run_v2_pipeline
 
-        return run_v2_pipeline()
+        return run_v2_pipeline(quality_core_v2.topic_direction_from_environment())
 
     start_time = time.time()
 

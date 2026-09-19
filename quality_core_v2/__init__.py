@@ -29,3 +29,16 @@ def is_enabled() -> bool:
     V2-specific, and to do nothing here otherwise.
     """
     return os.environ.get("ENABLE_QUALITY_CORE_V2") == "1"
+
+
+def topic_direction_from_environment() -> str:
+    """Pure: the same SHORTS_TOPIC env var V1's ci_topic_input_hotfix.py
+    reads for its `forced_topic`. main.py's V2 guard clause was calling
+    run_v2_pipeline() with no topic at all, so the Explorer always received
+    an empty topic_direction regardless of the workflow_dispatch `topic`
+    input -- confirmed as the root cause of Golden E2E run 35430511093
+    (Golden Topic "aircraft wing flex" dispatched, but Explorer produced an
+    unrelated typhoon-domain Scene 1, which then failed subject-anchor
+    enforcement with an empty keyword). Fixed by reading it here instead.
+    """
+    return os.environ.get("SHORTS_TOPIC", "").strip()
