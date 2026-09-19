@@ -354,12 +354,11 @@ def select_visual_for_scene(
                 if rank >= len(hits):
                     continue
                 if attempts >= limit:
-                    return None, Verdict(
-                        False,
-                        f"no exact visual passed within bounded classification budget "
-                        f"({attempts}/{limit}); last={last_verdict.reason}",
-                        "visual_qa",
-                    )
+                    # Stop stock inspection cleanly. If the plan explicitly
+                    # prefers generated evidence, the single bounded generated
+                    # fallback below still gets its chance; do not return early
+                    # and accidentally bypass that planned fallback.
+                    break
 
                 hit = hits[rank]
                 identity = _hit_identity(hit, provider, query)
@@ -448,6 +447,11 @@ def select_visual_for_scene(
                     )
                     if exact_verdict.passed:
                         return actual_visual, exact_verdict
+
+            if attempts >= limit:
+                break
+        if attempts >= limit:
+            break
 
     if allow_generated_fallback:
         generate_fn = generate_fn or _default_generate_visual

@@ -62,6 +62,9 @@ Narration을 직접 검색어로 바꾸지 마라.
 
 Candidate의 canonical_subject와 concrete_subject를 모든 Scene에서 유지한다.
 다른 대상(예: 날개 주제에서 객실/승객)으로 바꾸지 마라.
+subject / required_visible_components / required_observable_state /
+required_relation_or_mechanism / forbidden_visuals / search_queries /
+generation_prompt_constraints는 짧고 구체적인 영어 물리 용어로 작성한다.
 search_queries에는 required_observable_state의 핵심 현상 단어를 반드시 남긴다.
 예: bending/flexing이 필요하면 aircraft wing 같은 subject-only 검색어로 축약하지 마라.
 required_relation_or_mechanism은 실제 프레임에서 확인 가능한 물리적 관계만 적는다.
