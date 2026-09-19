@@ -183,6 +183,83 @@ def test_rejected_candidate_rewritten_and_accepted_mutates_in_place():
         assert mock_narrowness.call_count == 1
 
 
+def test_gate_rewrite_preserves_grounding_and_evidence_authority():
+    cg = _load_gate_module()
+
+    original = _candidate(
+        "비행기 날개",
+        "비행기 날개는 하중을 받을 때 왜 휘고 비틀리는가?",
+        "하중에 따라 날개 구조가 탄성 변형한다.",
+    )
+    original["fact_check_focus"] = [
+        "주익의 스파와 윙박스가 하중을 분산한다.",
+    ]
+    original["visual_proof"] = [
+        "비행 중 같은 날개의 실제 flex 변화",
+    ]
+    original["subject_kind"] = "physical_entity"
+    original["canonical_subject"] = "비행기 날개"
+    original["subject_identity_confidence"] = 0.95
+    original["grounding_evidence"] = [
+        {
+            "evidence_type": "explicit_candidate_identity",
+            "supports_subject": "비행기 날개",
+            "source": "candidate_text",
+            "detail": "topic explicitly names 비행기 날개",
+        }
+    ]
+
+    model_rewrite = _candidate(
+        "비행기 날개",
+        "비행기 날개는 하중을 받을 때 어느 구조가 먼저 휘는가?",
+        "스파와 윙박스가 하중을 나누며 탄성 변형한다.",
+    )
+    model_rewrite["fact_check_focus"] = ["모델이 새로 만든 미확인 주장"]
+    model_rewrite["visual_proof"] = ["모델이 새로 만든 미확인 화면"]
+
+    p1, p2, p3, p4 = _patched(cg, [_make_response(model_rewrite)])
+    with p1, p2, p3, p4:
+        rewritten = cg._rewrite_candidate_for_gate_feedback(
+            original,
+            "Reveal이 일반적임 (test)",
+        )
+
+    assert rewritten is not None
+    assert rewritten["topic"] == original["topic"]
+    assert rewritten["fact_check_focus"] == original["fact_check_focus"]
+    assert rewritten["visual_proof"] == original["visual_proof"]
+    assert rewritten["subject_kind"] == "physical_entity"
+    assert rewritten["canonical_subject"] == "비행기 날개"
+    assert rewritten["grounding_evidence"] == original["grounding_evidence"]
+
+
+def test_gate_rewrite_rejects_unsupported_numeric_detail():
+    cg = _load_gate_module()
+
+    original = _candidate(
+        "비행기 날개",
+        "비행기 날개는 하중을 받을 때 왜 휘고 비틀리는가?",
+        "하중에 따라 날개 구조가 탄성 변형한다.",
+    )
+    original["fact_check_focus"] = ["날개 하중과 탄성 변형의 관계"]
+    original["visual_proof"] = ["비행 중 같은 날개의 실제 flex 변화"]
+
+    fabricated = _candidate(
+        "비행기 날개",
+        "날개 끝 비틀림이 중간부보다 20% 더 큰 이유는 무엇인가?",
+        "특정 재료 조합 때문에 20% 차이가 난다.",
+    )
+
+    p1, p2, p3, p4 = _patched(cg, [_make_response(fabricated)])
+    with p1, p2, p3, p4:
+        rewritten = cg._rewrite_candidate_for_gate_feedback(
+            original,
+            "Reveal이 일반적임 (test)",
+        )
+
+    assert rewritten is None
+
+
 # ------------------------------------------------------------------
 # 3: bounded retry -- stops after MAX_CANDIDATE_GATE_REWRITES and discards.
 # ------------------------------------------------------------------
@@ -294,6 +371,12 @@ if __name__ == "__main__":
 
     test_rejected_candidate_rewritten_and_accepted_mutates_in_place()
     print("✓ test_rejected_candidate_rewritten_and_accepted_mutates_in_place")
+
+    test_gate_rewrite_preserves_grounding_and_evidence_authority()
+    print("✓ test_gate_rewrite_preserves_grounding_and_evidence_authority")
+
+    test_gate_rewrite_rejects_unsupported_numeric_detail()
+    print("✓ test_gate_rewrite_rejects_unsupported_numeric_detail")
 
     test_recovery_limit_respected_then_discards()
     print("✓ test_recovery_limit_respected_then_discards")

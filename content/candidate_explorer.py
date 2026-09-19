@@ -3,6 +3,7 @@
 import json
 import os
 import re
+from copy import deepcopy
 
 import openai
 
@@ -1852,14 +1853,27 @@ _NARROWNESS_REWRITE_PROMPT = """
 아래 [REJECTION REASON]에서 지적된
 일반적인/예상 가능한 설명 대신
 
-- 수치
-- 임계값
-- 예외
+- 구체적인 구조/부품
+- 힘이나 변화가 전달되는 경로
+- 위치/방향의 차이
 - 조건
 - 순서
+- 예외
+- 관찰 가능한 변화
+- 이미 근거에 있는 구체적인 메커니즘
 
-중 하나 이상이 들어간
+중 하나 이상을 사용해
 더 좁은 Core Question과 Reveal로 다시 써라.
+
+아래 [FACT CHECK FOCUS]와 [VISUAL PROOF], 그리고 기존 Candidate에
+이미 들어 있는 사실·관찰·메커니즘을 최우선으로 사용하라.
+이 단계는 Fact discovery가 아니다.
+
+수치·퍼센트·각도·힘·질량·거리·시간 같은 정량 정보는
+기존 Candidate 또는 근거에 같은 값이 이미 있을 때만 사용할 수 있다.
+없는 숫자를 만들어 구체적으로 보이게 하지 마라.
+근거가 비어 있거나 불충분하면 숫자를 만들지 말고
+구조/위치/조건/순서/관찰 포인트를 더 좁혀라.
 
 예:
 넓음: "비행기 날개는 왜 공기 흐름을 최적화할까?"
@@ -1886,6 +1900,242 @@ OUTPUT CONTRACT의 winner 객체와
 """
 
 
+_REWRITE_AUTHORITY_FIELDS = (
+    "fact_check_focus",
+    "visual_proof",
+    "specific_observation",
+    "mechanism",
+    "constraint",
+    "concrete_condition",
+    "counterintuitive_result",
+    "tradeoff",
+    "subject_kind",
+    "canonical_subject",
+    "subject_identity_confidence",
+    "grounding_evidence",
+    "_trusted_grounding_evidence",
+    "_trusted_grounded_claims",
+)
+
+
+def _rewrite_candidate_text(candidate):
+    if not isinstance(candidate, dict):
+        return ""
+
+    micro = candidate.get("micro_narrative")
+    if not isinstance(micro, dict):
+        micro = {}
+
+    chunks = [
+        candidate.get("topic"),
+        candidate.get("angle"),
+        candidate.get("core_question"),
+        candidate.get("specific_observation"),
+        candidate.get("mechanism"),
+        candidate.get("constraint"),
+        candidate.get("concrete_condition"),
+        candidate.get("counterintuitive_result"),
+        candidate.get("tradeoff"),
+        micro.get("hook"),
+        micro.get("core_question"),
+        micro.get("reveal"),
+        micro.get("payoff"),
+    ]
+
+    for field in ("fact_check_focus", "visual_proof"):
+        values = candidate.get(field)
+        if isinstance(values, list):
+            chunks.extend(values)
+
+    return " ".join(str(value or "").strip() for value in chunks if str(value or "").strip())
+
+
+def _numeric_claim_tokens(text):
+    return set(re.findall(r"(?<![A-Za-z0-9])\d+(?:[.,]\d+)?(?:\s*(?:%|°|도|배|초|분|시간|km|m|cm|mm|kg|g|N|kN))?", str(text or "")))
+
+
+def _preserve_rewrite_authority(original, rewritten):
+    """Keep a bounded rewrite on the exact same subject/evidence authority.
+
+    The rewrite call is editorial recovery, not a fact-discovery or grounding
+    step. It may rephrase the question/reveal, but it cannot replace the
+    Candidate's evidence lists, trusted grounding metadata, or introduce a new
+    numeric claim that was absent from the original Candidate/evidence.
+    """
+
+    if not isinstance(original, dict) or not isinstance(rewritten, dict):
+        return None
+
+    original_topic = str(original.get("topic") or "").strip()
+    rewritten_topic = str(rewritten.get("topic") or "").strip()
+    if not original_topic or rewritten_topic != original_topic:
+        print("🚫 Narrowness rewrite rejected: subject/topic changed")
+        return None
+
+    allowed_numbers = _numeric_claim_tokens(_rewrite_candidate_text(original))
+    rewritten_numbers = _numeric_claim_tokens(_rewrite_candidate_text(rewritten))
+    unsupported_numbers = rewritten_numbers - allowed_numbers
+    if unsupported_numbers:
+        print(
+            "🚫 Narrowness rewrite rejected: unsupported numeric detail "
+            + ",".join(sorted(unsupported_numbers))
+        )
+        return None
+
+    for field in _REWRITE_AUTHORITY_FIELDS:
+        if field in original:
+            rewritten[field] = deepcopy(original[field])
+
+    for field, value in original.items():
+        if field.startswith("_repo_owned_") or field.startswith("_trusted_"):
+            rewritten[field] = deepcopy(value)
+
+    return rewritten
+
+
+_NARROWNESS_FIXED_TOPIC_LLM_BLOCKED = set()
+
+
+def _exact_fixed_topic_for_candidate(candidate):
+    fixed_topic = str(os.environ.get("SHORTS_TOPIC") or "").strip()
+    candidate_topic = str((candidate or {}).get("topic") or "").strip()
+    if fixed_topic and candidate_topic == fixed_topic:
+        return fixed_topic
+    return ""
+
+
+def _deterministic_grounded_narrowness_rewrite(winner):
+    """One no-API narrowing attempt using only evidence already on Winner.
+
+    This is deliberately conservative: it never changes topic/identity and it
+    never invents a mechanism.  It only promotes an already-present mechanism
+    or fact-check claim into the Reveal, then lets the normal narrowness
+    self-critique decide whether that is specific enough.
+    """
+
+    if not isinstance(winner, dict):
+        return None
+
+    micro = winner.get("micro_narrative")
+    if not isinstance(micro, dict):
+        return None
+
+    evidence = []
+
+    for field in (
+        "mechanism",
+        "constraint",
+        "concrete_condition",
+        "specific_observation",
+        "counterintuitive_result",
+        "tradeoff",
+    ):
+        value = str(winner.get(field) or "").strip()
+        if value and value not in evidence:
+            evidence.append(value)
+
+    for field in ("fact_check_focus", "visual_proof"):
+        values = winner.get(field)
+        if isinstance(values, list):
+            for value in values:
+                text = str(value or "").strip()
+                if text and text not in evidence:
+                    evidence.append(text)
+
+    # A deterministic rewrite is only useful when there is real grounded
+    # specificity to promote.  Otherwise return None and preserve fail-close.
+    if not evidence:
+        return None
+
+    rewritten = deepcopy(winner)
+    rewritten_micro = deepcopy(micro)
+
+    # If this exact fixed topic is owned by exactly one repo-trusted seed,
+    # prefer that seed's already-grounded editorial question/reveal before
+    # asking a model to invent specificity.  The normal narrowness
+    # self-critique still decides PASS/TOO_BROAD afterwards, so this is supply,
+    # not a gate bypass.
+    fixed_topic = _exact_fixed_topic_for_candidate(winner)
+    if fixed_topic:
+        try:
+            from quality.grounding_aware_candidate_supply import (
+                all_trusted_candidate_records,
+            )
+
+            exact_seed_records = []
+            for record in all_trusted_candidate_records():
+                if not isinstance(record, dict):
+                    continue
+                seed = record.get("seed_candidate")
+                if not isinstance(seed, dict):
+                    continue
+                if str(seed.get("topic") or "").strip() == fixed_topic:
+                    exact_seed_records.append(record)
+
+            if len(exact_seed_records) == 1:
+                seed = exact_seed_records[0].get("seed_candidate") or {}
+                seed_micro = seed.get("micro_narrative")
+                if isinstance(seed_micro, dict):
+                    seed_question = str(seed.get("core_question") or "").strip()
+                    seed_reveal = str(seed_micro.get("reveal") or "").strip()
+                    if seed_question and seed_reveal:
+                        rewritten["angle"] = str(
+                            seed.get("angle") or rewritten.get("angle") or ""
+                        ).strip()
+                        rewritten["core_question"] = seed_question
+                        rewritten_micro = deepcopy(seed_micro)
+                        rewritten["micro_narrative"] = rewritten_micro
+                        preserved = _preserve_rewrite_authority(
+                            winner,
+                            rewritten,
+                        )
+                        if preserved is not None:
+                            print(
+                                "🧭 NARROWNESS DETERMINISTIC GROUNDED REWRITE: "
+                                "used exact repo-owned fixed-topic seed"
+                            )
+                            return preserved
+        except Exception:
+            # Exact-seed assistance is optional. Any lookup/composition problem
+            # falls back to the existing winner-owned evidence path below.
+            pass
+
+    # Prefer mechanism/fact authority over a generic generated Reveal.
+    grounded_reveal = ""
+    for field in ("mechanism",):
+        value = str(winner.get(field) or "").strip()
+        if value:
+            grounded_reveal = value
+            break
+
+    if not grounded_reveal:
+        fact_focus = winner.get("fact_check_focus")
+        if isinstance(fact_focus, list):
+            grounded_reveal = next(
+                (str(item).strip() for item in fact_focus if str(item or "").strip()),
+                "",
+            )
+
+    if not grounded_reveal:
+        grounded_reveal = evidence[0]
+
+    if not grounded_reveal:
+        return None
+
+    rewritten_micro["reveal"] = grounded_reveal
+    rewritten["micro_narrative"] = rewritten_micro
+
+    preserved = _preserve_rewrite_authority(winner, rewritten)
+    if preserved is None:
+        return None
+
+    print(
+        "🧭 NARROWNESS DETERMINISTIC GROUNDED REWRITE: "
+        "promoted existing evidence without API call"
+    )
+    return preserved
+
+
 def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
     """Targeted, same-subject rewrite of a Winner the narrowness self-critique
     rejected as TOO_BROAD.
@@ -1906,6 +2156,26 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
     if not isinstance(micro, dict):
         micro = {}
 
+    fact_check_focus = winner.get("fact_check_focus")
+    if not isinstance(fact_check_focus, list):
+        fact_check_focus = []
+
+    visual_proof = winner.get("visual_proof")
+    if not isinstance(visual_proof, list):
+        visual_proof = []
+
+    fact_focus_text = "\n".join(
+        f"- {str(item).strip()}"
+        for item in fact_check_focus
+        if str(item).strip()
+    ) or "- 없음"
+
+    visual_proof_text = "\n".join(
+        f"- {str(item).strip()}"
+        for item in visual_proof
+        if str(item).strip()
+    ) or "- 없음"
+
     original_summary = (
         f"Topic: {winner.get('topic', '')}\n"
         f"Angle: {winner.get('angle', '')}\n"
@@ -1913,6 +2183,8 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
         f"Hook: {micro.get('hook', '')}\n"
         f"Reveal: {micro.get('reveal', '')}\n"
         f"Payoff: {micro.get('payoff', '')}\n"
+        f"\n[FACT CHECK FOCUS]\n{fact_focus_text}\n"
+        f"\n[VISUAL PROOF]\n{visual_proof_text}\n"
         f"\n[REJECTION REASON]\n{reason}"
     )
 
@@ -1920,13 +2192,33 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
     print(f"💳 Narrowness rewrite API call authorized: #{call_number}")
 
     try:
+        allowed_numbers = sorted(
+            _numeric_claim_tokens(_rewrite_candidate_text(winner))
+        )
+        if allowed_numbers:
+            numeric_policy = (
+                "\n\n[NUMERIC AUTHORITY]\n"
+                "사용 가능한 기존 정량 토큰은 다음뿐이다: "
+                + ", ".join(allowed_numbers)
+                + "\n이 목록에 없는 새 숫자/단위/퍼센트/각도는 절대 추가하지 마라."
+            )
+        else:
+            numeric_policy = (
+                "\n\n[NUMERIC AUTHORITY]\n"
+                "기존 Candidate와 근거에는 승인된 정량 값이 없다. "
+                "숫자, 퍼센트, 각도, 힘, 질량, 거리, 시간 값을 새로 만들지 마라."
+            )
+
         response = openai.chat.completions.create(
             model=model,
             messages=[
-                {"role": "system", "content": _NARROWNESS_REWRITE_PROMPT},
+                {
+                    "role": "system",
+                    "content": _NARROWNESS_REWRITE_PROMPT + numeric_policy,
+                },
                 {"role": "user", "content": original_summary},
             ],
-            temperature=0.4,
+            temperature=0.2,
             response_format={"type": "json_object"},
         )
     except Exception:
@@ -1946,9 +2238,11 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
         return None
 
     try:
-        return validate_candidate(parsed, prefix="winner", runner_up=False)
+        rewritten = validate_candidate(parsed, prefix="winner", runner_up=False)
     except Exception:
         return None
+
+    return _preserve_rewrite_authority(winner, rewritten)
 
 
 def _self_critique_narrowness(winner, *, model=MODEL):
@@ -2211,12 +2505,45 @@ def explore_candidates(
 
         critique = _self_critique_narrowness(winner, model=model)
 
+        fixed_topic_key = _exact_fixed_topic_for_candidate(winner)
+
+        # Run 35415019612: before spending another model rewrite call, make one
+        # deterministic attempt that can only promote evidence already present
+        # on the Winner.  Acceptance still requires the unchanged narrowness
+        # self-critique to return NARROW_ENOUGH.
+        if (
+            critique.get("verdict") == "TOO_BROAD"
+            and fixed_topic_key
+            and fixed_topic_key not in _NARROWNESS_FIXED_TOPIC_LLM_BLOCKED
+        ):
+            deterministic_rewrite = _deterministic_grounded_narrowness_rewrite(
+                winner
+            )
+            if deterministic_rewrite is not None:
+                deterministic_critique = _self_critique_narrowness(
+                    deterministic_rewrite,
+                    model=model,
+                )
+                winner = deterministic_rewrite
+                critique = deterministic_critique
+
         rewrite_attempts = 0
 
         while (
             critique.get("verdict") == "TOO_BROAD"
             and rewrite_attempts < MAX_NARROWNESS_REWRITES
         ):
+
+            if (
+                fixed_topic_key
+                and fixed_topic_key in _NARROWNESS_FIXED_TOPIC_LLM_BLOCKED
+            ):
+                print(
+                    "🛑 NARROWNESS LLM REWRITE SKIPPED: "
+                    "exact fixed topic already produced an unusable rewrite "
+                    "in this process"
+                )
+                break
 
             print("")
             print("=" * 64)
@@ -2237,11 +2564,21 @@ def explore_candidates(
             rewrite_attempts += 1
 
             if rewritten is None:
-                # Rewrite itself failed or was unusable -- this attempt is
-                # spent. Keep the original (still TOO_BROAD) winner/critique
-                # so the loop condition above can still try again if
-                # attempts remain, and so the final REGENERATE below (if
-                # attempts run out) reports the real last critique reason.
+                # For an exact fixed topic, repeating a model rewrite after an
+                # unusable result recreated the same unsupported-precision loop
+                # across production attempts.  Remember that one failure for
+                # this process and let later raw Explorer candidates try to
+                # pass the real gate without spending more rewrite calls.
+                if fixed_topic_key:
+                    _NARROWNESS_FIXED_TOPIC_LLM_BLOCKED.add(fixed_topic_key)
+                    print(
+                        "🛑 NARROWNESS FIXED-TOPIC REWRITE BLOCKED: "
+                        "later attempts must pass without another LLM rewrite"
+                    )
+                    break
+
+                # Automatic-topic paths retain the original bounded retry
+                # behavior.  No threshold or retry limit is relaxed.
                 continue
 
             winner = rewritten

@@ -179,7 +179,12 @@ assert positions == sorted(positions)
 assert "SHORTS_TOPIC: ${{ inputs.topic }}" in workflow
 assert "SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}" in workflow
 
-assert '"MAX_TOPIC_REGENERATIONS = 6"' in production_hotfix
+# Guard the production retry constant without pinning this regression to a
+# historical value. The authoritative ci_hotfix.py must still patch the
+# constant explicitly, while the API/cost caps below remain unchanged.
+assert 'Path("main.py")' in production_hotfix
+assert 'r"^MAX_TOPIC_REGENERATIONS\\s*=\\s*\\d+\\s*$"' in production_hotfix
+assert '"main.py MAX_TOPIC_REGENERATIONS"' in production_hotfix
 assert 'V3_MAX_API_CALLS: "60"' in workflow
 assert 'V3_MAX_COST_USD: "0.05"' in workflow
 

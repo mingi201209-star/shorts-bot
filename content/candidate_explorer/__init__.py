@@ -8,6 +8,8 @@ loaded from its file path and remains the source of truth for normal runs.
 from __future__ import annotations
 
 import importlib.util
+import os
+from copy import deepcopy
 from pathlib import Path
 
 
@@ -63,6 +65,92 @@ def _retry_topic_info(topic_info):
     return retry_info
 
 
+def _recover_exact_fixed_topic_seed(kwargs, malformed_response_error):
+    """Recover a malformed fixed-topic model response from one exact repo seed.
+
+    Run 35419510021 showed the fixed topic itself was fully grounded, but a
+    model-authored Hook/Core-Question restatement was rejected before the
+    narrowness stage and the outer loop spent 20 Explorer calls repeating that
+    class of failure.  This recovery is deliberately narrow:
+    - only an explicit fixed topic;
+    - exactly one repo-owned trusted record whose seed topic matches exactly;
+    - the seed must pass the unchanged Explorer validator;
+    - the unchanged narrowness self-critique must return NARROW_ENOUGH.
+
+    Therefore this supplies known-good grounded prose without bypassing either
+    validation or narrowness authority.
+    """
+
+    fixed_topic = str(
+        kwargs.get("fixed_topic")
+        or os.environ.get("SHORTS_TOPIC")
+        or ""
+    ).strip()
+    if not fixed_topic:
+        return None
+
+    try:
+        from quality.grounding_aware_candidate_supply import (
+            all_trusted_candidate_records,
+        )
+    except Exception:
+        return None
+
+    matches = []
+    for record in all_trusted_candidate_records():
+        if not isinstance(record, dict):
+            continue
+        seed = record.get("seed_candidate")
+        if not isinstance(seed, dict):
+            continue
+        if str(seed.get("topic") or "").strip() == fixed_topic:
+            matches.append(seed)
+
+    if len(matches) != 1:
+        return None
+
+    candidate = {
+        "status": "SELECTED",
+        "winner": deepcopy(matches[0]),
+        "runner_up": None,
+    }
+
+    try:
+        validated = _LEGACY.validate_explorer_output(candidate)
+    except Exception:
+        return None
+
+    if (
+        not isinstance(validated, dict)
+        or str(validated.get("status") or "").strip().upper() != "SELECTED"
+        or not isinstance(validated.get("winner"), dict)
+    ):
+        return None
+
+    model = kwargs.get("model") or _LEGACY.MODEL
+    try:
+        critique = _LEGACY._self_critique_narrowness(
+            validated["winner"],
+            model=model,
+        )
+    except Exception:
+        return None
+
+    if str(critique.get("verdict") or "").strip().upper() != "NARROW_ENOUGH":
+        return None
+
+    validated["_exact_fixed_topic_seed_recovery"] = {
+        "status": "USED",
+        "reason": str(malformed_response_error),
+        "api_calls_added": 1,
+    }
+    print(
+        "🧭 EXACT FIXED-TOPIC SEED RECOVERY: "
+        "repo-owned seed passed validator + narrowness gate"
+    )
+    return validated
+
+
 def _call_legacy_explore_candidates(topic_info, kwargs):
     """Run the legacy Explorer call, converting its own known malformed-
     response signals into the same bounded REGENERATE contract it already
@@ -92,6 +180,13 @@ def _call_legacy_explore_candidates(topic_info, kwargs):
     try:
         return _LEGACY.explore_candidates(topic_info, **kwargs)
     except (ValueError, RuntimeError) as malformed_response_error:
+        recovered = _recover_exact_fixed_topic_seed(
+            kwargs,
+            malformed_response_error,
+        )
+        if recovered is not None:
+            return recovered
+
         return {
             "status": "REGENERATE",
             "reason": (
