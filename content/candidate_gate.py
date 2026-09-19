@@ -693,6 +693,13 @@ Gate가 지적한 문제를 해결한 버전으로 다시 쓰는 역할이다.
 중 하나 이상이 들어간
 더 좁고 구체적인 Core Question과 Reveal로 다시 써라.
 
+가능하면 아래 [FACT CHECK FOCUS]와 [VISUAL PROOF]에
+이미 들어 있는 구체적인 사실·관찰·메커니즘을 먼저 사용하라.
+이 단계는 Fact discovery가 아니다.
+기존 근거에 없는 새로운 수치, 원인, 메커니즘, 기술적 정체성을
+지어내지 마라. 근거가 부족하면 없는 사실을 추가하지 말고
+질문의 조건·범위·관찰 포인트만 더 좁혀라.
+
 OUTPUT CONTRACT의 winner 객체와
 동일한 형식의 JSON 객체 하나만 반환하라
 (status 필드 없이 winner 필드 내용만):
@@ -750,6 +757,26 @@ def _rewrite_candidate_for_gate_feedback(candidate, reason, *, model=MODEL):
     if not isinstance(micro, dict):
         micro = {}
 
+    fact_check_focus = candidate.get("fact_check_focus")
+    if not isinstance(fact_check_focus, list):
+        fact_check_focus = []
+
+    visual_proof = candidate.get("visual_proof")
+    if not isinstance(visual_proof, list):
+        visual_proof = []
+
+    fact_focus_text = "\n".join(
+        f"- {str(item).strip()}"
+        for item in fact_check_focus
+        if str(item).strip()
+    ) or "- 없음"
+
+    visual_proof_text = "\n".join(
+        f"- {str(item).strip()}"
+        for item in visual_proof
+        if str(item).strip()
+    ) or "- 없음"
+
     original_summary = (
         f"Topic: {candidate.get('topic', '')}\n"
         f"Angle: {candidate.get('angle', '')}\n"
@@ -757,6 +784,8 @@ def _rewrite_candidate_for_gate_feedback(candidate, reason, *, model=MODEL):
         f"Hook: {micro.get('hook', '')}\n"
         f"Reveal: {micro.get('reveal', '')}\n"
         f"Payoff: {micro.get('payoff', '')}\n"
+        f"\n[FACT CHECK FOCUS]\n{fact_focus_text}\n"
+        f"\n[VISUAL PROOF]\n{visual_proof_text}\n"
         f"\n[GATE REJECTION REASON]\n{reason}"
     )
 
@@ -790,9 +819,19 @@ def _rewrite_candidate_for_gate_feedback(candidate, reason, *, model=MODEL):
         return None
 
     try:
-        return validate_candidate(parsed, prefix="winner", runner_up=False)
+        rewritten = validate_candidate(parsed, prefix="winner", runner_up=False)
     except Exception:
         return None
+
+    preserve_authority = getattr(
+        _ce_pkg._LEGACY,
+        "_preserve_rewrite_authority",
+        None,
+    )
+    if callable(preserve_authority):
+        return preserve_authority(candidate, rewritten)
+
+    return rewritten
 
 
 def _narrowness_recheck_ok(candidate, *, model):
