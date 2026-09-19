@@ -28,6 +28,13 @@ _QUERY_ATTRIBUTE_TERMS = {
     "rounded", "round", "corner", "corners", "shape", "pressure", "structural",
     "structure", "layer", "layers", "hole", "holes", "small", "detail", "closeup",
     "mechanism", "pane", "panes", "vortex", "airflow", "drag", "wingtip", "winglet",
+    "flex", "flexing", "bend", "bending", "deform", "deformation", "deflection",
+    "lift", "load", "loaded", "twist", "twisting", "torsion", "vibration", "flutter",
+}
+_V2_QUERY_STATE_TERMS = {
+    "flex", "flexing", "bend", "bending", "deform", "deformation", "deflection",
+    "lift", "drag", "airflow", "load", "loaded", "twist", "twisting", "torsion",
+    "vibration", "flutter", "deploy", "deployment", "extended", "retracted",
 }
 
 
@@ -78,6 +85,13 @@ def query_relaxation_ladder(query):
         preferred = "airplane" if anchor == "aircraft" else anchor
         anchor_words.append(preferred)
     attributes = [word for word in words if word in _QUERY_ATTRIBUTE_TERMS and word not in anchor_words]
+    v2_enabled = str(os.environ.get("ENABLE_QUALITY_CORE_V2", "") or "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+    state_terms = [
+        word for word in words
+        if word in _V2_QUERY_STATE_TERMS and word not in anchor_words
+    ] if v2_enabled else []
 
     variants = []
     def add(parts):
@@ -86,17 +100,26 @@ def query_relaxation_ladder(query):
             variants.append(value)
 
     if attributes:
-        add(anchor_words + attributes[:2])
+        add(anchor_words + state_terms[:2] + attributes[:2])
     if anchors == ["aircraft", "window"]:
-        add(["aircraft", "window", "closeup"])
-        add(["airplane", "cabin", "window"])
+        add(["aircraft", "window"] + state_terms[:2] + ["closeup"])
+        add(["airplane", "cabin", "window"] + state_terms[:2])
     elif anchors == ["aircraft", "wing"]:
-        add(["airplane", "wing", "winglet"])
-        add(["aircraft", "wing", "closeup"])
-        add(["airplane", "wing"])
+        # Clean V2 must never relax a phenomenon-bearing query back to a
+        # subject-only wing search. Run 35431900419/35432524672 proved that
+        # doing so produces visually correct-domain but semantically useless
+        # footage. Preserve at least one physical state term in every rung.
+        if state_terms:
+            add(["airplane", "wing"] + state_terms[:2])
+            add(["aircraft", "wing"] + state_terms[:1] + ["closeup"])
+            add(["airplane", "wing"] + state_terms[:1])
+        else:
+            add(["airplane", "wing", "winglet"])
+            add(["aircraft", "wing", "closeup"])
+            add(["airplane", "wing"])
     else:
-        add(anchor_words + ["detail"])
-        add(anchor_words)
+        add(anchor_words + state_terms[:2] + ["detail"])
+        add(anchor_words + state_terms[:2])
     return variants[:3]
 
 
