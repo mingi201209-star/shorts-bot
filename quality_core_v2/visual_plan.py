@@ -37,19 +37,32 @@ _SUBJECT_CONCEPTS = {
 
 
 def _concept_tokens(text: str) -> set:
+    value = str(text or "").lower()
     result = set()
-    for token in _TOKEN_RE.findall(str(text or "").lower()):
+    for token in _TOKEN_RE.findall(value):
         if token in _STATE_STOP:
             continue
-        if token.startswith(("bend", "flex", "deform", "deflect")):
+        if (
+            token.startswith(("bend", "flex", "deform", "deflect"))
+            or any(stem in token for stem in ("휘", "굽힘", "변형", "처짐"))
+        ):
             result.add("flex_bend")
-        elif token.startswith(("twist", "torsion")):
+        elif (
+            token.startswith(("twist", "torsion"))
+            or any(stem in token for stem in ("비틀", "뒤틀"))
+        ):
             result.add("twist_torsion")
-        elif token.startswith(("vibr", "flutter")):
+        elif (
+            token.startswith(("vibr", "flutter"))
+            or any(stem in token for stem in ("진동", "플러터"))
+        ):
             result.add("vibration_flutter")
-        elif token.startswith(("deploy", "extend", "retract")):
+        elif (
+            token.startswith(("deploy", "extend", "retract"))
+            or any(stem in token for stem in ("전개", "펼쳐", "접혀", "수납"))
+        ):
             result.add("deployment")
-        elif token.startswith(("mix",)):
+        elif token.startswith(("mix",)) or "혼합" in token:
             result.add("mixing")
         else:
             result.add(token)
