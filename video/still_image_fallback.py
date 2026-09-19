@@ -364,6 +364,24 @@ def _verify_motion_clip(scene, output_path):
     return True, result
 
 
+def _verify_v2_semantic_asset(scene, output_path):
+    required_states = list((scene or {}).get("_v2_required_observable_state") or [])
+    required_components = list((scene or {}).get("_v2_required_visible_components") or [])
+    if not required_states and not required_components:
+        return True, None
+    try:
+        from quality_core_v2.actual_visual_qa import inspect_v2_item_clip
+
+        result = inspect_v2_item_clip(scene, str(output_path))
+        return bool(result.get("passed", False)), result
+    except Exception as exc:
+        print(
+            "[V2_ASSET_PREFLIGHT] "
+            f"scene={_scene_id(scene)} status=ERROR reason={type(exc).__name__}"
+        )
+        return False, {"reason": f"{type(exc).__name__}: {exc}"}
+
+
 def _reuse_verified_still(scene, *, output_path, duration, trigger_reason):
     for signature in _reuse_signatures(scene):
         cached = dict(_VERIFIED_STILL_CACHE.get(signature) or {})
@@ -380,6 +398,11 @@ def _reuse_verified_still(scene, *, output_path, duration, trigger_reason):
         try:
             _motion_clip(image_path, output_path, duration)
             verified, evidence = _verify_motion_clip(scene, output_path)
+            if verified:
+                verified, v2_preflight = _verify_v2_semantic_asset(scene, output_path)
+                if v2_preflight is not None:
+                    evidence = dict(evidence or {})
+                    evidence["v2_semantic_preflight"] = v2_preflight
             if not verified:
                 Path(output_path).unlink(missing_ok=True)
                 continue
@@ -440,6 +463,11 @@ def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reas
         image_path.write_bytes(image_bytes)
         _motion_clip(image_path, output_path, duration)
         verified, evidence = _verify_motion_clip(scene, output_path)
+        if verified:
+            verified, v2_preflight = _verify_v2_semantic_asset(scene, output_path)
+            if v2_preflight is not None:
+                evidence = dict(evidence or {})
+                evidence["v2_semantic_preflight"] = v2_preflight
         _trace_canonical_still(
             scene,
             prompt=prompt,
