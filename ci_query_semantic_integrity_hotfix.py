@@ -14,6 +14,11 @@ text = append_once(
     "QUERY_SEMANTIC_INTEGRITY",
     r'''
 # QUERY_SEMANTIC_INTEGRITY
+from quality.visual_semantic_contract import (
+    contract_requires_visual_evidence as _query_contract_requires_visual_evidence,
+    phenomenon_preserving_query as _phenomenon_preserving_query,
+)
+
 _QUERY_ANCHOR_GROUPS = {
     "aircraft": {"aircraft", "airplane", "plane", "aviation", "airliner"},
     "window": {"window", "windows", "pane", "panes"},
@@ -80,8 +85,16 @@ def query_relaxation_ladder(query):
     attributes = [word for word in words if word in _QUERY_ATTRIBUTE_TERMS and word not in anchor_words]
 
     variants = []
+    preserve_phenomenon = _query_contract_requires_visual_evidence(normalized)
+
     def add(parts):
         value = " ".join(_dedupe_words(parts)).strip()
+        if preserve_phenomenon:
+            # Run 35427917714: broadening "aircraft wing load/bending/torsion"
+            # to a bare aircraft-wing query let generic stock bypass the exact
+            # phenomenon contract, only to fail Final Visual Semantic QA later.
+            # Relax retrieval wording, never the visual-evidence promise.
+            value = _phenomenon_preserving_query(normalized, base_query=value)
         if value and value != normalized and value not in variants:
             variants.append(value)
 
@@ -91,8 +104,17 @@ def query_relaxation_ladder(query):
         add(["aircraft", "window", "closeup"])
         add(["airplane", "cabin", "window"])
     elif anchors == ["aircraft", "wing"]:
-        add(["airplane", "wing", "winglet"])
-        add(["aircraft", "wing", "closeup"])
+        # "winglet" is a concrete component, not a generic synonym for wing.
+        # Only retain it when the source query actually promised a winglet/
+        # wingtip; otherwise a relaxation step must not invent that component.
+        winglet_intent = bool(
+            set(words) & {"winglet", "winglets", "wingtip", "wingtips"}
+        )
+        if winglet_intent:
+            add(["airplane", "wing", "winglet"])
+        else:
+            add(["airplane", "wing", "closeup"])
+        add(["aircraft", "wing", "detail"])
         add(["airplane", "wing"])
     else:
         add(anchor_words + ["detail"])

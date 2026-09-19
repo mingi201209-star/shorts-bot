@@ -58,6 +58,34 @@ for query in ladder:
     anchors = vd.extract_query_anchors(query)
     assert anchors == ["aircraft", "window"], (query, anchors)
 
+# E2: relaxation may broaden stock wording, but must not drop a required
+# physical phenomenon. This is the Run 35427917714 Final Visual QA counterexample.
+load_ladder = vd.query_relaxation_ladder("aircraft wing load lift path")
+assert load_ladder, load_ladder
+for query in load_ladder:
+    qwords = set(query.split())
+    assert {"aircraft", "wing"} <= set(vd.extract_query_anchors(query)), (query, vd.extract_query_anchors(query))
+    assert qwords & {"load", "force"}, query
+    assert "winglet" not in qwords, query
+
+mode_ladder = vd.query_relaxation_ladder("aircraft wing bending torsion mode")
+assert mode_ladder, mode_ladder
+for query in mode_ladder:
+    qwords = set(query.split())
+    assert qwords & {"flex", "bending", "deformation"}, query
+    assert qwords & {"twisting", "torsion"}, query
+    assert "winglet" not in qwords, query
+
+# Actual winglet intent still keeps the component; the fix is not a blanket ban.
+winglet_ladder = vd.query_relaxation_ladder("aircraft wing winglet airflow")
+assert any("winglet" in query.split() for query in winglet_ladder), winglet_ladder
+
+# Plain static wing queries remain free to relax without manufacturing a
+# phenomenon requirement.
+plain_ladder = vd.query_relaxation_ladder("aircraft wing closeup")
+assert plain_ladder
+assert all("load" not in query.split() for query in plain_ladder), plain_ladder
+
 # F: provider failure isolation remains behavioral in both directions.
 orig_p, orig_x, orig_key = vd.search_pexels_candidates, vd.search_pixabay_candidates, vd.PIXABAY_API_KEY
 try:
