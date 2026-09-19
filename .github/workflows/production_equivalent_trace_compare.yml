@@ -1,6 +1,11 @@
 name: Production Equivalent Trace Compare
 
 on:
+  push:
+    branches:
+      - "test/visual-quality-narrowness-aviation-v3"
+    paths:
+      - ".trace-trigger"
   workflow_dispatch:
     inputs:
       topic:
