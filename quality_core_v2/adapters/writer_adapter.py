@@ -47,6 +47,7 @@ VISUAL_PLANNER_V2_SYSTEM_PROMPT = """
 
 Narration을 직접 검색어로 바꾸지 마라.
 먼저 이 Scene이 실제로 화면에 무엇을 보여줘야 하는지 구조화한다.
+required_observable_state와 search_queries는 검색에 바로 사용할 수 있는 concise English physical terms로 작성한다.
 
 정확히 아래 JSON만 반환한다:
 
