@@ -111,7 +111,6 @@ def main():
             vd = __import__("video.video_downloader", fromlist=["*"])
             runner = __import__("content.script_engine_v2_runner", fromlist=["*"])
             ve = __import__("video.visual_explanation", fromlist=["*"])
-            still = __import__("video.still_image_fallback", fromlist=["*"])
 
             # CASE A: exact Run 34847558126 Scene 4 claim -- keyword leak closed.
             plan_ctx = {"canonical_subject": "aircraft wing spoilers"}
@@ -215,29 +214,6 @@ def main():
             print(
                 "CASE H ASCII alias boundaries: flapwise!=flap while real flap stays required: PASS"
             )
-
-            # CASE I: a grounded wing-flex still request must ask the generator
-            # for visible deformation evidence rather than another generic
-            # straight-wing close-up. The Vision gate is unchanged and still
-            # decides acceptance.
-            flex_scene = {
-                "text": "항공기 날개는 하중 아래에서 탄성 변형합니다.",
-                "visual_goal": "실제 주날개의 탄성 휨이 보이는 장면",
-                "keyword": "aircraft wing load flex bending",
-            }
-            flex_prompt = still._prompt(flex_scene)
-            assert "Observable deformation proof required" in flex_prompt, flex_prompt
-            assert "wing root or fuselage reference" in flex_prompt, flex_prompt
-            assert "generic straight static wing" in flex_prompt, flex_prompt
-
-            static_scene = {
-                "text": "항공기 날개의 외형을 보여줍니다.",
-                "visual_goal": "aircraft wing closeup",
-                "keyword": "aircraft wing closeup",
-            }
-            static_prompt = still._prompt(static_scene)
-            assert "Observable deformation proof required" not in static_prompt, static_prompt
-            print("CASE I wing-flex still prompt requires visible deformation without gate relaxation: PASS")
 
         finally:
             sys.path.remove(str(repo))

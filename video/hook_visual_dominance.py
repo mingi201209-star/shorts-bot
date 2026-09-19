@@ -49,10 +49,28 @@ def requires_observable_action(scene):
         str(scene.get(key, "") or "")
         for key in ("text", "keyword", "visual_goal")
     ).lower()
-    words = set(re.findall(r"[a-z]+", combined))
+
+    # A negated motion phrase is not a promise of visible motion. Run
+    # 35427611515 hit this exact false positive on "완전히 움직이지 않는
+    # 판이 아니라": the substring "움직" forced action_required=True even
+    # though the Scene was a static structural statement. Strip only explicit
+    # negated movement forms before the literal action-term probe; all positive
+    # motion wording and the existing dynamic-result path remain unchanged.
+    motion_probe = re.sub(
+        r"움직이지\s*않(?:는|습니다|다|고|게)?",
+        " ",
+        combined,
+    )
+    motion_probe = re.sub(
+        r"\b(?:not\s+moving|does\s+not\s+move|doesn't\s+move)\b",
+        " ",
+        motion_probe,
+    )
+
+    words = set(re.findall(r"[a-z]+", motion_probe))
     if words & _OBSERVABLE_ACTION_TERMS:
         return True
-    if any(term in combined for term in _OBSERVABLE_ACTION_TERMS if not term.isascii()):
+    if any(term in motion_probe for term in _OBSERVABLE_ACTION_TERMS if not term.isascii()):
         return True
 
     role_text = " ".join(

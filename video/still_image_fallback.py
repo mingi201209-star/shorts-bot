@@ -157,50 +157,11 @@ def _canonical_still_contract(scene):
     }
 
 
-def _wing_flex_generation_requirement(scene):
-    """Return bounded composition guidance for visibly provable wing flex.
-
-    A still is allowed only as a fallback, and the existing Vision gate remains
-    authoritative. This helper does not make a still pass; it only stops the
-    image generator from returning a generic straight-wing close-up when the
-    grounded Scene explicitly promises elastic wing deformation.
-    """
-    if not isinstance(scene, dict):
-        return ""
-    combined = " ".join(
-        str(scene.get(key, "") or "").strip().lower()
-        for key in ("text", "visual_goal", "keyword")
-    )
-    wing_subject = (
-        ("wing" in combined and any(term in combined for term in ("aircraft", "airplane", "aviation")))
-        or ("날개" in combined and any(term in combined for term in ("비행기", "항공기", "항공")))
-    )
-    deformation = any(
-        term in combined
-        for term in (
-            "flex", "bending", "bend", "torsion", "twist",
-            "탄성 변형", "탄성변형", "휨", "휘고", "휘는", "비틀",
-        )
-    )
-    if not (wing_subject and deformation):
-        return ""
-    return (
-        "Observable deformation proof required: show the real aircraft wing with "
-        "clear, physically plausible elastic curvature under load. Keep the wing "
-        "root or fuselage reference and the wingtip visible together so the bend "
-        "is visually unambiguous on a phone screen. The wing must not read as a "
-        "generic straight static wing. Keep the deformation realistic, not "
-        "rubber-like or exaggerated; do not add labels, arrows, stress graphics, "
-        "cutaways, or invented internal structure. "
-    )
-
-
 def _prompt(scene):
     narration = str(scene.get("text", "") or "").strip()
     visual_goal = str(scene.get("visual_goal", "") or "").strip()
     keyword = str(scene.get("keyword", "") or "").strip()
     contract = _canonical_still_contract(scene)
-    deformation_requirement = _wing_flex_generation_requirement(scene)
 
     proof = ""
     canonical_subject = contract["canonical_subject"]
@@ -219,11 +180,6 @@ def _prompt(scene):
             proof += f"Required viewpoint from trusted physical evidence: {viewpoint}. "
         if negative_guards:
             proof += f"Avoid these compositions: {', '.join(negative_guards)}. "
-
-    # Keep the production verifier hotfix's stable prompt anchor byte-for-byte:
-    # fold optional deformation guidance into the existing proof prefix instead
-    # of changing the adjacent literal strings below.
-    proof += deformation_requirement
 
     return (
         "Create one accurate vertical educational still image for a Korean YouTube Short. "

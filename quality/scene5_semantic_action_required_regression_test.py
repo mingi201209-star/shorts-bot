@@ -34,6 +34,30 @@ def main():
     }
     assert not requires_observable_action(static_brake_structure), "Brake vocabulary alone must not force observable action"
 
+    negated_motion_structure = {
+        "text": "항공기 날개는 완전히 움직이지 않는 판이 아니라, 하중 전달과 탄성 변형을 설계에서 고려해야 하는 구조입니다.",
+        "keyword": "aircraft wing load flex bending",
+        "visual_goal": "항공기 주날개의 구조와 탄성 변형 형상을 보여줍니다.",
+        "scene_role": "payoff",
+        "claim_role": "primary_result",
+        "owned_claim_id": "wing_flex_not_rigid_plate",
+    }
+    assert not requires_observable_action(negated_motion_structure), (
+        "negated '움직이지 않는' wording must not manufacture an observable-action promise"
+    )
+
+    positive_motion = {
+        "text": "하중을 받는 동안 날개가 실제로 움직입니다.",
+        "keyword": "aircraft wing movement",
+        "visual_goal": "날개의 움직임이 직접 보이는 장면",
+        "scene_role": "mechanism",
+        "claim_role": "mechanism_change",
+        "owned_claim_id": "wing_motion_positive_control",
+    }
+    assert requires_observable_action(positive_motion), (
+        "positive movement wording must remain action-required"
+    )
+
     print("PASS: Scene 5 semantic action-required regression")
 
 
