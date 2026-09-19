@@ -32,6 +32,11 @@ on:
           - private
           - unlisted
           - public
+      enable_quality_core_v2:
+        description: "v2/clean-quality-core only: run the Clean V2 pipeline instead of V1"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -282,6 +287,7 @@ jobs:
           AI_VISUAL_SIZE: "720x1280"
           SHORTS_TOPIC: ${{ inputs.topic }}
           SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
+          ENABLE_QUALITY_CORE_V2: ${{ inputs.enable_quality_core_v2 && '1' || '' }}
         run: |
           echo "========================================"
           echo "🚀 START SHORTS GENERATOR V3.2"

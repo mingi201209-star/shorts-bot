@@ -1,0 +1,36 @@
+name: V2 Golden E2E One-Shot Bridge
+
+# v2/clean-quality-core ONLY. This is a minimal, branch-local bridge to
+# fire exactly one real E2E dispatch of the Clean V2 pipeline once the
+# offline replay suite passes -- not general dispatch infrastructure.
+# It must never be merged into main/publish-stable's default path.
+#
+# Trigger is scoped to changes to .v2-golden-e2e-trigger only, not to
+# ordinary pushes on this branch, so normal commits never re-fire it.
+
+on:
+  push:
+    branches:
+      - v2/clean-quality-core
+    paths:
+      - ".v2-golden-e2e-trigger"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch-golden-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch Shorts Generator (V2, Golden Topic, no upload)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run main.yml \
+            --repo "${{ github.repository }}" \
+            --ref v2/clean-quality-core \
+            -f enable_quality_core_v2=true \
+            -f topic="aircraft wing flex" \
+            -f youtube_upload=false
