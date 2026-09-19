@@ -44,7 +44,8 @@ required_observable_state 중 이미지에서 실제로 확인되는 항목만
 {
   "description": "화면에 실제로 보이는 것을 짧고 구체적으로 설명",
   "visible_components": ["VisualPlan의 원문 항목"],
-  "observable_state": ["VisualPlan의 원문 항목"]
+  "observable_state": ["VisualPlan의 원문 항목"],
+  "visible_relations_or_mechanisms": ["VisualPlan의 원문 항목"]
 }
 """
 
@@ -74,6 +75,9 @@ def parse_visual_classification(
             "description": classified_description,
             "visible_components": data.get("visible_components") or [],
             "observable_state": data.get("observable_state") or [],
+            "visible_relations_or_mechanisms": (
+                data.get("visible_relations_or_mechanisms") or []
+            ),
             "tags": tags or [],
             "provider": provider,
             "source_id": source_id,
@@ -186,6 +190,64 @@ def _classify_hit(
     )
 
 
+def _generation_scene_payload(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
+    visual_goal_parts = [
+        *plan.required_observable_state,
+        *plan.required_relation_or_mechanism,
+        *plan.generation_prompt_constraints,
+    ]
+    query = next(
+        (str(q).strip() for q in plan.search_queries if str(q).strip()),
+        plan.subject,
+    )
+    return {
+        "scene_id": f"v2-{scene.scene_index}",
+        "index": scene.scene_index,
+        "text": scene.narration,
+        "visual_goal": "; ".join(str(v).strip() for v in visual_goal_parts if str(v).strip()),
+        "keyword": str(query or plan.subject).strip(),
+        "visual_type": "ai_generated",
+    }
+
+
+def _default_generate_visual(scene: SceneV2, plan: VisualPlanV2) -> Optional[Dict[str, Any]]:
+    from pathlib import Path
+
+    from video.still_image_fallback import generate_still_motion_fallback
+
+    output = Path("workspace/temp") / f"v2_generated_scene_{scene.scene_index}.mp4"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    result = generate_still_motion_fallback(
+        _generation_scene_payload(scene, plan),
+        output_path=str(output),
+        duration=4.0,
+        trigger_reason="v2_plan_generated",
+    )
+    if not result:
+        return None
+    return {
+        "path": str(result.get("path") or output),
+        "provider": str(result.get("provider") or "openai_image"),
+        "source_id": str(result.get("source_id") or f"v2-generated-{scene.scene_index}"),
+    }
+
+
+def _default_classify_generated(
+    scene: SceneV2,
+    plan: VisualPlanV2,
+    identity_visual: CandidateVisualV2,
+    path: str,
+) -> CandidateVisualV2:
+    from quality_core_v2.rendered_visual_qa import classify_rendered_visual
+
+    return classify_rendered_visual(
+        scene,
+        plan,
+        identity_visual,
+        path,
+    )
+
+
 def _default_provider_searches():
     from video.video_downloader import search_pexels_candidates
     from video.video_providers import search_pixabay_candidates
@@ -203,6 +265,8 @@ def select_visual_for_scene(
     provider_searches: Optional[Sequence[Tuple[str, Any]]] = None,
     classify_fn=call_visual_classifier,
     max_classifications: Optional[int] = None,
+    generate_fn=None,
+    classify_generated_fn=None,
 ) -> Tuple[Optional[CandidateVisualV2], Verdict]:
     """Return only an exact asset that already passed V2 semantic QA.
 
@@ -220,14 +284,61 @@ def select_visual_for_scene(
         queries = [plan.subject.strip()]
 
     preferred = str(plan.preferred_source_type or "").strip().lower()
-    if preferred and preferred != "stock":
+    if preferred == "grounded_explanatory":
         return None, Verdict(
             False,
-            f"VisualPlan requires source_type={preferred!r}, but the current "
-            "exact-asset acquisition path only accepts verified stock; "
-            "no silent stock substitution is allowed",
+            "VisualPlan requires grounded_explanatory, but no V2 exact-asset "
+            "grounded explanatory renderer exists; no silent substitution is allowed",
             "visual_qa",
         )
+
+    if preferred == "generated":
+        generate_fn = generate_fn or _default_generate_visual
+        classify_generated_fn = classify_generated_fn or _default_classify_generated
+        generated = generate_fn(scene, plan)
+        if not generated:
+            return None, Verdict(
+                False,
+                "V2 generated visual supply returned no exact asset",
+                "visual_qa",
+            )
+        path = str(generated.get("path") or "").strip()
+        if not path:
+            return None, Verdict(
+                False,
+                "V2 generated visual supply returned no path",
+                "visual_qa",
+            )
+        identity_visual = CandidateVisualV2.from_dict({
+            "source_type": "generated",
+            "description": "",
+            "visible_components": [],
+            "observable_state": [],
+            "visible_relations_or_mechanisms": [],
+            "provider": str(generated.get("provider") or "generated"),
+            "source_id": str(generated.get("source_id") or ""),
+            "media_url": path,
+            "search_query": next(
+                (str(q).strip() for q in plan.search_queries if str(q).strip()),
+                plan.subject,
+            ),
+        })
+        actual_visual = classify_generated_fn(
+            scene,
+            plan,
+            identity_visual,
+            path,
+        )
+        verdict = evaluate_scene_visual_qa(scene, plan, actual_visual)
+        print(
+            "[V2_VISUAL_SELECT] "
+            f"scene={scene.scene_index} provider={actual_visual.provider or 'generated'} "
+            f"source_id={actual_visual.source_id or 'unknown'} "
+            f"status={'PASS' if verdict.passed else 'FAIL'} mode=generated"
+        )
+        if verdict.passed:
+            return actual_visual, verdict
+        return None, verdict
 
     attempts = 0
     last_verdict = Verdict(False, "no visual candidate was classified", "visual_qa")

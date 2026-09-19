@@ -228,3 +228,85 @@ def test_select_visual_for_scene_preserves_exact_accepted_media_url():
     assert selected.source_id == "flex"
     assert selected.media_url == "https://cdn.example/flex.mp4"
     assert selected.thumbnail_url == "https://cdn.example/flex.jpg"
+
+
+def test_generated_preference_uses_exact_generated_asset_without_stock_search():
+    from quality_core_v2.adapters.retrieval_adapter import select_visual_for_scene
+    from quality_core_v2.schemas import CandidateVisualV2, SceneV2, VisualPlanV2
+
+    scene = SceneV2.from_dict({
+        "scene_index": 2,
+        "narration": "aircraft wing flex visible",
+        "causal_role": "mechanism_change",
+        "owned_claim_id": "elastic_bending",
+        "new_information": "elastic bending is visible",
+        "visual_requirement": "aircraft main wing visible upward elastic bending",
+    })
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 2,
+        "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft", "main wing"],
+        "required_observable_state": ["visible upward elastic bending"],
+        "preferred_source_type": "generated",
+        "search_queries": ["aircraft wing flex"],
+    })
+    stock_calls = []
+
+    def forbidden_stock(_query):
+        stock_calls.append(True)
+        return []
+
+    def fake_generate(_scene, _plan):
+        return {
+            "path": "workspace/temp/generated-scene-2.mp4",
+            "provider": "openai_image",
+            "source_id": "generated-2",
+        }
+
+    def fake_classify_generated(scene_, plan_, identity_, path_):
+        assert path_ == "workspace/temp/generated-scene-2.mp4"
+        return CandidateVisualV2.from_dict({
+            "source_type": "generated",
+            "description": "aircraft wing flex visible",
+            "visible_components": list(plan_.required_visible_components),
+            "observable_state": list(plan_.required_observable_state),
+            "provider": identity_.provider,
+            "source_id": identity_.source_id,
+            "media_url": identity_.media_url,
+            "search_query": identity_.search_query,
+        })
+
+    visual, verdict = select_visual_for_scene(
+        scene,
+        plan,
+        provider_searches=[("pexels", forbidden_stock)],
+        generate_fn=fake_generate,
+        classify_generated_fn=fake_classify_generated,
+    )
+    assert verdict.passed
+    assert visual is not None
+    assert visual.media_url == "workspace/temp/generated-scene-2.mp4"
+    assert stock_calls == []
+
+
+def test_required_relation_must_be_visibly_proven():
+    from quality_core_v2.visual_plan import match_visual_to_plan
+    from quality_core_v2.schemas import CandidateVisualV2, VisualPlanV2
+
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 4,
+        "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft", "main wing"],
+        "required_observable_state": ["visible upward elastic bending"],
+        "required_relation_or_mechanism": ["bending under aerodynamic load"],
+    })
+    visual = CandidateVisualV2.from_dict({
+        "source_type": "stock",
+        "description": "aircraft main wing bending",
+        "visible_components": ["aircraft", "main wing"],
+        "observable_state": ["visible upward elastic bending"],
+        "visible_relations_or_mechanisms": [],
+    })
+    verdict = match_visual_to_plan(plan, visual)
+    assert not verdict.passed
+    assert "relation/mechanism" in verdict.reason

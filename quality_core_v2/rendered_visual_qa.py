@@ -22,15 +22,15 @@ def _parse_json(raw: str) -> Dict[str, Any]:
     return data
 
 
-def verify_rendered_visual(
+def classify_rendered_visual(
     scene: SceneV2,
     plan: VisualPlanV2,
     selected_visual: CandidateVisualV2,
     vertical_video_path: str,
     *,
     client: Any = None,
-) -> Verdict:
-    """One fail-closed vision call over frames from the exact rendered clip."""
+) -> CandidateVisualV2:
+    """Classify visible evidence from the exact rendered clip."""
     if client is None:
         import openai
 
@@ -44,7 +44,7 @@ def verify_rendered_visual(
 
     frames = _extract_vertical_frames(vertical_video_path)
     if not frames:
-        return Verdict(False, "no frames extracted from exact rendered clip", "visual_qa")
+        raise ValueError("no frames extracted from exact rendered clip")
 
     requirements = {
         "subject": plan.subject,
@@ -55,13 +55,13 @@ def verify_rendered_visual(
     }
     prompt = (
         "Judge only these frames from the exact 9:16 clip that will be rendered. "
-        "Do not infer from provider metadata or search terms. "
-        "Return exact VisualPlan strings only when visibly confirmed. "
-        "A static subject does not prove bending/flexing/deformation. "
-        "Write description in the same language as the narration and use a narration "
-        "term only when that exact physical evidence is visible. Do not echo narration "
-        "to manufacture a match. JSON only with keys description, visible_components, "
-        "observable_state.\nNarration: " + scene.narration + "\n"
+        "Do not infer from provider metadata or search terms. Return exact VisualPlan "
+        "strings only when visibly confirmed. A static subject does not prove bending, "
+        "flexing, deformation, or a mechanism relation. Write description in the same "
+        "language as the narration and use a narration term only when that exact "
+        "physical evidence is visible. Do not echo narration to manufacture a match. "
+        "JSON only with keys description, visible_components, observable_state, "
+        "visible_relations_or_mechanisms.\nNarration: " + scene.narration + "\n"
         + json.dumps(requirements, ensure_ascii=False)
     )
     content = [{"type": "text", "text": prompt}]
@@ -93,11 +93,14 @@ def verify_rendered_visual(
     record_usage(MODEL, response)
     data = _parse_json(response.choices[0].message.content)
 
-    actual_visual = CandidateVisualV2.from_dict({
+    return CandidateVisualV2.from_dict({
         "source_type": selected_visual.source_type,
         "description": str(data.get("description") or ""),
         "visible_components": data.get("visible_components") or [],
         "observable_state": data.get("observable_state") or [],
+        "visible_relations_or_mechanisms": (
+            data.get("visible_relations_or_mechanisms") or []
+        ),
         "tags": list(selected_visual.tags),
         "provider": selected_visual.provider,
         "source_id": selected_visual.source_id,
@@ -105,6 +108,27 @@ def verify_rendered_visual(
         "thumbnail_url": selected_visual.thumbnail_url,
         "search_query": selected_visual.search_query,
     })
+
+
+def verify_rendered_visual(
+    scene: SceneV2,
+    plan: VisualPlanV2,
+    selected_visual: CandidateVisualV2,
+    vertical_video_path: str,
+    *,
+    client: Any = None,
+) -> Verdict:
+    """One fail-closed vision call over frames from the exact rendered clip."""
+    try:
+        actual_visual = classify_rendered_visual(
+            scene,
+            plan,
+            selected_visual,
+            vertical_video_path,
+            client=client,
+        )
+    except ValueError as exc:
+        return Verdict(False, str(exc), "visual_qa")
     verdict = evaluate_scene_visual_qa(scene, plan, actual_visual)
     print(
         "[V2_RENDERED_VISUAL_QA] "

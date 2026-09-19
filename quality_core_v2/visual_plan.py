@@ -89,7 +89,21 @@ def match_visual_to_plan(plan: VisualPlanV2, visual: CandidateVisualV2) -> Verdi
             "visual_qa",
         )
 
-    # 4. Generic stock fallback used to paper over a real gap: a "stock"
+    # 4. If the plan explicitly requires a visible physical relation or
+    # mechanism, subject/state evidence alone is insufficient.
+    missing_relations = [
+        relation
+        for relation in plan.required_relation_or_mechanism
+        if not _contains_any(visual.visible_relations_or_mechanisms, relation)
+    ]
+    if missing_relations:
+        return Verdict(
+            False,
+            f"visual does not show required relation/mechanism: {missing_relations}",
+            "visual_qa",
+        )
+
+    # 5. Generic stock fallback used to paper over a real gap: a "stock"
     #    source with no observable_state at all is never an acceptable
     #    fallback, even if it happens to pass 2/3 above on an empty plan.
     if visual.source_type == "stock" and not visual.observable_state:
