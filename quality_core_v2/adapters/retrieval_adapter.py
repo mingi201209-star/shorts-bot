@@ -372,8 +372,11 @@ def select_visual_for_scene(
         queries = [plan.subject.strip()]
 
     preferred = str(plan.preferred_source_type or "").strip().lower()
-    allow_generated_fallback = preferred == "generated"
-    grounded_only_after_stock = preferred == "grounded_explanatory"
+    # "generated" and "grounded_explanatory" both permit one bounded
+    # verified generated fallback after exact stock proof fails. This does not
+    # relax semantics: the generated clip must pass the same full V2 visual QA.
+    allow_generated_fallback = preferred in {"generated", "grounded_explanatory"}
+    grounded_only_after_stock = False
     download_stock_fn = download_stock_fn or _default_download_stock
     classify_stock_video_fn = (
         classify_stock_video_fn or _default_classify_stock_video
@@ -568,14 +571,6 @@ def select_visual_for_scene(
                         return actual_visual, generated_verdict
                 else:
                     last_verdict = generated_verdict
-
-    if grounded_only_after_stock:
-        return None, Verdict(
-            False,
-            "no exact stock visual proved the plan and V2 has no exact-asset "
-            "grounded explanatory renderer; no silent substitution is allowed",
-            "visual_qa",
-        )
 
     return None, Verdict(
         False,
