@@ -69,7 +69,7 @@ def call_explorer(
 
     from quality.budget_guard import authorize_call, record_usage
 
-    authorize_call()
+    authorize_call(EXPLORER_MODEL)
     user_prompt = (
         f"방향: {topic_direction}\n"
         f"최근 사용된 주제 (피할 것): {recent_topics or []}"
@@ -82,7 +82,7 @@ def call_explorer(
         ],
         response_format={"type": "json_object"},
     )
-    record_usage(response, model=EXPLORER_MODEL)
+    record_usage(EXPLORER_MODEL, response)
     return response.choices[0].message.content
 
 

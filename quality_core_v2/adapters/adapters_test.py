@@ -72,3 +72,84 @@ def test_provider_hit_to_description_pixabay_uses_tags():
 
 def test_provider_hit_to_description_pexels_uses_query():
     assert provider_hit_to_description({"query": "wing bending"}, "pexels") == "wing bending"
+
+
+# ============================================================
+# budget_guard contract regression (no real OpenAI call; a fake client
+# with a fake response object exercises the exact call_* functions
+# against the real quality.budget_guard module).
+# ============================================================
+
+class _FakeUsage:
+    prompt_tokens = 10
+    completion_tokens = 5
+    prompt_tokens_details = None
+
+
+class _FakeMessage:
+    content = "{}"
+
+
+class _FakeChoice:
+    message = _FakeMessage()
+
+
+class _FakeResponse:
+    usage = _FakeUsage()
+    choices = [_FakeChoice()]
+
+
+class _FakeCompletions:
+    def create(self, **kwargs):
+        return _FakeResponse()
+
+
+class _FakeChat:
+    completions = _FakeCompletions()
+
+
+class _FakeClient:
+    chat = _FakeChat()
+
+
+def _reset_budget():
+    from quality.budget_guard import reset_budget
+    reset_budget()
+
+
+def test_call_explorer_matches_budget_guard_contract():
+    from quality_core_v2.adapters.explorer_adapter import call_explorer
+    _reset_budget()
+    raw = call_explorer("dir", [], client=_FakeClient())
+    assert raw == "{}"
+
+
+def test_call_writer_matches_budget_guard_contract():
+    from quality_core_v2.adapters.writer_adapter import call_writer
+    from quality_core_v2.schemas import CandidateV2
+    _reset_budget()
+    candidate = CandidateV2.from_dict({
+        "topic": "t", "concrete_subject": "s", "observable_phenomenon": "p",
+        "core_question": "q", "mechanism": "m", "reveal": "r", "canonical_subject": "s",
+    })
+    raw = call_writer(candidate, client=_FakeClient())
+    assert raw == "{}"
+
+
+def test_call_visual_planner_matches_budget_guard_contract():
+    from quality_core_v2.adapters.writer_adapter import call_visual_planner
+    from quality_core_v2.schemas import SceneV2
+    _reset_budget()
+    scene = SceneV2.from_dict({
+        "scene_index": 1, "narration": "n", "causal_role": "c",
+        "owned_claim_id": "a", "new_information": "i", "visual_requirement": "v",
+    })
+    raw = call_visual_planner(scene, client=_FakeClient())
+    assert raw == "{}"
+
+
+def test_call_visual_classifier_matches_budget_guard_contract():
+    from quality_core_v2.adapters.retrieval_adapter import call_visual_classifier
+    _reset_budget()
+    raw = call_visual_classifier("http://example.com/thumb.jpg", client=_FakeClient())
+    assert raw == "{}"

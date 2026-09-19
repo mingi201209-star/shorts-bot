@@ -86,7 +86,7 @@ def call_visual_classifier(thumbnail_url: str, *, client: Any = None) -> str:
 
     from quality.budget_guard import authorize_call, record_usage
 
-    authorize_call()
+    authorize_call(CLASSIFIER_MODEL)
     response = client.chat.completions.create(
         model=CLASSIFIER_MODEL,
         messages=[
@@ -100,7 +100,7 @@ def call_visual_classifier(thumbnail_url: str, *, client: Any = None) -> str:
         ],
         response_format={"type": "json_object"},
     )
-    record_usage(response, model=CLASSIFIER_MODEL)
+    record_usage(CLASSIFIER_MODEL, response)
     return response.choices[0].message.content
 
 

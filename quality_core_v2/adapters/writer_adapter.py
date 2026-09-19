@@ -95,7 +95,7 @@ def call_writer(candidate: CandidateV2, *, client: Any = None) -> str:
 
     from quality.budget_guard import authorize_call, record_usage
 
-    authorize_call()
+    authorize_call(WRITER_MODEL)
     user_prompt = json.dumps(
         {
             "topic": candidate.topic,
@@ -115,7 +115,7 @@ def call_writer(candidate: CandidateV2, *, client: Any = None) -> str:
         ],
         response_format={"type": "json_object"},
     )
-    record_usage(response, model=WRITER_MODEL)
+    record_usage(WRITER_MODEL, response)
     return response.choices[0].message.content
 
 
@@ -130,7 +130,7 @@ def call_visual_planner(scene: SceneV2, *, client: Any = None) -> str:
 
     from quality.budget_guard import authorize_call, record_usage
 
-    authorize_call()
+    authorize_call(VISUAL_PLANNER_MODEL)
     user_prompt = json.dumps(
         {"narration": scene.narration, "visual_requirement": scene.visual_requirement},
         ensure_ascii=False,
@@ -143,5 +143,5 @@ def call_visual_planner(scene: SceneV2, *, client: Any = None) -> str:
         ],
         response_format={"type": "json_object"},
     )
-    record_usage(response, model=VISUAL_PLANNER_MODEL)
+    record_usage(VISUAL_PLANNER_MODEL, response)
     return response.choices[0].message.content
