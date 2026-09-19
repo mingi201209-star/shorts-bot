@@ -137,8 +137,8 @@ def patch_explanation_lineage():
     text = path.read_text(encoding="utf-8")
     if MARKER in text:
         return
-    anchor = '''                    "source_id": still_result.get("source_id", "generated-still"),\n                    "metadata": " | ".join(part for part in metadata_parts if part),\n                })\n'''
-    replacement = '''                    "source_id": still_result.get("source_id", "generated-still"),\n                    "metadata": " | ".join(part for part in metadata_parts if part),\n                    # GROUNDED_EXPLANATORY_VISUAL_SUPPLY_V1\n                    "required_explanatory_anchors": list(still_result.get("required_explanatory_groups") or []),\n                    "explanatory_anchor_matched": int(still_result.get("explanatory_anchor_matched", 0) or 0),\n                    "explanatory_anchor_total": int(still_result.get("explanatory_anchor_total", 0) or 0),\n                })\n'''
+    anchor = '''                    "metadata": " | ".join(part for part in metadata_parts if part),\n'''
+    replacement = '''                    # GROUNDED_EXPLANATORY_VISUAL_SUPPLY_V1\n                    "required_explanatory_anchors": list(still_result.get("required_explanatory_groups") or []),\n                    "explanatory_anchor_matched": int(still_result.get("explanatory_anchor_matched", 0) or 0),\n                    "explanatory_anchor_total": int(still_result.get("explanatory_anchor_total", 0) or 0),\n''' + anchor
     text = _replace_once(text, anchor, replacement, "grounded explanation lineage")
     path.write_text(text.rstrip() + f"\n\n# {MARKER}\n", encoding="utf-8")
 
