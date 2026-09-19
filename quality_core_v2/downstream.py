@@ -15,6 +15,7 @@ which is explicitly out of scope for this phase.
 
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List
 
 from quality_core_v2.schemas import SceneV2, VisualPlanV2
@@ -33,6 +34,53 @@ def _first_nonempty(*candidates: Any) -> str:
             if text:
                 return text
     return ""
+
+
+def _augment_query_with_observable_state(base_query: str, states: List[str]) -> str:
+    """Preserve observable-state meaning in the provider search query.
+
+    Locked contract:
+    - tokenize by whitespace only
+    - exact case-insensitive token dedupe across base query + all states
+    - no stemming/plural/synonym normalization
+    - skip additional non-ASCII state tokens instead of leaking them into
+      the provider query
+    - preserve first-seen order and apply no added-token cap
+    """
+    base_tokens = base_query.split()
+    seen = {token.lower() for token in base_tokens}
+    added_tokens: List[str] = []
+    skipped_non_ascii_token: List[str] = []
+
+    for phrase in states:
+        for raw_token in str(phrase or "").split():
+            token = raw_token.strip()
+            if not token:
+                continue
+            token_key = token.lower()
+            if token_key in seen:
+                continue
+            seen.add(token_key)
+            if not token.isascii():
+                skipped_non_ascii_token.append(token)
+                continue
+            added_tokens.append(token)
+
+    augmented_query = " ".join(base_tokens + added_tokens)
+    print(
+        "[V2_QUERY_AUGMENT] "
+        + json.dumps(
+            {
+                "original_query": base_query,
+                "augmented_query": augmented_query,
+                "added_token_count": len(added_tokens),
+                "skipped_non_ascii_token": skipped_non_ascii_token,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        )
+    )
+    return augmented_query
 
 
 def scene_v2_to_v1_item(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
@@ -54,6 +102,9 @@ def scene_v2_to_v1_item(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
             f"VisualPlanV2 for scene {scene.scene_index} has no usable keyword "
             f"(search_queries={plan.search_queries!r}, subject={plan.subject!r})"
         )
+    keyword = _augment_query_with_observable_state(
+        keyword, plan.required_observable_state
+    )
     visual_goal = ", ".join(plan.required_observable_state) or scene.narration
     visual_type = (
         "ai_generated" if plan.preferred_source_type == "generated" else "real_world_broll"
