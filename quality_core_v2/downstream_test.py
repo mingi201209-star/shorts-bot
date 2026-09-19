@@ -53,7 +53,7 @@ def test_full_control_flow_candidate_to_render_handoff():
             "scene_index": 2, "subject": "aircraft main wing",
             "required_visible_components": ["aircraft", "main wing"],
             "required_observable_state": ["visible upward elastic bending"],
-            "search_queries": ["airplane wing wide shot"],
+            "search_queries": ["airplane wing flex bending wide shot"],
         }),
     ]
     for plan in plans:
