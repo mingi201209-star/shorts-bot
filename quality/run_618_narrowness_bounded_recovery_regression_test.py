@@ -164,9 +164,9 @@ def test_rejected_candidate_rewritten_narrower_and_accepted():
     narrow_critique = {"verdict": "NARROW_ENOUGH", "reason": "임계각 조건 구체적 (test)"}
 
     rewritten = _bare_candidate(
-        "비행기 날개 끝 윙렛",
+        "비행기 날개",
         "비행기 날개 끝은 왜 위로 꺾여 있을까?",
-        "임계각을 넘는 순간에만 소용돌이 손실이 급증하기 때문이다.",
+        "날개 끝의 흐름을 바꿔 소용돌이 손실을 줄이기 때문이다.",
     )
 
     side_effect = [
@@ -182,7 +182,7 @@ def test_rejected_candidate_rewritten_narrower_and_accepted():
         assert result["status"] == "SELECTED"
         # Same subject preserved -- rewrite narrowed the question, did not
         # switch to an unrelated topic direction.
-        assert result["winner"]["topic"] == "비행기 날개 끝 윙렛"
+        assert result["winner"]["topic"] == "비행기 날개"
         assert "위로 꺾여" in result["winner"]["core_question"]
         assert mock_create.call_count == 4
 
