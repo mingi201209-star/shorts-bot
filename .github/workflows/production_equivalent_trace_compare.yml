@@ -1,9 +1,6 @@
 name: Production Equivalent Trace Compare
 
 on:
-  push:
-    branches:
-      - "test/visual-quality-narrowness-aviation-v3"
   workflow_dispatch:
     inputs:
       topic:
@@ -51,7 +48,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.expected_sha || 'b9576de6448751a1c9545c35ba3f738371571bcb' }}
+          ref: ${{ inputs.expected_sha || github.sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -89,7 +86,7 @@ jobs:
           SHORTS_TOPIC: ${{ inputs.topic || '비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?' }}
           SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
           ENABLE_YOUTUBE_UPLOAD: "0"
-          TRACE_TARGET_SHA: ${{ inputs.expected_sha || 'b9576de6448751a1c9545c35ba3f738371571bcb' }}
+          TRACE_TARGET_SHA: ${{ inputs.expected_sha || github.sha }}
         run: |
           set -euo pipefail
           python -m quality.production_hotfix_chain_structure_regression_test
