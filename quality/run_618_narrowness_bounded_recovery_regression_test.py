@@ -389,6 +389,69 @@ def test_fixed_topic_deterministic_grounded_rewrite_can_pass_without_llm_rewrite
     assert fixed_topic not in ce._NARROWNESS_FIXED_TOPIC_LLM_BLOCKED
 
 
+def test_exact_repo_owned_wing_flex_seed_is_used_before_llm_rewrite():
+    ce = _load_legacy_module()
+    fixed_topic = "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?"
+    ce._NARROWNESS_FIXED_TOPIC_LLM_BLOCKED.clear()
+
+    broad = _winner(
+        fixed_topic,
+        "비행기 날개가 하중을 받으면 왜 변형될까?",
+        "날개는 하중을 받으면 변형될 수 있다.",
+    )
+    broad["winner"]["fact_check_focus"] = [
+        "날개 하중과 탄성 변형의 관계",
+    ]
+    broad["winner"]["visual_proof"] = [
+        "비행 중 날개 flex 변화",
+    ]
+    broad["winner"]["canonical_subject"] = (
+        "aircraft wing structure under aerodynamic load"
+    )
+
+    broad_critique = {
+        "verdict": "TOO_BROAD",
+        "reason": "Reveal이 일반 상식 수준이다.",
+    }
+    narrow_critique = {
+        "verdict": "NARROW_ENOUGH",
+        "reason": "하중 전달 경로와 휨/비틀림 모드가 구체적이다.",
+    }
+
+    direct = None
+    with patch.dict("os.environ", {"SHORTS_TOPIC": fixed_topic}, clear=False):
+        direct = ce._deterministic_grounded_narrowness_rewrite(broad["winner"])
+
+    assert direct is not None
+    assert direct["topic"] == fixed_topic
+    assert direct["core_question"] == "같은 날개에서 왜 휨과 비틀림이 함께 생길까?"
+    assert "리브와 스파" in direct["micro_narrative"]["reveal"]
+    assert "휨과 비틀림" in direct["micro_narrative"]["reveal"]
+    # Model-authored authority fields remain authoritative; the exact seed only
+    # supplies grounded editorial specificity for another real gate decision.
+    assert direct["fact_check_focus"] == broad["winner"]["fact_check_focus"]
+    assert direct["visual_proof"] == broad["winner"]["visual_proof"]
+
+    side_effect = [
+        _make_response(broad),
+        _make_response(broad_critique),
+        _make_response(narrow_critique),
+    ]
+    p1, p2, p3, p4 = _patched(ce, side_effect)
+    with patch.dict("os.environ", {"SHORTS_TOPIC": fixed_topic}, clear=False):
+        with p1, p2, p3, p4 as mock_create:
+            result = ce.explore_candidates(_TOPIC_INFO)
+
+    assert result["status"] == "SELECTED"
+    assert mock_create.call_count == 3, (
+        "exact trusted seed should replace both LLM narrowness rewrites when "
+        "the unchanged self-critique accepts the deterministic result"
+    )
+    assert result["winner"]["topic"] == fixed_topic
+    assert "리브와 스파" in result["winner"]["micro_narrative"]["reveal"]
+    assert fixed_topic not in ce._NARROWNESS_FIXED_TOPIC_LLM_BLOCKED
+
+
 def test_fixed_topic_unusable_llm_rewrite_is_not_repeated_across_attempts():
     ce = _load_legacy_module()
     fixed_topic = "비행기 날개"
@@ -568,6 +631,9 @@ if __name__ == "__main__":
 
     test_fixed_topic_deterministic_grounded_rewrite_can_pass_without_llm_rewrite()
     print("✓ test_fixed_topic_deterministic_grounded_rewrite_can_pass_without_llm_rewrite")
+
+    test_exact_repo_owned_wing_flex_seed_is_used_before_llm_rewrite()
+    print("✓ test_exact_repo_owned_wing_flex_seed_is_used_before_llm_rewrite")
 
     test_fixed_topic_unusable_llm_rewrite_is_not_repeated_across_attempts()
     print("✓ test_fixed_topic_unusable_llm_rewrite_is_not_repeated_across_attempts")
