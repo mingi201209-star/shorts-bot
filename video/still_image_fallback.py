@@ -165,6 +165,11 @@ def _prompt(scene):
 
     # Clean V2 may attach exact semantic requirements as private scene keys.
     # V1 never sets them, so legacy generation behavior is unchanged.
+    v2_components = [
+        str(value).strip()
+        for value in (scene.get("_v2_required_visible_components") or [])
+        if str(value).strip()
+    ]
     v2_states = [
         str(value).strip()
         for value in (scene.get("_v2_required_observable_state") or [])
@@ -180,6 +185,11 @@ def _prompt(scene):
         for value in (scene.get("_v2_forbidden_visuals") or [])
         if str(value).strip()
     ]
+    v2_constraints = [
+        str(value).strip()
+        for value in (scene.get("_v2_generation_prompt_constraints") or [])
+        if str(value).strip()
+    ]
 
     proof = ""
     canonical_subject = contract["canonical_subject"]
@@ -187,9 +197,10 @@ def _prompt(scene):
     viewpoint = contract["required_viewpoint"]
     negative_guards = contract["negative_composition_guards"]
 
-    if v2_states or v2_relations:
+    if v2_components or v2_states or v2_relations:
         proof += (
             "Clean V2 mandatory visible requirements: "
+            f"components = {', '.join(v2_components) or 'none'}; "
             f"observable state = {', '.join(v2_states) or 'none'}; "
             f"relation/mechanism = {', '.join(v2_relations) or 'none'}. "
             "These are hard visual requirements, not contextual suggestions. "
@@ -197,6 +208,11 @@ def _prompt(scene):
             "or another physical state is required, depict that state unmistakably; "
             "a normal static subject is invalid. "
         )
+        if v2_constraints:
+            proof += (
+                f"Clean V2 generation constraints: {', '.join(v2_constraints)}. "
+                "Follow these only when they are consistent with the visible requirements above. "
+            )
         if v2_forbidden:
             proof += (
                 f"Clean V2 forbidden visuals: {', '.join(v2_forbidden)}. "
