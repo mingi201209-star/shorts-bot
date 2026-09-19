@@ -51,7 +51,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.expected_sha || '39b0dea1c38926a7b30096d184241de0f0cb93ac' }}
+          ref: ${{ inputs.expected_sha || 'a270fafc08202b77340e69bde261cdac16e54c3c' }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -89,7 +89,7 @@ jobs:
           SHORTS_TOPIC: ${{ inputs.topic || '비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?' }}
           SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
           ENABLE_YOUTUBE_UPLOAD: "0"
-          TRACE_TARGET_SHA: ${{ inputs.expected_sha || '39b0dea1c38926a7b30096d184241de0f0cb93ac' }}
+          TRACE_TARGET_SHA: ${{ inputs.expected_sha || 'a270fafc08202b77340e69bde261cdac16e54c3c' }}
         run: |
           set -euo pipefail
           python -m quality.production_hotfix_chain_structure_regression_test
