@@ -15,7 +15,7 @@ text = append_once(
     r'''
 # GENERAL_SCENE_VISUAL_PARITY_UNKNOWN_SAFE
 # No new frame/vision API is introduced here. Existing #26 visual evidence is
-# authoritative when present; otherwise UNKNOWN stays UNKNOWN and is ranked by
+authoritative when present; otherwise UNKNOWN stays UNKNOWN and is ranked by
 # semantic/domain integrity instead of being promoted to visible evidence.
 
 
@@ -51,7 +51,7 @@ def _missing_required_aviation_component_anchor(candidate, scene_query):
 def _known_hidden_subject_asset(candidate, scene_query):
     """Reject a verified production asset whose required subject is off-frame.
 
-    Run 32938743453 sampled Pixabay 3966 for an aircraft-wing scene. The
+    Run 32938743453 sampled Pixabay 3966 for an ``aircraft wing`` scene. The
     metadata named both anchors, but the rendered interval showed almost only
     sunset sky with a tiny edge fragment, so metadata-only UNKNOWN evidence is
     insufficient for this exact asset/query pair.
@@ -124,6 +124,23 @@ def semantic_safe_reuse_candidate(scene_query):
     return reused
 
 
+def _candidate_passes_final_visual_contract(candidate, scene_query):
+    from quality.visual_semantic_contract import evaluate_visual_semantic_contract
+
+    selection = {
+        "metadata": _candidate_metadata(candidate),
+        "provider": candidate.get("provider", ""),
+        "source_id": candidate.get("source_id", candidate.get("id", "")),
+        "source_asset_id": candidate.get("source_asset_id", ""),
+        "mode": candidate.get("mode", ""),
+        "visible_components": candidate.get("visible_components", []),
+        "visible_subject_groups": candidate.get("visible_subject_groups", {}),
+        "verification_evidence": candidate.get("verification_evidence", {}),
+        "current_scene_verification": candidate.get("current_scene_verification", {}),
+    }
+    return evaluate_visual_semantic_contract(scene_query, selection)
+
+
 _general_parity_previous_choose_best_candidate = choose_best_candidate
 
 
@@ -182,6 +199,18 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
         )
         selected = None
         selected_mode = "REJECTED_CROSS_DOMAIN"
+
+    if anchors and selected is not None:
+        contract = _candidate_passes_final_visual_contract(selected, subject_filter_query)
+        if not bool(contract.get("pass", False)):
+            print(
+                "[GENERAL_VISUAL_REJECT] "
+                f"candidate={selected.get('source_id', selected.get('id'))} "
+                f"anchors={'+'.join(anchors)} tier={selected_tier} "
+                f"reason={contract.get('reason', 'semantic_contract_failed')}"
+            )
+            selected = None
+            selected_mode = "REJECTED_FINAL_VISUAL_CONTRACT"
 
     if selected is None and not anchors:
         selected = _general_parity_previous_choose_best_candidate(
