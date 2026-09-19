@@ -33,6 +33,11 @@ EXPLORER_V2_SYSTEM_PROMPT = """
   "visual_proof": ["..."]
 }
 
+Topic direction은 단순 참고가 아니라 scope lock이다.
+- 방향이 현상/메커니즘(예: aircraft wing flex)을 지정하면, 성능/안전/편안함 같은 downstream benefit로 주제를 바꾸지 않는다.
+- reveal은 mechanism을 한 단계 더 구체화해야 한다. "중요한 역할", "성능/안정성/기동성 향상", "긍정적 영향" 같은 효익 결론은 금지한다.
+- bounded rewrite 피드백이 주어지면 같은 오류를 반복하지 말고 그 이유를 직접 수정한 새 Candidate를 낸다.
+
 새 Candidate를 하나만 제안한다. 점수를 매기지 않는다.
 """
 
@@ -54,6 +59,7 @@ def call_explorer(
     recent_topics: Optional[List[str]] = None,
     *,
     client: Any = None,
+    rejection_reason: str = "",
 ) -> str:
     """Impure: the actual OpenAI call. Not exercised in this session (no
     OPENAI_KEY here) -- exists so GitHub Actions (which has the secret)
@@ -71,8 +77,9 @@ def call_explorer(
 
     authorize_call(EXPLORER_MODEL)
     user_prompt = (
-        f"방향: {topic_direction}\n"
-        f"최근 사용된 주제 (피할 것): {recent_topics or []}"
+        f"방향(scope lock): {topic_direction}\n"
+        f"최근 사용된 주제 (피할 것): {recent_topics or []}\n"
+        f"이전 Candidate 거절 이유 (있으면 반드시 수정): {rejection_reason or '없음'}"
     )
     response = client.chat.completions.create(
         model=EXPLORER_MODEL,
@@ -99,7 +106,15 @@ def propose_candidate_with_bounded_rewrite(
     """
     last_verdict = Verdict(False, "no attempt made", "candidate")
     for attempt in range(MAX_CANDIDATE_REWRITES + 1):
-        raw = call_fn(topic_direction, recent_topics)
+        if call_fn is call_explorer:
+            raw = call_fn(
+                topic_direction,
+                recent_topics,
+                rejection_reason=(last_verdict.reason if attempt else ""),
+            )
+        else:
+            # Preserve the existing injected two-argument test contract.
+            raw = call_fn(topic_direction, recent_topics)
         try:
             candidate = parse_explorer_response(raw)
         except (ShapeError, ValueError) as exc:
