@@ -178,6 +178,18 @@ def main() -> int:
     )
     print("TEST C unresolved/untrusted subject still fail-closed: PASS")
 
+    print(
+        "ACTIVE_SEED_RECORDS=",
+        [
+            (
+                record.get("canonical_subject"),
+                record.get("seed_priority"),
+                (record.get("seed_candidate") or {}).get("topic"),
+            )
+            for record in records
+            if isinstance(record.get("seed_candidate"), dict)
+        ],
+    )
     seed_pool = grounded_seed_candidate_pool(recent_topics=[], rejected_topics=[])
     assert seed_pool["status"] == "CANDIDATE_POOL", seed_pool
     seed_candidates = seed_pool["candidates"]
