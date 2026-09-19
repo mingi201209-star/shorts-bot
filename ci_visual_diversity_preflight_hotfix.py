@@ -12,13 +12,18 @@ def replace_once(text, old, new, label):
 
 qa_path = Path("quality/final_visual_semantic_qa.py")
 qa = qa_path.read_text(encoding="utf-8")
-qa = replace_once(
-    qa,
-    '''            "provider": str(selection.get("provider") or ""),
+if not (
+    '"physical_signature": str(selection.get("physical_signature") or "")' in qa
+    and '"source_asset_id": str(selection.get("source_asset_id") or "")' in qa
+    and '"motion_profile": str(selection.get("motion_profile") or "")' in qa
+):
+    qa = replace_once(
+        qa,
+        '''            "provider": str(selection.get("provider") or ""),
             "source_id": str(selection.get("source_id") or ""),
             "metadata": str(selection.get("metadata") or "")[:500],
 ''',
-    '''            "provider": str(selection.get("provider") or ""),
+        '''            "provider": str(selection.get("provider") or ""),
             "source_id": str(selection.get("source_id") or ""),
             "physical_signature": str(selection.get("physical_signature") or ""),
             "source_asset_id": str(selection.get("source_asset_id") or ""),
@@ -27,8 +32,8 @@ qa = replace_once(
             "motion_profile": str(selection.get("motion_profile") or ""),
             "metadata": str(selection.get("metadata") or "")[:500],
 ''',
-    "final visual physical/presentation lineage",
-)
+        "final visual physical/presentation lineage",
+    )
 qa_path.write_text(qa, encoding="utf-8")
 
 still_path = Path("video/still_image_fallback.py")
