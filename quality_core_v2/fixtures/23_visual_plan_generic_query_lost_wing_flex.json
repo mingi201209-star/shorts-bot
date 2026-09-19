@@ -1,0 +1,20 @@
+{
+  "name": "golden_e2e_6_generic_subject_query_lost_wing_flex",
+  "category": "wing flex retrieval query lost observable phenomenon",
+  "provenance": "Golden E2E #6 run 35431900419 rendered generic aircraft/wing shots while the topic was aircraft wing flex because VisualPlan search_queries degraded to aircraft wing / wing.",
+  "stage": "visual_plan",
+  "input": {
+    "plan": {
+      "scene_index": 1,
+      "subject": "aircraft main wing",
+      "required_visible_components": ["aircraft", "main wing"],
+      "required_observable_state": ["visible upward elastic bending"],
+      "required_relation_or_mechanism": ["wing deformation under aerodynamic load"],
+      "forbidden_visuals": ["generic cruising aircraft"],
+      "preferred_source_type": "stock",
+      "search_queries": ["aircraft wing"]
+    }
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "lost the required observable phenomenon"
+}

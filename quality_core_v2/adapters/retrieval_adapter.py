@@ -267,6 +267,7 @@ def select_visual_for_scene(
     max_classifications: Optional[int] = None,
     generate_fn=None,
     classify_generated_fn=None,
+    used_asset_keys: Optional[set] = None,
 ) -> Tuple[Optional[CandidateVisualV2], Verdict]:
     """Return only an exact asset that already passed V2 semantic QA.
 
@@ -375,6 +376,17 @@ def select_visual_for_scene(
                 hit = hits[rank]
                 identity = _hit_identity(hit, provider, query)
                 if not identity["media_url"] or not identity["thumbnail_url"]:
+                    continue
+                asset_key = (
+                    f"{identity['provider']}:{identity['source_id']}"
+                    if identity["source_id"]
+                    else identity["media_url"]
+                )
+                if used_asset_keys and asset_key in used_asset_keys:
+                    print(
+                        "[V2_VISUAL_SKIP] "
+                        f"scene={scene.scene_index} asset={asset_key} reason=already_used"
+                    )
                     continue
 
                 attempts += 1

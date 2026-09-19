@@ -99,9 +99,22 @@ def _run_fixture(fixture: Dict[str, Any]) -> FixtureResult:
             verdict = evaluate_grounding_v2(GroundingV2.from_dict(fx_input))
         elif stage == "script_plan":
             scenes = [SceneV2.from_dict(s) for s in fx_input["scenes"]]
-            verdict = evaluate_script_plan_v2(scenes)
+            candidate = (
+                CandidateV2.from_dict(fx_input["candidate"])
+                if isinstance(fx_input.get("candidate"), dict)
+                else None
+            )
+            verdict = evaluate_script_plan_v2(scenes, candidate)
         elif stage == "visual_plan":
-            verdict = evaluate_visual_plan_v2(VisualPlanV2.from_dict(fx_input["plan"]))
+            candidate = (
+                CandidateV2.from_dict(fx_input["candidate"])
+                if isinstance(fx_input.get("candidate"), dict)
+                else None
+            )
+            verdict = evaluate_visual_plan_v2(
+                VisualPlanV2.from_dict(fx_input["plan"]),
+                candidate,
+            )
         elif stage == "visual_match":
             plan = VisualPlanV2.from_dict(fx_input["plan"])
             visual = CandidateVisualV2.from_dict(fx_input["visual"])

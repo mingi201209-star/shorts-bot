@@ -1,0 +1,32 @@
+{
+  "name": "golden_e2e_9_visual_plan_drifted_to_passenger_comfort",
+  "category": "canonical subject drift in VisualPlan",
+  "provenance": "Golden E2E #9 run 35433006381: aircraft-wing-flex Candidate reached Scene 6, but Visual Planner changed the visual to aircraft interior/passengers/comfort.",
+  "stage": "visual_plan",
+  "input": {
+    "candidate": {
+      "topic": "aircraft wing flex",
+      "concrete_subject": "aircraft main wing",
+      "observable_phenomenon": "visible upward elastic bending during flight",
+      "core_question": "why does an aircraft wing visibly flex upward in flight",
+      "mechanism": "aerodynamic lift load causes elastic wing bending",
+      "reveal": "the wing carries load by elastically deforming rather than behaving as a rigid plate",
+      "canonical_subject": "aircraft main wing",
+      "evidence_refs": ["golden-topic"],
+      "visual_proof": ["main wing visibly bends upward under aerodynamic load"]
+    },
+    "plan": {
+      "scene_index": 6,
+      "subject": "aircraft cabin passengers",
+      "required_visible_components": ["passengers", "aircraft seats", "cabin interior"],
+      "required_observable_state": ["comfortable posture", "calm expressions"],
+      "required_relation_or_mechanism": ["passenger comfort during flight"],
+      "forbidden_visuals": [],
+      "preferred_source_type": "stock",
+      "search_queries": ["aircraft interior passengers comfortable posture"],
+      "generation_prompt_constraints": []
+    }
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "canonical subject"
+}

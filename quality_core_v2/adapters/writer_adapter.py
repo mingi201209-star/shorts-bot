@@ -21,8 +21,20 @@ VISUAL_PLANNER_MODEL = os.environ.get("V3_VISUAL_PLANNER_V2_MODEL", "gpt-4o-mini
 WRITER_V2_SYSTEM_PROMPT = """
 너는 YouTube Shorts Script Writer V2다.
 
-주어진 Candidate 하나로 5~7개 Scene을 작성한다.
+주어진 Candidate 하나로 정확히 6개 Scene을 작성한다.
 각 Scene은 정확히 하나의 owned_claim_id를 가지며, 인접 Scene과 같은 사실을 반복하지 않는다.
+
+고정 구조:
+1) phenomenon: 첫 문장부터 관찰되는 현상을 단정한다. 질문/인사/예고 금지.
+2) why_question
+3) mechanism_input
+4) mechanism_change
+5) observable_result
+6) payoff: Candidate의 mechanism/reveal을 구체적으로 회수한다.
+
+Candidate에 없는 새 효익/수혜자/도메인을 만들지 마라.
+특히 승객 편안함, 객실, 성능/안전성 향상 같은 일반적 효익을 Candidate 근거 없이 추가하지 마라.
+payoff를 "도움이 됩니다 / 중요한 역할 / 긍정적 영향을 줍니다"로 끝내지 마라.
 
 정확히 아래 JSON만 반환한다:
 
@@ -47,6 +59,12 @@ VISUAL_PLANNER_V2_SYSTEM_PROMPT = """
 
 Narration을 직접 검색어로 바꾸지 마라.
 먼저 이 Scene이 실제로 화면에 무엇을 보여줘야 하는지 구조화한다.
+
+Candidate의 canonical_subject와 concrete_subject를 모든 Scene에서 유지한다.
+다른 대상(예: 날개 주제에서 객실/승객)으로 바꾸지 마라.
+search_queries에는 required_observable_state의 핵심 현상 단어를 반드시 남긴다.
+예: bending/flexing이 필요하면 aircraft wing 같은 subject-only 검색어로 축약하지 마라.
+required_relation_or_mechanism은 실제 프레임에서 확인 가능한 물리적 관계만 적는다.
 
 정확히 아래 JSON만 반환한다:
 
@@ -104,6 +122,8 @@ def call_writer(candidate: CandidateV2, *, client: Any = None) -> str:
             "core_question": candidate.core_question,
             "mechanism": candidate.mechanism,
             "reveal": candidate.reveal,
+            "canonical_subject": candidate.canonical_subject,
+            "visual_proof": list(candidate.visual_proof),
         },
         ensure_ascii=False,
     )
@@ -119,7 +139,12 @@ def call_writer(candidate: CandidateV2, *, client: Any = None) -> str:
     return response.choices[0].message.content
 
 
-def call_visual_planner(scene: SceneV2, *, client: Any = None) -> str:
+def call_visual_planner(
+    scene: SceneV2,
+    candidate: CandidateV2 | None = None,
+    *,
+    client: Any = None,
+) -> str:
     if client is None:
         import openai
 
@@ -132,7 +157,23 @@ def call_visual_planner(scene: SceneV2, *, client: Any = None) -> str:
 
     authorize_call(VISUAL_PLANNER_MODEL)
     user_prompt = json.dumps(
-        {"narration": scene.narration, "visual_requirement": scene.visual_requirement},
+        {
+            "narration": scene.narration,
+            "visual_requirement": scene.visual_requirement,
+            "candidate": (
+                {
+                    "topic": candidate.topic,
+                    "concrete_subject": candidate.concrete_subject,
+                    "observable_phenomenon": candidate.observable_phenomenon,
+                    "mechanism": candidate.mechanism,
+                    "reveal": candidate.reveal,
+                    "canonical_subject": candidate.canonical_subject,
+                    "visual_proof": list(candidate.visual_proof),
+                }
+                if candidate is not None
+                else None
+            ),
+        },
         ensure_ascii=False,
     )
     response = client.chat.completions.create(

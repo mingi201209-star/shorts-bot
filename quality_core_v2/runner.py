@@ -32,31 +32,44 @@ def run_v2_pipeline(topic_direction: str = "", recent_topics=None):
         )
 
     scenes = parse_writer_response(call_writer(candidate))
-    script_verdict = evaluate_script_plan_v2(scenes)
+    script_verdict = evaluate_script_plan_v2(scenes, candidate)
     if not script_verdict.passed:
         raise RuntimeError(f"V2 ScriptPlan rejected: {script_verdict.reason}")
 
     plans = []
     selected_visuals = []
+    used_asset_keys = set()
 
     for scene in scenes:
         plan = parse_visual_plan_response(
-            call_visual_planner(scene),
+            call_visual_planner(scene, candidate),
             scene.scene_index,
         )
-        plan_verdict = evaluate_visual_plan_v2(plan)
+        plan_verdict = evaluate_visual_plan_v2(plan, candidate)
         if not plan_verdict.passed:
             raise RuntimeError(
                 f"V2 VisualPlan rejected for scene {scene.scene_index}: "
                 f"{plan_verdict.reason}"
             )
 
-        visual, visual_verdict = select_visual_for_scene(scene, plan)
+        visual, visual_verdict = select_visual_for_scene(
+            scene,
+            plan,
+            used_asset_keys=used_asset_keys,
+        )
         if visual is None:
             raise RuntimeError(
                 f"V2 visual acquisition rejected for scene {scene.scene_index}: "
                 f"{visual_verdict.reason}"
             )
+
+        asset_key = (
+            f"{visual.provider}:{visual.source_id}"
+            if visual.source_id
+            else visual.media_url
+        )
+        if asset_key:
+            used_asset_keys.add(asset_key)
 
         plans.append(plan)
         selected_visuals.append(visual)

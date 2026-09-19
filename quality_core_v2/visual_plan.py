@@ -13,12 +13,62 @@ Two responsibilities, kept separate:
 
 from __future__ import annotations
 
+import re
 from typing import List
 
-from quality_core_v2.schemas import CandidateVisualV2, VisualPlanV2, Verdict
+from quality_core_v2.schemas import CandidateV2, CandidateVisualV2, VisualPlanV2, Verdict
+
+_TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]{2,}")
+_STATE_STOP = {
+    "visible", "visibly", "clear", "clearly", "actual", "state", "show",
+    "showing", "shown", "the", "during", "under", "with", "into", "from",
+    "aircraft", "airplane", "aviation", "main", "wing", "flight",
+}
+
+_SUBJECT_CONCEPTS = {
+    "wing": ("wing", "날개"),
+    "window": ("window", "창문"),
+    "engine": ("engine", "nozzle", "nacelle", "엔진", "노즐"),
+    "spoiler": ("spoiler", "스포일러"),
+    "flap": ("flap", "플랩"),
+    "wheel": ("wheel", "바퀴"),
+    "tire": ("tire", "tyre", "타이어"),
+}
 
 
-def evaluate_visual_plan_v2(plan: VisualPlanV2) -> Verdict:
+def _concept_tokens(text: str) -> set:
+    result = set()
+    for token in _TOKEN_RE.findall(str(text or "").lower()):
+        if token in _STATE_STOP:
+            continue
+        if token.startswith(("bend", "flex", "deform", "deflect")):
+            result.add("flex_bend")
+        elif token.startswith(("twist", "torsion")):
+            result.add("twist_torsion")
+        elif token.startswith(("vibr", "flutter")):
+            result.add("vibration_flutter")
+        elif token.startswith(("deploy", "extend", "retract")):
+            result.add("deployment")
+        elif token.startswith(("mix",)):
+            result.add("mixing")
+        else:
+            result.add(token)
+    return result
+
+
+def _subject_concepts(text: str) -> set:
+    value = str(text or "").lower()
+    return {
+        concept
+        for concept, aliases in _SUBJECT_CONCEPTS.items()
+        if any(alias in value for alias in aliases)
+    }
+
+
+def evaluate_visual_plan_v2(
+    plan: VisualPlanV2,
+    candidate: CandidateV2 | None = None,
+) -> Verdict:
     if not plan.subject.strip():
         return Verdict(False, "VisualPlan has no subject", "visual_plan")
     if not plan.required_visible_components:
@@ -35,7 +85,52 @@ def evaluate_visual_plan_v2(plan: VisualPlanV2) -> Verdict:
             "observable phenomenon the visual must show",
             "visual_plan",
         )
-    return Verdict(True, "plan has subject, required components, and observable state", "visual_plan")
+    if not plan.search_queries:
+        return Verdict(
+            False,
+            "no search_queries -- observable state cannot survive into retrieval",
+            "visual_plan",
+        )
+
+    state_concepts = set()
+    for state in plan.required_observable_state:
+        state_concepts |= _concept_tokens(state)
+    query_concepts = set()
+    for query in plan.search_queries:
+        query_concepts |= _concept_tokens(query)
+    if state_concepts and not (state_concepts & query_concepts):
+        return Verdict(
+            False,
+            "search_queries lost the required observable phenomenon; "
+            f"states={plan.required_observable_state!r} queries={plan.search_queries!r}",
+            "visual_plan",
+        )
+
+    if candidate is not None:
+        candidate_subject = " ".join([
+            candidate.canonical_subject,
+            candidate.concrete_subject,
+        ])
+        expected = _subject_concepts(candidate_subject)
+        plan_subject_text = " ".join([
+            plan.subject,
+            *plan.required_visible_components,
+            *plan.search_queries,
+        ])
+        actual = _subject_concepts(plan_subject_text)
+        if expected and not (expected & actual):
+            return Verdict(
+                False,
+                "canonical subject drift in VisualPlan: "
+                f"candidate={candidate.canonical_subject!r} plan_subject={plan.subject!r}",
+                "visual_plan",
+            )
+
+    return Verdict(
+        True,
+        "plan has subject, components, observable state, state-bearing query, and candidate identity",
+        "visual_plan",
+    )
 
 
 def _contains_any(haystack_items: List[str], needle: str) -> bool:

@@ -310,3 +310,51 @@ def test_required_relation_must_be_visibly_proven():
     verdict = match_visual_to_plan(plan, visual)
     assert not verdict.passed
     assert "relation/mechanism" in verdict.reason
+
+
+def test_used_asset_is_skipped_before_classification():
+    from quality_core_v2.adapters.retrieval_adapter import select_visual_for_scene
+    from quality_core_v2.schemas import SceneV2, VisualPlanV2
+
+    scene = SceneV2.from_dict({
+        "scene_index": 3,
+        "narration": "aircraft wing flex visible",
+        "causal_role": "mechanism_input",
+        "owned_claim_id": "load",
+        "new_information": "wing load",
+        "visual_requirement": "aircraft wing flex visible",
+    })
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 3,
+        "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft", "main wing"],
+        "required_observable_state": ["visible upward elastic bending"],
+        "search_queries": ["aircraft wing flex"],
+    })
+    hits = [
+        {"id": "used", "url": "https://cdn.example/used.mp4",
+         "thumbnail": "https://cdn.example/used.jpg", "query": "aircraft wing flex"},
+        {"id": "fresh", "url": "https://cdn.example/fresh.mp4",
+         "thumbnail": "https://cdn.example/fresh.jpg", "query": "aircraft wing flex"},
+    ]
+    classified = []
+
+    def classify(url, plan_):
+        classified.append(url)
+        return json.dumps({
+            "description": "aircraft wing flex visible",
+            "visible_components": list(plan_.required_visible_components),
+            "observable_state": list(plan_.required_observable_state),
+        })
+
+    visual, verdict = select_visual_for_scene(
+        scene,
+        plan,
+        provider_searches=[("pexels", lambda _q: hits)],
+        classify_fn=classify,
+        max_classifications=2,
+        used_asset_keys={"pexels:used"},
+    )
+    assert verdict.passed
+    assert visual is not None and visual.source_id == "fresh"
+    assert classified == ["https://cdn.example/fresh.jpg"]
