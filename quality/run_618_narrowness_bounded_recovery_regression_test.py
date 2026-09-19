@@ -153,6 +153,17 @@ def test_specific_phenomenon_accepted_by_unmodified_gate():
         assert result["verdict"] == "NARROW_ENOUGH"
 
 
+def test_self_critique_prompt_distinguishes_observation_from_answer_leakage():
+    ce = _load_legacy_module()
+    prompt = ce._SELF_CRITIQUE_PROMPT
+
+    assert "관찰 현상 자체를 질문에 적었다는 이유만으로 TOO_BROAD로 판정하지 마라" in prompt
+    assert "질문에 없던 구체적인 구조" in prompt
+    assert "질문 자체에 이미 Reveal의 핵심 원인/메커니즘" in prompt
+    assert "일반 목적/상식으로 끝나면 TOO_BROAD" in prompt
+    assert "NARROW_ENOUGH" in prompt
+
+
 # ------------------------------------------------------------------
 # 3 & 5: targeted rewrite on the SAME subject, using the critique reason,
 # succeeding on the first retry.
@@ -617,6 +628,9 @@ if __name__ == "__main__":
 
     test_specific_phenomenon_accepted_by_unmodified_gate()
     print("✓ test_specific_phenomenon_accepted_by_unmodified_gate")
+
+    test_self_critique_prompt_distinguishes_observation_from_answer_leakage()
+    print("✓ test_self_critique_prompt_distinguishes_observation_from_answer_leakage")
 
     test_rejected_candidate_rewritten_narrower_and_accepted()
     print("✓ test_rejected_candidate_rewritten_narrower_and_accepted")
