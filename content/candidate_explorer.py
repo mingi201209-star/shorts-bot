@@ -1861,6 +1861,12 @@ _NARROWNESS_REWRITE_PROMPT = """
 중 하나 이상이 들어간
 더 좁은 Core Question과 Reveal로 다시 써라.
 
+가능하면 아래 [FACT CHECK FOCUS]와 [VISUAL PROOF]에
+이미 들어 있는 구체적인 사실·관찰·메커니즘을 먼저 사용하라.
+그 근거에 없는 새로운 수치, 원인, 메커니즘을 지어내지 마라.
+근거가 비어 있거나 불충분하면 없는 사실을 만들지 말고
+Core Question의 조건·범위·관찰 포인트만 더 좁혀라.
+
 예:
 넓음: "비행기 날개는 왜 공기 흐름을 최적화할까?"
 좁음: "비행기 날개 끝은 왜 위로 꺾여 있을까?"
@@ -1906,6 +1912,26 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
     if not isinstance(micro, dict):
         micro = {}
 
+    fact_check_focus = winner.get("fact_check_focus")
+    if not isinstance(fact_check_focus, list):
+        fact_check_focus = []
+
+    visual_proof = winner.get("visual_proof")
+    if not isinstance(visual_proof, list):
+        visual_proof = []
+
+    fact_focus_text = "\n".join(
+        f"- {str(item).strip()}"
+        for item in fact_check_focus
+        if str(item).strip()
+    ) or "- 없음"
+
+    visual_proof_text = "\n".join(
+        f"- {str(item).strip()}"
+        for item in visual_proof
+        if str(item).strip()
+    ) or "- 없음"
+
     original_summary = (
         f"Topic: {winner.get('topic', '')}\n"
         f"Angle: {winner.get('angle', '')}\n"
@@ -1913,6 +1939,8 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
         f"Hook: {micro.get('hook', '')}\n"
         f"Reveal: {micro.get('reveal', '')}\n"
         f"Payoff: {micro.get('payoff', '')}\n"
+        f"\n[FACT CHECK FOCUS]\n{fact_focus_text}\n"
+        f"\n[VISUAL PROOF]\n{visual_proof_text}\n"
         f"\n[REJECTION REASON]\n{reason}"
     )
 
