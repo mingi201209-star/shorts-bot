@@ -1,0 +1,23 @@
+name: V2 Recovery Golden E2E One-Shot
+
+on:
+  push:
+    branches:
+      - v2/recovery-golden-e2e-launch-20260919
+    paths:
+      - ".github/workflows/v2-recovery-golden-e2e-one-shot.yml"
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch exact recovery V2 Golden E2E once
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh workflow run main.yml             --repo "${{ github.repository }}"             --ref v2/clean-quality-core-recovery             -f enable_quality_core_v2=true             -f topic="aircraft wing flex"             -f youtube_upload=false
