@@ -133,10 +133,19 @@ def _recover_exact_fixed_topic_seed(kwargs, malformed_response_error):
             validated["winner"],
             model=model,
         )
-    except Exception:
+    except Exception as exc:
+        print(
+            "🛑 EXACT FIXED-TOPIC SEED RECOVERY SKIPPED: "
+            f"narrowness critique errored: {exc}"
+        )
         return None
 
     if str(critique.get("verdict") or "").strip().upper() != "NARROW_ENOUGH":
+        print(
+            "🛑 EXACT FIXED-TOPIC SEED RECOVERY SKIPPED: "
+            "repo-owned seed failed unchanged narrowness gate: "
+            f"{critique.get('reason', '')}"
+        )
         return None
 
     validated["_exact_fixed_topic_seed_recovery"] = {
