@@ -27,6 +27,12 @@ FAA_PHAK_CH8_SOURCE = (
 NASA_WINGLETS_SOURCE = (
     "https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/winglets/"
 )
+FAA_AIRFRAME_HANDBOOK_SOURCE = (
+    "https://www.faa.gov/documentLibrary/media/Advisory_Circular/AC_65-15A.pdf"
+)
+NASA_FLEXIBLE_AIRCRAFT_SOURCE = (
+    "https://ntrs.nasa.gov/citations/20100023415"
+)
 
 
 CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
@@ -362,6 +368,127 @@ CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
             "counterintuitive_result": "비행 속도는 외부 튜브가 받은 총압과 정압의 차이에서 계산되는 동압으로 표시됩니다.",
             "tradeoff": "",
             "concrete_condition": "피토관이 막히지 않고 외부 흐름을 정상적으로 받을 때 속도계가 압력 정보를 사용합니다."
+        },
+    },
+    {
+        "record_type": "trusted_subject_identity",
+        "subject_kind": "physical_entity",
+        "canonical_subject": "aircraft wing structure under aerodynamic load",
+        "identity_confidence": 0.99,
+        "seed_priority": 110,
+        "visual_discriminators": ["wing", "flex", "bend", "twist", "load"],
+        "feature_descriptions": [
+            "aircraft wing visibly bending or flexing under aerodynamic load",
+            "aircraft wing bending and torsional deformation under load",
+            "비행 중 하중을 받아 위로 휘거나 비틀리는 비행기 주날개",
+            "하중에 따라 탄성으로 변형되는 항공기 날개 구조",
+        ],
+        "context_descriptions": [
+            "aircraft wing in flight carrying aerodynamic lift load",
+            "flexible aircraft wing structure under flight loads",
+            "비행 중 양력과 구조 하중을 받는 항공기 주날개",
+        ],
+        "source": FAA_AIRFRAME_HANDBOOK_SOURCE,
+        "detail": (
+            "FAA Airframe handbook material explains that lift forces act on wing surfaces, "
+            "are transferred through skin/stringers and ribs to the spars and fuselage, and "
+            "that wing tips bend upward in flight; it also identifies bending and torsion as "
+            "aircraft structural stresses. NASA flexible-aircraft research models wing elastic "
+            "motion with flapwise/chordwise bending and torsion under coupled aerodynamic and "
+            "inertial forces."
+        ),
+        "supported_claims": [
+            {
+                "claim_id": "wing_lift_load_path",
+                "claim_type": "mechanism_input",
+                "evidence_summary": (
+                    "비행 중 양력은 날개 표면과 스트링거에서 시작해 리브와 스파를 거쳐 동체로 전달됩니다."
+                ),
+                "source": FAA_AIRFRAME_HANDBOOK_SOURCE,
+                "detail": (
+                    "FAA Airframe handbook: lift forces are exerted first against skin and "
+                    "stringers, then passed to ribs, and finally transmitted through spars "
+                    "to be distributed through the fuselage."
+                ),
+                "allowed_paraphrase_scope": [
+                    "양력 하중은 날개 표면에서 리브와 스파를 거쳐 동체로 전달됩니다.",
+                    "날개가 받은 양력은 구조 부재를 따라 스파와 동체로 전달됩니다.",
+                ],
+            },
+            {
+                "claim_id": "wing_upward_bending",
+                "claim_type": "observable_identity",
+                "evidence_summary": (
+                    "비행 중에는 양력 때문에 날개 끝이 위로 휘는 탄성 변형이 실제로 나타날 수 있습니다."
+                ),
+                "source": FAA_AIRFRAME_HANDBOOK_SOURCE,
+                "detail": (
+                    "FAA Airframe handbook states that wings bend upward at their ends "
+                    "during flight and that this bending must be considered in design and maintenance."
+                ),
+                "allowed_paraphrase_scope": [
+                    "비행 중 날개 끝은 양력 하중을 받아 위로 휠 수 있습니다.",
+                    "날개 끝이 비행 중 위로 휘는 현상은 구조 하중과 연결됩니다.",
+                ],
+            },
+            {
+                "claim_id": "wing_bending_torsion_modes",
+                "claim_type": "mechanism_change",
+                "evidence_summary": (
+                    "유연한 날개 구조는 하중에 따라 휨뿐 아니라 비틀림 변형도 함께 나타낼 수 있습니다."
+                ),
+                "source": NASA_FLEXIBLE_AIRCRAFT_SOURCE,
+                "detail": (
+                    "NASA flexible-aircraft model represents wing elastic motion as flapwise "
+                    "bending, chordwise bending, and torsion, coupled with aerodynamic and inertial forces."
+                ),
+                "allowed_paraphrase_scope": [
+                    "날개는 하중을 받을 때 휨과 비틀림이라는 서로 다른 탄성 변형을 함께 보일 수 있습니다.",
+                    "유연한 항공기 날개에는 bending과 torsion 변형이 함께 나타날 수 있습니다.",
+                ],
+            },
+            {
+                "claim_id": "wing_flex_not_rigid_plate",
+                "claim_type": "primary_result",
+                "evidence_summary": (
+                    "항공기 날개는 완전히 움직이지 않는 판이 아니라, 하중 전달과 탄성 변형을 설계에서 고려해야 하는 구조입니다."
+                ),
+                "source": FAA_AIRFRAME_HANDBOOK_SOURCE,
+                "detail": (
+                    "FAA notes that wing bending cannot be ignored in original design and construction "
+                    "and compares the structural behavior to a leaf spring."
+                ),
+                "allowed_paraphrase_scope": [
+                    "날개는 완전히 고정된 판처럼 거동하지 않고 하중 아래에서 탄성 변형합니다.",
+                    "날개가 휘는 거동은 설계에서 반드시 고려해야 하는 구조적 특성입니다.",
+                ],
+            },
+        ],
+        "seed_candidate": {
+            "topic": "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?",
+            "angle": "날개가 단단한 판이 아니라 양력 하중을 구조 부재로 전달하면서 휨과 비틀림을 함께 겪는 탄성 구조라는 점",
+            "core_question": "같은 날개에서 왜 휨과 비틀림이 함께 생길까?",
+            "micro_narrative": {
+                "hook": "비행 중 날개 끝이 위로 휘는 건 실제 하중을 받는 날개의 탄성 변형입니다.",
+                "core_question": "같은 날개에서 왜 휨뿐 아니라 비틀림까지 함께 생길까요?",
+                "reveal": "양력 하중이 날개 표면에서 리브와 스파를 거쳐 동체로 전달되는 동안 날개 구조에는 휨과 비틀림 변형이 함께 생길 수 있습니다.",
+                "payoff": "그래서 항공기 날개는 완전히 움직이지 않는 판이 아니라 하중 아래에서 변형하는 구조로 설계와 해석이 이루어집니다."
+            },
+            "fact_check_focus": [
+                "양력 하중이 날개 표면·리브·스파를 거쳐 동체로 전달되는 경로",
+                "비행 중 날개 끝이 위로 휘는 현상",
+                "유연한 날개 구조에서 휨과 비틀림 변형이 함께 나타날 수 있다는 점"
+            ],
+            "visual_proof": [
+                "비행 중 같은 주날개의 날개 끝이 동체 대비 위아래로 휘는 장면",
+                "날개 구조 하중 시험에서 주날개가 위로 휘는 장면"
+            ],
+            "selection_reason": "실제로 보이는 날개 flex를 하중 전달과 bending/torsion이라는 구조 메커니즘에 직접 연결할 수 있습니다.",
+            "specific_observation": "비행 중 주날개 끝이 양력 하중을 받아 위로 휘며 구조가 탄성 변형합니다.",
+            "constraint": "날개가 만든 양력 하중을 스파와 리브를 통해 동체로 전달하면서 구조 한계 안에서 견뎌야 합니다.",
+            "counterintuitive_result": "날개가 휘는 모습 자체는 단순한 강성 부족이 아니라 하중을 받는 탄성 구조의 거동입니다.",
+            "tradeoff": "날개는 하중을 견딜 충분한 강성과 동시에 실제 비행 하중에서 발생하는 탄성 변형을 고려해야 합니다.",
+            "concrete_condition": "비행 중 주날개가 양력을 만들고 공력·관성 하중을 받을 때입니다."
         },
     },
     {
