@@ -1,0 +1,29 @@
+{
+  "name": "wing_flex_script_invents_passenger_comfort",
+  "category": "out-of-Candidate payoff drift",
+  "provenance": "Golden E2E #9 showed passenger/cabin comfort appearing downstream of an aircraft-wing-flex Candidate. This fixture blocks that invented benefit at ScriptPlan time.",
+  "stage": "script_plan",
+  "input": {
+    "candidate": {
+      "topic": "aircraft wing flex",
+      "concrete_subject": "aircraft main wing",
+      "observable_phenomenon": "visible upward elastic bending during flight",
+      "core_question": "why does the wing flex upward under load",
+      "mechanism": "aerodynamic lift load causes elastic bending and load redistribution",
+      "reveal": "the wing carries load by elastically deforming rather than acting as a rigid plate",
+      "canonical_subject": "aircraft main wing",
+      "evidence_refs": ["golden-topic"],
+      "visual_proof": ["main wing visibly bends upward under aerodynamic load"]
+    },
+    "scenes": [
+      {"scene_index": 1, "narration": "비행 중 날개가 위로 휩니다.", "causal_role": "phenomenon", "owned_claim_id": "phenomenon", "new_information": "날개가 위로 휜다", "visual_requirement": "visible upward wing bending"},
+      {"scene_index": 2, "narration": "왜 단단한 날개가 이렇게 움직일까요?", "causal_role": "why_question", "owned_claim_id": "why", "new_information": "휘는 이유를 묻는다", "visual_requirement": "flexing wing"},
+      {"scene_index": 3, "narration": "양력이 날개 전체에 하중을 만듭니다.", "causal_role": "mechanism_input", "owned_claim_id": "load", "new_information": "양력이 하중을 만든다", "visual_requirement": "wing under lift load"},
+      {"scene_index": 4, "narration": "날개 구조는 그 하중을 받으며 탄성 변형됩니다.", "causal_role": "mechanism_change", "owned_claim_id": "elastic", "new_information": "날개가 탄성 변형된다", "visual_requirement": "elastic wing bending"},
+      {"scene_index": 5, "narration": "그래서 날개 끝의 위쪽 변위가 눈에 보입니다.", "causal_role": "observable_result", "owned_claim_id": "result", "new_information": "날개 끝 위쪽 변위가 보인다", "visual_requirement": "wingtip upward displacement"},
+      {"scene_index": 6, "narration": "이 움직임 덕분에 승객은 객실에서 더 편안하게 느낍니다.", "causal_role": "payoff", "owned_claim_id": "payoff", "new_information": "승객 편안함이 높아진다", "visual_requirement": "comfortable passengers in aircraft cabin seats"}
+    ]
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "out-of-Candidate"
+}
