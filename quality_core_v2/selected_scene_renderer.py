@@ -28,6 +28,7 @@ def create_scene_from_selected_visual(
     create_subtitle_clips_fn=None,
     audio_clip_cls=None,
     composite_clip_cls=None,
+    verify_rendered_visual_fn=None,
 ):
     """Build one scene from the exact accepted asset. No search is possible."""
     if not visual.media_url.strip():
@@ -55,6 +56,10 @@ def create_scene_from_selected_visual(
 
         audio_clip_cls = audio_clip_cls or AudioFileClip
         composite_clip_cls = composite_clip_cls or CompositeVideoClip
+    if verify_rendered_visual_fn is None:
+        from quality_core_v2.rendered_visual_qa import (
+            verify_rendered_visual as verify_rendered_visual_fn,
+        )
 
     paths = get_scene_paths_fn(idx)
     audio_path = paths["audio"]
@@ -96,6 +101,18 @@ def create_scene_from_selected_visual(
         )
         if not os.path.exists(vertical_video_path):
             raise RuntimeError(f"vertical scene missing: {vertical_video_path}")
+
+        rendered_verdict = verify_rendered_visual_fn(
+            scene,
+            plan,
+            visual,
+            vertical_video_path,
+        )
+        if not rendered_verdict.passed:
+            raise RuntimeError(
+                f"V2 exact rendered clip rejected for scene {scene.scene_index}: "
+                f"{rendered_verdict.reason}"
+            )
 
         video_clip = load_video_for_scene_fn(vertical_video_path, duration)
         subtitle_clips = create_subtitle_clips_fn(

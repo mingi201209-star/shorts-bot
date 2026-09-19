@@ -209,10 +209,21 @@ def select_visual_for_scene(
     if not queries and plan.subject.strip():
         queries = [plan.subject.strip()]
 
+    preferred = str(plan.preferred_source_type or "").strip().lower()
+    if preferred and preferred != "stock":
+        return None, Verdict(
+            False,
+            f"VisualPlan requires source_type={preferred!r}, but the current "
+            "exact-asset acquisition path only accepts verified stock; "
+            "no silent stock substitution is allowed",
+            "visual_qa",
+        )
+
     attempts = 0
     last_verdict = Verdict(False, "no visual candidate was classified", "visual_qa")
 
     for query in queries:
+        provider_hits = []
         for provider, search_fn in searches:
             try:
                 hits = list(search_fn(query) or [])
@@ -221,9 +232,17 @@ def select_visual_for_scene(
                     f"[V2_RETRIEVAL_SKIP] provider={provider} "
                     f"reason={type(exc).__name__}"
                 )
-                continue
+                hits = []
+            provider_hits.append((provider, hits))
 
-            for hit in hits:
+        # Interleave providers by rank: Pexels #1, Pixabay #1, then rank #2...
+        # A two-call budget therefore samples provider diversity instead of
+        # spending both classifications on one provider.
+        max_rank = max((len(hits) for _, hits in provider_hits), default=0)
+        for rank in range(max_rank):
+            for provider, hits in provider_hits:
+                if rank >= len(hits):
+                    continue
                 if attempts >= limit:
                     return None, Verdict(
                         False,
@@ -231,6 +250,8 @@ def select_visual_for_scene(
                         f"({attempts}/{limit}); last={last_verdict.reason}",
                         "visual_qa",
                     )
+
+                hit = hits[rank]
                 identity = _hit_identity(hit, provider, query)
                 if not identity["media_url"] or not identity["thumbnail_url"]:
                     continue
