@@ -77,6 +77,8 @@ def scene_v2_to_v1_item(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
         "_v2_required_observable_state": list(plan.required_observable_state),
         "_v2_required_relation_or_mechanism": list(plan.required_relation_or_mechanism),
         "_v2_forbidden_visuals": list(plan.forbidden_visuals),
+        "_v2_preferred_source_type": str(plan.preferred_source_type or ""),
+        "_v2_generation_prompt_constraints": list(plan.generation_prompt_constraints),
     }
 
 
