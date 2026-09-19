@@ -358,8 +358,9 @@ def select_visual_for_scene(
 ) -> Tuple[Optional[CandidateVisualV2], Verdict]:
     """Return only an exact asset that already passed V2 semantic QA.
 
-    Classification attempts are globally bounded for the scene.  Failure does
-    not relax the plan or substitute a generic B-roll shot.
+    Exact-video inspections are globally bounded for the scene. Thumbnails are
+    never used to prove motion/deformation/mechanism semantics. Failure does not
+    relax the plan or substitute generic B-roll.
     """
     searches = list(provider_searches or _default_provider_searches())
     limit = (
@@ -383,7 +384,7 @@ def select_visual_for_scene(
     )
 
     attempts = 0
-    last_verdict = Verdict(False, "no visual candidate was classified", "visual_qa")
+    last_verdict = Verdict(False, "no exact stock video was inspected", "visual_qa")
 
     for query in queries:
         provider_hits = []
@@ -398,25 +399,22 @@ def select_visual_for_scene(
                 hits = []
             provider_hits.append((provider, hits))
 
-        # Interleave providers by rank: Pexels #1, Pixabay #1, then rank #2...
-        # A two-call budget therefore samples provider diversity instead of
-        # spending both classifications on one provider.
+        # Interleave providers by rank so the bounded inspection budget samples
+        # provider diversity. Do NOT spend a vision call on thumbnails: motion,
+        # deformation and mechanism claims are proved only from the exact video.
         max_rank = max((len(hits) for _, hits in provider_hits), default=0)
         for rank in range(max_rank):
             for provider, hits in provider_hits:
                 if rank >= len(hits):
                     continue
                 if attempts >= limit:
-                    # Stop stock inspection cleanly. If the plan explicitly
-                    # prefers generated evidence, the single bounded generated
-                    # fallback below still gets its chance; do not return early
-                    # and accidentally bypass that planned fallback.
                     break
 
                 hit = hits[rank]
                 identity = _hit_identity(hit, provider, query)
-                if not identity["media_url"] or not identity["thumbnail_url"]:
+                if not identity["media_url"]:
                     continue
+
                 asset_key = (
                     f"{identity['provider']}:{identity['source_id']}"
                     if identity["source_id"]
@@ -430,79 +428,76 @@ def select_visual_for_scene(
                     continue
 
                 attempts += 1
-                visual = _classify_hit(
-                    hit,
-                    provider=provider,
-                    query=query,
-                    plan=plan,
-                    scene=scene,
-                    classify_fn=classify_fn,
-                )
-                verdict = _evaluate_thumbnail_candidate(plan, visual)
-                last_verdict = verdict
-                print(
-                    "[V2_VISUAL_SELECT] "
-                    f"scene={scene.scene_index} provider={provider} "
-                    f"source_id={visual.source_id or 'unknown'} "
-                    f"attempt={attempts}/{limit} "
-                    f"status={'PASS' if verdict.passed else 'FAIL'}"
-                )
-                if verdict.passed:
-                    try:
-                        local_path = download_stock_fn(visual, scene)
-                    except Exception as exc:
-                        print(
-                            "[V2_STOCK_PREFLIGHT] "
-                            f"scene={scene.scene_index} source_id={visual.source_id or 'unknown'} "
-                            f"status=ERROR reason={type(exc).__name__}"
-                        )
-                        local_path = None
-                    if not local_path:
-                        last_verdict = Verdict(
-                            False,
-                            "exact stock candidate could not be materialized for frame QA",
-                            "visual_qa",
-                        )
-                        continue
+                tags = []
+                if provider == "pixabay":
+                    tags = [
+                        part.strip()
+                        for part in str(hit.get("tags", "")).split(",")
+                        if part.strip()
+                    ]
+                identity_visual = CandidateVisualV2.from_dict({
+                    "source_type": "stock",
+                    "description": provider_hit_to_description(hit, provider),
+                    "visible_components": [],
+                    "observable_state": [],
+                    "visible_relations_or_mechanisms": [],
+                    "forbidden_visuals_present": [],
+                    "tags": tags,
+                    **identity,
+                })
 
-                    local_identity = CandidateVisualV2.from_dict({
-                        "source_type": visual.source_type,
-                        "description": visual.description,
-                        "visible_components": list(visual.visible_components),
-                        "observable_state": list(visual.observable_state),
-                        "visible_relations_or_mechanisms": list(
-                            visual.visible_relations_or_mechanisms
-                        ),
-                        "forbidden_visuals_present": list(
-                            visual.forbidden_visuals_present
-                        ),
-                        "tags": list(visual.tags),
-                        "provider": visual.provider,
-                        "source_id": visual.source_id,
-                        "media_url": local_path,
-                        "thumbnail_url": visual.thumbnail_url,
-                        "search_query": visual.search_query,
-                    })
-                    actual_visual = classify_stock_video_fn(
-                        scene,
-                        plan,
-                        local_identity,
-                        local_path,
-                    )
-                    exact_verdict = evaluate_scene_visual_qa(
-                        scene,
-                        plan,
-                        actual_visual,
-                    )
-                    last_verdict = exact_verdict
+                try:
+                    local_path = download_stock_fn(identity_visual, scene)
+                except Exception as exc:
                     print(
                         "[V2_STOCK_PREFLIGHT] "
-                        f"scene={scene.scene_index} provider={provider} "
-                        f"source_id={visual.source_id or 'unknown'} "
-                        f"status={'PASS' if exact_verdict.passed else 'FAIL'}"
+                        f"scene={scene.scene_index} source_id={identity_visual.source_id or 'unknown'} "
+                        f"status=ERROR reason={type(exc).__name__}"
                     )
-                    if exact_verdict.passed:
-                        return actual_visual, exact_verdict
+                    local_path = None
+                if not local_path:
+                    last_verdict = Verdict(
+                        False,
+                        "exact stock candidate could not be materialized for frame QA",
+                        "visual_qa",
+                    )
+                    continue
+
+                local_identity = CandidateVisualV2.from_dict({
+                    "source_type": identity_visual.source_type,
+                    "description": identity_visual.description,
+                    "visible_components": [],
+                    "observable_state": [],
+                    "visible_relations_or_mechanisms": [],
+                    "forbidden_visuals_present": [],
+                    "tags": list(identity_visual.tags),
+                    "provider": identity_visual.provider,
+                    "source_id": identity_visual.source_id,
+                    "media_url": local_path,
+                    "thumbnail_url": identity_visual.thumbnail_url,
+                    "search_query": identity_visual.search_query,
+                })
+                actual_visual = classify_stock_video_fn(
+                    scene,
+                    plan,
+                    local_identity,
+                    local_path,
+                )
+                exact_verdict = evaluate_scene_visual_qa(
+                    scene,
+                    plan,
+                    actual_visual,
+                )
+                last_verdict = exact_verdict
+                print(
+                    "[V2_STOCK_PREFLIGHT] "
+                    f"scene={scene.scene_index} provider={provider} "
+                    f"source_id={identity_visual.source_id or 'unknown'} "
+                    f"attempt={attempts}/{limit} "
+                    f"status={'PASS' if exact_verdict.passed else 'FAIL'}"
+                )
+                if exact_verdict.passed:
+                    return actual_visual, exact_verdict
 
             if attempts >= limit:
                 break

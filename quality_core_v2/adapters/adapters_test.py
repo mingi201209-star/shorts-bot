@@ -538,3 +538,63 @@ def test_thumbnail_is_only_coarse_gate_and_exact_video_proves_motion():
     assert verdict.passed
     assert visual is not None
     assert visual.source_id == "dynamic-1"
+
+
+def test_scene_selection_does_not_spend_vision_on_thumbnail():
+    from quality_core_v2.adapters.retrieval_adapter import select_visual_for_scene
+    from quality_core_v2.schemas import CandidateVisualV2, SceneV2, VisualPlanV2
+
+    scene = SceneV2.from_dict({
+        "scene_index": 1,
+        "narration": "aircraft wing flex visible",
+        "causal_role": "phenomenon",
+        "owned_claim_id": "flex",
+        "new_information": "wing flex visible",
+        "visual_requirement": "aircraft wing flex visible",
+    })
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 1,
+        "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft", "main wing"],
+        "required_observable_state": ["visible upward elastic bending"],
+        "search_queries": ["aircraft wing flex"],
+    })
+    thumbnail_calls = []
+
+    def forbidden_thumbnail_classifier(*_args):
+        thumbnail_calls.append(True)
+        raise AssertionError("thumbnail classifier must not be called by scene selection")
+
+    def exact_classifier(scene_, plan_, identity_, path_):
+        return CandidateVisualV2.from_dict({
+            "source_type": "stock",
+            "description": "aircraft wing flex visible",
+            "visible_components": list(plan_.required_visible_components),
+            "observable_state": list(plan_.required_observable_state),
+            "provider": identity_.provider,
+            "source_id": identity_.source_id,
+            "media_url": path_,
+            "thumbnail_url": identity_.thumbnail_url,
+            "search_query": identity_.search_query,
+        })
+
+    visual, verdict = select_visual_for_scene(
+        scene,
+        plan,
+        provider_searches=[(
+            "pexels",
+            lambda _q: [{
+                "id": "exact-1",
+                "url": "https://cdn.example/exact-1.mp4",
+                "thumbnail": "https://cdn.example/exact-1.jpg",
+                "query": "aircraft wing flex",
+            }],
+        )],
+        classify_fn=forbidden_thumbnail_classifier,
+        max_classifications=1,
+        download_stock_fn=lambda *_args: "/tmp/exact-1.mp4",
+        classify_stock_video_fn=exact_classifier,
+    )
+    assert verdict.passed
+    assert visual is not None and visual.source_id == "exact-1"
+    assert thumbnail_calls == []
