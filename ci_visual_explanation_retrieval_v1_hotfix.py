@@ -62,6 +62,14 @@ if marker not in text:
                     "anchor_total": int(still_result.get("anchor_total", 1)),
                     "provider": still_result.get("provider", "openai_image"),
                     "source_id": still_result.get("source_id", "generated-still"),
+                    "source_asset_id": still_result.get("source_asset_id", still_result.get("source_id", "generated-still")),
+                    "template_type": still_result.get("template_type", ""),
+                    "presentation_variant": still_result.get("presentation_variant", ""),
+                    "motion_profile": still_result.get("motion_profile", ""),
+                    "visible_components": still_result.get("visible_components", []),
+                    "visible_subject_groups": still_result.get("visible_subject_groups", {}),
+                    "verification_evidence": still_result.get("verification_evidence", {}),
+                    "current_scene_verification": still_result.get("current_scene_verification", {}),
                     "metadata": " | ".join(part for part in metadata_parts if part),
                 })
                 print(
