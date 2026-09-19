@@ -76,6 +76,8 @@ def test_full_control_flow_candidate_to_render_handoff():
         "_v2_required_observable_state": ["visible upward elastic bending"],
         "_v2_required_relation_or_mechanism": [],
         "_v2_forbidden_visuals": [],
+        "_v2_preferred_source_type": "",
+        "_v2_generation_prompt_constraints": [],
     }
 
     # 6. Render/export handoff: stub generate_scenes/render_final_video so
