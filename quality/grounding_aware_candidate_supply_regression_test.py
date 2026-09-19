@@ -214,7 +214,7 @@ def main() -> int:
     assert blocked_pool["status"] == "CANDIDATE_POOL", blocked_pool
     blocked_topics = [candidate["topic"] for candidate in blocked_pool["candidates"]]
     assert seed_topics[0] not in blocked_topics, blocked_topics
-    assert blocked_topics[0] == "착륙 직후 날개 위로 솟는 스포일러", blocked_topics
+    assert blocked_topics[0] == "비행기 날개 뒤의 가느다란 스태틱 윅", blocked_topics
     print("TEST E recent/rejected deterministic seed is not replayed: PASS")
 
     all_seed_topics = [
