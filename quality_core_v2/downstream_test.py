@@ -241,3 +241,18 @@ def test_render_v2_pipeline_skips_render_when_actual_visual_qa_fails():
     except RuntimeError as exc:
         assert "V2_ACTUAL_VISUAL_QA_FAILED" in str(exc)
     assert calls == ["reset", "generate", "v1qa", "v2qa"]
+
+
+if __name__ == "__main__":
+    tests = [
+        test_full_control_flow_candidate_to_render_handoff,
+        test_scene_v2_to_v1_item_skips_blank_first_search_query,
+        test_scene_v2_to_v1_item_falls_back_to_subject_when_all_queries_blank,
+        test_scene_v2_to_v1_item_rejects_when_no_keyword_available,
+        test_render_v2_pipeline_calls_reset_generate_qa_render_in_order,
+        test_render_v2_pipeline_skips_render_when_qa_fails,
+        test_render_v2_pipeline_skips_render_when_actual_visual_qa_fails,
+    ]
+    for test in tests:
+        test()
+    print(f"V2 DOWNSTREAM REGRESSION: PASS ({len(tests)}/{len(tests)})")
