@@ -58,12 +58,27 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
     competition_roles = {"hook", "reveal", "cause", "mechanism", "solution", "result", "conclusion"}
     if role not in competition_roles or historical or not subject_filter_query or len(candidates or []) < 2:
         return _vq_previous_choose_best_candidate(candidates, relevant_top_n=relevant_top_n, historical=historical, subject_filter_query=subject_filter_query)
+    if any(
+        name not in globals()
+        for name in (
+            "general_scene_unknown_safe_tier",
+            "candidate_anchor_compatibility",
+            "visual_specificity_decision",
+            "_candidate_unique_key",
+        )
+    ):
+        return _vq_previous_choose_best_candidate(
+            candidates,
+            relevant_top_n=relevant_top_n,
+            historical=historical,
+            subject_filter_query=subject_filter_query,
+        )
 
     # Preserve every existing eligibility/hard gate. Only candidates in tiers 1-4
     # can enter V1; cross-domain/abstract tier 5+ never competes.
     valid = []
     for candidate in list(candidates or []):
-        if _candidate_is_used(candidate):
+        if globals().get("_candidate_is_used", lambda item: item.get("id") in USED_VIDEO_IDS)(candidate):
             continue
         tier, _ = general_scene_unknown_safe_tier(candidate, subject_filter_query)
         if tier <= 4:
