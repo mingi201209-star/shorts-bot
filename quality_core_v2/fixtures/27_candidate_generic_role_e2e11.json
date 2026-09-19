@@ -1,0 +1,19 @@
+{
+  "name": "golden_e2e_11_candidate_generic_performance_role",
+  "category": "aircraft wing flex Candidate generic reveal",
+  "provenance": "Golden E2E #11 run 35433371497: Candidate reveal said wing deflection plays an important role in improving maneuverability/stability, which is a benefit claim rather than the physical mechanism.",
+  "stage": "candidate",
+  "input": {
+    "topic": "어떻게 비행기 날개의 굴절이 비행 성능에 영향을 미치는가?",
+    "concrete_subject": "비행기 날개",
+    "observable_phenomenon": "날개 끝 부분이 비행 중에 위아래로 움직이는 모습",
+    "core_question": "날개가 굴절할 때 비행기의 공기역학적 성능이 어떻게 변화하는가?",
+    "mechanism": "비행기 날개가 굴절하면 공기 흐름과 압력 분포가 변하게 되어 비행기의 양력과 저항이 조절된다.",
+    "reveal": "이러한 굴절은 비행기의 기동성과 안정성을 높이는 중요한 역할을 한다.",
+    "canonical_subject": "aircraft wing",
+    "evidence_refs": ["e2e11-trace"],
+    "visual_proof": ["wing visibly flexing in flight"]
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "vague-benefit"
+}
