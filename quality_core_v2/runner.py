@@ -29,7 +29,7 @@ def run_v2_pipeline(topic_direction: str = "", recent_topics=None):
         raise RuntimeError(f"V2 Candidate Loop: no Candidate passed the gate ({verdict.reason})")
 
     scenes = parse_writer_response(call_writer(candidate))
-    script_verdict = evaluate_script_plan_v2(scenes)
+    script_verdict = evaluate_script_plan_v2(scenes, candidate=candidate)
     if not script_verdict.passed:
         raise RuntimeError(f"V2 ScriptPlan rejected: {script_verdict.reason}")
 
