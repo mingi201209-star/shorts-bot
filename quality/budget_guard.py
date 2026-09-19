@@ -370,6 +370,34 @@ def print_budget_status():
     print("=" * 52)
 
 
+DEFAULT_REWRITE_RESERVE_CALLS = 5
+DEFAULT_REWRITE_RESERVE_COST_USD = 0.005
+
+
+def has_budget_for_rewrite(
+    reserve_calls=DEFAULT_REWRITE_RESERVE_CALLS,
+    reserve_cost_usd=DEFAULT_REWRITE_RESERVE_COST_USD,
+):
+    """True if starting one more rewrite-recovery cycle (a rewrite call plus
+    at least one recheck call) would still leave a small safety reserve of
+    calls/cost, so a run that must fail can still fail cleanly with
+    diagnostics instead of dying mid-call when the hard budget cap is hit.
+
+    This never grants extra budget and never bypasses ``authorize_call``'s
+    own hard limits -- it only decides, on the caller's side, whether it is
+    worth *attempting* another rewrite cycle at all. If the reserve is not
+    available, the caller should skip the rewrite and discard the candidate
+    exactly as it would if the rewrite bound had been reached.
+    """
+
+    status = get_budget_status()
+
+    calls_left = status["max_calls"] - status["calls"]
+    cost_left = status["max_cost_usd"] - status["cost_usd"]
+
+    return calls_left > reserve_calls and cost_left > reserve_cost_usd
+
+
 def reset_budget():
 
     with _lock:
