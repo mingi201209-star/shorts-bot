@@ -244,6 +244,7 @@ jobs:
             diagnostics/failure_diagnostics.py diagnostics/runner.py quality/failure_diagnostics_regression_test.py \
             quality_core_v2/actual_visual_qa.py quality_core_v2/actual_visual_qa_regression_test.py \
             quality_core_v2/downstream.py quality_core_v2/downstream_test.py quality_core_v2/visual_plan.py \
+            quality_core_v2/script_plan.py quality_core_v2/replay.py quality_core_v2/runner.py \
             quality_core_v2/adapters/writer_adapter.py quality_core_v2/production_composition_regression_test.py \
             video/still_image_fallback.py
 
@@ -316,6 +317,7 @@ jobs:
             artifacts/diagnostics/traceback.txt
             artifacts/diagnostics/progress.json
             artifacts/diagnostics/scene_trace.jsonl
+            v2_pipeline_trace.json
             final_visual_semantic_qa.json
             v2_actual_visual_qa.json
             visual_diversity_preflight.json
