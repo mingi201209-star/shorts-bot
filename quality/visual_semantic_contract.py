@@ -46,6 +46,15 @@ EVIDENCE_GROUPS = {
     },
 }
 
+EVIDENCE_QUERY_TERMS = {
+    "deformation": ("flex", "bending", "deformation"),
+    "twisting": ("twisting", "torsion"),
+    "load": ("load", "force"),
+    "oscillation": ("oscillation", "motion"),
+    "valve_motion": ("valve", "opening", "closing"),
+    "damper_motion": ("damper", "motion"),
+}
+
 GENERIC_FALLBACK_TERMS = {
     "beauty", "beautiful", "generic", "cruise", "cruising", "flight",
     "flying", "cloud", "clouds", "sky", "runway", "cockpit", "landscape",
@@ -91,6 +100,10 @@ def _metadata_text(selection):
         selection.get("template_type"),
         selection.get("mode"),
         selection.get("motion_profile"),
+        selection.get("visible_components"),
+        selection.get("visible_subject_groups"),
+        selection.get("verification_evidence"),
+        selection.get("current_scene_verification"),
     ]
     return " ".join(str(value or "") for value in values)
 
@@ -170,3 +183,29 @@ def evaluate_visual_semantic_contract(scene, selection):
 
 def contract_requires_visual_evidence(scene_or_query):
     return bool(build_visual_semantic_contract(scene_or_query)["required_visual_evidence"])
+
+
+def phenomenon_preserving_query(scene_or_query, *, base_query=None):
+    """Return a retrieval query that keeps required phenomenon/action terms.
+
+    This is deterministic and metadata-only: it does not relax acceptance, it
+    only prevents retrieval from silently degrading "wing bending" into a bare
+    "aircraft wing" query before candidate validation sees the request.
+    """
+    base = _norm(base_query if base_query is not None else _scene_text(scene_or_query))
+    if not base:
+        return base
+
+    contract = build_visual_semantic_contract(scene_or_query)
+    tokens = _tokens(base)
+    additions = []
+    for group in contract["required_visual_evidence"]:
+        if _contains_phrase_or_token(base, EVIDENCE_GROUPS.get(group, set())):
+            continue
+        for term in EVIDENCE_QUERY_TERMS.get(group, (group,)):
+            if term not in tokens and term not in additions:
+                additions.append(term)
+
+    if not additions:
+        return base
+    return _norm(" ".join([base] + additions))
