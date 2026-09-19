@@ -168,6 +168,53 @@ def test_empty_content_regenerates_instead_of_crashing():
     assert len(calls) == 1, "must not spend a second API call recovering from this"
 
 
+def test_exact_fixed_topic_malformed_hook_recovers_from_repo_seed():
+    """Run 35419510021: a malformed generated Hook/Core Question must not burn
+    the whole fixed-topic attempt budget when one exact repo-owned seed exists.
+    The trusted seed still has to pass the real validator and real narrowness
+    gate; only the failed generative prose is replaced.
+    """
+
+    fixed_topic = "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?"
+    original_explore = ce_pkg._LEGACY.explore_candidates
+    original_critique = ce_pkg._LEGACY._self_critique_narrowness
+    critique_calls = []
+
+    def malformed_explore(*args, **kwargs):
+        raise ValueError(
+            "winner.micro_narrative hook이 Core Question과 같은 내용을 반복합니다."
+        )
+
+    def narrow_enough(winner, *, model):
+        critique_calls.append((winner, model))
+        return {
+            "verdict": "NARROW_ENOUGH",
+            "reason": "trusted seed exposes a concrete load path and deformation modes",
+        }
+
+    try:
+        ce_pkg._LEGACY.explore_candidates = malformed_explore
+        ce_pkg._LEGACY._self_critique_narrowness = narrow_enough
+        result = ce_pkg.explore_candidates(
+            {"category": "항공", "topic": fixed_topic},
+            recent_topics=[],
+            rejected_topics=[],
+            fixed_topic=fixed_topic,
+        )
+    finally:
+        ce_pkg._LEGACY.explore_candidates = original_explore
+        ce_pkg._LEGACY._self_critique_narrowness = original_critique
+
+    assert result["status"] == "SELECTED", result
+    assert result["winner"]["topic"] == fixed_topic, result
+    assert "리브와 스파" in result["winner"]["micro_narrative"]["reveal"], result
+    assert "휨과 비틀림" in result["winner"]["micro_narrative"]["reveal"], result
+    assert len(critique_calls) == 1, critique_calls
+    recovery = result.get("_exact_fixed_topic_seed_recovery") or {}
+    assert recovery.get("status") == "USED", recovery
+    assert recovery.get("api_calls_added") == 1, recovery
+
+
 def test_no_hotfix_anchor_text_touched():
     """Guard against regressing the composition-safety fix itself: the exact
     text several production hotfixes match against in
@@ -202,6 +249,7 @@ def main():
     test_valid_selected_response_is_unaffected()
     test_valid_regenerate_response_is_unaffected()
     test_empty_content_regenerates_instead_of_crashing()
+    test_exact_fixed_topic_malformed_hook_recovers_from_repo_seed()
     test_no_hotfix_anchor_text_touched()
     print(
         "PASS: Candidate Explorer malformed-response regenerate-not-crash "
