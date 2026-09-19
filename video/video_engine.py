@@ -509,7 +509,28 @@ def create_scene(
             }
         )
 
-        if hook_scene_enabled:
+        v2_preferred_source_type = str(
+            item.get("_v2_preferred_source_type", "") or ""
+        ).strip().lower()
+        v2_force_explanatory_generation = (
+            bool(item.get("_v2_required_observable_state"))
+            and v2_preferred_source_type in {"generated", "grounded_explanatory"}
+        )
+
+        if v2_force_explanatory_generation:
+            # Clean V2 plan explicitly determined that stock is not the right
+            # proof medium for this scene. Keep create_scene's public
+            # interface unchanged, but skip semantic-degrading stock search
+            # so the existing verified still/explanatory fallback receives
+            # the full V2 contract.
+            print(
+                "[V2_SOURCE_ROUTING] "
+                f"scene={idx + 1} preferred={v2_preferred_source_type} "
+                "route=verified_explanatory_generation"
+            )
+            video_url = None
+
+        elif hook_scene_enabled:
 
             try:
 
