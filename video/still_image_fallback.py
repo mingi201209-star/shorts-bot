@@ -343,12 +343,16 @@ def _reuse_verified_still(scene, *, output_path, duration, trigger_reason):
                 "path": str(output_path),
                 "provider": cached.get("provider", "openai_image"),
                 "source_id": source_id,
+                "source_asset_id": source_id,
                 "mode": "REUSED_VERIFIED_STILL_MOTION",
                 "tier": 2,
                 "visual_state": "TRUE",
                 "anchor_matched": len(_anchor_signature(scene)),
                 "anchor_total": len(_anchor_signature(scene)),
                 "visible_components": list(evidence.get("visible_components", []) or []),
+                "visible_subject_groups": dict(evidence.get("visible_subject_groups") or {}),
+                "verification_evidence": dict(cached.get("verification_evidence") or {}),
+                "current_scene_verification": dict(evidence or {}),
             }
         except Exception as exc:
             Path(output_path).unlink(missing_ok=True)
@@ -413,6 +417,7 @@ def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reas
                 "image_path": str(image_path),
                 "provider": "openai_image",
                 "source_id": source_id,
+                "verification_evidence": dict(evidence or {}),
             }
         _register_source_use(source_id, scene)
         print(
@@ -424,12 +429,16 @@ def generate_still_motion_fallback(scene, *, output_path, duration, trigger_reas
             "path": str(output_path),
             "provider": "openai_image",
             "source_id": source_id,
+            "source_asset_id": source_id,
             "mode": "GENERATED_STILL_MOTION_VERIFIED",
             "tier": 2,
             "visual_state": "TRUE",
             "anchor_matched": len(signature),
             "anchor_total": len(signature),
             "visible_components": list(evidence.get("visible_components", []) or []),
+            "visible_subject_groups": dict(evidence.get("visible_subject_groups") or {}),
+            "verification_evidence": dict(evidence or {}),
+            "current_scene_verification": dict(evidence or {}),
         }
     except Exception as exc:
         print(
