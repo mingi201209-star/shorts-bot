@@ -41,6 +41,55 @@ def evaluate_script_plan_v2(scenes: List[SceneV2]) -> Verdict:
     if not scenes:
         return Verdict(False, "empty scene list", "script_plan")
 
+    ordered = sorted(scenes, key=lambda s: s.scene_index)
+    required_roles = [
+        "phenomenon",
+        "why_question",
+        "mechanism_input",
+        "mechanism_change",
+        "observable_result",
+        "payoff",
+    ]
+    actual_roles = [str(scene.causal_role or "").strip() for scene in ordered]
+    if len(ordered) != len(required_roles) or actual_roles != required_roles:
+        return Verdict(
+            False,
+            "causal progression must be exactly "
+            f"{required_roles!r}; got {actual_roles!r}",
+            "script_plan",
+        )
+
+    first = ordered[0].narration.strip()
+    if not first or first.endswith("?") or first.endswith("？"):
+        return Verdict(
+            False,
+            "scene 1 must directly state the observable phenomenon, not open with a question",
+            "script_plan",
+        )
+
+    payoff_text = " ".join(
+        [ordered[-1].narration, ordered[-1].new_information]
+    ).lower()
+    generic_payoff_markers = (
+        "안전성과 성능",
+        "안전성에 긍정",
+        "성능에 긍정",
+        "긍정적인 영향",
+        "효율을 높",
+        "효율 향상",
+        "도움이 됩니다",
+        "도움을 줍니다",
+        "중요한 역할",
+        "최적화",
+    )
+    if any(marker in payoff_text for marker in generic_payoff_markers):
+        return Verdict(
+            False,
+            "payoff collapsed into a generic benefit instead of explaining the mechanism: "
+            f"{ordered[-1].narration!r}",
+            "script_plan",
+        )
+
     seen_claims = {}
     for scene in scenes:
         if scene.owned_claim_id in seen_claims:
@@ -53,7 +102,6 @@ def evaluate_script_plan_v2(scenes: List[SceneV2]) -> Verdict:
             )
         seen_claims[scene.owned_claim_id] = scene.scene_index
 
-    ordered = sorted(scenes, key=lambda s: s.scene_index)
     for prev, curr in zip(ordered, ordered[1:]):
         overlap = _jaccard(_tokens(prev.new_information), _tokens(curr.new_information))
         if overlap >= ADJACENT_DUPLICATE_THRESHOLD:
