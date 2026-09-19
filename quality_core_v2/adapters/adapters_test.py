@@ -4,7 +4,7 @@ import json
 
 from quality_core_v2.adapters.explorer_adapter import parse_explorer_response, propose_candidate_with_bounded_rewrite
 from quality_core_v2.adapters.writer_adapter import parse_writer_response, parse_visual_plan_response
-from quality_core_v2.adapters.retrieval_adapter import parse_visual_classification, provider_hit_to_description
+from quality_core_v2.adapters.retrieval_adapter import parse_visual_classification, provider_hit_to_description, select_visual_for_scene
 from quality_core_v2.schemas import ShapeError
 
 
@@ -150,6 +150,81 @@ def test_call_visual_planner_matches_budget_guard_contract():
 
 def test_call_visual_classifier_matches_budget_guard_contract():
     from quality_core_v2.adapters.retrieval_adapter import call_visual_classifier
+    from quality_core_v2.schemas import VisualPlanV2
     _reset_budget()
-    raw = call_visual_classifier("http://example.com/thumb.jpg", client=_FakeClient())
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 1,
+        "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft", "main wing"],
+        "required_observable_state": ["visible upward bending"],
+    })
+    raw = call_visual_classifier(
+        "http://example.com/thumb.jpg",
+        plan,
+        client=_FakeClient(),
+    )
     assert raw == "{}"
+
+
+def test_select_visual_for_scene_preserves_exact_accepted_media_url():
+    from quality_core_v2.schemas import SceneV2, VisualPlanV2
+
+    scene = SceneV2.from_dict({
+        "scene_index": 1,
+        "narration": "aircraft wing flex visible",
+        "causal_role": "phenomenon",
+        "owned_claim_id": "wing_flex",
+        "new_information": "wing flex is visible",
+        "visual_requirement": "aircraft wing flex visible",
+    })
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 1,
+        "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft", "main wing"],
+        "required_observable_state": ["visible upward bending"],
+        "search_queries": ["aircraft wing flex"],
+    })
+
+    hits = [
+        {
+            "id": "static",
+            "url": "https://cdn.example/static.mp4",
+            "thumbnail": "https://cdn.example/static.jpg",
+            "query": "aircraft wing flex",
+        },
+        {
+            "id": "flex",
+            "url": "https://cdn.example/flex.mp4",
+            "thumbnail": "https://cdn.example/flex.jpg",
+            "query": "aircraft wing flex",
+        },
+    ]
+
+    def fake_search(_query):
+        return hits
+
+    def fake_classify(thumbnail_url, plan_):
+        if thumbnail_url.endswith("static.jpg"):
+            return json.dumps({
+                "description": "aircraft main wing static",
+                "visible_components": ["aircraft", "main wing"],
+                "observable_state": [],
+            })
+        return json.dumps({
+            "description": "aircraft wing flex visible upward bending",
+            "visible_components": list(plan_.required_visible_components),
+            "observable_state": list(plan_.required_observable_state),
+        })
+
+    selected, verdict = select_visual_for_scene(
+        scene,
+        plan,
+        provider_searches=[("pexels", fake_search)],
+        classify_fn=fake_classify,
+        max_classifications=2,
+    )
+    assert verdict.passed
+    assert selected is not None
+    assert selected.source_id == "flex"
+    assert selected.media_url == "https://cdn.example/flex.mp4"
+    assert selected.thumbnail_url == "https://cdn.example/flex.jpg"

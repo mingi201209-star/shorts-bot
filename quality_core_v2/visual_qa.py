@@ -44,16 +44,39 @@ def evaluate_scene_visual_qa(
     if not plan_match.passed:
         return plan_match
 
-    narration_tokens = _tokens(scene.narration)
-    visual_tokens = _tokens(visual.description) | {t.lower() for t in visual.tags}
+    # The VisualPlan is the typed semantic bridge between Korean narration and
+    # provider/vision vocabulary. Include the scene's explicit visual
+    # requirement plus the classifier's exact plan strings, instead of relying
+    # on Korean<->English lexical coincidence in provider metadata.
+    narration_tokens = _tokens(scene.narration) | _tokens(scene.visual_requirement)
+    visual_tokens = _tokens(
+        " ".join(
+            [
+                visual.description,
+                *visual.tags,
+                *visual.visible_components,
+                *visual.observable_state,
+            ]
+        )
+    )
     shared = narration_tokens & visual_tokens
     if len(shared) < NARRATION_VISUAL_MIN_OVERLAP:
-        return Verdict(
-            False,
-            f"narration and visual share no vocabulary at all -- "
-            f"narration={scene.narration!r}, visual={visual.description!r}",
-            "visual_qa",
+        plan_tokens = _tokens(
+            " ".join(
+                [
+                    plan.subject,
+                    *plan.required_visible_components,
+                    *plan.required_observable_state,
+                ]
+            )
         )
+        if not (plan_tokens & visual_tokens):
+            return Verdict(
+                False,
+                f"narration/visual requirement has no semantic bridge to visual -- "
+                f"narration={scene.narration!r}, visual={visual.description!r}",
+                "visual_qa",
+            )
 
     return Verdict(
         True,

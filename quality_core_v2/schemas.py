@@ -158,6 +158,15 @@ class CandidateVisualV2:
     observable_state: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
 
+    # Exact asset identity.  V2 must render this exact accepted asset; these
+    # fields are intentionally part of the typed contract so a later stage
+    # cannot silently search again from a keyword and pick something else.
+    provider: str = ""
+    source_id: str = ""
+    media_url: str = ""
+    thumbnail_url: str = ""
+    search_query: str = ""
+
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> "CandidateVisualV2":
         ctx = "CandidateVisualV2"
@@ -167,6 +176,11 @@ class CandidateVisualV2:
             visible_components=list(d.get("visible_components") or []),
             observable_state=list(d.get("observable_state") or []),
             tags=list(d.get("tags") or []),
+            provider=str(d.get("provider", "")),
+            source_id=str(d.get("source_id", "")),
+            media_url=str(d.get("media_url", "")),
+            thumbnail_url=str(d.get("thumbnail_url", "")),
+            search_query=str(d.get("search_query", "")),
         )
 
 

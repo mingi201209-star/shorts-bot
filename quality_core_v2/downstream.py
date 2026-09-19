@@ -1,31 +1,23 @@
-"""Downstream handoff: validated V2 objects -> existing V1
-create_scene/renderer/TTS/subtitle/export, called as-is (not
-copied/rewritten -- see AGENTS.md / execution order section 0).
+"""Clean V2 downstream handoff.
 
-Known limitation, not hidden: main.py's create_scene() does its OWN
-provider search from `keyword` internally (video/video_engine.py); it does
-not accept a pre-fetched/pre-classified visual. So the VisualQA V2 pass
-that quality_core_v2.visual_qa performs before this handoff is a plan-
-quality gate (is the keyword/plan good enough to search with), not a
-guarantee that create_scene's own internal search will pick the exact
-clip that was classified. Closing that gap (passing a pre-fetched visual
-through to create_scene) would mean changing create_scene's interface,
-which is explicitly out of scope for this phase.
+Invariant:
+    the exact CandidateVisualV2 accepted by V2 Visual QA is the asset rendered.
+
+Unlike the old handoff, this module never calls V1 create_scene(), because that
+function performs its own keyword search and can silently replace the asset V2
+actually validated.  V1 remains untouched; V2 uses a dedicated exact-asset
+renderer that reuses V1's low-level media/TTS/subtitle primitives.
 """
 
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from quality_core_v2.schemas import SceneV2, VisualPlanV2
+from quality_core_v2.schemas import CandidateVisualV2, SceneV2, VisualPlanV2
+from quality_core_v2.visual_qa import evaluate_scene_visual_qa
 
 
 def _first_nonempty(*candidates: Any) -> str:
-    """Deterministic: first non-blank string across search_queries (in
-    order) then subject. Never a generic placeholder -- an empty result
-    means the plan itself carried no usable keyword, which is a
-    fail-closed error, not something to paper over.
-    """
     for candidate in candidates:
         items = candidate if isinstance(candidate, list) else [candidate]
         for item in items:
@@ -36,17 +28,8 @@ def _first_nonempty(*candidates: Any) -> str:
 
 
 def scene_v2_to_v1_item(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
-    """Pure: map a validated (SceneV2, VisualPlanV2) pair to the exact
-    dict shape video/video_engine.create_scene expects (text/keyword/
-    visual_goal/visual_type). No network, no rendering.
-
-    create_scene requires a non-empty `keyword`
-    (video/video_engine.py:create_scene). Run 35430296847 (Golden E2E #2)
-    crashed on scene 2 with an empty keyword because search_queries[0] can
-    itself be a blank string even when the list is non-empty -- picking
-    index 0 blindly let that through. Fixed here by taking the first
-    genuinely non-blank entry across search_queries then subject, and
-    failing closed (not a generic fallback string) if none exists.
+    """Compatibility/debug projection only. It is no longer used to acquire
+    or render V2 visuals, so a keyword can never replace an accepted asset.
     """
     keyword = _first_nonempty(plan.search_queries, plan.subject)
     if not keyword:
@@ -69,40 +52,38 @@ def scene_v2_to_v1_item(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
 def render_v2_pipeline(
     scenes: List[SceneV2],
     plans: List[VisualPlanV2],
+    selected_visuals: List[CandidateVisualV2],
     *,
-    generate_scenes_fn=None,
+    generate_selected_scenes_fn=None,
     render_final_video_fn=None,
-    create_voice_fn=None,
-    reset_final_visual_semantic_report_fn=None,
-    validate_final_visual_semantic_qa_fn=None,
 ):
-    """Impure orchestration: maps every (scene, plan) pair, then calls the
-    real V1 generate_scenes()/render_final_video() unchanged. Injectable
-    for offline testing (see downstream_test.py); defaults to the real
-    functions when not injected.
+    """Render only visuals already accepted for the corresponding plan."""
+    if not (len(scenes) == len(plans) == len(selected_visuals)):
+        raise ValueError(
+            "V2 downstream inputs must align: "
+            f"{len(scenes)}/{len(plans)}/{len(selected_visuals)}"
+        )
 
-    Reuses V1's existing quality.final_visual_semantic_qa as-is (no new QA
-    implementation): reset before generate_scenes() runs (create_scene's
-    own production hotfix lineage calls record_final_visual_scene() per
-    scene as it goes), then validate right after. validate raises
-    RuntimeError on FAIL, so render_final_video_fn is only ever reached on
-    PASS -- no separate if/else needed.
-    """
-    if generate_scenes_fn is None:
-        from main import generate_scenes as generate_scenes_fn
+    # Recheck the pure semantic contract at the boundary.  No API call and no
+    # score relaxation: a malformed/mismatched asset cannot enter rendering.
+    for scene, plan, visual in zip(scenes, plans, selected_visuals):
+        if not visual.media_url.strip():
+            raise RuntimeError(
+                f"V2 selected visual for scene {scene.scene_index} has no exact media_url"
+            )
+        verdict = evaluate_scene_visual_qa(scene, plan, visual)
+        if not verdict.passed:
+            raise RuntimeError(
+                f"V2 selected visual rejected before render for scene "
+                f"{scene.scene_index}: {verdict.reason}"
+            )
+
+    if generate_selected_scenes_fn is None:
+        from quality_core_v2.selected_scene_renderer import (
+            generate_selected_scenes as generate_selected_scenes_fn,
+        )
     if render_final_video_fn is None:
         from video.renderer import render_final_video as render_final_video_fn
-    if reset_final_visual_semantic_report_fn is None:
-        from quality.final_visual_semantic_qa import (
-            reset_final_visual_semantic_report as reset_final_visual_semantic_report_fn,
-        )
-    if validate_final_visual_semantic_qa_fn is None:
-        from quality.final_visual_semantic_qa import (
-            validate_final_visual_semantic_qa as validate_final_visual_semantic_qa_fn,
-        )
 
-    items = [scene_v2_to_v1_item(s, p) for s, p in zip(scenes, plans)]
-    reset_final_visual_semantic_report_fn()
-    scene_clips = generate_scenes_fn(items)
-    validate_final_visual_semantic_qa_fn(scenes)
+    scene_clips = generate_selected_scenes_fn(scenes, plans, selected_visuals)
     return render_final_video_fn(scene_clips)
