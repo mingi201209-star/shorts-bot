@@ -187,6 +187,62 @@ def test_rejected_candidate_rewritten_narrower_and_accepted():
         assert mock_create.call_count == 4
 
 
+def test_rewrite_prompt_reuses_grounded_candidate_evidence():
+    ce = _load_legacy_module()
+    broad = _winner(
+        "비행기 날개",
+        "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?",
+        "하중 때문에 날개가 변형되기 때문이다.",
+    )
+    broad["winner"]["fact_check_focus"] = [
+        "주익의 스파와 윙박스가 하중을 분산하고 휨 강성을 만든다.",
+        "공력 중심과 구조 중심의 차이는 비틀림 하중과 연결된다.",
+    ]
+    broad["winner"]["visual_proof"] = [
+        "비행 중 날개 끝의 실제 flex 변화",
+        "윙박스 또는 스파 구조 단면",
+    ]
+
+    broad_critique = {
+        "verdict": "TOO_BROAD",
+        "reason": "Reveal이 하중 때문에 변형된다는 일반 설명에 머문다.",
+    }
+    rewritten = _bare_candidate(
+        "비행기 날개",
+        "비행기 날개는 하중을 받으면 왜 위로 휘면서 동시에 비틀릴까?",
+        "스파와 윙박스가 휨 하중을 나누는 동안 공력 중심과 구조 중심의 차이가 비틀림 하중을 만든다.",
+    )
+    rewritten["fact_check_focus"] = list(broad["winner"]["fact_check_focus"])
+    rewritten["visual_proof"] = list(broad["winner"]["visual_proof"])
+    narrow_critique = {
+        "verdict": "NARROW_ENOUGH",
+        "reason": "구체적인 구조 요소와 비틀림 원인이 명시됨 (test)",
+    }
+
+    side_effect = [
+        _make_response(broad),
+        _make_response(broad_critique),
+        _make_response(rewritten),
+        _make_response(narrow_critique),
+    ]
+
+    p1, p2, p3, p4 = _patched(ce, side_effect)
+    with p1, p2, p3, p4 as mock_create:
+        result = ce.explore_candidates(_TOPIC_INFO)
+
+    assert result["status"] == "SELECTED"
+    rewrite_call = mock_create.call_args_list[2]
+    user_content = rewrite_call.kwargs["messages"][1]["content"]
+    system_content = rewrite_call.kwargs["messages"][0]["content"]
+
+    assert "[FACT CHECK FOCUS]" in user_content
+    assert "스파와 윙박스가 하중을 분산" in user_content
+    assert "공력 중심과 구조 중심의 차이" in user_content
+    assert "[VISUAL PROOF]" in user_content
+    assert "비행 중 날개 끝의 실제 flex 변화" in user_content
+    assert "새로운 수치, 원인, 메커니즘을 지어내지 마라" in system_content
+
+
 # ------------------------------------------------------------------
 # 4: bounded retry -- stops after MAX_NARROWNESS_REWRITES and discards.
 # ------------------------------------------------------------------
@@ -298,6 +354,9 @@ if __name__ == "__main__":
 
     test_rejected_candidate_rewritten_narrower_and_accepted()
     print("✓ test_rejected_candidate_rewritten_narrower_and_accepted")
+
+    test_rewrite_prompt_reuses_grounded_candidate_evidence()
+    print("✓ test_rewrite_prompt_reuses_grounded_candidate_evidence")
 
     test_recovery_limit_respected_then_discards()
     print("✓ test_recovery_limit_respected_then_discards")
