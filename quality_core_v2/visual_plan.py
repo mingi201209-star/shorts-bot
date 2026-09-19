@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from typing import List
 
-from quality_core_v2.schemas import CandidateVisualV2, VisualPlanV2, Verdict
+from quality_core_v2.schemas import CandidateV2, CandidateVisualV2, VisualPlanV2, Verdict
 
 
 _QUERY_TOKEN_RE = re.compile(r"[a-z0-9]+")
@@ -27,6 +27,60 @@ _STATE_STOPWORDS = {
     "under", "with", "and", "aircraft", "airplane", "wing", "main",
     "flight", "view", "close", "closeup",
 }
+
+
+_IDENTITY_TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]+")
+_IDENTITY_GENERIC_TERMS = {
+    "aircraft", "airplane", "plane", "aviation", "vehicle", "main",
+    "system", "structure", "component", "part", "object", "subject",
+    "flight", "flying", "scene", "view", "detail", "closeup",
+    "비행기", "항공기", "구조", "시스템", "부품", "대상", "장면",
+}
+_IDENTITY_STATE_TERMS = {
+    "visible", "upward", "elastic", "flex", "flexing", "bend", "bending",
+    "deform", "deformation", "deflection", "load", "loaded", "aerodynamic",
+    "force", "forces", "lift", "drag", "airflow", "pressure", "during",
+    "under", "with", "and", "of", "the",
+    "보이는", "위로", "탄성", "변형", "하중", "양력", "항력", "공기",
+}
+
+
+def _identity_tokens(text: str) -> set:
+    return {
+        token.lower()
+        for token in _IDENTITY_TOKEN_RE.findall(str(text or ""))
+        if token.lower() not in _IDENTITY_GENERIC_TERMS
+        and token.lower() not in _IDENTITY_STATE_TERMS
+        and len(token) >= 2
+    }
+
+
+def _candidate_identity_tokens(candidate: CandidateV2) -> set:
+    canonical = _identity_tokens(candidate.canonical_subject)
+    concrete = _identity_tokens(candidate.concrete_subject)
+    # Intersection is too brittle when one field is more specific than the
+    # other. Union is safe because the gate only requires one concrete identity
+    # token to survive into the plan.
+    return canonical | concrete
+
+
+def _plan_identity_tokens(plan: VisualPlanV2) -> set:
+    values = [
+        plan.subject,
+        *plan.required_visible_components,
+        *plan.search_queries,
+    ]
+    tokens = set()
+    for value in values:
+        tokens |= _identity_tokens(value)
+    return tokens
+
+
+def _candidate_identity_bound(plan: VisualPlanV2, candidate: CandidateV2) -> bool:
+    required = _candidate_identity_tokens(candidate)
+    if not required:
+        return True
+    return bool(required & _plan_identity_tokens(plan))
 
 
 def _semantic_query_terms(text: str) -> set:
@@ -60,7 +114,10 @@ def _state_bearing_query_exists(plan: VisualPlanV2) -> bool:
     return False
 
 
-def evaluate_visual_plan_v2(plan: VisualPlanV2) -> Verdict:
+def evaluate_visual_plan_v2(
+    plan: VisualPlanV2,
+    candidate: CandidateV2 | None = None,
+) -> Verdict:
     if not plan.subject.strip():
         return Verdict(False, "VisualPlan has no subject", "visual_plan")
     if not plan.required_visible_components:
@@ -81,6 +138,16 @@ def evaluate_visual_plan_v2(plan: VisualPlanV2) -> Verdict:
         return Verdict(
             False,
             "no search_queries -- the observable state cannot survive into retrieval",
+            "visual_plan",
+        )
+    if candidate is not None and not _candidate_identity_bound(plan, candidate):
+        return Verdict(
+            False,
+            "VisualPlan drifted away from Candidate canonical subject; "
+            f"canonical_subject={candidate.canonical_subject!r} "
+            f"concrete_subject={candidate.concrete_subject!r} "
+            f"plan_subject={plan.subject!r} components={plan.required_visible_components!r} "
+            f"queries={plan.search_queries!r}",
             "visual_plan",
         )
     if not _state_bearing_query_exists(plan):
