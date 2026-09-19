@@ -18,6 +18,30 @@ from quality_core_v2.schemas import CandidateV2, SceneV2, ShapeError, VisualPlan
 WRITER_MODEL = os.environ.get("V3_WRITER_V2_MODEL", "gpt-4o-mini")
 VISUAL_PLANNER_MODEL = os.environ.get("V3_VISUAL_PLANNER_V2_MODEL", "gpt-4o-mini")
 
+_OUT_OF_CANDIDATE_CONTEXT_TERMS = (
+    "passenger", "passengers", "cabin", "interior", "comfort", "comfortable",
+    "seat", "seats", "승객", "객실", "편안", "좌석",
+)
+
+
+def _candidate_context_text(candidate: CandidateV2) -> str:
+    return " ".join([
+        candidate.topic,
+        candidate.concrete_subject,
+        candidate.observable_phenomenon,
+        candidate.core_question,
+        candidate.mechanism,
+        candidate.reveal,
+        candidate.canonical_subject,
+        *candidate.visual_proof,
+    ]).lower()
+
+
+def _forbidden_out_of_candidate_terms(candidate: CandidateV2) -> List[str]:
+    context = _candidate_context_text(candidate)
+    return [term for term in _OUT_OF_CANDIDATE_CONTEXT_TERMS if term not in context]
+
+
 WRITER_V2_SYSTEM_PROMPT = """
 너는 YouTube Shorts Script Writer V2다.
 
@@ -139,6 +163,15 @@ def call_writer(candidate: CandidateV2, *, client: Any = None) -> str:
             "canonical_subject": candidate.canonical_subject,
             "visual_proof": list(candidate.visual_proof),
             "evidence_refs": list(candidate.evidence_refs),
+            "hard_constraints": {
+                "scene_count": 6,
+                "scene_1": "state the observable phenomenon directly",
+                "scene_6": (
+                    "explain the Candidate mechanism/reveal itself; keep the canonical "
+                    "subject; do not introduce a new user benefit or new domain"
+                ),
+                "forbidden_out_of_candidate_terms": _forbidden_out_of_candidate_terms(candidate),
+            },
         },
         ensure_ascii=False,
     )
