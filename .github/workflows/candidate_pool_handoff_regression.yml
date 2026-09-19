@@ -257,7 +257,7 @@ jobs:
                   "quality/candidate_pool_grounding_records.py",
               )
           )
-          assert "MAX_TOPIC_REGENERATIONS = 6" in runtime_main
+          assert "MAX_TOPIC_REGENERATIONS = 19" in runtime_main
           assert 'V3_MAX_API_CALLS: "60"' in workflow
           assert 'V3_MAX_COST_USD: "0.05"' in workflow
           assert "CANDIDATE SUPPLY RECOVERY (1/1)" in recovery
@@ -271,7 +271,7 @@ jobs:
           ):
               assert token not in implementation, token
           print("THRESHOLDS_CHANGED=NO")
-          print("MAX_TOPIC_REGENERATIONS=6")
+          print("MAX_TOPIC_REGENERATIONS=19")
           print("API_CAP=60")
           print("COST_CAP=0.05")
           print("SUPPLY_RECOVERY_BOUND=1")
