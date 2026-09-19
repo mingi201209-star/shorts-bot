@@ -69,7 +69,7 @@ def test_full_control_flow_candidate_to_render_handoff():
     items = [scene_v2_to_v1_item(s, p) for s, p in zip(scenes, plans)]
     assert items[0] == {
         "text": "날개 끝이 위로 휩니다",
-        "keyword": "airplane wing flexing in flight",
+        "keyword": "airplane wing flexing in flight visible upward elastic bending",
         "visual_goal": "visible upward elastic bending",
         "visual_type": "real_world_broll",
     }
@@ -113,7 +113,7 @@ def test_scene_v2_to_v1_item_skips_blank_first_search_query():
         "search_queries": ["", "  ", "airplane wing wide shot"],
     })
     item = scene_v2_to_v1_item(scene, plan)
-    assert item["keyword"] == "airplane wing wide shot"
+    assert item["keyword"] == "airplane wing wide shot bending"
 
 
 def test_scene_v2_to_v1_item_falls_back_to_subject_when_all_queries_blank():
@@ -128,7 +128,7 @@ def test_scene_v2_to_v1_item_falls_back_to_subject_when_all_queries_blank():
         "search_queries": ["", ""],
     })
     item = scene_v2_to_v1_item(scene, plan)
-    assert item["keyword"] == "aircraft main wing"
+    assert item["keyword"] == "aircraft main wing bending"
 
 
 def test_scene_v2_to_v1_item_rejects_when_no_keyword_available():
@@ -262,3 +262,12 @@ def test_scene_v2_to_v1_item_skips_non_ascii_state_tokens_and_logs(capsys):
     assert '"augmented_query": "aircraft wing"' in log
     assert '"added_token_count": 0' in log
     assert '"skipped_non_ascii_token": ["날개가", "휘어짐"]' in log
+
+
+def test_scene_v2_to_v1_item_keeps_query_when_state_tokens_already_present():
+    scene, plan = _query_preservation_scene_and_plan(
+        base_query="aircraft wing flex bending",
+        states=["wing flex", "wing bending"],
+    )
+    item = scene_v2_to_v1_item(scene, plan)
+    assert item["keyword"] == "aircraft wing flex bending"
