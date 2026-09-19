@@ -5,6 +5,10 @@ import re
 import subprocess
 import time
 
+import numpy as np
+
+from config import VIDEO_HEIGHT, VIDEO_WIDTH
+
 
 def _clean(value):
     return re.sub(r"\s+", " ", str(value or "").strip())
@@ -108,6 +112,92 @@ def _probe_duration(path):
     return float(result.stdout.strip())
 
 
+def assess_opening_frame_visual_safety(frame, *, subtitle_visible=True, timestamp=0.0):
+    frame = np.asarray(frame)
+    if frame.ndim != 3 or frame.shape[2] < 3:
+        return {
+            "pass": False,
+            "reason": "opening_frame_invalid",
+            "timestamp": float(timestamp),
+        }
+    rgb = frame[:, :, :3].astype(np.float32)
+    gray = (
+        0.299 * rgb[:, :, 0]
+        + 0.587 * rgb[:, :, 1]
+        + 0.114 * rgb[:, :, 2]
+    )
+    mean = float(np.mean(gray))
+    std = float(np.std(gray))
+    edge = 0.0
+    if gray.shape[0] > 1 and gray.shape[1] > 1:
+        edge = float(
+            np.mean(np.abs(np.diff(gray[::4, ::4], axis=0)))
+            + np.mean(np.abs(np.diff(gray[::4, ::4], axis=1)))
+        )
+    black_or_empty = mean < 12.0 and std < 8.0 and edge < 3.0
+    if subtitle_visible and black_or_empty:
+        return {
+            "pass": False,
+            "reason": "subtitle_on_black_or_empty_frame",
+            "timestamp": float(timestamp),
+            "mean_luma": round(mean, 3),
+            "std_luma": round(std, 3),
+            "edge_signal": round(edge, 3),
+        }
+    return {
+        "pass": True,
+        "reason": "opening_frame_visual_ready",
+        "timestamp": float(timestamp),
+        "mean_luma": round(mean, 3),
+        "std_luma": round(std, 3),
+        "edge_signal": round(edge, 3),
+    }
+
+
+def _probe_opening_frame(path):
+    result = subprocess.run(
+        [
+            "ffmpeg", "-v", "error", "-ss", "0", "-i", path,
+            "-frames:v", "1",
+            "-vf", f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}",
+            "-f", "rawvideo",
+            "-pix_fmt", "rgb24",
+            "-",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=30,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"FINAL_RENDER_OPENING_FRAME_PROBE_FAILED {result.stderr[-500:]!r}")
+    expected = VIDEO_WIDTH * VIDEO_HEIGHT * 3
+    if len(result.stdout) < expected:
+        raise RuntimeError("FINAL_RENDER_OPENING_FRAME_MISSING")
+    return np.frombuffer(result.stdout[:expected], dtype=np.uint8).reshape(
+        (VIDEO_HEIGHT, VIDEO_WIDTH, 3)
+    )
+
+
+def validate_opening_frame_visual_safety(final_path):
+    frame = _probe_opening_frame(final_path)
+    result = assess_opening_frame_visual_safety(
+        frame,
+        subtitle_visible=True,
+        timestamp=0.0,
+    )
+    if not result.get("pass"):
+        raise RuntimeError(
+            "FINAL_RENDER_OPENING_FRAME_VISUAL_UNSAFE "
+            f"reason={result.get('reason')} mean={result.get('mean_luma')} "
+            f"std={result.get('std_luma')}"
+        )
+    print(
+        "FINAL_RENDER_OPENING_FRAME_VISUAL_READY "
+        f"mean={result.get('mean_luma')} std={result.get('std_luma')}"
+    )
+    return result
+
+
 def validate_final_render_integrity(final_path, script_data, expected_topic, manifest, expected_duration):
     assert_content_identity(expected_topic, script_data, stage="post_render")
     current = build_content_manifest(script_data, expected_topic)
@@ -133,6 +223,8 @@ def validate_final_render_integrity(final_path, script_data, expected_topic, man
             "FINAL_RENDER_DURATION_MISMATCH "
             f"expected={float(expected_duration):.3f} actual={actual_duration:.3f} tolerance={tolerance:.3f}"
         )
+
+    validate_opening_frame_visual_safety(final_path)
 
     print(
         "FINAL_RENDER_CONTENT_INTEGRITY PASS "

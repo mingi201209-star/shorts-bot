@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+from quality.visual_semantic_contract import evaluate_visual_semantic_contract
+
 
 REPORT_PATH = Path("final_visual_semantic_qa.json")
 SCENE_REPORT_DIR = Path(".final_visual_semantic_qa")
@@ -21,7 +23,7 @@ def reset_final_visual_semantic_report():
         pass
 
 
-def record_final_visual_scene(scene_index, query, selection, *, hook_verified=False):
+def record_final_visual_scene(scene_index, query, selection, *, hook_verified=False, duration=None):
     if hook_verified:
         entry = {
             "scene_index": int(scene_index),
@@ -42,8 +44,18 @@ def record_final_visual_scene(scene_index, query, selection, *, hook_verified=Fa
             "anchor_total": int(selection.get("anchor_total", 0) or 0),
             "provider": str(selection.get("provider") or ""),
             "source_id": str(selection.get("source_id") or ""),
+            "physical_signature": str(selection.get("physical_signature") or ""),
+            "source_asset_id": str(selection.get("source_asset_id") or ""),
+            "template_type": str(selection.get("template_type") or ""),
+            "presentation_variant": str(selection.get("presentation_variant") or ""),
+            "motion_profile": str(selection.get("motion_profile") or ""),
             "metadata": str(selection.get("metadata") or "")[:500],
         }
+    if duration is not None:
+        try:
+            entry["duration"] = float(duration)
+        except Exception:
+            entry["duration"] = 0.0
     _SCENE_REPORT.append(entry)
     # Scene rendering may run in worker processes. Persist one file per scene so
     # the parent process can validate the exact selections after workers join.
@@ -83,17 +95,30 @@ def _missing_required_aviation_component_anchor(item):
 
 
 def validate_final_visual_semantic_qa(scenes):
-    expected = len(list(scenes or []))
+    scenes = list(scenes or [])
+    expected = len(scenes)
     by_index = {item["scene_index"]: item for item in _SCENE_REPORT}
     for path in SCENE_REPORT_DIR.glob("scene_*.json"):
         item = json.loads(path.read_text(encoding="utf-8"))
         by_index[int(item["scene_index"])] = item
     ordered = sorted(by_index.values(), key=lambda item: item["scene_index"])
-    failures = [
-        item
-        for item in ordered
-        if not item.get("accepted") or _missing_required_aviation_component_anchor(item)
-    ]
+    failures = []
+    for item in ordered:
+        failed = False
+        if not item.get("accepted") or _missing_required_aviation_component_anchor(item):
+            failed = True
+        idx = int(item.get("scene_index", -1))
+        if (
+            0 <= idx < len(scenes)
+            and str(item.get("mode") or "") != "EXISTING_STRICT_HOOK_GATE"
+        ):
+            semantic = evaluate_visual_semantic_contract(scenes[idx], item)
+            item["semantic_visual_contract"] = semantic
+            if not semantic.get("pass"):
+                item["failure_reason"] = semantic.get("reason")
+                failed = True
+        if failed:
+            failures.append(item)
     seen = {item["scene_index"] for item in ordered}
     missing = [idx for idx in range(expected) if idx not in seen]
     payload = {
