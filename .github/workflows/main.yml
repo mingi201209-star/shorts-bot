@@ -264,8 +264,8 @@ jobs:
           python -m quality.subscriber_conversion_regression_test
           python quality/failure_diagnostics_regression_test.py
           python -m quality_core_v2.replay
-          python quality_core_v2/downstream_test.py
-          python quality_core_v2/actual_visual_qa_regression_test.py
+          python -m quality_core_v2.downstream_test
+          python -m quality_core_v2.actual_visual_qa_regression_test
 
       - name: Restore recent-topics memory
         env:
