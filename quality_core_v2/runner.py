@@ -18,6 +18,7 @@ from quality_core_v2.adapters.writer_adapter import (
     parse_visual_plan_response,
     parse_writer_response,
 )
+from quality_core_v2.downstream import render_v2_pipeline
 from quality_core_v2.script_plan import evaluate_script_plan_v2
 from quality_core_v2.visual_plan import evaluate_visual_plan_v2
 
@@ -40,8 +41,9 @@ def run_v2_pipeline(topic_direction: str = "", recent_topics=None):
             raise RuntimeError(f"V2 VisualPlan rejected for scene {scene.scene_index}: {plan_verdict.reason}")
         plans.append(plan)
 
-    raise NotImplementedError(
-        "V2 Candidate/Script/VisualPlan validated -- retrieval/generation + "
-        "downstream create_scene/renderer/TTS/subtitle/export wiring is the "
-        "next phase, not yet implemented."
-    )
+    # Retrieval/classification against each plan (visual_qa gate) is not
+    # re-run here: create_scene() below does its own provider search from
+    # the mapped keyword. See quality_core_v2/downstream.py's module
+    # docstring for the known gap this leaves (plan-quality gate, not a
+    # guarantee of the exact clip create_scene's own search will pick).
+    return render_v2_pipeline(scenes, plans)
