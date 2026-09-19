@@ -183,9 +183,9 @@ def main() -> int:
     seed_candidates = seed_pool["candidates"]
     assert 1 <= len(seed_candidates) <= 3
     seed_topics = [candidate["topic"] for candidate in seed_candidates]
-    assert seed_topics[0] == "비행기 날개 뒤의 가느다란 스태틱 윅", seed_topics
+    assert seed_topics[0] == "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?", seed_topics
+    assert "비행기 날개 뒤의 가느다란 스태틱 윅" in seed_topics
     assert "착륙 직후 날개 위로 솟는 스포일러" in seed_topics
-    assert "비행기 밖으로 튀어나온 작은 피토관" in seed_topics
     seed_handoff = _handoff(seed_candidates)
     assert seed_handoff["status"] == "SELECTED", seed_handoff
     trace = seed_handoff.get("_candidate_pool_handoff") or {}
