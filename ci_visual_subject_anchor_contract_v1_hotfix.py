@@ -208,11 +208,16 @@ qa = ROOT / "quality/final_visual_semantic_qa.py"
 text = qa.read_text(encoding="utf-8")
 qa_marker = "VISUAL_SUBJECT_ANCHOR_FINAL_QA_V1"
 if qa_marker not in text:
-    metadata_line = '            "metadata": str(selection.get("metadata") or "")[:500],\n'
-    if metadata_line not in text:
+    metadata_candidates = (
+        '            "metadata": str(selection.get("metadata") or "")[:500],\n',
+        '            "metadata": metadata[:900],\n',
+    )
+    metadata_line = next((line for line in metadata_candidates if line in text), "")
+    if not metadata_line:
         raise RuntimeError("Visual Subject Anchor Contract: final QA lineage anchor not found")
-    lineage = metadata_line + '''            "subject_anchor_contract_required": bool(selection.get("subject_anchor_contract_required", False)),\n            "required_subject_anchors": list(selection.get("required_subject_anchors") or []),\n            "subject_anchor_original_query": str(selection.get("subject_anchor_original_query") or ""),\n            "subject_anchor_effective_query": str(selection.get("subject_anchor_effective_query") or ""),\n            "subject_anchor_contract_reason": str(selection.get("subject_anchor_contract_reason") or ""),\n'''
-    text = text.replace(metadata_line, lineage, 1)
+    if '"subject_anchor_contract_required":' not in text:
+        lineage = metadata_line + '''            "subject_anchor_contract_required": bool(selection.get("subject_anchor_contract_required", False)),\n            "required_subject_anchors": list(selection.get("required_subject_anchors") or []),\n            "subject_anchor_original_query": str(selection.get("subject_anchor_original_query") or ""),\n            "subject_anchor_effective_query": str(selection.get("subject_anchor_effective_query") or ""),\n            "subject_anchor_contract_reason": str(selection.get("subject_anchor_contract_reason") or ""),\n'''
+        text = text.replace(metadata_line, lineage, 1)
 
     loop_failure_clause = '''        if not item.get("accepted") or _missing_required_aviation_component_anchor(item):
             failed = True
