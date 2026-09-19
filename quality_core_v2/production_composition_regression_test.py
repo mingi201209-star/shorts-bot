@@ -47,6 +47,18 @@ def main():
         else:
             os.environ["ENABLE_QUALITY_CORE_V2"] = old
 
+    writer = (
+        ROOT / "quality_core_v2/adapters/writer_adapter.py"
+    ).read_text(encoding="utf-8")
+    runner = (ROOT / "quality_core_v2/runner.py").read_text(encoding="utf-8")
+    visual_plan = (ROOT / "quality_core_v2/visual_plan.py").read_text(encoding="utf-8")
+    assert "candidate_context" in writer
+    assert "canonical_subject" in writer
+    assert "call_visual_planner(scene, candidate=candidate)" in runner
+    assert "evaluate_visual_plan_v2(plan, candidate=candidate)" in runner
+    assert "evaluate_script_plan_v2(scenes, candidate=candidate)" in runner
+    assert "VisualPlan drifted away from Candidate canonical subject" in visual_plan
+
     engine = (ROOT / "video/video_engine.py").read_text(encoding="utf-8")
     assert "[V2_SOURCE_ROUTING]" in engine
     assert "_v2_preferred_source_type" in engine
