@@ -73,6 +73,8 @@ def scene_v2_to_v1_item(scene: SceneV2, plan: VisualPlanV2) -> Dict[str, Any]:
         "visual_type": visual_type,
         # Private V2-only hints. create_scene ignores unknown keys, while
         # V2-aware fallbacks/diagnostics may use them. V1 callers never set them.
+        "_v2_scene_index": int(scene.scene_index),
+        "_v2_subject": str(plan.subject or ""),
         "_v2_required_visible_components": list(plan.required_visible_components),
         "_v2_required_observable_state": list(plan.required_observable_state),
         "_v2_required_relation_or_mechanism": list(plan.required_relation_or_mechanism),
