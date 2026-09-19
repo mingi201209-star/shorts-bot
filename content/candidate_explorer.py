@@ -2463,10 +2463,8 @@ def explore_candidates(
         # self-critique to return NARROW_ENOUGH.
         if (
             critique.get("verdict") == "TOO_BROAD"
-            and not (
-                fixed_topic_key
-                and fixed_topic_key in _NARROWNESS_FIXED_TOPIC_LLM_BLOCKED
-            )
+            and fixed_topic_key
+            and fixed_topic_key not in _NARROWNESS_FIXED_TOPIC_LLM_BLOCKED
         ):
             deterministic_rewrite = _deterministic_grounded_narrowness_rewrite(
                 winner
