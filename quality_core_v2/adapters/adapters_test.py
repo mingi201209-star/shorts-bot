@@ -431,3 +431,67 @@ def test_thumbnail_pass_exact_video_fail_moves_to_next_candidate():
     assert visual is not None
     assert visual.source_id == "real-flex"
     assert visual.media_url == "/tmp/real-flex.mp4"
+
+
+def test_thumbnail_is_only_coarse_gate_and_exact_video_proves_motion():
+    from quality_core_v2.adapters.retrieval_adapter import select_visual_for_scene
+    from quality_core_v2.schemas import CandidateVisualV2, SceneV2, VisualPlanV2
+
+    scene = SceneV2.from_dict({
+        "scene_index": 1,
+        "narration": "aircraft wing flex visible",
+        "causal_role": "phenomenon",
+        "owned_claim_id": "flex",
+        "new_information": "wing flex visible",
+        "visual_requirement": "aircraft wing flex visible",
+    })
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 1,
+        "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft", "main wing"],
+        "required_observable_state": ["visible upward elastic bending"],
+        "search_queries": ["aircraft wing flex"],
+    })
+
+    def thumbnail_classifier(_url, plan_):
+        return json.dumps({
+            "description": "aircraft main wing",
+            "visible_components": list(plan_.required_visible_components),
+            "observable_state": [],
+            "visible_relations_or_mechanisms": [],
+            "forbidden_visuals_present": [],
+        })
+
+    def exact_classifier(scene_, plan_, identity_, path_):
+        return CandidateVisualV2.from_dict({
+            "source_type": "stock",
+            "description": "aircraft wing flex visible",
+            "visible_components": list(plan_.required_visible_components),
+            "observable_state": list(plan_.required_observable_state),
+            "provider": identity_.provider,
+            "source_id": identity_.source_id,
+            "media_url": path_,
+            "thumbnail_url": identity_.thumbnail_url,
+            "search_query": identity_.search_query,
+        })
+
+    visual, verdict = select_visual_for_scene(
+        scene,
+        plan,
+        provider_searches=[(
+            "pexels",
+            lambda _q: [{
+                "id": "dynamic-1",
+                "url": "https://cdn.example/dynamic.mp4",
+                "thumbnail": "https://cdn.example/dynamic.jpg",
+                "query": "aircraft wing flex",
+            }],
+        )],
+        classify_fn=thumbnail_classifier,
+        max_classifications=1,
+        download_stock_fn=lambda *_args: "/tmp/dynamic-1.mp4",
+        classify_stock_video_fn=exact_classifier,
+    )
+    assert verdict.passed
+    assert visual is not None
+    assert visual.source_id == "dynamic-1"

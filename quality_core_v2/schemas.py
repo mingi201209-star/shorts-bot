@@ -157,6 +157,7 @@ class CandidateVisualV2:
     visible_components: List[str] = field(default_factory=list)
     observable_state: List[str] = field(default_factory=list)
     visible_relations_or_mechanisms: List[str] = field(default_factory=list)
+    forbidden_visuals_present: List[str] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
 
     # Exact asset identity.  V2 must render this exact accepted asset; these
@@ -178,6 +179,9 @@ class CandidateVisualV2:
             observable_state=list(d.get("observable_state") or []),
             visible_relations_or_mechanisms=list(
                 d.get("visible_relations_or_mechanisms") or []
+            ),
+            forbidden_visuals_present=list(
+                d.get("forbidden_visuals_present") or []
             ),
             tags=list(d.get("tags") or []),
             provider=str(d.get("provider", "")),

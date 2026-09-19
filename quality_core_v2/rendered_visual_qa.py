@@ -61,7 +61,9 @@ def classify_rendered_visual(
         "language as the narration and use a narration term only when that exact "
         "physical evidence is visible. Do not echo narration to manufacture a match. "
         "JSON only with keys description, visible_components, observable_state, "
-        "visible_relations_or_mechanisms.\nNarration: " + scene.narration + "\n"
+        "visible_relations_or_mechanisms, forbidden_visuals_present. "
+        "forbidden_visuals_present must contain only exact forbidden_visuals strings "
+        "that are visibly present.\nNarration: " + scene.narration + "\n"
         + json.dumps(requirements, ensure_ascii=False)
     )
     content = [{"type": "text", "text": prompt}]
@@ -100,6 +102,9 @@ def classify_rendered_visual(
         "observable_state": data.get("observable_state") or [],
         "visible_relations_or_mechanisms": (
             data.get("visible_relations_or_mechanisms") or []
+        ),
+        "forbidden_visuals_present": (
+            data.get("forbidden_visuals_present") or []
         ),
         "tags": list(selected_visual.tags),
         "provider": selected_visual.provider,

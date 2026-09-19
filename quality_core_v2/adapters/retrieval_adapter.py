@@ -46,7 +46,8 @@ required_observable_state, required_relation_or_mechanism 중
   "description": "화면에 실제로 보이는 것을 짧고 구체적으로 설명",
   "visible_components": ["VisualPlan의 원문 항목"],
   "observable_state": ["VisualPlan의 원문 항목"],
-  "visible_relations_or_mechanisms": ["VisualPlan의 원문 항목"]
+  "visible_relations_or_mechanisms": ["VisualPlan의 원문 항목"],
+  "forbidden_visuals_present": ["VisualPlan의 forbidden_visuals 중 실제로 보이는 원문 항목"]
 }
 """
 
@@ -78,6 +79,9 @@ def parse_visual_classification(
             "observable_state": data.get("observable_state") or [],
             "visible_relations_or_mechanisms": (
                 data.get("visible_relations_or_mechanisms") or []
+            ),
+            "forbidden_visuals_present": (
+                data.get("forbidden_visuals_present") or []
             ),
             "tags": tags or [],
             "provider": provider,
@@ -249,6 +253,52 @@ def _default_classify_generated(
     )
 
 
+def _contains_visible(items: List[str], required: str) -> bool:
+    required_l = str(required or "").strip().lower()
+    if not required_l:
+        return True
+    return any(
+        required_l in str(item).lower() or str(item).lower() in required_l
+        for item in items
+        if str(item).strip()
+    )
+
+
+def _evaluate_thumbnail_candidate(
+    plan: VisualPlanV2,
+    visual: CandidateVisualV2,
+) -> Verdict:
+    """Cheap routing gate only.
+
+    A single thumbnail cannot reliably prove motion, deformation over time,
+    or a mechanism relation. It may reject obvious wrong-subject/forbidden
+    assets, but the downloaded exact video must pass the full V2 gate before
+    it can be selected.
+    """
+    if visual.forbidden_visuals_present:
+        return Verdict(
+            False,
+            f"thumbnail shows forbidden visual(s): {visual.forbidden_visuals_present}",
+            "visual_qa",
+        )
+    missing = [
+        component
+        for component in plan.required_visible_components
+        if not _contains_visible(visual.visible_components, component)
+    ]
+    if missing:
+        return Verdict(
+            False,
+            f"thumbnail missing required component(s): {missing}",
+            "visual_qa",
+        )
+    return Verdict(
+        True,
+        "thumbnail subject/components plausible; exact video still requires strict QA",
+        "visual_qa",
+    )
+
+
 def _default_download_stock(
     visual: CandidateVisualV2,
     scene: SceneV2,
@@ -385,7 +435,7 @@ def select_visual_for_scene(
                     scene=scene,
                     classify_fn=classify_fn,
                 )
-                verdict = evaluate_scene_visual_qa(scene, plan, visual)
+                verdict = _evaluate_thumbnail_candidate(plan, visual)
                 last_verdict = verdict
                 print(
                     "[V2_VISUAL_SELECT] "
@@ -419,6 +469,9 @@ def select_visual_for_scene(
                         "observable_state": list(visual.observable_state),
                         "visible_relations_or_mechanisms": list(
                             visual.visible_relations_or_mechanisms
+                        ),
+                        "forbidden_visuals_present": list(
+                            visual.forbidden_visuals_present
                         ),
                         "tags": list(visual.tags),
                         "provider": visual.provider,
@@ -466,6 +519,7 @@ def select_visual_for_scene(
                     "visible_components": [],
                     "observable_state": [],
                     "visible_relations_or_mechanisms": [],
+                    "forbidden_visuals_present": [],
                     "provider": str(generated.get("provider") or "generated"),
                     "source_id": str(generated.get("source_id") or ""),
                     "media_url": path,

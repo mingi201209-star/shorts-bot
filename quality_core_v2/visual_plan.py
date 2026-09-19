@@ -141,6 +141,14 @@ def _contains_any(haystack_items: List[str], needle: str) -> bool:
 def match_visual_to_plan(plan: VisualPlanV2, visual: CandidateVisualV2) -> Verdict:
     """FAIL is the default. A visual must affirmatively satisfy the plan."""
 
+    if visual.forbidden_visuals_present:
+        return Verdict(
+            False,
+            "visual contains forbidden visual(s): "
+            f"{visual.forbidden_visuals_present}",
+            "visual_qa",
+        )
+
     # 1. Forbidden visuals -- checked first and unconditionally. A subject
     #    match never overrides this (this is the exact "subject right but
     #    stock is a forbidden generic shot" case from the execution order).
