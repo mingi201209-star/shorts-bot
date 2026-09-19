@@ -1,0 +1,26 @@
+{
+  "name": "recovery_e2e_scene1_generated_subject_without_flex",
+  "category": "generated fallback missing observable wing flex",
+  "provenance": "Recovery Golden E2E run 35437661147: generated Scene 1 showed aircraft+wing and passed the legacy still verifier, but strict Clean V2 exact-video QA correctly found that wing bending during flight was not visible.",
+  "stage": "visual_match",
+  "input": {
+    "plan": {
+      "scene_index": 1,
+      "subject": "aircraft main wing",
+      "required_visible_components": ["aircraft", "main wing"],
+      "required_observable_state": ["wing bending during flight"],
+      "forbidden_visuals": ["straight static wing"]
+    },
+    "visual": {
+      "source_type": "generated",
+      "description": "aircraft main wing visible in flight but visually straight",
+      "visible_components": ["aircraft", "main wing"],
+      "observable_state": [],
+      "visible_relations_or_mechanisms": [],
+      "forbidden_visuals_present": [],
+      "tags": ["generated"]
+    }
+  },
+  "expected_pass": false,
+  "expected_reason_contains": "observable state"
+}

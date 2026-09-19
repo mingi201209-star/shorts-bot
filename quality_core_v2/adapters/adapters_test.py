@@ -312,7 +312,7 @@ def test_generated_preference_uses_exact_generated_asset_without_stock_search():
     assert verdict.passed
     assert visual is not None
     assert visual.media_url == "workspace/temp/generated-scene-2.mp4"
-    assert stock_calls == ["aircraft wing flex"]
+    assert stock_calls == []
 
 
 def test_required_relation_must_be_visibly_proven():
@@ -600,3 +600,32 @@ def test_scene_selection_does_not_spend_vision_on_thumbnail():
     assert verdict.passed
     assert visual is not None and visual.source_id == "exact-1"
     assert thumbnail_calls == []
+
+
+def test_generation_payload_carries_canonical_subject_and_explicit_flex_geometry():
+    from quality_core_v2.adapters.retrieval_adapter import _generation_scene_payload
+    from quality_core_v2.schemas import SceneV2, VisualPlanV2
+
+    scene = SceneV2.from_dict({
+        "scene_index": 1,
+        "narration": "비행 중 날개가 위로 휩니다.",
+        "causal_role": "phenomenon",
+        "owned_claim_id": "wing_flex",
+        "new_information": "날개가 위로 휜다",
+        "visual_requirement": "main wing bends upward",
+    })
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 1,
+        "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft", "main wing"],
+        "required_observable_state": ["wing bending during flight"],
+        "preferred_source_type": "generated",
+        "search_queries": ["aircraft wing flex bending in flight"],
+    })
+    payload = _generation_scene_payload(scene, plan)
+    profile = payload["_canonical_visual_supply"]
+    assert profile["canonical_subject"] == "aircraft main wing"
+    assert "main wing" in profile["canonical_terms"]
+    assert "wing bending during flight" in profile["visual_discriminators"]
+    assert "wingtip must sit visibly higher than the wing root plane" in payload["visual_goal"]
+    assert "straight or merely banked wing is invalid" in payload["visual_goal"]
