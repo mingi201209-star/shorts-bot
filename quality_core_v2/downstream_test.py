@@ -72,6 +72,10 @@ def test_full_control_flow_candidate_to_render_handoff():
         "keyword": "airplane wing flexing in flight",
         "visual_goal": "visible upward elastic bending",
         "visual_type": "real_world_broll",
+        "_v2_required_visible_components": ["aircraft", "main wing"],
+        "_v2_required_observable_state": ["visible upward elastic bending"],
+        "_v2_required_relation_or_mechanism": [],
+        "_v2_forbidden_visuals": [],
     }
 
     # 6. Render/export handoff: stub generate_scenes/render_final_video so
