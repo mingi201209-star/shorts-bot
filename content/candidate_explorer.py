@@ -3,6 +3,7 @@
 import json
 import os
 import re
+from copy import deepcopy
 
 import openai
 
@@ -1861,6 +1862,12 @@ _NARROWNESS_REWRITE_PROMPT = """
 중 하나 이상이 들어간
 더 좁은 Core Question과 Reveal로 다시 써라.
 
+가능하면 아래 [FACT CHECK FOCUS]와 [VISUAL PROOF]에
+이미 들어 있는 구체적인 사실·관찰·메커니즘을 먼저 사용하라.
+그 근거에 없는 새로운 수치, 원인, 메커니즘을 지어내지 마라.
+근거가 비어 있거나 불충분하면 없는 사실을 만들지 말고
+Core Question의 조건·범위·관찰 포인트만 더 좁혀라.
+
 예:
 넓음: "비행기 날개는 왜 공기 흐름을 최적화할까?"
 좁음: "비행기 날개 끝은 왜 위로 꺾여 있을까?"
@@ -1886,6 +1893,99 @@ OUTPUT CONTRACT의 winner 객체와
 """
 
 
+_REWRITE_AUTHORITY_FIELDS = (
+    "fact_check_focus",
+    "visual_proof",
+    "specific_observation",
+    "mechanism",
+    "constraint",
+    "concrete_condition",
+    "counterintuitive_result",
+    "tradeoff",
+    "subject_kind",
+    "canonical_subject",
+    "subject_identity_confidence",
+    "grounding_evidence",
+    "_trusted_grounding_evidence",
+    "_trusted_grounded_claims",
+)
+
+
+def _rewrite_candidate_text(candidate):
+    if not isinstance(candidate, dict):
+        return ""
+
+    micro = candidate.get("micro_narrative")
+    if not isinstance(micro, dict):
+        micro = {}
+
+    chunks = [
+        candidate.get("topic"),
+        candidate.get("angle"),
+        candidate.get("core_question"),
+        candidate.get("specific_observation"),
+        candidate.get("mechanism"),
+        candidate.get("constraint"),
+        candidate.get("concrete_condition"),
+        candidate.get("counterintuitive_result"),
+        candidate.get("tradeoff"),
+        micro.get("hook"),
+        micro.get("core_question"),
+        micro.get("reveal"),
+        micro.get("payoff"),
+    ]
+
+    for field in ("fact_check_focus", "visual_proof"):
+        values = candidate.get(field)
+        if isinstance(values, list):
+            chunks.extend(values)
+
+    return " ".join(str(value or "").strip() for value in chunks if str(value or "").strip())
+
+
+def _numeric_claim_tokens(text):
+    return set(re.findall(r"(?<![A-Za-z0-9])\d+(?:[.,]\d+)?(?:\s*(?:%|°|도|배|초|분|시간|km|m|cm|mm|kg|g|N|kN))?", str(text or "")))
+
+
+def _preserve_rewrite_authority(original, rewritten):
+    """Keep a bounded rewrite on the exact same subject/evidence authority.
+
+    The rewrite call is editorial recovery, not a fact-discovery or grounding
+    step. It may rephrase the question/reveal, but it cannot replace the
+    Candidate's evidence lists, trusted grounding metadata, or introduce a new
+    numeric claim that was absent from the original Candidate/evidence.
+    """
+
+    if not isinstance(original, dict) or not isinstance(rewritten, dict):
+        return None
+
+    original_topic = str(original.get("topic") or "").strip()
+    rewritten_topic = str(rewritten.get("topic") or "").strip()
+    if not original_topic or rewritten_topic != original_topic:
+        print("🚫 Narrowness rewrite rejected: subject/topic changed")
+        return None
+
+    allowed_numbers = _numeric_claim_tokens(_rewrite_candidate_text(original))
+    rewritten_numbers = _numeric_claim_tokens(_rewrite_candidate_text(rewritten))
+    unsupported_numbers = rewritten_numbers - allowed_numbers
+    if unsupported_numbers:
+        print(
+            "🚫 Narrowness rewrite rejected: unsupported numeric detail "
+            + ",".join(sorted(unsupported_numbers))
+        )
+        return None
+
+    for field in _REWRITE_AUTHORITY_FIELDS:
+        if field in original:
+            rewritten[field] = deepcopy(original[field])
+
+    for field, value in original.items():
+        if field.startswith("_repo_owned_") or field.startswith("_trusted_"):
+            rewritten[field] = deepcopy(value)
+
+    return rewritten
+
+
 def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
     """Targeted, same-subject rewrite of a Winner the narrowness self-critique
     rejected as TOO_BROAD.
@@ -1906,6 +2006,26 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
     if not isinstance(micro, dict):
         micro = {}
 
+    fact_check_focus = winner.get("fact_check_focus")
+    if not isinstance(fact_check_focus, list):
+        fact_check_focus = []
+
+    visual_proof = winner.get("visual_proof")
+    if not isinstance(visual_proof, list):
+        visual_proof = []
+
+    fact_focus_text = "\n".join(
+        f"- {str(item).strip()}"
+        for item in fact_check_focus
+        if str(item).strip()
+    ) or "- 없음"
+
+    visual_proof_text = "\n".join(
+        f"- {str(item).strip()}"
+        for item in visual_proof
+        if str(item).strip()
+    ) or "- 없음"
+
     original_summary = (
         f"Topic: {winner.get('topic', '')}\n"
         f"Angle: {winner.get('angle', '')}\n"
@@ -1913,6 +2033,8 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
         f"Hook: {micro.get('hook', '')}\n"
         f"Reveal: {micro.get('reveal', '')}\n"
         f"Payoff: {micro.get('payoff', '')}\n"
+        f"\n[FACT CHECK FOCUS]\n{fact_focus_text}\n"
+        f"\n[VISUAL PROOF]\n{visual_proof_text}\n"
         f"\n[REJECTION REASON]\n{reason}"
     )
 
@@ -1946,9 +2068,11 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
         return None
 
     try:
-        return validate_candidate(parsed, prefix="winner", runner_up=False)
+        rewritten = validate_candidate(parsed, prefix="winner", runner_up=False)
     except Exception:
         return None
+
+    return _preserve_rewrite_authority(winner, rewritten)
 
 
 def _self_critique_narrowness(winner, *, model=MODEL):
