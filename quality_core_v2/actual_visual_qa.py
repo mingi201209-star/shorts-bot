@@ -132,6 +132,83 @@ Return JSON only:
     return _parse_json(response.choices[0].message.content)
 
 
+def _payload_passes_plan(payload: Dict[str, Any], plan: VisualPlanV2) -> bool:
+    forbidden_present = [
+        str(value).strip()
+        for value in (payload.get("forbidden_visuals_present") or [])
+        if str(value).strip()
+    ]
+    components_ok = bool(payload.get("components_satisfied", False))
+    state_ok = bool(payload.get("observable_state_satisfied", False))
+    relation_ok = (
+        bool(payload.get("relation_or_mechanism_satisfied", False))
+        if plan.required_relation_or_mechanism
+        else True
+    )
+    return components_ok and state_ok and relation_ok and not forbidden_present
+
+
+def inspect_v2_item_clip(
+    item: Dict[str, Any],
+    vertical_video_path: str,
+    *,
+    inspect_fn=None,
+) -> Dict[str, Any]:
+    """Verify one V2 fallback asset before it can enter the verified cache.
+
+    This uses the same strict final inspector as the post-render gate.  It is
+    only activated for items carrying Clean V2 private requirements, so the
+    V1 path remains unchanged.
+    """
+    required_states = list(item.get("_v2_required_observable_state") or [])
+    required_components = list(item.get("_v2_required_visible_components") or [])
+    if not required_states and not required_components:
+        return {"passed": True, "reason": "no V2 semantic requirements"}
+
+    scene_index = int(item.get("_v2_scene_index", 0) or 0)
+    scene = SceneV2(
+        scene_index=scene_index,
+        narration=str(item.get("text") or ""),
+        causal_role="v2_asset_check",
+        owned_claim_id=f"v2_asset_{scene_index}",
+        new_information=str(item.get("text") or ""),
+        visual_requirement=str(item.get("visual_goal") or ""),
+    )
+    plan = VisualPlanV2(
+        scene_index=scene_index,
+        subject=str(item.get("_v2_subject") or item.get("keyword") or ""),
+        required_visible_components=required_components,
+        required_observable_state=required_states,
+        required_relation_or_mechanism=list(
+            item.get("_v2_required_relation_or_mechanism") or []
+        ),
+        forbidden_visuals=list(item.get("_v2_forbidden_visuals") or []),
+        preferred_source_type=str(item.get("_v2_preferred_source_type") or ""),
+        search_queries=[str(item.get("keyword") or "")],
+        generation_prompt_constraints=list(
+            item.get("_v2_generation_prompt_constraints") or []
+        ),
+    )
+    payload = (
+        inspect_fn(scene, plan, vertical_video_path)
+        if inspect_fn is not None
+        else _call_scene_vision(scene, plan, vertical_video_path)
+    )
+    passed = _payload_passes_plan(payload, plan)
+    result = {
+        "passed": passed,
+        "scene_index": scene_index,
+        "reason": str(payload.get("reason") or "")[:800],
+        "payload": payload,
+    }
+    print(
+        "[V2_ASSET_PREFLIGHT] "
+        f"scene={scene_index} status={'PASS' if passed else 'FAIL'} "
+        f"reason={result['reason']}"
+    )
+    return result
+
+
 def validate_actual_v2_visuals(
     scenes: List[SceneV2],
     plans: List[VisualPlanV2],
@@ -185,13 +262,12 @@ def validate_actual_v2_visuals(
         ]
         components_ok = bool(payload.get("components_satisfied", False))
         state_ok = bool(payload.get("observable_state_satisfied", False))
-        relation_required = bool(plan.required_relation_or_mechanism)
         relation_ok = (
             bool(payload.get("relation_or_mechanism_satisfied", False))
-            if relation_required
+            if plan.required_relation_or_mechanism
             else True
         )
-        passed = components_ok and state_ok and relation_ok and not forbidden_present
+        passed = _payload_passes_plan(payload, plan)
 
         entry = {
             "scene_index": int(scene.scene_index),
