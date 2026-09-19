@@ -101,7 +101,14 @@ def _run_fixture(fixture: Dict[str, Any]) -> FixtureResult:
             scenes = [SceneV2.from_dict(s) for s in fx_input["scenes"]]
             verdict = evaluate_script_plan_v2(scenes)
         elif stage == "visual_plan":
-            verdict = evaluate_visual_plan_v2(VisualPlanV2.from_dict(fx_input["plan"]))
+            plan = VisualPlanV2.from_dict(fx_input["plan"])
+            candidate_raw = fx_input.get("candidate")
+            candidate = (
+                CandidateV2.from_dict(candidate_raw)
+                if isinstance(candidate_raw, dict)
+                else None
+            )
+            verdict = evaluate_visual_plan_v2(plan, candidate=candidate)
         elif stage == "visual_match":
             plan = VisualPlanV2.from_dict(fx_input["plan"])
             visual = CandidateVisualV2.from_dict(fx_input["visual"])
