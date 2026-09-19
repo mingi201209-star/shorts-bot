@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
+import subprocess
+import tempfile
+from pathlib import Path
 from typing import Any, Dict
 
 from quality_core_v2.schemas import CandidateVisualV2, SceneV2, Verdict, VisualPlanV2
@@ -40,9 +44,8 @@ def classify_rendered_visual(
         client = openai
 
     from quality.budget_guard import authorize_call, record_usage
-    from video.hook_visual_dominance import _extract_vertical_frames
 
-    frames = _extract_vertical_frames(vertical_video_path)
+    frames = _extract_scene_frames(vertical_video_path)
     if not frames:
         raise ValueError("no frames extracted from exact rendered clip")
 
@@ -113,6 +116,54 @@ def classify_rendered_visual(
         "thumbnail_url": selected_visual.thumbnail_url,
         "search_query": selected_visual.search_query,
     })
+
+
+def _extract_scene_frames(video_path: str) -> list[str]:
+    """Sample the whole rendered scene, not only hook-time frames.
+
+    Four evenly distributed frames are enough for a bounded semantic check and
+    avoid the old mistake of applying the first-2.7-second hook sampler to every
+    mechanism/payoff scene.
+    """
+    with tempfile.TemporaryDirectory(prefix="v2_scene_qa_") as temp_dir:
+        pattern = Path(temp_dir) / "frame_%03d.jpg"
+        result = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-loglevel",
+                "error",
+                "-i",
+                str(video_path),
+                "-vf",
+                "fps=1,scale=540:960",
+                "-q:v",
+                "4",
+                str(pattern),
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=90,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                "V2 rendered visual frame extraction failed: "
+                + result.stderr[-600:]
+            )
+        frames = sorted(Path(temp_dir).glob("frame_*.jpg"))
+        if not frames:
+            raise RuntimeError("V2 rendered visual frame extraction produced no frames")
+
+        if len(frames) <= 4:
+            selected = frames
+        else:
+            indexes = [0, len(frames) // 3, (2 * len(frames)) // 3, len(frames) - 1]
+            selected = [frames[i] for i in sorted(set(indexes))]
+        return [
+            base64.b64encode(path.read_bytes()).decode("ascii")
+            for path in selected
+        ]
 
 
 def verify_rendered_visual(
