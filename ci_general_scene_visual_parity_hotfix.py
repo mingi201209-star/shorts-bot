@@ -15,7 +15,7 @@ text = append_once(
     r'''
 # GENERAL_SCENE_VISUAL_PARITY_UNKNOWN_SAFE
 # No new frame/vision API is introduced here. Existing #26 visual evidence is
-authoritative when present; otherwise UNKNOWN stays UNKNOWN and is ranked by
+# authoritative when present; otherwise UNKNOWN stays UNKNOWN and is ranked by
 # semantic/domain integrity instead of being promoted to visible evidence.
 
 
