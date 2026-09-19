@@ -76,6 +76,40 @@ if "spoiler" not in _VISUAL_ANCHOR_ORDER:
     _anchor_order.insert(_wing_index, "spoiler")
     _VISUAL_ANCHOR_ORDER = tuple(_anchor_order)
 
+# Run 35426677064: source-alias matching used raw substring containment, so
+# the aerodynamic term "flapwise" falsely asserted the concrete "flap"
+# component. That converted a valid wing bending/torsion Scene into an
+# aircraft+wing+flap contract and rejected a Vision-verified bending image only
+# because no flap was visible. Keep Korean aliases as substring matches, but
+# require normalized token/phrase boundaries for ASCII aliases.
+def _visual_source_alias_present(raw, alias):
+    raw_value = str(raw or "").strip().lower()
+    alias_value = str(alias or "").strip().lower()
+    if not raw_value or not alias_value:
+        return False
+    if any("가" <= ch <= "힣" for ch in alias_value):
+        return alias_value in raw_value
+    normalized_raw = normalize_search_query(raw_value)
+    normalized_alias = normalize_search_query(alias_value)
+    if not normalized_alias:
+        return False
+    return f" {normalized_alias} " in f" {normalized_raw} "
+
+
+def _source_visual_anchors(value):
+    raw = str(value or "").strip().lower()
+    if not raw:
+        return []
+    normalized = normalize_search_query(raw)
+    anchors = list(extract_query_anchors(normalized))
+    for canonical in _VISUAL_ANCHOR_ORDER:
+        if canonical in anchors:
+            continue
+        aliases = _VISUAL_SOURCE_ANCHOR_ALIASES.get(canonical, ())
+        if any(_visual_source_alias_present(raw, alias) for alias in aliases):
+            anchors.append(canonical)
+    return _dedupe_words(anchors)[:3]
+
 # V1 intentionally preserves historical aircraft+wing exact behavior. When a
 # discriminative wing component is explicitly present, extend that pair to the
 # concrete third component instead of allowing the V1 two-anchor compatibility

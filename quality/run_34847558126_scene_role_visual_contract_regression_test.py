@@ -196,6 +196,25 @@ def main():
                 f"{flex_keyword!r}: PASS"
             )
 
+            # CASE H: "flapwise" is an aerodynamic bending-mode word,
+            # not evidence that a physical trailing-edge flap is present.
+            flapwise_required = vd._required_scene_subject_anchors(
+                "NASA flexible-wing model uses flapwise bending and torsion on an aircraft wing.",
+                "날개의 휨과 비틀림을 보여줍니다.",
+            )
+            assert "aircraft" in flapwise_required, flapwise_required
+            assert "wing" in flapwise_required, flapwise_required
+            assert "flap" not in flapwise_required, flapwise_required
+
+            actual_flap_required = vd._required_scene_subject_anchors(
+                "The aircraft wing flap moves at the trailing edge.",
+                "실제 날개 플랩을 보여줍니다.",
+            )
+            assert "flap" in actual_flap_required, actual_flap_required
+            print(
+                "CASE H ASCII alias boundaries: flapwise!=flap while real flap stays required: PASS"
+            )
+
         finally:
             sys.path.remove(str(repo))
 
