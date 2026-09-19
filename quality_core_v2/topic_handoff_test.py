@@ -48,24 +48,61 @@ def test_run_v2_pipeline_forwards_topic_to_explorer(monkeypatch):
 
     def fake_call_writer(candidate):
         import json
+        roles = [
+            "phenomenon",
+            "why_question",
+            "mechanism_input",
+            "mechanism_change",
+            "observable_result",
+            "payoff",
+        ]
         return json.dumps({"scenes": [
-            {"scene_index": 1, "narration": "n", "causal_role": "phenomenon",
-             "owned_claim_id": "a", "new_information": "i", "visual_requirement": "v"},
+            {
+                "scene_index": i,
+                "narration": f"aircraft wing flex scene {i}",
+                "causal_role": role,
+                "owned_claim_id": f"claim-{i}",
+                "new_information": f"distinct information {i}",
+                "visual_requirement": "aircraft main wing visible bending",
+            }
+            for i, role in enumerate(roles, start=1)
         ]})
 
-    def fake_call_visual_planner(scene):
+    def fake_call_visual_planner(scene, candidate):
         import json
+        assert candidate.canonical_subject == "aircraft main wing"
         return json.dumps({
-            "subject": "aircraft main wing", "required_visible_components": ["aircraft"],
-            "required_observable_state": ["bending"], "search_queries": ["aircraft wing flex"],
+            "subject": "aircraft main wing",
+            "required_visible_components": ["aircraft", "main wing"],
+            "required_observable_state": ["visible bending"],
+            "search_queries": ["aircraft wing flex"],
         })
+
+    def fake_select(scene, plan, **kwargs):
+        from quality_core_v2.schemas import CandidateVisualV2, Verdict
+        visual = CandidateVisualV2.from_dict({
+            "source_type": "stock",
+            "description": scene.narration,
+            "visible_components": list(plan.required_visible_components),
+            "observable_state": list(plan.required_observable_state),
+            "provider": "fixture",
+            "source_id": f"asset-{scene.scene_index}",
+            "media_url": f"/tmp/asset-{scene.scene_index}.mp4",
+        })
+        return visual, Verdict(True, "ok", "visual_qa")
 
     monkeypatch.setattr("quality_core_v2.runner.call_writer", fake_call_writer)
     monkeypatch.setattr("quality_core_v2.runner.call_visual_planner", fake_call_visual_planner)
+    monkeypatch.setattr("quality_core_v2.runner.select_visual_for_scene", fake_select)
     monkeypatch.setattr(
         "quality_core_v2.runner.render_v2_pipeline",
-        lambda scenes, plans: {"scenes": scenes, "plans": plans},
+        lambda scenes, plans, visuals: {
+            "scenes": scenes,
+            "plans": plans,
+            "visuals": visuals,
+        },
     )
 
-    run_v2_pipeline("aircraft wing flex", [])
+    result = run_v2_pipeline("aircraft wing flex", [])
     assert seen["topic_direction"] == "aircraft wing flex"
+    assert len(result["visuals"]) == 6

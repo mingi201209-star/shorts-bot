@@ -216,17 +216,43 @@ def test_select_visual_for_scene_preserves_exact_accepted_media_url():
             "observable_state": list(plan_.required_observable_state),
         })
 
+    def exact_video_classifier(scene_, plan_, identity_, path_):
+        state = (
+            []
+            if identity_.source_id == "static"
+            else list(plan_.required_observable_state)
+        )
+        return __import__(
+            "quality_core_v2.schemas", fromlist=["CandidateVisualV2"]
+        ).CandidateVisualV2.from_dict({
+            "source_type": "stock",
+            "description": (
+                "aircraft main wing static"
+                if not state
+                else "aircraft wing flex visible upward bending"
+            ),
+            "visible_components": list(plan_.required_visible_components),
+            "observable_state": state,
+            "provider": identity_.provider,
+            "source_id": identity_.source_id,
+            "media_url": path_,
+            "thumbnail_url": identity_.thumbnail_url,
+            "search_query": identity_.search_query,
+        })
+
     selected, verdict = select_visual_for_scene(
         scene,
         plan,
         provider_searches=[("pexels", fake_search)],
         classify_fn=fake_classify,
         max_classifications=2,
+        download_stock_fn=lambda visual_, _scene: f"/tmp/{visual_.source_id}.mp4",
+        classify_stock_video_fn=exact_video_classifier,
     )
     assert verdict.passed
     assert selected is not None
     assert selected.source_id == "flex"
-    assert selected.media_url == "https://cdn.example/flex.mp4"
+    assert selected.media_url == "/tmp/flex.mp4"
     assert selected.thumbnail_url == "https://cdn.example/flex.jpg"
 
 
@@ -347,12 +373,29 @@ def test_used_asset_is_skipped_before_classification():
             "observable_state": list(plan_.required_observable_state),
         })
 
+    from quality_core_v2.schemas import CandidateVisualV2
+
+    def exact_video_classifier(scene_, plan_, identity_, path_):
+        return CandidateVisualV2.from_dict({
+            "source_type": "stock",
+            "description": "aircraft wing flex visible",
+            "visible_components": list(plan_.required_visible_components),
+            "observable_state": list(plan_.required_observable_state),
+            "provider": identity_.provider,
+            "source_id": identity_.source_id,
+            "media_url": path_,
+            "thumbnail_url": identity_.thumbnail_url,
+            "search_query": identity_.search_query,
+        })
+
     visual, verdict = select_visual_for_scene(
         scene,
         plan,
         provider_searches=[("pexels", lambda _q: hits)],
         classify_fn=classify,
         max_classifications=2,
+        download_stock_fn=lambda visual_, _scene: f"/tmp/{visual_.source_id}.mp4",
+        classify_stock_video_fn=exact_video_classifier,
         used_asset_keys={"pexels:used"},
     )
     assert verdict.passed
