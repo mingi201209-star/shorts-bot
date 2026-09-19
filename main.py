@@ -1342,6 +1342,13 @@ def generate_scenes(
 
 def main():
 
+    import quality_core_v2
+
+    if quality_core_v2.is_enabled():
+        from quality_core_v2.runner import run_v2_pipeline
+
+        return run_v2_pipeline()
+
     start_time = time.time()
 
     scene_clips = []
