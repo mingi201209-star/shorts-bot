@@ -35,8 +35,11 @@ def run_v2_pipeline(topic_direction: str = "", recent_topics=None):
 
     plans = []
     for scene in scenes:
-        plan = parse_visual_plan_response(call_visual_planner(scene), scene.scene_index)
-        plan_verdict = evaluate_visual_plan_v2(plan)
+        plan = parse_visual_plan_response(
+            call_visual_planner(scene, candidate=candidate),
+            scene.scene_index,
+        )
+        plan_verdict = evaluate_visual_plan_v2(plan, candidate=candidate)
         if not plan_verdict.passed:
             raise RuntimeError(f"V2 VisualPlan rejected for scene {scene.scene_index}: {plan_verdict.reason}")
         plans.append(plan)
