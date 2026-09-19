@@ -92,6 +92,7 @@ def test_full_control_flow_candidate_to_render_handoff():
         render_final_video_fn=fake_render_final_video,
         reset_final_visual_semantic_report_fn=lambda: None,
         validate_final_visual_semantic_qa_fn=lambda scenes_: None,
+        validate_actual_v2_visuals_fn=lambda scenes_, plans_, items_: None,
     )
     assert result == "final_shorts.mp4"
     assert calls["scene_items"] == items
@@ -167,10 +168,11 @@ def test_render_v2_pipeline_calls_reset_generate_qa_render_in_order():
         scenes, plans,
         reset_final_visual_semantic_report_fn=lambda: calls.append("reset"),
         generate_scenes_fn=lambda items: calls.append("generate") or ["clip"],
-        validate_final_visual_semantic_qa_fn=lambda scenes_: calls.append("qa"),
+        validate_final_visual_semantic_qa_fn=lambda scenes_: calls.append("v1qa"),
+        validate_actual_v2_visuals_fn=lambda scenes_, plans_, items_: calls.append("v2qa"),
         render_final_video_fn=lambda clips: calls.append("render") or "final.mp4",
     )
-    assert calls == ["reset", "generate", "qa", "render"]
+    assert calls == ["reset", "generate", "v1qa", "v2qa", "render"]
     assert result == "final.mp4"
 
 
@@ -203,3 +205,35 @@ def test_render_v2_pipeline_skips_render_when_qa_fails():
     except RuntimeError as exc:
         assert "FINAL_VISUAL_SEMANTIC_QA_FAILED" in str(exc)
     assert calls == ["reset", "generate", "qa"]  # render never called
+
+
+def test_render_v2_pipeline_skips_render_when_actual_visual_qa_fails():
+    scenes = [SceneV2.from_dict({
+        "scene_index": 1, "narration": "n", "causal_role": "phenomenon",
+        "owned_claim_id": "a", "new_information": "i", "visual_requirement": "v",
+    })]
+    plans = [VisualPlanV2.from_dict({
+        "scene_index": 1, "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft", "wing"],
+        "required_observable_state": ["visible upward bending"],
+        "search_queries": ["aircraft wing flex"],
+    })]
+    calls = []
+
+    def failing_actual(scenes_, plans_, items_):
+        calls.append("v2qa")
+        raise RuntimeError("V2_ACTUAL_VISUAL_QA_FAILED scenes=[1]")
+
+    try:
+        render_v2_pipeline(
+            scenes, plans,
+            reset_final_visual_semantic_report_fn=lambda: calls.append("reset"),
+            generate_scenes_fn=lambda items: calls.append("generate") or ["clip"],
+            validate_final_visual_semantic_qa_fn=lambda scenes_: calls.append("v1qa"),
+            validate_actual_v2_visuals_fn=failing_actual,
+            render_final_video_fn=lambda clips: calls.append("render") or "final.mp4",
+        )
+        assert False, "should have raised"
+    except RuntimeError as exc:
+        assert "V2_ACTUAL_VISUAL_QA_FAILED" in str(exc)
+    assert calls == ["reset", "generate", "v1qa", "v2qa"]
