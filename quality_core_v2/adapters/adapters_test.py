@@ -286,7 +286,7 @@ def test_generated_preference_uses_exact_generated_asset_without_stock_search():
     assert verdict.passed
     assert visual is not None
     assert visual.media_url == "workspace/temp/generated-scene-2.mp4"
-    assert stock_calls == []
+    assert stock_calls == ["aircraft wing flex"]
 
 
 def test_required_relation_must_be_visibly_proven():
@@ -358,3 +358,76 @@ def test_used_asset_is_skipped_before_classification():
     assert verdict.passed
     assert visual is not None and visual.source_id == "fresh"
     assert classified == ["https://cdn.example/fresh.jpg"]
+
+
+def test_thumbnail_pass_exact_video_fail_moves_to_next_candidate():
+    from quality_core_v2.adapters.retrieval_adapter import select_visual_for_scene
+    from quality_core_v2.schemas import CandidateVisualV2, SceneV2, VisualPlanV2
+
+    scene = SceneV2.from_dict({
+        "scene_index": 1,
+        "narration": "aircraft wing flex visible",
+        "causal_role": "phenomenon",
+        "owned_claim_id": "flex",
+        "new_information": "wing flex visible",
+        "visual_requirement": "aircraft wing flex visible",
+    })
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 1,
+        "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft", "main wing"],
+        "required_observable_state": ["visible upward elastic bending"],
+        "search_queries": ["aircraft wing flex"],
+    })
+    hits = [
+        {"id": "false-positive", "url": "https://cdn.example/a.mp4",
+         "thumbnail": "https://cdn.example/a.jpg", "query": "aircraft wing flex"},
+        {"id": "real-flex", "url": "https://cdn.example/b.mp4",
+         "thumbnail": "https://cdn.example/b.jpg", "query": "aircraft wing flex"},
+    ]
+
+    def thumb_classifier(_url, plan_):
+        return json.dumps({
+            "description": "aircraft wing flex visible",
+            "visible_components": list(plan_.required_visible_components),
+            "observable_state": list(plan_.required_observable_state),
+        })
+
+    def download(visual_, _scene):
+        return f"/tmp/{visual_.source_id}.mp4"
+
+    def video_classifier(scene_, plan_, identity_, path_):
+        state = (
+            []
+            if "false-positive" in path_
+            else list(plan_.required_observable_state)
+        )
+        return CandidateVisualV2.from_dict({
+            "source_type": "stock",
+            "description": (
+                "aircraft wing static"
+                if not state
+                else "aircraft wing flex visible"
+            ),
+            "visible_components": list(plan_.required_visible_components),
+            "observable_state": state,
+            "provider": identity_.provider,
+            "source_id": identity_.source_id,
+            "media_url": identity_.media_url,
+            "thumbnail_url": identity_.thumbnail_url,
+            "search_query": identity_.search_query,
+        })
+
+    visual, verdict = select_visual_for_scene(
+        scene,
+        plan,
+        provider_searches=[("pexels", lambda _q: hits)],
+        classify_fn=thumb_classifier,
+        max_classifications=2,
+        download_stock_fn=download,
+        classify_stock_video_fn=video_classifier,
+    )
+    assert verdict.passed
+    assert visual is not None
+    assert visual.source_id == "real-flex"
+    assert visual.media_url == "/tmp/real-flex.mp4"

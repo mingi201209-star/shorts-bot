@@ -248,6 +248,40 @@ def _default_classify_generated(
     )
 
 
+def _default_download_stock(
+    visual: CandidateVisualV2,
+    scene: SceneV2,
+) -> Optional[str]:
+    from pathlib import Path
+    import re
+
+    from video.video_downloader import download_video
+
+    safe_id = re.sub(r"[^0-9A-Za-z_-]+", "_", visual.source_id or "unknown")
+    path = Path("workspace/temp") / (
+        f"v2_stock_scene_{scene.scene_index}_{visual.provider}_{safe_id}.mp4"
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    download_video(visual.media_url, str(path))
+    return str(path) if path.is_file() else None
+
+
+def _default_classify_stock_video(
+    scene: SceneV2,
+    plan: VisualPlanV2,
+    identity_visual: CandidateVisualV2,
+    path: str,
+) -> CandidateVisualV2:
+    from quality_core_v2.rendered_visual_qa import classify_rendered_visual
+
+    return classify_rendered_visual(
+        scene,
+        plan,
+        identity_visual,
+        path,
+    )
+
+
 def _default_provider_searches():
     from video.video_downloader import search_pexels_candidates
     from video.video_providers import search_pixabay_candidates
@@ -267,6 +301,8 @@ def select_visual_for_scene(
     max_classifications: Optional[int] = None,
     generate_fn=None,
     classify_generated_fn=None,
+    download_stock_fn=None,
+    classify_stock_video_fn=None,
     used_asset_keys: Optional[set] = None,
 ) -> Tuple[Optional[CandidateVisualV2], Verdict]:
     """Return only an exact asset that already passed V2 semantic QA.
@@ -285,61 +321,12 @@ def select_visual_for_scene(
         queries = [plan.subject.strip()]
 
     preferred = str(plan.preferred_source_type or "").strip().lower()
-    if preferred == "grounded_explanatory":
-        return None, Verdict(
-            False,
-            "VisualPlan requires grounded_explanatory, but no V2 exact-asset "
-            "grounded explanatory renderer exists; no silent substitution is allowed",
-            "visual_qa",
-        )
-
-    if preferred == "generated":
-        generate_fn = generate_fn or _default_generate_visual
-        classify_generated_fn = classify_generated_fn or _default_classify_generated
-        generated = generate_fn(scene, plan)
-        if not generated:
-            return None, Verdict(
-                False,
-                "V2 generated visual supply returned no exact asset",
-                "visual_qa",
-            )
-        path = str(generated.get("path") or "").strip()
-        if not path:
-            return None, Verdict(
-                False,
-                "V2 generated visual supply returned no path",
-                "visual_qa",
-            )
-        identity_visual = CandidateVisualV2.from_dict({
-            "source_type": "generated",
-            "description": "",
-            "visible_components": [],
-            "observable_state": [],
-            "visible_relations_or_mechanisms": [],
-            "provider": str(generated.get("provider") or "generated"),
-            "source_id": str(generated.get("source_id") or ""),
-            "media_url": path,
-            "search_query": next(
-                (str(q).strip() for q in plan.search_queries if str(q).strip()),
-                plan.subject,
-            ),
-        })
-        actual_visual = classify_generated_fn(
-            scene,
-            plan,
-            identity_visual,
-            path,
-        )
-        verdict = evaluate_scene_visual_qa(scene, plan, actual_visual)
-        print(
-            "[V2_VISUAL_SELECT] "
-            f"scene={scene.scene_index} provider={actual_visual.provider or 'generated'} "
-            f"source_id={actual_visual.source_id or 'unknown'} "
-            f"status={'PASS' if verdict.passed else 'FAIL'} mode=generated"
-        )
-        if verdict.passed:
-            return actual_visual, verdict
-        return None, verdict
+    allow_generated_fallback = preferred == "generated"
+    grounded_only_after_stock = preferred == "grounded_explanatory"
+    download_stock_fn = download_stock_fn or _default_download_stock
+    classify_stock_video_fn = (
+        classify_stock_video_fn or _default_classify_stock_video
+    )
 
     attempts = 0
     last_verdict = Verdict(False, "no visual candidate was classified", "visual_qa")
@@ -408,7 +395,110 @@ def select_visual_for_scene(
                     f"status={'PASS' if verdict.passed else 'FAIL'}"
                 )
                 if verdict.passed:
-                    return visual, verdict
+                    try:
+                        local_path = download_stock_fn(visual, scene)
+                    except Exception as exc:
+                        print(
+                            "[V2_STOCK_PREFLIGHT] "
+                            f"scene={scene.scene_index} source_id={visual.source_id or 'unknown'} "
+                            f"status=ERROR reason={type(exc).__name__}"
+                        )
+                        local_path = None
+                    if not local_path:
+                        last_verdict = Verdict(
+                            False,
+                            "exact stock candidate could not be materialized for frame QA",
+                            "visual_qa",
+                        )
+                        continue
+
+                    local_identity = CandidateVisualV2.from_dict({
+                        "source_type": visual.source_type,
+                        "description": visual.description,
+                        "visible_components": list(visual.visible_components),
+                        "observable_state": list(visual.observable_state),
+                        "visible_relations_or_mechanisms": list(
+                            visual.visible_relations_or_mechanisms
+                        ),
+                        "tags": list(visual.tags),
+                        "provider": visual.provider,
+                        "source_id": visual.source_id,
+                        "media_url": local_path,
+                        "thumbnail_url": visual.thumbnail_url,
+                        "search_query": visual.search_query,
+                    })
+                    actual_visual = classify_stock_video_fn(
+                        scene,
+                        plan,
+                        local_identity,
+                        local_path,
+                    )
+                    exact_verdict = evaluate_scene_visual_qa(
+                        scene,
+                        plan,
+                        actual_visual,
+                    )
+                    last_verdict = exact_verdict
+                    print(
+                        "[V2_STOCK_PREFLIGHT] "
+                        f"scene={scene.scene_index} provider={provider} "
+                        f"source_id={visual.source_id or 'unknown'} "
+                        f"status={'PASS' if exact_verdict.passed else 'FAIL'}"
+                    )
+                    if exact_verdict.passed:
+                        return actual_visual, exact_verdict
+
+    if allow_generated_fallback:
+        generate_fn = generate_fn or _default_generate_visual
+        classify_generated_fn = classify_generated_fn or _default_classify_generated
+        generated = generate_fn(scene, plan)
+        if generated:
+            path = str(generated.get("path") or "").strip()
+            if path:
+                identity_visual = CandidateVisualV2.from_dict({
+                    "source_type": "generated",
+                    "description": "",
+                    "visible_components": [],
+                    "observable_state": [],
+                    "visible_relations_or_mechanisms": [],
+                    "provider": str(generated.get("provider") or "generated"),
+                    "source_id": str(generated.get("source_id") or ""),
+                    "media_url": path,
+                    "search_query": next(
+                        (str(q).strip() for q in plan.search_queries if str(q).strip()),
+                        plan.subject,
+                    ),
+                })
+                actual_visual = classify_generated_fn(
+                    scene,
+                    plan,
+                    identity_visual,
+                    path,
+                )
+                generated_verdict = evaluate_scene_visual_qa(
+                    scene,
+                    plan,
+                    actual_visual,
+                )
+                print(
+                    "[V2_VISUAL_SELECT] "
+                    f"scene={scene.scene_index} "
+                    f"provider={actual_visual.provider or 'generated'} "
+                    f"source_id={actual_visual.source_id or 'unknown'} "
+                    f"status={'PASS' if generated_verdict.passed else 'FAIL'} "
+                    "mode=generated_fallback"
+                )
+                if generated_verdict.passed:
+                    return actual_visual, generated_verdict
+                last_verdict = generated_verdict
+
+    if grounded_only_after_stock:
+        return None, Verdict(
+            False,
+            "no exact stock visual proved the plan and V2 has no exact-asset "
+            "grounded explanatory renderer; no silent substitution is allowed",
+            "visual_qa",
+        )
 
     return None, Verdict(
         False,
