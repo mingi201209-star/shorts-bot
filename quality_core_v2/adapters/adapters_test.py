@@ -278,8 +278,8 @@ def test_generated_preference_uses_exact_generated_asset_without_stock_search():
     })
     stock_calls = []
 
-    def forbidden_stock(_query):
-        stock_calls.append(True)
+    def forbidden_stock(query):
+        stock_calls.append(query)
         return []
 
     def fake_generate(_scene, _plan):
@@ -400,7 +400,9 @@ def test_used_asset_is_skipped_before_classification():
     )
     assert verdict.passed
     assert visual is not None and visual.source_id == "fresh"
-    assert classified == ["https://cdn.example/fresh.jpg"]
+    # Scene selection no longer spends vision on thumbnails; the exact
+    # downloaded video is the first semantic classifier.
+    assert classified == []
 
 
 def test_thumbnail_pass_exact_video_fail_moves_to_next_candidate():

@@ -56,16 +56,24 @@ def test_run_v2_pipeline_forwards_topic_to_explorer(monkeypatch):
             "observable_result",
             "payoff",
         ]
+        infos = [
+            "wing flex appears",
+            "reason is questioned",
+            "lift load enters wing",
+            "elastic structure deforms",
+            "wingtip moves upward",
+            "flex is intentional design",
+        ]
         return json.dumps({"scenes": [
             {
                 "scene_index": i,
                 "narration": f"aircraft wing flex scene {i}",
                 "causal_role": role,
                 "owned_claim_id": f"claim-{i}",
-                "new_information": f"distinct information {i}",
+                "new_information": info,
                 "visual_requirement": "aircraft main wing visible bending",
             }
-            for i, role in enumerate(roles, start=1)
+            for i, (role, info) in enumerate(zip(roles, infos), start=1)
         ]})
 
     def fake_call_visual_planner(scene, candidate):
