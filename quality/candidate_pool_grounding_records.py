@@ -441,12 +441,14 @@ CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
                 "source": NASA_FLEXIBLE_AIRCRAFT_SOURCE,
                 "detail": (
                     "NASA flexible-aircraft model represents wing elastic motion as flapwise "
-                    "bending, chordwise bending, and torsion, coupled with aerodynamic and inertial forces."
+                    "bending, chordwise bending, and torsion, coupled with aerodynamic and inertial forces; "
+                    "the resulting structural deflections create an effective aeroelastic angle of attack."
                 ),
                 "allowed_paraphrase_scope": [
                     "날개는 하중을 받을 때 휨과 비틀림이라는 서로 다른 탄성 변형을 함께 보일 수 있습니다.",
                     "유연한 항공기 날개에는 bending과 torsion 변형이 함께 나타날 수 있습니다.",
                     "공력·관성력은 날개의 flapwise/chordwise bending과 torsion 탄성 운동과 결합됩니다.",
+                    "날개의 휨·비틀림 같은 구조 변형은 유효 공탄성 받음각을 바꿀 수 있습니다.",
                 ],
             },
             {
@@ -468,24 +470,24 @@ CANDIDATE_POOL_TRUSTED_SUBJECT_IDENTITY_RECORDS: tuple[Dict[str, Any], ...] = (
         ],
         "seed_candidate": {
             "topic": "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?",
-            "angle": "날개가 단단한 판이 아니라 양력 하중을 표면에서 리브·스파·동체로 전달하면서 flapwise/chordwise bending과 torsion을 함께 겪는 탄성 구조라는 점",
-            "core_question": "날개 끝은 위로 휘는데, 왜 같은 비행 하중에서 단면 비틀림까지 별도 탄성 모드로 나타날까?",
+            "angle": "눈에 보이는 날개 flex가 위치 변화에서 끝나지 않고, bending/torsion 결합을 통해 날개 단면의 유효 공탄성 받음각 변화까지 이어질 수 있다는 점",
+            "core_question": "날개 끝이 위로 휘고 비틀리는 동안, 왜 날개 단면의 유효 받음각까지 함께 달라질 수 있을까?",
             "micro_narrative": {
                 "hook": "비행 중 날개 끝이 위로 들리는 flex는 하중이 날개 구조 안으로 흘러간다는 신호입니다.",
-                "core_question": "날개 끝은 위로 휘는데 왜 같은 비행 하중에서 단면 비틀림까지 함께 나타날까요?",
-                "reveal": "양력 하중은 표면·스트링거에서 리브와 스파를 거쳐 동체로 전달되고, NASA의 유연 항공기 모델에서는 공력·관성력이 flapwise/chordwise bending과 torsion 세 탄성 운동과 결합됩니다. 그래서 날개 거동은 위쪽 휨 하나로만 끝나지 않습니다.",
-                "payoff": "그래서 설계와 해석은 날개를 고정된 판이 아니라 하중 경로를 따라 휘고 비트는 탄성 구조로 다룹니다."
+                "core_question": "날개 끝이 위로 휘고 비틀리는 동안 왜 날개 단면의 유효 받음각까지 함께 달라질까요?",
+                "reveal": "양력 하중은 표면·스트링거에서 리브와 스파를 거쳐 동체로 전달됩니다. NASA의 유연 항공기 모델은 flapwise/chordwise bending과 torsion을 공력·관성력과 결합해 다루고, 이런 구조 변형이 유효 공탄성 받음각을 만든다고 설명합니다. 그래서 flex는 위치 변화뿐 아니라 날개 단면이 흐름을 만나는 각도까지 바꿀 수 있습니다.",
+                "payoff": "즉 날개가 휘는 장면은 단순한 흔들림이 아니라, 하중 아래에서 위치와 단면 각도가 함께 변하는 공탄성 구조의 거동입니다."
             },
             "fact_check_focus": [
                 "양력 하중이 날개 표면·리브·스파를 거쳐 동체로 전달되는 경로",
                 "비행 중 날개 끝이 위로 휘는 현상",
-                "공력·관성력이 유연한 날개의 flapwise/chordwise bending과 torsion 탄성 운동과 결합된다는 점"
+                "flapwise/chordwise bending과 torsion 같은 구조 변형이 유효 공탄성 받음각 변화로 이어질 수 있다는 점"
             ],
             "visual_proof": [
                 "비행 중 같은 주날개의 날개 끝이 동체 대비 위아래로 휘는 장면",
                 "날개 구조 하중 시험에서 주날개가 위로 휘는 장면"
             ],
-            "selection_reason": "실제로 보이는 날개 flex를 하중 전달과 bending/torsion이라는 구조 메커니즘에 직접 연결할 수 있습니다.",
+            "selection_reason": "눈에 보이는 날개 flex를 bending/torsion 결합과 숨은 유효 받음각 변화라는 구체적인 공탄성 결과에 연결할 수 있습니다.",
             "specific_observation": "비행 중 주날개 끝이 양력 하중을 받아 위로 휘며 구조가 탄성 변형합니다.",
             "constraint": "날개가 만든 양력 하중을 스파와 리브를 통해 동체로 전달하면서 구조 한계 안에서 견뎌야 합니다.",
             "counterintuitive_result": "날개가 휘는 모습 자체는 단순한 강성 부족이 아니라 하중을 받는 탄성 구조의 거동입니다.",
