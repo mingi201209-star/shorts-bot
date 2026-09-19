@@ -5,8 +5,54 @@
   "stage": "script_plan",
   "input": {
     "scenes": [
-      {"scene_index": 1, "narration": "엔진 뒤쪽 노즐 가장자리가 톱니 모양으로 물결친다", "causal_role": "phenomenon", "owned_claim_id": "shape", "new_information": "노즐 가장자리가 톱니 모양 물결 형태다", "visual_requirement": "close-up of chevron nozzle edge"},
-      {"scene_index": 5, "narration": "이 톱니 모양은 배기음을 줄여준다", "causal_role": "payoff", "owned_claim_id": "noise_reduction", "new_information": "톱니 모양이 배기음을 줄여준다", "visual_requirement": "engine running with visible airflow mixing"}
+      {
+        "scene_index": 1,
+        "narration": "엔진 뒤쪽 노즐 가장자리가 톱니 모양으로 물결칩니다.",
+        "causal_role": "phenomenon",
+        "owned_claim_id": "shape",
+        "new_information": "노즐 가장자리가 톱니 모양이다",
+        "visual_requirement": "close-up of chevron nozzle edge"
+      },
+      {
+        "scene_index": 2,
+        "narration": "왜 굳이 매끈한 원형 대신 이런 모양을 쓸까요?",
+        "causal_role": "why_question",
+        "owned_claim_id": "why_question",
+        "new_information": "톱니 형상의 이유를 묻는다",
+        "visual_requirement": "chevron edge in context"
+      },
+      {
+        "scene_index": 3,
+        "narration": "배기 제트와 바깥 공기는 속도가 크게 다릅니다.",
+        "causal_role": "mechanism_input",
+        "owned_claim_id": "velocity_difference",
+        "new_information": "배기와 외부 공기의 속도 차이가 크다",
+        "visual_requirement": "engine exhaust boundary"
+      },
+      {
+        "scene_index": 4,
+        "narration": "셰브론은 두 흐름이 만나는 경계를 여러 갈래로 나눕니다.",
+        "causal_role": "mechanism_change",
+        "owned_claim_id": "mixing_boundary",
+        "new_information": "셰브론이 혼합 경계를 여러 갈래로 만든다",
+        "visual_requirement": "visible chevron flow mixing relation"
+      },
+      {
+        "scene_index": 5,
+        "narration": "그래서 배기와 외부 공기의 혼합이 더 점진적으로 일어납니다.",
+        "causal_role": "observable_result",
+        "owned_claim_id": "gradual_mixing",
+        "new_information": "공기 혼합이 더 점진적으로 진행된다",
+        "visual_requirement": "progressive exhaust mixing"
+      },
+      {
+        "scene_index": 6,
+        "narration": "핵심은 톱니가 소리를 막는 게 아니라, 배기와 공기가 섞이는 방식을 바꾼다는 점입니다.",
+        "causal_role": "payoff",
+        "owned_claim_id": "mechanism_payoff",
+        "new_information": "소리를 직접 막는 것이 아니라 혼합 방식을 바꾼다",
+        "visual_requirement": "chevron edge and mixing flow together"
+      }
     ]
   },
   "expected_pass": true,
