@@ -287,7 +287,7 @@ def main() -> int:
     assert 'V3_MAX_API_CALLS: "60"' in main_workflow
     assert 'V3_MAX_COST_USD: "0.05"' in main_workflow
     main_source = (ROOT / "main.py").read_text(encoding="utf-8")
-    assert "MAX_TOPIC_REGENERATIONS = 6" in main_source
+    assert "MAX_TOPIC_REGENERATIONS = 19" in main_source
     print("CAPS: PASS API=60 cost=$0.05 attempts=7")
 
     print("GROUNDING-AWARE CANDIDATE SUPPLY REGRESSION: PASS")
