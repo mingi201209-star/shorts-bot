@@ -203,3 +203,62 @@ def test_render_v2_pipeline_skips_render_when_qa_fails():
     except RuntimeError as exc:
         assert "FINAL_VISUAL_SEMANTIC_QA_FAILED" in str(exc)
     assert calls == ["reset", "generate", "qa"]  # render never called
+
+
+def _query_preservation_scene_and_plan(*, base_query, states, subject="aircraft wing"):
+    scene = SceneV2.from_dict({
+        "scene_index": 1, "narration": "n", "causal_role": "phenomenon",
+        "owned_claim_id": "query-preservation", "new_information": "i",
+        "visual_requirement": "v",
+    })
+    plan = VisualPlanV2.from_dict({
+        "scene_index": 1, "subject": subject,
+        "required_visible_components": ["aircraft", "wing"],
+        "required_observable_state": states,
+        "search_queries": [base_query] if base_query is not None else [],
+    })
+    return scene, plan
+
+
+def test_scene_v2_to_v1_item_preserves_all_observable_state_tokens():
+    # Locked regression for Golden E2E #6: the plan knew the physical
+    # phenomenon, but handoff reduced the provider query to "aircraft wing".
+    scene, plan = _query_preservation_scene_and_plan(
+        base_query="aircraft wing",
+        states=["wing flex", "wing bending"],
+    )
+    item = scene_v2_to_v1_item(scene, plan)
+    assert item["keyword"] == "aircraft wing flex bending"
+
+
+def test_scene_v2_to_v1_item_query_dedupe_is_exact_case_insensitive():
+    scene, plan = _query_preservation_scene_and_plan(
+        base_query="Aircraft Wing",
+        states=["wing flex"],
+    )
+    item = scene_v2_to_v1_item(scene, plan)
+    assert item["keyword"] == "Aircraft Wing flex"
+
+    # No stemming/plural normalization in this locked scope:
+    # "wings" must not suppress the distinct exact token "wing".
+    scene2, plan2 = _query_preservation_scene_and_plan(
+        base_query="aircraft wings",
+        states=["wing flex"],
+    )
+    item2 = scene_v2_to_v1_item(scene2, plan2)
+    assert item2["keyword"] == "aircraft wings wing flex"
+
+
+def test_scene_v2_to_v1_item_skips_non_ascii_state_tokens_and_logs(capsys):
+    scene, plan = _query_preservation_scene_and_plan(
+        base_query="aircraft wing",
+        states=["날개가 휘어짐"],
+    )
+    item = scene_v2_to_v1_item(scene, plan)
+    assert item["keyword"] == "aircraft wing"
+
+    log = capsys.readouterr().out
+    assert '"original_query": "aircraft wing"' in log
+    assert '"augmented_query": "aircraft wing"' in log
+    assert '"added_token_count": 0' in log
+    assert '"skipped_non_ascii_token": ["날개가", "휘어짐"]' in log
