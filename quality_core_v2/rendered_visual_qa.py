@@ -136,7 +136,8 @@ def _extract_scene_frames(video_path: str) -> list[str]:
                 "-i",
                 str(video_path),
                 "-vf",
-                "fps=1,scale=540:960",
+                "scale=540:960:force_original_aspect_ratio=increase,"
+                + "crop=540:960,setsar=1,fps=1",
                 "-q:v",
                 "4",
                 str(pattern),
