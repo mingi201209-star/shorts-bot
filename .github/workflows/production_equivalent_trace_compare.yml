@@ -1,6 +1,9 @@
 name: Production Equivalent Trace Compare
 
 on:
+  push:
+    branches:
+      - "test/visual-quality-trace-aviation"
   workflow_dispatch:
     inputs:
       topic:
@@ -48,7 +51,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.expected_sha || github.sha }}
+          ref: ${{ inputs.expected_sha || '6e7850377b6eec2c1b9e9f582366c236aff29b89' }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -83,9 +86,10 @@ jobs:
           AI_VISUAL_MODEL: sora-2
           AI_VISUAL_SECONDS: "4"
           AI_VISUAL_SIZE: "720x1280"
-          SHORTS_TOPIC: ${{ inputs.topic }}
+          SHORTS_TOPIC: ${{ inputs.topic || '비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?' }}
           SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
           ENABLE_YOUTUBE_UPLOAD: "0"
+          TRACE_TARGET_SHA: ${{ inputs.expected_sha || '6e7850377b6eec2c1b9e9f582366c236aff29b89' }}
         run: |
           set -euo pipefail
           python -m quality.production_hotfix_chain_structure_regression_test
@@ -105,7 +109,7 @@ jobs:
             pushd "$work"
             export SHORTS_DIAGNOSTICS_DIR="$diag"
             export SHORTS_TRACE_RUN_LABEL="$label"
-            export GITHUB_SHA="${GITHUB_SHA}"
+            export GITHUB_SHA="${TRACE_TARGET_SHA}"
             python quality/apply_production_hotfix_chain.py
             python -m diagnostics.runner
             popd
