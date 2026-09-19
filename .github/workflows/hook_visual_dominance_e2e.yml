@@ -236,10 +236,14 @@ jobs:
           }, ensure_ascii=False, indent=2))
           PY
 
+      - name: Install multi-provider fallback for live E2E
+        run: python ci_video_provider_hotfix.py
+
       - name: Run Hook OFF E2E
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           ENABLE_HOOK_EXPERIMENT: "0"
           V3_MAX_API_CALLS: "40"
           V3_MAX_COST_USD: "0.04"
@@ -259,6 +263,7 @@ jobs:
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           ENABLE_HOOK_EXPERIMENT: "1"
           V3_MAX_API_CALLS: "45"
           V3_MAX_COST_USD: "0.045"
