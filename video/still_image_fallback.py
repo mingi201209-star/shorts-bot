@@ -220,12 +220,16 @@ def _prompt(scene):
         if negative_guards:
             proof += f"Avoid these compositions: {', '.join(negative_guards)}. "
 
+    # Keep the production verifier hotfix's stable prompt anchor byte-for-byte:
+    # fold optional deformation guidance into the existing proof prefix instead
+    # of changing the adjacent literal strings below.
+    proof += deformation_requirement
+
     return (
         "Create one accurate vertical educational still image for a Korean YouTube Short. "
         + proof
         + f"Narration meaning: {narration}. Visual goal: {visual_goal}. Search concept: {keyword}. "
-        + deformation_requirement
-        + "Show the exact physical subject named in the narration clearly and prominently. "
+        "Show the exact physical subject named in the narration clearly and prominently. "
         "No text, captions, logos, diagrams with invented labels, unrelated decorative objects, or cross-domain metaphors. "
         "Do not invent hidden technical structure, measurements, or unsupported mechanisms. "
         "If technical internals are uncertain, show only the externally visible real-world subject in a conservative photorealistic style. "
