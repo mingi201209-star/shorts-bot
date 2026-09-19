@@ -308,6 +308,7 @@ jobs:
             artifacts/diagnostics/traceback.txt
             artifacts/diagnostics/progress.json
             artifacts/diagnostics/scene_trace.jsonl
+            final_visual_semantic_qa.json
             visual_diversity_preflight.json
             final_director_qa.json
           if-no-files-found: warn
