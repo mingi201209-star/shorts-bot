@@ -240,7 +240,8 @@ def test_rewrite_prompt_reuses_grounded_candidate_evidence():
     assert "공력 중심과 구조 중심의 차이" in user_content
     assert "[VISUAL PROOF]" in user_content
     assert "비행 중 날개 끝의 실제 flex 변화" in user_content
-    assert "새로운 수치, 원인, 메커니즘을 지어내지 마라" in system_content
+    assert "없는 숫자를 만들어 구체적으로 보이게 하지 마라" in system_content
+    assert "[NUMERIC AUTHORITY]" in system_content
 
 
 def test_rewrite_preserves_grounding_and_evidence_authority():
