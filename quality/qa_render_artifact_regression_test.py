@@ -11,7 +11,7 @@ def main():
     assert "Preserve QA-only render artifact" in workflow
     assert "production-qa-render-${{ github.run_id }}" in workflow
     assert "failure()" in workflow
-    assert "hashFiles('final_shorts_*.mp4')" in workflow
+    assert "hashFiles('final_shorts.mp4', 'final_shorts_*.mp4')" in workflow
     assert "NOT_UPLOAD_APPROVED" in workflow
     assert "DIRECTOR_HOLD" in workflow
     assert "qa_render_status.json" in workflow
@@ -24,6 +24,7 @@ def main():
     assert "if: always()" not in verified
     qa = workflow.split("- name: Preserve QA-only render artifact", 1)[1].split("- name:", 1)[0]
     assert "failure()" in qa
+    assert "final_shorts.mp4" in qa
     assert "final_shorts_*.mp4" in qa
 
     publish = workflow.split("- name: Publish to YouTube and persist lineage", 1)[1]
@@ -32,7 +33,7 @@ def main():
 
     # A render-before-failure is required for QA MP4 preservation. Pre-render
     # failures therefore keep diagnostics only because hashFiles is empty.
-    assert "if: ${{ failure() && hashFiles('final_shorts_*.mp4') != '' }}" in workflow
+    assert "if: ${{ failure() && hashFiles('final_shorts.mp4', 'final_shorts_*.mp4') != '' }}" in workflow
 
     print("DIRECTOR HOLD QA RENDER ARTIFACT REGRESSION: PASS")
 
