@@ -244,7 +244,8 @@ jobs:
             diagnostics/failure_diagnostics.py diagnostics/runner.py quality/failure_diagnostics_regression_test.py \
             quality_core_v2/actual_visual_qa.py quality_core_v2/actual_visual_qa_regression_test.py \
             quality_core_v2/downstream.py quality_core_v2/downstream_test.py quality_core_v2/visual_plan.py \
-            quality_core_v2/adapters/writer_adapter.py video/still_image_fallback.py
+            quality_core_v2/adapters/writer_adapter.py quality_core_v2/production_composition_regression_test.py \
+            video/still_image_fallback.py
 
           python quality/final_render_integrity_regression_test.py
           python quality/final_visual_semantic_qa_regression_test.py
@@ -266,6 +267,7 @@ jobs:
           python -m quality_core_v2.replay
           python -m quality_core_v2.downstream_test
           python -m quality_core_v2.actual_visual_qa_regression_test
+          python -m quality_core_v2.production_composition_regression_test
 
       - name: Restore recent-topics memory
         env:
