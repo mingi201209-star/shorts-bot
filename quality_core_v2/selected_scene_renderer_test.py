@@ -115,13 +115,6 @@ def test_renderer_source_contains_no_provider_search_call():
     assert "search_pixabay_candidates" not in source
 
 
-if __name__ == "__main__":
-    test_exact_selected_media_url_is_downloaded_without_research()
-    test_renderer_source_contains_no_provider_search_call()
-    test_rendered_visual_qa_failure_blocks_scene_before_composition()
-    print("V2 EXACT-ASSET RENDER REGRESSION: PASS (3/3)")
-
-
 def test_rendered_visual_qa_failure_blocks_scene_before_composition():
     scene = SceneV2.from_dict({
         "scene_index": 1,
@@ -193,3 +186,12 @@ def test_rendered_visual_qa_failure_blocks_scene_before_composition():
             assert loaded == []
         finally:
             os.chdir(old)
+
+
+if __name__ == "__main__":
+    test_exact_selected_media_url_is_downloaded_without_research()
+    test_renderer_source_contains_no_provider_search_call()
+    test_rendered_visual_qa_failure_blocks_scene_before_composition()
+    print("V2 EXACT-ASSET RENDER REGRESSION: PASS (3/3)")
+
+
