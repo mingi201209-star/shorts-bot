@@ -28,6 +28,19 @@ _LAST_FINAL_VISUAL_SELECTION = None
 _final_visual_previous_choose_best_candidate = choose_best_candidate
 
 
+def _final_visual_candidate_metadata(candidate):
+    if "_candidate_metadata" in globals():
+        return _candidate_metadata(candidate)
+    candidate = dict(candidate or {})
+    return " ".join(
+        str(candidate.get(key) or "")
+        for key in (
+            "metadata", "title", "tags", "description", "page_url",
+            "source_id", "id", "provider",
+        )
+    )
+
+
 def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, subject_filter_query=None):
     global _LAST_FINAL_VISUAL_SELECTION
     selected = _final_visual_previous_choose_best_candidate(
@@ -44,9 +57,21 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
                 "tier": 99,
             }
         else:
-            tier, mode = general_scene_unknown_safe_tier(selected, subject_filter_query)
-            visual = candidate_visible_component_evidence(selected, subject_filter_query)
-            compatibility = candidate_anchor_compatibility(selected, subject_filter_query)
+            if all(
+                name in globals()
+                for name in (
+                    "general_scene_unknown_safe_tier",
+                    "candidate_visible_component_evidence",
+                    "candidate_anchor_compatibility",
+                )
+            ):
+                tier, mode = general_scene_unknown_safe_tier(selected, subject_filter_query)
+                visual = candidate_visible_component_evidence(selected, subject_filter_query)
+                compatibility = candidate_anchor_compatibility(selected, subject_filter_query)
+            else:
+                tier, mode = 3, "LEGACY_SELECTION_LINEAGE"
+                visual = {"state": "UNKNOWN"}
+                compatibility = {"matched": 0, "total": 0}
             _LAST_FINAL_VISUAL_SELECTION = {
                 "accepted": tier <= 4 and str(visual.get("state") or "UNKNOWN").upper() != "FALSE",
                 "mode": mode,
@@ -56,7 +81,7 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
                 "anchor_total": compatibility.get("total", 0),
                 "provider": selected.get("provider", "pexels"),
                 "source_id": selected.get("source_id", selected.get("id")),
-                "metadata": _candidate_metadata(selected),
+                "metadata": _final_visual_candidate_metadata(selected),
             }
     return selected
 
@@ -85,12 +110,39 @@ import_needle = "from video.subtitle_engine import (\n"
 import_replacement = (
     "from video.video_downloader import get_last_final_visual_selection\n"
     "from quality.final_visual_semantic_qa import record_final_visual_scene\n\n"
+    "from quality.visual_semantic_contract import phenomenon_preserving_query\n\n"
     + import_needle
 )
 if "FINAL_VISUAL_SCENE_RECORD_V1" not in text:
     if import_needle not in text:
         raise RuntimeError("final visual QA video_engine import anchor not found")
     text = text.replace(import_needle, import_replacement, 1)
+    search_needle = '''        if hook_scene_enabled:
+'''
+    search_replacement = '''        # PHENOMENON_PRESERVING_RETRIEVAL_QUERY_V1
+        search_keyword = phenomenon_preserving_query(
+            item,
+            base_query=keyword,
+        )
+        if search_keyword != keyword.lower():
+            print(
+                "🧭 Phenomenon-preserving search: "
+                f"{keyword} -> {search_keyword}"
+            )
+
+        if hook_scene_enabled:
+'''
+    if search_needle not in text:
+        raise RuntimeError("phenomenon-preserving query anchor not found")
+    text = text.replace(search_needle, search_replacement, 1)
+    text = text.replace(
+        "fetch_pexels_video(\n                        keyword",
+        "fetch_pexels_video(\n                        search_keyword",
+    )
+    text = text.replace(
+        "fetch_pexels_video(\n                    keyword",
+        "fetch_pexels_video(\n                    search_keyword",
+    )
     selection_needle = '''        # ====================================================
         # 4. 영상 다운로드
         # ====================================================
@@ -98,7 +150,7 @@ if "FINAL_VISUAL_SCENE_RECORD_V1" not in text:
     selection_replacement = '''        # FINAL_VISUAL_SCENE_RECORD_V1
         record_final_visual_scene(
             idx,
-            keyword,
+            search_keyword,
             get_last_final_visual_selection(),
             hook_verified=hook_scene_enabled,
             duration=duration,
@@ -148,13 +200,21 @@ if "STILL_IMAGE_MOTION_FALLBACK_V1" not in text:
                     "template_type": still_result.get("template_type", ""),
                     "presentation_variant": still_result.get("presentation_variant", ""),
                     "motion_profile": still_result.get("motion_profile", ""),
-                    "metadata": "verified generated still animated with slow zoom/pan and fade",
+                    "visible_components": still_result.get("visible_components", []),
+                    "visible_subject_groups": still_result.get("visible_subject_groups", {}),
+                    "verification_evidence": still_result.get("verification_evidence", {}),
+                    "current_scene_verification": still_result.get("current_scene_verification", {}),
+                    "metadata": (
+                        "verified generated still animated with slow zoom/pan and fade "
+                        f"visible_components={still_result.get('visible_components', [])} "
+                        f"verification={still_result.get('current_scene_verification', {})}"
+                    ),
                 })
                 print(f"🖼️ STILL IMAGE MOTION FALLBACK scene={idx + 1}: {vertical_video_path}")
             else:
                 raise RuntimeError(
                     "영상 후보가 없고 검증된 정지 이미지 fallback도 실패했습니다: "
-                    f"{keyword}"
+                    f"{search_keyword}"
                 )
 
 '''
@@ -176,7 +236,7 @@ if "FINAL_VISUAL_SCENE_RECORD_V1" not in text:
     record_block = '''        # FINAL_VISUAL_SCENE_RECORD_V1
         record_final_visual_scene(
             idx,
-            keyword,
+            search_keyword,
             get_last_final_visual_selection(),
             hook_verified=hook_scene_enabled,
         )
@@ -200,15 +260,29 @@ if "FINAL_VISUAL_SEMANTIC_QA_V1" not in text:
     validate_final_render_integrity,
 )
 '''
-    import_replacement = import_needle + '''
+    import_block = '''
 from quality.final_visual_semantic_qa import (
     reset_final_visual_semantic_report,
     validate_final_visual_semantic_qa,
 )
 '''
-    if import_needle not in text:
-        raise RuntimeError("final visual QA main import anchor not found")
-    text = text.replace(import_needle, import_replacement, 1)
+    import_replacement = import_needle + import_block
+    if "from quality.final_visual_semantic_qa import" not in text:
+        if import_needle in text:
+            text = text.replace(import_needle, import_replacement, 1)
+        else:
+            fallback_import_needle = '''from quality.budget_guard import (
+    reset_budget,
+    print_budget_status,
+)
+'''
+            if fallback_import_needle not in text:
+                raise RuntimeError("final visual QA main import anchor not found")
+            text = text.replace(
+                fallback_import_needle,
+                fallback_import_needle + "\n" + import_block,
+                1,
+            )
     production_needle = '''        scene_clips = (
             generate_scenes(
                 scenes
