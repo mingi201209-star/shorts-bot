@@ -36,9 +36,10 @@ VISUAL_CLASSIFIER_SYSTEM_PROMPT = """
 description은 narration과 같은 언어로 쓴다. narration의 단어를 복사해서 맞추지 말고,
 그 단어가 이미지에서 실제로 확인될 때만 같은 구체 명사/동사를 사용한다.
 
-사용자가 준 VisualPlan의 required_visible_components와
-required_observable_state 중 이미지에서 실제로 확인되는 항목만
-원문 문자열 그대로 배열에 넣는다. 보이지 않으면 넣지 않는다.
+사용자가 준 VisualPlan의 required_visible_components,
+required_observable_state, required_relation_or_mechanism 중
+이미지에서 실제로 확인되는 항목만 원문 문자열 그대로 배열에 넣는다.
+보이지 않으면 넣지 않는다.
 
 정확히 아래 JSON만 반환한다:
 {
@@ -489,8 +490,26 @@ def select_visual_for_scene(
                     "mode=generated_fallback"
                 )
                 if generated_verdict.passed:
-                    return actual_visual, generated_verdict
-                last_verdict = generated_verdict
+                    generated_key = (
+                        f"{actual_visual.provider}:{actual_visual.source_id}"
+                        if actual_visual.source_id
+                        else actual_visual.media_url
+                    )
+                    if used_asset_keys and generated_key in used_asset_keys:
+                        last_verdict = Verdict(
+                            False,
+                            f"generated exact asset already used: {generated_key}",
+                            "visual_qa",
+                        )
+                        print(
+                            "[V2_VISUAL_SKIP] "
+                            f"scene={scene.scene_index} asset={generated_key} "
+                            "reason=already_used"
+                        )
+                    else:
+                        return actual_visual, generated_verdict
+                else:
+                    last_verdict = generated_verdict
 
     if grounded_only_after_stock:
         return None, Verdict(
