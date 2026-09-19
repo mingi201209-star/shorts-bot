@@ -207,12 +207,62 @@ def test_exact_fixed_topic_malformed_hook_recovers_from_repo_seed():
 
     assert result["status"] == "SELECTED", result
     assert result["winner"]["topic"] == fixed_topic, result
+    assert "flapwise/chordwise bending" in result["winner"]["micro_narrative"]["reveal"], result
+    assert "torsion" in result["winner"]["micro_narrative"]["reveal"], result
     assert "리브와 스파" in result["winner"]["micro_narrative"]["reveal"], result
-    assert "휨과 비틀림" in result["winner"]["micro_narrative"]["reveal"], result
+    assert "휨" in result["winner"]["core_question"], result
+    assert "비틀림" in result["winner"]["core_question"], result
     assert len(critique_calls) == 1, critique_calls
     recovery = result.get("_exact_fixed_topic_seed_recovery") or {}
     assert recovery.get("status") == "USED", recovery
     assert recovery.get("api_calls_added") == 1, recovery
+
+
+def test_exact_fixed_topic_seed_failure_is_diagnostic_not_silent():
+    """Run 35422235885: if the exact seed still fails the unchanged
+    narrowness gate, the wrapper must log the concrete critique reason instead
+    of making the next production attempt look like another unexplained
+    malformed Explorer loop.
+    """
+
+    import contextlib
+    import io
+
+    fixed_topic = "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?"
+    original_explore = ce_pkg._LEGACY.explore_candidates
+    original_critique = ce_pkg._LEGACY._self_critique_narrowness
+
+    def malformed_explore(*args, **kwargs):
+        raise ValueError(
+            "winner.micro_narrative hook이 Core Question과 같은 내용을 반복합니다."
+        )
+
+    def still_too_broad(winner, *, model):
+        return {
+            "verdict": "TOO_BROAD",
+            "reason": "fixture narrowness rejection",
+        }
+
+    captured = io.StringIO()
+    try:
+        ce_pkg._LEGACY.explore_candidates = malformed_explore
+        ce_pkg._LEGACY._self_critique_narrowness = still_too_broad
+        with contextlib.redirect_stdout(captured):
+            result = ce_pkg.explore_candidates(
+                {"category": "항공", "topic": fixed_topic},
+                recent_topics=[],
+                rejected_topics=[],
+                fixed_topic=fixed_topic,
+            )
+    finally:
+        ce_pkg._LEGACY.explore_candidates = original_explore
+        ce_pkg._LEGACY._self_critique_narrowness = original_critique
+
+    assert result["status"] == "REGENERATE", result
+    assert "malformed Candidate Explorer response" in result["reason"], result
+    log = captured.getvalue()
+    assert "EXACT FIXED-TOPIC SEED RECOVERY SKIPPED" in log, log
+    assert "fixture narrowness rejection" in log, log
 
 
 def test_no_hotfix_anchor_text_touched():
@@ -250,6 +300,7 @@ def main():
     test_valid_regenerate_response_is_unaffected()
     test_empty_content_regenerates_instead_of_crashing()
     test_exact_fixed_topic_malformed_hook_recovers_from_repo_seed()
+    test_exact_fixed_topic_seed_failure_is_diagnostic_not_silent()
     test_no_hotfix_anchor_text_touched()
     print(
         "PASS: Candidate Explorer malformed-response regenerate-not-crash "
