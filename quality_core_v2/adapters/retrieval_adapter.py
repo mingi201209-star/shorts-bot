@@ -33,6 +33,8 @@ MAX_CLASSIFICATIONS_PER_SCENE = max(
 VISUAL_CLASSIFIER_SYSTEM_PROMPT = """
 너는 Clean V2 Visual Classifier다.
 이미지에 실제로 보이는 것만 판단한다. 검색어/메타데이터를 보고 추측하지 않는다.
+description은 narration과 같은 언어로 쓴다. narration의 단어를 복사해서 맞추지 말고,
+그 단어가 이미지에서 실제로 확인될 때만 같은 구체 명사/동사를 사용한다.
 
 사용자가 준 VisualPlan의 required_visible_components와
 required_observable_state 중 이미지에서 실제로 확인되는 항목만
@@ -92,6 +94,7 @@ def provider_hit_to_description(hit: Dict[str, Any], provider: str) -> str:
 def call_visual_classifier(
     thumbnail_url: str,
     plan: VisualPlanV2,
+    scene: Optional[SceneV2] = None,
     *,
     client: Any = None,
 ) -> str:
@@ -113,6 +116,8 @@ def call_visual_classifier(
         "required_observable_state": list(plan.required_observable_state),
         "required_relation_or_mechanism": list(plan.required_relation_or_mechanism),
         "forbidden_visuals": list(plan.forbidden_visuals),
+        "narration": str(scene.narration if scene is not None else ""),
+        "visual_requirement": str(scene.visual_requirement if scene is not None else ""),
     }
     response = client.chat.completions.create(
         model=CLASSIFIER_MODEL,
@@ -155,6 +160,7 @@ def _classify_hit(
     provider: str,
     query: str,
     plan: VisualPlanV2,
+    scene: Optional[SceneV2],
     classify_fn,
 ) -> CandidateVisualV2:
     identity = _hit_identity(hit, provider, query)
@@ -163,7 +169,11 @@ def _classify_hit(
     if not identity["thumbnail_url"]:
         raise ValueError("candidate has no thumbnail_url")
 
-    raw = classify_fn(identity["thumbnail_url"], plan)
+    raw = (
+        classify_fn(identity["thumbnail_url"], plan, scene)
+        if classify_fn is call_visual_classifier
+        else classify_fn(identity["thumbnail_url"], plan)
+    )
     tags = []
     if provider == "pixabay":
         tags = [part.strip() for part in str(hit.get("tags", "")).split(",") if part.strip()]
@@ -262,6 +272,7 @@ def select_visual_for_scene(
                     provider=provider,
                     query=query,
                     plan=plan,
+                    scene=scene,
                     classify_fn=classify_fn,
                 )
                 verdict = evaluate_scene_visual_qa(scene, plan, visual)
@@ -306,6 +317,7 @@ def search_and_classify(
                 provider="pexels",
                 query=query,
                 plan=plan,
+                scene=None,
                 classify_fn=classify_fn,
             )
     return None

@@ -58,7 +58,10 @@ def verify_rendered_visual(
         "Do not infer from provider metadata or search terms. "
         "Return exact VisualPlan strings only when visibly confirmed. "
         "A static subject does not prove bending/flexing/deformation. "
-        "JSON only with keys description, visible_components, observable_state.\n"
+        "Write description in the same language as the narration and use a narration "
+        "term only when that exact physical evidence is visible. Do not echo narration "
+        "to manufacture a match. JSON only with keys description, visible_components, "
+        "observable_state.\nNarration: " + scene.narration + "\n"
         + json.dumps(requirements, ensure_ascii=False)
     )
     content = [{"type": "text", "text": prompt}]

@@ -44,39 +44,20 @@ def evaluate_scene_visual_qa(
     if not plan_match.passed:
         return plan_match
 
-    # The VisualPlan is the typed semantic bridge between Korean narration and
-    # provider/vision vocabulary. Include the scene's explicit visual
-    # requirement plus the classifier's exact plan strings, instead of relying
-    # on Korean<->English lexical coincidence in provider metadata.
-    narration_tokens = _tokens(scene.narration) | _tokens(scene.visual_requirement)
-    visual_tokens = _tokens(
-        " ".join(
-            [
-                visual.description,
-                *visual.tags,
-                *visual.visible_components,
-                *visual.observable_state,
-            ]
-        )
-    )
+    # Keep the original direct narration<->visual evidence floor intact.
+    # The classifier is responsible for describing visible evidence in the
+    # narration's language; this gate must not let plan tokens substitute for
+    # an actually corresponding visual description.
+    narration_tokens = _tokens(scene.narration)
+    visual_tokens = _tokens(visual.description) | {t.lower() for t in visual.tags}
     shared = narration_tokens & visual_tokens
     if len(shared) < NARRATION_VISUAL_MIN_OVERLAP:
-        plan_tokens = _tokens(
-            " ".join(
-                [
-                    plan.subject,
-                    *plan.required_visible_components,
-                    *plan.required_observable_state,
-                ]
-            )
+        return Verdict(
+            False,
+            f"narration and visual share no vocabulary at all -- "
+            f"narration={scene.narration!r}, visual={visual.description!r}",
+            "visual_qa",
         )
-        if not (plan_tokens & visual_tokens):
-            return Verdict(
-                False,
-                f"narration/visual requirement has no semantic bridge to visual -- "
-                f"narration={scene.narration!r}, visual={visual.description!r}",
-                "visual_qa",
-            )
 
     return Verdict(
         True,
