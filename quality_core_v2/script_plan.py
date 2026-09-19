@@ -16,7 +16,7 @@ from __future__ import annotations
 import re
 from typing import List
 
-from quality_core_v2.schemas import SceneV2, Verdict
+from quality_core_v2.schemas import CandidateV2, SceneV2, Verdict
 
 _TOKEN_RE = re.compile(r"[0-9A-Za-z가-힣]{2,}")
 
@@ -37,7 +37,10 @@ def _jaccard(a: set, b: set) -> float:
 ADJACENT_DUPLICATE_THRESHOLD = 0.6
 
 
-def evaluate_script_plan_v2(scenes: List[SceneV2]) -> Verdict:
+def evaluate_script_plan_v2(
+    scenes: List[SceneV2],
+    candidate: CandidateV2 | None = None,
+) -> Verdict:
     if not scenes:
         return Verdict(False, "empty scene list", "script_plan")
 
@@ -93,6 +96,38 @@ def evaluate_script_plan_v2(scenes: List[SceneV2]) -> Verdict:
             "scene 1 must directly state the observable phenomenon, not open with a question",
             "script_plan",
         )
+
+    if candidate is not None:
+        candidate_context = " ".join([
+            candidate.topic,
+            candidate.concrete_subject,
+            candidate.observable_phenomenon,
+            candidate.core_question,
+            candidate.mechanism,
+            candidate.reveal,
+            candidate.canonical_subject,
+            *candidate.visual_proof,
+        ]).lower()
+        script_text = " ".join(
+            f"{scene.narration} {scene.new_information} {scene.visual_requirement}"
+            for scene in ordered
+        ).lower()
+        out_of_candidate_benefit_terms = (
+            "passenger", "passengers", "cabin", "interior", "comfort",
+            "comfortable", "seat", "seats",
+            "승객", "객실", "편안", "좌석",
+        )
+        invented = [
+            term for term in out_of_candidate_benefit_terms
+            if term in script_text and term not in candidate_context
+        ]
+        if invented:
+            return Verdict(
+                False,
+                "script invented an out-of-Candidate benefit/context: "
+                f"{invented!r}",
+                "script_plan",
+            )
 
     payoff_text = " ".join(
         [ordered[-1].narration, ordered[-1].new_information]
