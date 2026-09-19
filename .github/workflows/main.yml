@@ -314,7 +314,7 @@ jobs:
           retention-days: 30
 
       - name: Prepare QA-only render status
-        if: ${{ failure() && hashFiles('final_shorts_*.mp4') != '' }}
+        if: ${{ failure() && hashFiles('final_shorts.mp4', 'final_shorts_*.mp4') != '' }}
         run: |
           cat > qa_render_status.json <<'EOF'
           {
@@ -325,11 +325,12 @@ jobs:
           EOF
 
       - name: Preserve QA-only render artifact
-        if: ${{ failure() && hashFiles('final_shorts_*.mp4') != '' }}
+        if: ${{ failure() && hashFiles('final_shorts.mp4', 'final_shorts_*.mp4') != '' }}
         uses: actions/upload-artifact@v4
         with:
           name: production-qa-render-${{ github.run_id }}
           path: |
+            final_shorts.mp4
             final_shorts_*.mp4
             final_visual_semantic_qa.json
             final_director_qa.json
@@ -348,6 +349,7 @@ jobs:
         with:
           name: verified-shorts-${{ github.run_id }}-${{ github.sha }}
           path: |
+            final_shorts.mp4
             final_shorts_*.mp4
             final_visual_semantic_qa.json
             final_director_qa.json

@@ -73,17 +73,36 @@ def render_v2_pipeline(
     generate_scenes_fn=None,
     render_final_video_fn=None,
     create_voice_fn=None,
+    reset_final_visual_semantic_report_fn=None,
+    validate_final_visual_semantic_qa_fn=None,
 ):
     """Impure orchestration: maps every (scene, plan) pair, then calls the
     real V1 generate_scenes()/render_final_video() unchanged. Injectable
     for offline testing (see downstream_test.py); defaults to the real
     functions when not injected.
+
+    Reuses V1's existing quality.final_visual_semantic_qa as-is (no new QA
+    implementation): reset before generate_scenes() runs (create_scene's
+    own production hotfix lineage calls record_final_visual_scene() per
+    scene as it goes), then validate right after. validate raises
+    RuntimeError on FAIL, so render_final_video_fn is only ever reached on
+    PASS -- no separate if/else needed.
     """
     if generate_scenes_fn is None:
         from main import generate_scenes as generate_scenes_fn
     if render_final_video_fn is None:
         from video.renderer import render_final_video as render_final_video_fn
+    if reset_final_visual_semantic_report_fn is None:
+        from quality.final_visual_semantic_qa import (
+            reset_final_visual_semantic_report as reset_final_visual_semantic_report_fn,
+        )
+    if validate_final_visual_semantic_qa_fn is None:
+        from quality.final_visual_semantic_qa import (
+            validate_final_visual_semantic_qa as validate_final_visual_semantic_qa_fn,
+        )
 
     items = [scene_v2_to_v1_item(s, p) for s, p in zip(scenes, plans)]
+    reset_final_visual_semantic_report_fn()
     scene_clips = generate_scenes_fn(items)
+    validate_final_visual_semantic_qa_fn(scenes)
     return render_final_video_fn(scene_clips)

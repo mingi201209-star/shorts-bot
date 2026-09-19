@@ -90,6 +90,8 @@ def test_full_control_flow_candidate_to_render_handoff():
         scenes, plans,
         generate_scenes_fn=fake_generate_scenes,
         render_final_video_fn=fake_render_final_video,
+        reset_final_visual_semantic_report_fn=lambda: None,
+        validate_final_visual_semantic_qa_fn=lambda scenes_: None,
     )
     assert result == "final_shorts.mp4"
     assert calls["scene_items"] == items
@@ -147,3 +149,57 @@ def test_scene_v2_to_v1_item_rejects_when_no_keyword_available():
         assert False, "should have raised ValueError"
     except ValueError as exc:
         assert "no usable keyword" in str(exc)
+
+
+def test_render_v2_pipeline_calls_reset_generate_qa_render_in_order():
+    scenes = [SceneV2.from_dict({
+        "scene_index": 1, "narration": "n", "causal_role": "phenomenon",
+        "owned_claim_id": "a", "new_information": "i", "visual_requirement": "v",
+    })]
+    plans = [VisualPlanV2.from_dict({
+        "scene_index": 1, "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft"],
+        "required_observable_state": ["bending"],
+        "search_queries": ["aircraft wing flex"],
+    })]
+    calls = []
+    result = render_v2_pipeline(
+        scenes, plans,
+        reset_final_visual_semantic_report_fn=lambda: calls.append("reset"),
+        generate_scenes_fn=lambda items: calls.append("generate") or ["clip"],
+        validate_final_visual_semantic_qa_fn=lambda scenes_: calls.append("qa"),
+        render_final_video_fn=lambda clips: calls.append("render") or "final.mp4",
+    )
+    assert calls == ["reset", "generate", "qa", "render"]
+    assert result == "final.mp4"
+
+
+def test_render_v2_pipeline_skips_render_when_qa_fails():
+    scenes = [SceneV2.from_dict({
+        "scene_index": 1, "narration": "n", "causal_role": "phenomenon",
+        "owned_claim_id": "a", "new_information": "i", "visual_requirement": "v",
+    })]
+    plans = [VisualPlanV2.from_dict({
+        "scene_index": 1, "subject": "aircraft main wing",
+        "required_visible_components": ["aircraft"],
+        "required_observable_state": ["bending"],
+        "search_queries": ["aircraft wing flex"],
+    })]
+    calls = []
+
+    def failing_qa(scenes_):
+        calls.append("qa")
+        raise RuntimeError("FINAL_VISUAL_SEMANTIC_QA_FAILED missing=[] failed=[1]")
+
+    try:
+        render_v2_pipeline(
+            scenes, plans,
+            reset_final_visual_semantic_report_fn=lambda: calls.append("reset"),
+            generate_scenes_fn=lambda items: calls.append("generate") or ["clip"],
+            validate_final_visual_semantic_qa_fn=failing_qa,
+            render_final_video_fn=lambda clips: calls.append("render") or "final.mp4",
+        )
+        assert False, "should have raised"
+    except RuntimeError as exc:
+        assert "FINAL_VISUAL_SEMANTIC_QA_FAILED" in str(exc)
+    assert calls == ["reset", "generate", "qa"]  # render never called
