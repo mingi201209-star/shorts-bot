@@ -172,16 +172,33 @@ def choose_best_candidate(candidates, relevant_top_n=None, *, historical=False, 
             selected_mode = "SEMANTIC_SAFE_REUSE"
 
     anchors = extract_query_anchors(subject_filter_query)
-    # For anchored scenes, never fill with cross-domain/abstract stock. Returning
-    # None lets existing retry/AI/contextual fallback paths handle the scene.
-    if anchors and selected is not None and selected_tier >= 5:
+    v2_enabled = str(os.environ.get("ENABLE_QUALITY_CORE_V2", "") or "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+    query_words = set(normalize_search_query(subject_filter_query).split())
+    v2_state_bearing = bool(
+        v2_enabled
+        and query_words
+        and query_words & set(globals().get("_V2_QUERY_STATE_TERMS", set()))
+    )
+    # For anchored scenes, never fill with cross-domain/abstract stock. Clean
+    # V2 is stricter for phenomenon-bearing queries: same-domain contextual
+    # UNKNOWN (tier 4) is also rejected because Run 35432524672 proved that an
+    # aircraft+wing match can still show no flex/bending at all.
+    reject_floor = 4 if v2_state_bearing else 5
+    if anchors and selected is not None and selected_tier >= reject_floor:
         print(
             "[GENERAL_VISUAL_REJECT] "
             f"candidate={selected.get('source_id', selected.get('id'))} "
-            f"anchors={'+'.join(anchors)} tier={selected_tier} reason=cross_domain"
+            f"anchors={'+'.join(anchors)} tier={selected_tier} "
+            f"reason={'v2_state_not_proven' if v2_state_bearing else 'cross_domain'}"
         )
         selected = None
-        selected_mode = "REJECTED_CROSS_DOMAIN"
+        selected_mode = (
+            "REJECTED_V2_STATE_NOT_PROVEN"
+            if v2_state_bearing
+            else "REJECTED_CROSS_DOMAIN"
+        )
 
     if selected is None and not anchors:
         selected = _general_parity_previous_choose_best_candidate(
