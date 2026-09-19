@@ -3,6 +3,7 @@
 import json
 import os
 import re
+from copy import deepcopy
 
 import openai
 
@@ -1892,6 +1893,99 @@ OUTPUT CONTRACT의 winner 객체와
 """
 
 
+_REWRITE_AUTHORITY_FIELDS = (
+    "fact_check_focus",
+    "visual_proof",
+    "specific_observation",
+    "mechanism",
+    "constraint",
+    "concrete_condition",
+    "counterintuitive_result",
+    "tradeoff",
+    "subject_kind",
+    "canonical_subject",
+    "subject_identity_confidence",
+    "grounding_evidence",
+    "_trusted_grounding_evidence",
+    "_trusted_grounded_claims",
+)
+
+
+def _rewrite_candidate_text(candidate):
+    if not isinstance(candidate, dict):
+        return ""
+
+    micro = candidate.get("micro_narrative")
+    if not isinstance(micro, dict):
+        micro = {}
+
+    chunks = [
+        candidate.get("topic"),
+        candidate.get("angle"),
+        candidate.get("core_question"),
+        candidate.get("specific_observation"),
+        candidate.get("mechanism"),
+        candidate.get("constraint"),
+        candidate.get("concrete_condition"),
+        candidate.get("counterintuitive_result"),
+        candidate.get("tradeoff"),
+        micro.get("hook"),
+        micro.get("core_question"),
+        micro.get("reveal"),
+        micro.get("payoff"),
+    ]
+
+    for field in ("fact_check_focus", "visual_proof"):
+        values = candidate.get(field)
+        if isinstance(values, list):
+            chunks.extend(values)
+
+    return " ".join(str(value or "").strip() for value in chunks if str(value or "").strip())
+
+
+def _numeric_claim_tokens(text):
+    return set(re.findall(r"(?<![A-Za-z0-9])\d+(?:[.,]\d+)?(?:\s*(?:%|°|도|배|초|분|시간|km|m|cm|mm|kg|g|N|kN))?", str(text or "")))
+
+
+def _preserve_rewrite_authority(original, rewritten):
+    """Keep a bounded rewrite on the exact same subject/evidence authority.
+
+    The rewrite call is editorial recovery, not a fact-discovery or grounding
+    step. It may rephrase the question/reveal, but it cannot replace the
+    Candidate's evidence lists, trusted grounding metadata, or introduce a new
+    numeric claim that was absent from the original Candidate/evidence.
+    """
+
+    if not isinstance(original, dict) or not isinstance(rewritten, dict):
+        return None
+
+    original_topic = str(original.get("topic") or "").strip()
+    rewritten_topic = str(rewritten.get("topic") or "").strip()
+    if not original_topic or rewritten_topic != original_topic:
+        print("🚫 Narrowness rewrite rejected: subject/topic changed")
+        return None
+
+    allowed_numbers = _numeric_claim_tokens(_rewrite_candidate_text(original))
+    rewritten_numbers = _numeric_claim_tokens(_rewrite_candidate_text(rewritten))
+    unsupported_numbers = rewritten_numbers - allowed_numbers
+    if unsupported_numbers:
+        print(
+            "🚫 Narrowness rewrite rejected: unsupported numeric detail "
+            + ",".join(sorted(unsupported_numbers))
+        )
+        return None
+
+    for field in _REWRITE_AUTHORITY_FIELDS:
+        if field in original:
+            rewritten[field] = deepcopy(original[field])
+
+    for field, value in original.items():
+        if field.startswith("_repo_owned_") or field.startswith("_trusted_"):
+            rewritten[field] = deepcopy(value)
+
+    return rewritten
+
+
 def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
     """Targeted, same-subject rewrite of a Winner the narrowness self-critique
     rejected as TOO_BROAD.
@@ -1974,9 +2068,11 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
         return None
 
     try:
-        return validate_candidate(parsed, prefix="winner", runner_up=False)
+        rewritten = validate_candidate(parsed, prefix="winner", runner_up=False)
     except Exception:
         return None
+
+    return _preserve_rewrite_authority(winner, rewritten)
 
 
 def _self_critique_narrowness(winner, *, model=MODEL):
