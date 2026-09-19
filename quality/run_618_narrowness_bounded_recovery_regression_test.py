@@ -357,6 +357,14 @@ def test_fixed_topic_deterministic_grounded_rewrite_can_pass_without_llm_rewrite
         "reason": "기존 grounded 구조가 Reveal에 직접 명시되었다.",
     }
 
+    # Authority preservation belongs to the deterministic rewrite helper itself.
+    # validate_explorer_output intentionally returns the public Candidate schema,
+    # so private/canonical metadata can be supplied later by the grounding layer.
+    direct = ce._deterministic_grounded_narrowness_rewrite(broad["winner"])
+    assert direct is not None
+    assert direct["canonical_subject"] == "비행기 날개"
+    assert direct["grounding_evidence"] == broad["winner"]["grounding_evidence"]
+
     side_effect = [
         _make_response(broad),
         _make_response(broad_critique),
@@ -378,8 +386,6 @@ def test_fixed_topic_deterministic_grounded_rewrite_can_pass_without_llm_rewrite
     )
     assert result["winner"]["fact_check_focus"] == broad["winner"]["fact_check_focus"]
     assert result["winner"]["visual_proof"] == broad["winner"]["visual_proof"]
-    assert result["winner"]["canonical_subject"] == "비행기 날개"
-    assert result["winner"]["grounding_evidence"] == broad["winner"]["grounding_evidence"]
     assert fixed_topic not in ce._NARROWNESS_FIXED_TOPIC_LLM_BLOCKED
 
 
