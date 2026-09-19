@@ -42,6 +42,33 @@ def evaluate_script_plan_v2(scenes: List[SceneV2]) -> Verdict:
         return Verdict(False, "empty scene list", "script_plan")
 
     ordered = sorted(scenes, key=lambda s: s.scene_index)
+
+    # Preserve the original failure-specific checks first so a known duplicate
+    # still reports its real cause instead of being masked by a later
+    # progression-shape error.
+    seen_claims = {}
+    for scene in scenes:
+        if scene.owned_claim_id in seen_claims:
+            other = seen_claims[scene.owned_claim_id]
+            return Verdict(
+                False,
+                f"scene {scene.scene_index} and scene {other} share "
+                f"owned_claim_id {scene.owned_claim_id!r}",
+                "script_plan",
+            )
+        seen_claims[scene.owned_claim_id] = scene.scene_index
+
+    for prev, curr in zip(ordered, ordered[1:]):
+        overlap = _jaccard(_tokens(prev.new_information), _tokens(curr.new_information))
+        if overlap >= ADJACENT_DUPLICATE_THRESHOLD:
+            return Verdict(
+                False,
+                f"scene {curr.scene_index} repeats scene {prev.scene_index}'s "
+                f"new_information (token overlap {overlap:.2f} >= "
+                f"{ADJACENT_DUPLICATE_THRESHOLD:.2f}): {curr.new_information!r}",
+                "script_plan",
+            )
+
     required_roles = [
         "phenomenon",
         "why_question",
@@ -89,28 +116,5 @@ def evaluate_script_plan_v2(scenes: List[SceneV2]) -> Verdict:
             f"{ordered[-1].narration!r}",
             "script_plan",
         )
-
-    seen_claims = {}
-    for scene in scenes:
-        if scene.owned_claim_id in seen_claims:
-            other = seen_claims[scene.owned_claim_id]
-            return Verdict(
-                False,
-                f"scene {scene.scene_index} and scene {other} share "
-                f"owned_claim_id {scene.owned_claim_id!r}",
-                "script_plan",
-            )
-        seen_claims[scene.owned_claim_id] = scene.scene_index
-
-    for prev, curr in zip(ordered, ordered[1:]):
-        overlap = _jaccard(_tokens(prev.new_information), _tokens(curr.new_information))
-        if overlap >= ADJACENT_DUPLICATE_THRESHOLD:
-            return Verdict(
-                False,
-                f"scene {curr.scene_index} repeats scene {prev.scene_index}'s "
-                f"new_information (token overlap {overlap:.2f} >= "
-                f"{ADJACENT_DUPLICATE_THRESHOLD:.2f}): {curr.new_information!r}",
-                "script_plan",
-            )
 
     return Verdict(True, f"{len(scenes)} scenes, each owns a distinct claim", "script_plan")
