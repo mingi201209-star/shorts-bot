@@ -101,20 +101,24 @@ def run():
         trusted_records=records,
     ) is None
 
-    # Run 35413574652 counterexample: a pinned wing-flex topic has no exact
-    # repo-owned seed identity. It must remain unresolved (or keep already
-    # explicit Candidate identity) instead of being generically rebound to a
-    # different aircraft component such as a static wick.
+    # Run 35413574652 counterexample now has an explicit repo-owned wing-flex
+    # seed. Exact fixed-topic binding must resolve that one record and must not
+    # generically rebound the Candidate to another aircraft component.
     wing_flex_topic = "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?"
     wing_flex = deepcopy(candidate)
     wing_flex["topic"] = wing_flex_topic
     wing_flex["core_question"] = "비행기 날개가 하중을 받을 때 왜 휘고 비틀리는가?"
     wing_flex["micro_narrative"]["core_question"] = wing_flex["core_question"]
-    assert supply_exact_fixed_topic_seed_grounding(
+    wing_flex_supply = supply_exact_fixed_topic_seed_grounding(
         wing_flex,
         wing_flex_topic,
         trusted_records=records,
-    ) is None
+    )
+    assert wing_flex_supply is not None
+    supplied_wing_flex, wing_flex_record = wing_flex_supply
+    assert wing_flex_record["canonical_subject"] == "aircraft wing structure under aerodynamic load"
+    assert supplied_wing_flex["canonical_subject"] == "aircraft wing structure under aerodynamic load"
+    assert supplied_wing_flex.get("_trusted_grounding_evidence")
 
     duplicate_records = tuple(records) + (deepcopy(resolved),)
     assert exact_fixed_topic_seed_record(
