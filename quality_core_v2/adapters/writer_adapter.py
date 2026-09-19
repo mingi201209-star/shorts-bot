@@ -21,8 +21,18 @@ VISUAL_PLANNER_MODEL = os.environ.get("V3_VISUAL_PLANNER_V2_MODEL", "gpt-4o-mini
 WRITER_V2_SYSTEM_PROMPT = """
 너는 YouTube Shorts Script Writer V2다.
 
-주어진 Candidate 하나로 5~7개 Scene을 작성한다.
+주어진 Candidate 하나로 정확히 6개 Scene을 작성한다.
 각 Scene은 정확히 하나의 owned_claim_id를 가지며, 인접 Scene과 같은 사실을 반복하지 않는다.
+
+Retention contract:
+- Scene 1은 인사/소개/예고/질문으로 시작하지 않는다. 카메라로 보이는 핵심 결과/현상을 즉시 단정한다.
+- Scene 2에서만 "왜?" 질문을 던진다.
+- Scene 3은 mechanism_input, Scene 4는 mechanism_change를 구체적으로 설명한다.
+- Scene 5는 앞의 메커니즘으로 생기는 observable_result를 보여준다.
+- Scene 6 payoff는 메커니즘의 의미를 설명한다. "안전성/성능/효율에 도움" 같은 추상적 효익 문장으로 끝내지 않는다.
+- 첫 5초 안에 concrete_subject와 observable_phenomenon이 둘 다 대사에 직접 등장해야 한다.
+- 문장은 짧고 자연스러운 한국어 존댓말로 쓴다.
+- visual_requirement는 추상어가 아니라 화면에서 확인 가능한 물리적 증거를 적는다.
 
 정확히 아래 JSON만 반환한다:
 
@@ -47,6 +57,18 @@ VISUAL_PLANNER_V2_SYSTEM_PROMPT = """
 
 Narration을 직접 검색어로 바꾸지 마라.
 먼저 이 Scene이 실제로 화면에 무엇을 보여줘야 하는지 구조화한다.
+
+Machine contract:
+- subject / required_visible_components / required_observable_state /
+  required_relation_or_mechanism / forbidden_visuals / search_queries /
+  generation_prompt_constraints 값은 간결한 영어 물리 용어로 작성한다.
+- required_observable_state는 실제 프레임에서 확인할 수 있는 상태/변형/움직임이어야 한다.
+- required_relation_or_mechanism은 가능하면 두 물리 요소 사이의 보이는 관계로 쓴다.
+- search_queries는 generic subject-only 검색어를 금지한다.
+- 모든 search_query는 subject/component뿐 아니라 required_observable_state의 핵심 물리 현상 단어를 반드시 포함한다.
+  예: aircraft wing flex 주제라면 "aircraft wing flex bending in flight"처럼 flex/bending을 보존한다.
+- "aircraft wing", "wing", "airplane"처럼 현상이 빠진 검색어는 반환하지 않는다.
+- forbidden_visuals에는 같은 도메인이어도 의미를 증명하지 못하는 generic B-roll을 명시한다.
 
 정확히 아래 JSON만 반환한다:
 
