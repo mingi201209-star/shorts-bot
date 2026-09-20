@@ -286,8 +286,8 @@ def _render(script, mode):
             hook_visual.print_hook_visual_audit = original_print
             if hasattr(hook_visual, "_FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT"):
                 delattr(hook_visual, "_FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT")
-        USED_VIDEO_IDS.discard(CONTROLLED_HOOK_VIDEO["id"])
-        USED_VIDEO_IDS.discard(f"pexels:{CONTROLLED_HOOK_VIDEO['id']}")
+        hook_visual.USED_VIDEO_IDS.discard(CONTROLLED_HOOK_VIDEO["id"])
+        hook_visual.USED_VIDEO_IDS.discard(f"pexels:{CONTROLLED_HOOK_VIDEO['id']}")
         for clip in clips:
             try:
                 clip.close()
