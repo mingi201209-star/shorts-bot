@@ -1,6 +1,7 @@
 import argparse
 import copy
 import json
+from types import SimpleNamespace
 
 from moviepy.editor import AudioFileClip
 
@@ -181,16 +182,25 @@ def _capture_hook_visual_audit(audit):
     hook_visual._FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT(audit)
 
 
-def _fixture_request_candidates(
-    topic_info,
-    candidate,
-    generation_round,
-):
-    del topic_info, candidate, generation_round
-    print("🧪 HOOK FIXTURE CANDIDATES GENERATED: 5")
-    return hook_experiment._normalize_candidates({
-        "candidates": copy.deepcopy(HOOK_CANDIDATE_FIXTURE),
-    })
+def _fixture_openai_create(*args, **kwargs):
+    del args, kwargs
+    raw_payload = json.dumps(
+        {"candidates": copy.deepcopy(HOOK_CANDIDATE_FIXTURE)},
+        ensure_ascii=False,
+    )
+    print("🧪 HOOK RAW RESPONSE FIXTURE GENERATED: 5")
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content=raw_payload),
+            )
+        ],
+        usage=SimpleNamespace(
+            prompt_tokens=100,
+            completion_tokens=200,
+            prompt_tokens_details=SimpleNamespace(cached_tokens=0),
+        ),
+    )
 
 
 def _build_script(mode):
@@ -204,15 +214,15 @@ def _build_script(mode):
     if not hook_experiment_enabled():
         raise AssertionError("Hook experiment must be enabled in ON fixture")
 
-    original_request = hook_experiment._request_candidates
-    hook_experiment._request_candidates = _fixture_request_candidates
+    original_create = hook_experiment.openai.chat.completions.create
+    hook_experiment.openai.chat.completions.create = _fixture_openai_create
     try:
         selected, audit = select_hook(
             TOPIC_INFO,
             WINNER,
         )
     finally:
-        hook_experiment._request_candidates = original_request
+        hook_experiment.openai.chat.completions.create = original_create
 
     print_hook_audit(audit)
 
@@ -221,8 +231,17 @@ def _build_script(mode):
             "Hook selector did not return a threshold-passing fixture hook"
         )
 
-    if audit["attempts"][0]["candidate_count"] != 5:
-        raise AssertionError("Hook E2E fixture did not exercise five candidates")
+    attempt = audit["attempts"][0]
+    if attempt.get("raw_candidate_count") != 5:
+        raise AssertionError("Hook E2E raw generation contract did not produce five candidates")
+    if attempt.get("parsed_candidate_count") != 5:
+        raise AssertionError("Hook E2E raw JSON did not parse five candidates")
+    if attempt.get("scoring_pool_count", 0) < 5:
+        raise AssertionError("Hook E2E did not build a five-candidate scoring pool")
+    if attempt.get("cumulative_scoring_pool_count", 0) < 5:
+        raise AssertionError("Hook E2E cumulative scoring pool is below five")
+    if audit.get("fallback"):
+        raise AssertionError("Hook E2E unexpectedly used legacy fallback")
 
     script = _apply_selected_hook(
         script,
@@ -245,9 +264,9 @@ def _render(script, mode):
     _LAST_HOOK_VISUAL_AUDIT = None
 
     if mode == "on":
-        original_search = hook_visual.search_pexels_candidates
+        original_search = hook_visual.search_video_candidates
         original_print = hook_visual.print_hook_visual_audit
-        hook_visual.search_pexels_candidates = _fixture_search_pexels_candidates
+        hook_visual.search_video_candidates = _fixture_search_pexels_candidates
         hook_visual._FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT = original_print
         hook_visual.print_hook_visual_audit = _capture_hook_visual_audit
 
@@ -268,7 +287,7 @@ def _render(script, mode):
         return output
     finally:
         if mode == "on":
-            hook_visual.search_pexels_candidates = original_search
+            hook_visual.search_video_candidates = original_search
             hook_visual.print_hook_visual_audit = original_print
             if hasattr(hook_visual, "_FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT"):
                 delattr(hook_visual, "_FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT")
