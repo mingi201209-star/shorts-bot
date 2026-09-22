@@ -30,8 +30,10 @@ def main():
         assert fake_requests.post.call_count == 1
         assert set(payload["questions"]) == {"route", "specificity", "grounded"}
         assert payload["state"]["existing_gate"]["verdict"] == "PASS"
-        row = json.loads(js.JEV_SHADOW_LOG.read_text(encoding="utf-8").strip())
-        assert row["existing_verdict"] == "PASS"
+        rows = [json.loads(line) for line in js.JEV_SHADOW_LOG.read_text(encoding="utf-8").splitlines()]
+        assert rows[0]["existing_verdict"] == "PASS"
+        assert rows[1]["status"] == "SKIPPED"
+        assert rows[1]["reason"] == "JEV_SHADOW_MAX_CALLS reached"
     print("Jev shadow regression: PASS")
 
 
