@@ -18,6 +18,8 @@ JEV_API_URL = os.getenv("JEV_API_URL", "https://api.typesafe.ai/v1/systemone")
 JEV_MODEL = os.getenv("JEV_MODEL", "jev-latest")
 JEV_TIMEOUT_SECONDS = float(os.getenv("JEV_TIMEOUT_SECONDS", "8"))
 JEV_SHADOW_LOG = Path(os.getenv("JEV_SHADOW_LOG", "artifacts/diagnostics/jev_shadow.jsonl"))
+JEV_SHADOW_MAX_CALLS = int(os.getenv("JEV_SHADOW_MAX_CALLS", "1"))
+_JEV_SHADOW_CALLS = 0
 
 
 def _append(event: dict[str, Any]) -> None:
@@ -37,6 +39,14 @@ def evaluate_candidate_shadow(candidate: dict[str, Any], existing_verdict: str, 
         event = {"status": "SKIPPED", "reason": "JEV_API_KEY unavailable", "existing_verdict": existing_verdict}
         _append(event)
         return event
+
+    # Separate hard cap: Jev must never silently expand the existing LLM API/cost budget.
+    global _JEV_SHADOW_CALLS
+    if _JEV_SHADOW_CALLS >= max(0, JEV_SHADOW_MAX_CALLS):
+        event = {"status": "SKIPPED", "reason": "JEV_SHADOW_MAX_CALLS reached", "existing_verdict": existing_verdict}
+        _append(event)
+        return event
+    _JEV_SHADOW_CALLS += 1
 
     state = {
         "candidate": {
