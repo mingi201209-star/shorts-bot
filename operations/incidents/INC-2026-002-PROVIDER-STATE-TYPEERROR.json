@@ -1,0 +1,53 @@
+{
+  "incident_id": "INC-2026-002-PROVIDER-STATE-TYPEERROR",
+  "timestamp": "2026-09-22",
+  "repository": "mingi201209-star/shorts-bot",
+  "authority_main_sha": "11c151fa80d4fc5ad7e0525cb4c458dafeadfe34",
+  "workflow": "hook_experiment_e2e.yml",
+  "run_id": 35716973066,
+  "job_id": 106710637348,
+  "failure_stage": "TEST_FIXTURE",
+  "failure_signature": "TypeError: _fixture_search_pexels_candidates() got an unexpected keyword argument 'provider_state'",
+  "symptoms": [
+    "hook-on-e2e job printed 'FIXTURE E2E COMPLETE | mode=on' and the render completed, but 'HOOK VISUAL AUDIT JSON' never appeared in the log",
+    "every grep-based assertion depending on the Hook-visual audit output failed even though the job's own script did not raise visibly",
+    "video/video_engine.py's broad 'except Exception as e:' around the fetch_hook_pexels_video() call site printed only a one-line warning and silently fell back to the general fetch_video(keyword) path, masking the real exception"
+  ],
+  "root_cause": {
+    "category": "TYPE_MISMATCH",
+    "summary": "ci_video_provider_hotfix.py's own patch to fetch_hook_pexels_video() (part of INC-2026-001's provider_state-threading design) calls search_video_candidates(query, per_page=..., provider_state=...), but quality/hook_e2e_fixture.py's monkeypatch stub _fixture_search_pexels_candidates(query, per_page) had no provider_state parameter. Every call raised TypeError, which is not ProviderRateLimitedError/ProviderTransientError, so it was not caught inside fetch_hook_pexels_video() -- it propagated up to video_engine.py's broad except Exception, which silently fell back to a non-hook-specific video and never reached print_hook_visual_audit().",
+    "evidence": [
+      {"kind": "job_id", "value": "106710637348", "note": "hook-on-e2e failure on head a8d371d9bb43f1a3364fd97eb3a09b4f8c4955bf; log shows FIXTURE E2E COMPLETE printed with no HOOK VISUAL AUDIT JSON before it, and 'Process completed with exit code 1' immediately after, consistent with a later grep assertion failing on the missing audit output."},
+      {"kind": "file", "value": "quality/hook_e2e_fixture.py", "note": "_fixture_search_pexels_candidates(query, per_page) -- stub signature missing provider_state before the fix."},
+      {"kind": "file", "value": "ci_video_provider_hotfix.py", "note": "patched fetch_hook_pexels_video() call site passing provider_state=provider_state, the source of the mismatch."}
+    ]
+  },
+  "affected_files": [
+    "quality/hook_e2e_fixture.py"
+  ],
+  "fix": {
+    "commits": ["dd270d5588850d36e9d49f3ff62618fe6ac72b8d"],
+    "files": ["quality/hook_e2e_fixture.py"],
+    "summary": "Added provider_state=None to _fixture_search_pexels_candidates()'s signature, matching the *args/**kwargs pattern already used correctly by the other hv.search_video_candidates stubs elsewhere in the test suite (quality/hook_production_parity_regression_test.py, quality/hook_fallback_quality_floor_regression_test.py)."
+  },
+  "regressions": {
+    "test_files": ["quality/video_provider_pool_regression_test.py"],
+    "counterexample": "test_hook_scene_recovery_does_not_bypass_hook_visual_contract",
+    "result": "PASS"
+  },
+  "pull_requests": [
+    {"number": 436, "status": "OPEN", "merge_commit": null}
+  ],
+  "verification": {
+    "workflow_runs": [
+      {"run_id": 35717730766, "job_id": 106713082726, "conclusion": "success"}
+    ],
+    "result": "PASS",
+    "verified_sha": "dd270d5588850d36e9d49f3ff62618fe6ac72b8d"
+  },
+  "relationships": [
+    {"type": "REGRESSION_OF", "target_incident_id": "INC-2026-001-PEXELS-429", "note": "Introduced while implementing INC-2026-001's provider_state-threading fix, within the same PR #436, and caught by that same PR's own CI before landing."}
+  ],
+  "status": "MONITORING",
+  "confidence": "VERIFIED"
+}
