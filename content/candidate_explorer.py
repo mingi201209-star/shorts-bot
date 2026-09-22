@@ -6,6 +6,8 @@ import re
 
 import openai
 
+from quality.jev_shadow import evaluate_candidate_shadow
+
 from config import (
     OPENAI_KEY,
     TARGET_MIN_SECONDS,
@@ -2210,6 +2212,18 @@ def explore_candidates(
         print("=" * 64)
 
         critique = _self_critique_narrowness(winner, model=model)
+
+        # JEV_SHADOW_V1: observe the exact existing narrowness decision, but
+        # never use Jev's answer to alter control flow. The authoritative
+        # critique below remains unchanged.
+        try:
+            evaluate_candidate_shadow(
+                winner,
+                str(critique.get("verdict", "")),
+                str(critique.get("reason", "")),
+            )
+        except Exception as exc:
+            print(f"[JEV_SHADOW] unexpected observer failure ignored: {exc}")
 
         rewrite_attempts = 0
 
