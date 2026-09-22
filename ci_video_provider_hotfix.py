@@ -43,20 +43,36 @@ text = replace_once(
 
 provider_functions = r'''
 
-def search_video_candidates(query, per_page=None):
-    """Collect a bounded normalized pool while isolating provider failures."""
+def search_video_candidates(query, per_page=None, *, provider_state=None):
+    """Collect a bounded normalized pool while isolating provider failures.
+
+    provider_state is an optional caller-owned dict threaded across repeated
+    calls within one fetch_video() pass (one per fallback query). Once Pexels
+    is classified rate-limited/transient in this pass, subsequent calls that
+    share the same provider_state skip Pexels entirely instead of hammering
+    it again with the next fallback query -- 429/5xx is a provider
+    availability failure, not a query-quality failure.
+    """
     limit = VIDEO_PROVIDER_PER_PAGE if per_page is None else min(VIDEO_PROVIDER_PER_PAGE, int(per_page))
+    state = {} if provider_state is None else provider_state
     provider_results = []
 
-    try:
-        pexels = [
-            normalize_pexels_candidate(item)
-            for item in search_pexels_candidates(query, per_page=limit)
-        ]
-        print(f"[VIDEO_PROVIDER] provider=pexels candidates={len(pexels)}")
-        provider_results.append(pexels)
-    except Exception as exc:
-        print(f"[VIDEO_PROVIDER_SKIP] provider=pexels reason={type(exc).__name__}")
+    if state.get("pexels_unavailable"):
+        print("[VIDEO_PROVIDER_SKIP] provider=pexels reason=unavailable_this_pass")
+    else:
+        try:
+            pexels = [
+                normalize_pexels_candidate(item)
+                for item in search_pexels_candidates(query, per_page=limit)
+            ]
+            print(f"[VIDEO_PROVIDER] provider=pexels candidates={len(pexels)}")
+            provider_results.append(pexels)
+        except (ProviderRateLimitedError, ProviderTransientError) as exc:
+            reason = "rate_limited" if isinstance(exc, ProviderRateLimitedError) else "transient_error"
+            print(f"[VIDEO_PROVIDER_SKIP] provider=pexels reason={reason}")
+            state["pexels_unavailable"] = True
+        except Exception as exc:
+            print(f"[VIDEO_PROVIDER_SKIP] provider=pexels reason=error type={type(exc).__name__}")
 
     if WIKIMEDIA_COMMONS_ENABLED:
         try:
@@ -101,8 +117,9 @@ def fetch_video(query):
             if fallback not in queries:
                 queries.append(fallback)
 
+    provider_state = {}
     for search_query in queries:
-        candidates = search_video_candidates(search_query, per_page=VIDEO_PROVIDER_PER_PAGE)
+        candidates = search_video_candidates(search_query, per_page=VIDEO_PROVIDER_PER_PAGE, provider_state=provider_state)
         best = choose_best_candidate(
             candidates,
             relevant_top_n=(min(3, PEXELS_RELEVANT_TOP_N) if historical else PEXELS_RELEVANT_TOP_N),
@@ -151,7 +168,17 @@ text = text.replace(
     'slug = _candidate_metadata(candidate)',
 )
 text = text.replace("search_pexels_candidates(\n", "search_video_candidates(\n")
+text = replace_once(
+    text,
+    '''    strict_best = None\n    dominance_checks = 0\n    provider_unavailable = None\n    for search_query in queries:\n        try:\n            candidates = search_video_candidates(\n                search_query,\n                per_page=PEXELS_SEARCH_PER_PAGE,\n            )\n''',
+    '''    strict_best = None\n    dominance_checks = 0\n    provider_unavailable = None\n    provider_state = {}\n    for search_query in queries:\n        try:\n            candidates = search_video_candidates(\n                search_query,\n                per_page=PEXELS_SEARCH_PER_PAGE,\n                provider_state=provider_state,\n            )\n''',
+    "hook provider-state threading",
+)
 text = text.replace("fetch_pexels_video(original_query)", "fetch_video(original_query)")
+text = text.replace(
+    'fetch_pexels_video(component_profile["queries"][0])',
+    'fetch_video(component_profile["queries"][0])',
+)
 text = text.replace(
     '''        video_id = candidate.get("id")\n        if video_id is not None:\n            USED_VIDEO_IDS.add(video_id)\n''',
     '''        video_id = candidate.get("id")\n        _mark_candidate_used(candidate)\n''',

@@ -40,6 +40,7 @@ jobs:
           python ci_hook_pool_guard_hotfix.py
           python ci_retention_hotfix.py
           python ci_hook_e2e_contract_hotfix.py
+          python ci_video_provider_hotfix.py
           grep -n '"+13%"' config.py
           grep -n "HOOK_GENERATION_COUNT\|speech_style_failure\|cumulative_scoring_pool_count" content/hook_experiment.py
           grep -n "SCRIPT GENERATION FAILED" main.py
@@ -59,6 +60,8 @@ jobs:
             content/script_generator/__init__.py \
             video/hook_visual.py \
             video/video_engine.py \
+            video/video_downloader.py \
+            video/video_providers.py \
             video/subtitle_engine.py \
             quality/korean_speech_style.py \
             quality/hook_generation_regression_test.py \
@@ -165,6 +168,7 @@ jobs:
           python ci_hook_pool_guard_hotfix.py
           python ci_retention_hotfix.py
           python ci_hook_e2e_contract_hotfix.py
+          python ci_video_provider_hotfix.py
           grep -n '"+13%"' config.py
           grep -n "HOOK_GENERATION_COUNT\|speech_style_failure\|cumulative_scoring_pool_count" content/hook_experiment.py
           grep -n "SCRIPT GENERATION FAILED" main.py
@@ -184,6 +188,8 @@ jobs:
             content/script_generator/__init__.py \
             video/hook_visual.py \
             video/video_engine.py \
+            video/video_downloader.py \
+            video/video_providers.py \
             video/subtitle_engine.py \
             quality/korean_speech_style.py \
             quality/hook_generation_regression_test.py \

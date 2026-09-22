@@ -26,6 +26,8 @@ from video.video_downloader import (
     fetch_pexels_video,
     normalize_search_query,
     search_pexels_candidates,
+    ProviderRateLimitedError,
+    ProviderTransientError,
 )
 
 
@@ -290,11 +292,24 @@ def fetch_hook_pexels_video(scene):
 
     strict_best = None
     dominance_checks = 0
+    provider_unavailable = None
     for search_query in queries:
-        candidates = search_pexels_candidates(
-            search_query,
-            per_page=PEXELS_SEARCH_PER_PAGE,
-        )
+        try:
+            candidates = search_pexels_candidates(
+                search_query,
+                per_page=PEXELS_SEARCH_PER_PAGE,
+            )
+        except (ProviderRateLimitedError, ProviderTransientError) as exc:
+            # Provider availability failure, not a candidate-quality failure.
+            # Stop sending more fallback queries to the same provider this
+            # pass; fall through to the existing legacy-path fallback below
+            # rather than hammering Pexels or silently passing a bad result.
+            print(
+                "⛔ Hook visual provider unavailable "
+                f"({type(exc).__name__}): {exc}"
+            )
+            provider_unavailable = exc
+            break
         safe_pool = _safe_candidate_pool(candidates, search_query, historical)
         scored = []
 
@@ -377,10 +392,17 @@ def fetch_hook_pexels_video(scene):
         return candidate["url"]
 
     audit["fallback"] = True
-    audit["fallback_reason"] = (
-        "기존 metadata strict gate와 실제 9:16 초반 프레임 subject dominance/action gate를 "
-        "모두 통과한 후보가 없어 기존 Pexels 경로로 fallback"
-    )
+    if provider_unavailable is not None:
+        audit["fallback_reason"] = (
+            "provider availability failure "
+            f"({type(provider_unavailable).__name__}): "
+            "기존 Pexels 경로로 fallback"
+        )
+    else:
+        audit["fallback_reason"] = (
+            "기존 metadata strict gate와 실제 9:16 초반 프레임 subject dominance/action gate를 "
+            "모두 통과한 후보가 없어 기존 Pexels 경로로 fallback"
+        )
     print_hook_visual_audit(audit)
     if component_profile:
         # Do not throw away the named component at the final fallback. A targeted

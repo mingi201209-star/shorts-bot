@@ -350,8 +350,31 @@ def _human_centric_candidate(candidate):
     )
 
 
+class ProviderRateLimitedError(RuntimeError):
+    """Provider responded with HTTP 429: an availability failure, not a query/content failure.
+
+    Never treat this the same as "no results" -- the caller must stop sending more
+    fallback queries to the SAME provider this pass, not keep searching.
+    """
+
+
+class ProviderTransientError(RuntimeError):
+    """Provider failed with a transient condition: HTTP 5xx, timeout, or network error.
+
+    Same recovery contract as ProviderRateLimitedError -- bounded, no repeated
+    same-provider retries within one fetch pass.
+    """
+
+
 def search_pexels_candidates(query, per_page=None):
-    """Pexels 검색 결과의 원래 관련도 순서를 보존한다."""
+    """Pexels 검색 결과의 원래 관련도 순서를 보존한다.
+
+    Raises ProviderRateLimitedError for HTTP 429, ProviderTransientError for
+    HTTP 5xx/network/timeout failures, and plain RuntimeError/ValueError for
+    permanent/config errors (missing key, empty query, other 4xx). Callers must
+    distinguish these from "zero results" -- a provider availability failure is
+    not evidence the search query itself was bad.
+    """
     if not PEXELS_API_KEY:
         raise RuntimeError("PEXELS_API_KEY가 없습니다.")
 
@@ -362,17 +385,34 @@ def search_pexels_candidates(query, per_page=None):
     if per_page is None:
         per_page = PEXELS_SEARCH_PER_PAGE
 
-    response = requests.get(
-        PEXELS_VIDEO_API,
-        headers={"Authorization": PEXELS_API_KEY},
-        params={
-            "query": query,
-            "per_page": int(per_page),
-            "orientation": "portrait",
-            "locale": "en-US",
-        },
-        timeout=30,
-    )
+    try:
+        response = requests.get(
+            PEXELS_VIDEO_API,
+            headers={"Authorization": PEXELS_API_KEY},
+            params={
+                "query": query,
+                "per_page": int(per_page),
+                "orientation": "portrait",
+                "locale": "en-US",
+            },
+            timeout=30,
+        )
+    except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as exc:
+        raise ProviderTransientError(
+            f"Pexels 검색 실패: 네트워크 오류 ({type(exc).__name__})"
+        ) from exc
+    except requests.exceptions.RequestException as exc:
+        raise ProviderTransientError(
+            f"Pexels 검색 실패: {type(exc).__name__}"
+        ) from exc
+
+    if response.status_code == 429:
+        raise ProviderRateLimitedError("Pexels 검색 실패: HTTP 429")
+
+    if response.status_code >= 500:
+        raise ProviderTransientError(
+            f"Pexels 검색 실패: HTTP {response.status_code}"
+        )
 
     if not response.ok:
         raise RuntimeError(
@@ -676,10 +716,21 @@ def fetch_pexels_video(query):
                 f"{effective_query} -> {search_query}"
             )
 
-        candidates = search_pexels_candidates(
-            search_query,
-            per_page=PEXELS_SEARCH_PER_PAGE,
-        )
+        try:
+            candidates = search_pexels_candidates(
+                search_query,
+                per_page=PEXELS_SEARCH_PER_PAGE,
+            )
+        except (ProviderRateLimitedError, ProviderTransientError) as exc:
+            # Provider availability failure, not a query failure. Do not keep
+            # hammering Pexels with more fallback queries this pass -- stop
+            # and fail closed (bounded) exactly like the "no candidates" path.
+            print(
+                "⛔ Pexels provider unavailable "
+                f"({type(exc).__name__}): {exc}; "
+                "더 이상 같은 provider에 fallback query를 보내지 않습니다."
+            )
+            break
 
         best = choose_best_candidate(
             candidates,
