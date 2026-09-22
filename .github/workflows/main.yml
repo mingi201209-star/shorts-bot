@@ -170,6 +170,7 @@ jobs:
             diagnostics/failure_diagnostics.py diagnostics/runner.py quality/failure_diagnostics_regression_test.py \
             content/topic_selector.py quality/recent_topic_memory_wiring_regression_test.py
 
+          python quality/jev_shadow_regression_test.py
           python quality/final_render_integrity_regression_test.py
           python quality/final_visual_semantic_qa_regression_test.py
           python quality/fixed_topic_gate_feedback_regression_test.py
