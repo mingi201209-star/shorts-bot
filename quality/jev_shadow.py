@@ -12,8 +12,6 @@ import os
 from pathlib import Path
 from typing import Any
 
-import requests
-
 JEV_SHADOW_ENABLED = os.getenv("JEV_SHADOW_ENABLED", "0") == "1"
 JEV_API_KEY = os.getenv("JEV_API_KEY", "")
 JEV_API_URL = os.getenv("JEV_API_URL", "https://api.typesafe.ai/v1/systemone")
@@ -79,6 +77,9 @@ def evaluate_candidate_shadow(candidate: dict[str, Any], existing_verdict: str, 
     }
 
     try:
+        # Keep the optional shadow observer import-safe in focused regression
+        # jobs that intentionally do not install runtime HTTP dependencies.
+        import requests
         response = requests.post(
             JEV_API_URL,
             headers={"Authorization": f"Bearer {JEV_API_KEY}", "Content-Type": "application/json"},
