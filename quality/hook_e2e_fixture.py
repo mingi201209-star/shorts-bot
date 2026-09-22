@@ -169,8 +169,8 @@ BASE_SCRIPT = {
 }
 
 
-def _fixture_search_pexels_candidates(query, per_page):
-    del query, per_page
+def _fixture_search_pexels_candidates(query, per_page, provider_state=None):
+    del query, per_page, provider_state
     print("🧪 HOOK VISUAL CONTROLLED SOURCE: Pexels 7592608")
     return [copy.deepcopy(CONTROLLED_HOOK_VIDEO)]
 
