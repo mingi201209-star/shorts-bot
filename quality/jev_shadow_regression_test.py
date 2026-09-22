@@ -24,6 +24,10 @@ def main():
             result = js.evaluate_candidate_shadow(candidate, "PASS", "existing gate stays authoritative")
         assert result["status"] == "OK"
         payload = fake_requests.post.call_args.kwargs["json"]
+        second = js.evaluate_candidate_shadow(candidate, "PASS", "second observation")
+        assert second["status"] == "SKIPPED"
+        assert second["reason"] == "JEV_SHADOW_MAX_CALLS reached"
+        assert fake_requests.post.call_count == 1
         assert set(payload["questions"]) == {"route", "specificity", "grounded"}
         assert payload["state"]["existing_gate"]["verdict"] == "PASS"
         row = json.loads(js.JEV_SHADOW_LOG.read_text(encoding="utf-8").strip())
