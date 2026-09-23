@@ -303,7 +303,7 @@ def green() -> int:
     main_workflow = (ROOT / ".github/workflows/main.yml").read_text(encoding="utf-8")
     assert 'V3_MAX_API_CALLS: "60"' in main_workflow
     assert 'V3_MAX_COST_USD: "0.05"' in main_workflow
-    assert "MAX_TOPIC_REGENERATIONS = 6" in (ROOT / "main.py").read_text(encoding="utf-8")
+    assert "MAX_TOPIC_REGENERATIONS = 19" in (ROOT / "main.py").read_text(encoding="utf-8")
     print("TEST J API/cost/retry safety: PASS (new calls=0; caps unchanged)")
 
     print("CANDIDATE POOL HANDOFF AUTHORITY REGRESSION: PASS")

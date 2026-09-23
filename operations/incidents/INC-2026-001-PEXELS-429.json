@@ -1,0 +1,65 @@
+{
+  "incident_id": "INC-2026-001-PEXELS-429",
+  "timestamp": "2026-09-22",
+  "repository": "mingi201209-star/shorts-bot",
+  "authority_main_sha": "11c151fa80d4fc5ad7e0525cb4c458dafeadfe34",
+  "workflow": "hook_experiment_e2e.yml",
+  "run_id": null,
+  "job_id": null,
+  "failure_stage": "PROVIDER",
+  "failure_signature": "RuntimeError: Pexels 검색 실패: HTTP 429",
+  "symptoms": [
+    "'Retention Hook Frame and TTS Speed', 'Hook Experiment E2E hook-on', 'Hook Experiment E2E hook-off' failing uncaught at video/video_engine.py create_scene -> fetch_pexels_video -> search_pexels_candidates",
+    "search_pexels_candidates() raised a bare untyped RuntimeError for every HTTP failure kind (429, 5xx, other), so callers could not distinguish provider-availability failure from query-quality failure",
+    "fetch_pexels_video()'s fallback-query loop and fetch_hook_pexels_video()'s query loop had no try/except around the search call, so the exception propagated out of create_scene() and killed the whole scene",
+    "an existing multi-provider fallback (ci_video_provider_hotfix.py, backed by video/video_providers.py's Pexels+Wikimedia+Pixabay pool) already existed in the real production hotfix chain, but retention_e2e.yml and hook_experiment_e2e.yml each hard-coded their own abbreviated hotfix list that never applied it"
+  ],
+  "root_cause": {
+    "category": "PROVIDER_AVAILABILITY",
+    "summary": "search_pexels_candidates() had no error classification and its two call sites had no exception handling, so an HTTP 429 (an availability failure) crashed create_scene() outright instead of triggering the multi-provider fallback that already existed elsewhere in the codebase but was never wired into these two E2E workflows.",
+    "evidence": [
+      {"kind": "pr_number", "value": "436", "note": "PR body documents the original crash location (video/video_engine.py:543) and the three compounding causes; this is an agent-authored PR description, not a raw log capture -- see caveat below."},
+      {"kind": "file", "value": "video/video_downloader.py", "note": "search_pexels_candidates() prior to the fix: single untyped RuntimeError for every HTTP failure kind."},
+      {"kind": "file", "value": "ci_video_provider_hotfix.py", "note": "pre-existing multi-provider fallback that was not applied by the two failing workflows before this fix."}
+    ]
+  },
+  "affected_files": [
+    "video/video_downloader.py",
+    "video/hook_visual.py",
+    "video/video_engine.py",
+    "ci_video_provider_hotfix.py",
+    ".github/workflows/retention_e2e.yml",
+    ".github/workflows/hook_experiment_e2e.yml"
+  ],
+  "fix": {
+    "commits": ["7f536a54b4ce992792d8fe16412b54b7bcc6f342"],
+    "files": [
+      "video/video_downloader.py",
+      "video/hook_visual.py",
+      "ci_video_provider_hotfix.py",
+      ".github/workflows/retention_e2e.yml",
+      ".github/workflows/hook_experiment_e2e.yml"
+    ],
+    "summary": "Added typed ProviderRateLimitedError (HTTP 429) / ProviderTransientError (5xx/timeout/network) exceptions to search_pexels_candidates(); wrapped both call sites (fetch_pexels_video, fetch_hook_pexels_video) in try/except that breaks the fallback-query loop immediately on either typed exception (bounded to at most one Pexels call per outage) rather than storming it with different queries; threaded a caller-owned provider_state dict through ci_video_provider_hotfix.py's search_video_candidates()/fetch_video() so once Pexels is marked unavailable in one fetch pass, later fallback queries in that same pass skip straight to Wikimedia Commons/Pixabay; added the missing ci_video_provider_hotfix.py step to retention_e2e.yml and hook_experiment_e2e.yml so these E2E jobs actually exercise the multi-provider pool instead of the single-provider legacy path."
+  },
+  "regressions": {
+    "test_files": ["quality/video_provider_pool_regression_test.py"],
+    "counterexample": "test_pexels_rate_limit_no_repeat_calls_across_fallback_queries",
+    "result": "PASS"
+  },
+  "pull_requests": [
+    {"number": 436, "status": "OPEN", "merge_commit": null}
+  ],
+  "verification": {
+    "workflow_runs": [
+      {"run_id": 35717730766, "job_id": 106713082726, "conclusion": "success"}
+    ],
+    "result": "PARTIAL",
+    "verified_sha": "dd270d5588850d36e9d49f3ff62618fe6ac72b8d"
+  },
+  "relationships": [
+    {"type": "RELATED_TO", "target_incident_id": "INC-2026-002-PROVIDER-STATE-TYPEERROR", "note": "INC-002 is a regression introduced while fixing this incident, within the same PR #436."}
+  ],
+  "status": "MONITORING",
+  "confidence": "PARTIAL"
+}

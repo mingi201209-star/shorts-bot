@@ -1,0 +1,64 @@
+{
+  "incident_id": "INC-2026-004-CANDIDATE-BUDGET-EXHAUSTION",
+  "timestamp": "2026-09-18",
+  "repository": "mingi201209-star/shorts-bot",
+  "authority_main_sha": "11c151fa80d4fc5ad7e0525cb4c458dafeadfe34",
+  "workflow": null,
+  "run_id": 35401815431,
+  "job_id": null,
+  "failure_stage": "CANDIDATE",
+  "failure_signature": "Run 621: Narrowness/Candidate Gate bounded rewrite recovery exhausted 57/60 API calls with no passing Winner",
+  "symptoms": [
+    "both bounded-recovery mechanisms (Narrowness self-critique recovery in content/candidate_explorer.py, Candidate Gate recovery in content/candidate_gate.py) worked exactly as designed -- bounded, no forced-pass -- but did not help",
+    "candidates rejected as 'too broad' were rewritten and rechecked, but the rewrites themselves kept coming back broad/generic, exhausting both 2-cycle bounds repeatedly",
+    "API calls climbed to 57/60 without ever producing a passing Winner, i.e. the run was heading toward hard budget exhaustion rather than a clean REGENERATE/failure"
+  ],
+  "root_cause": {
+    "category": "BUDGET_EXHAUSTION",
+    "summary": "The rewrite prompts for both recovery loops told the model to 'be more specific' without naming a concrete axis to narrow along, and did not penalize a Reveal that stopped at a bare generic-purpose word (efficiency/safety/optimization). The model's rewrites therefore tended to stay generic, so the same bounded-but-repeated rewrite cycle kept firing across many candidates in one run, consuming the shared API budget even though no single loop exceeded its own 2-attempt cap.",
+    "evidence": [
+      {"kind": "pr_number", "value": "426", "note": "PR body and the added regression test's own docstring both independently cite 'Run 621 (job 35401815431, commit 11c151f)' and the 57/60 call figure -- two independent GitHub-native artifacts agreeing. NOTE: the PR's own text labels 35401815431 as a 'job' id, but its magnitude matches this repository's GitHub Actions RUN id range (e.g. 35580671177, 35414363774), not its job id range (e.g. 106272556899) -- recorded here as run_id, not job_id, on that basis. Neither the PR's own label nor this correction was independently re-opened against the live GitHub Actions run in this session; treat as PARTIAL, not re-verified raw evidence."},
+      {"kind": "test_file", "value": "quality/run_621_generation_quality_regression_test.py", "note": "added by this PR; its module docstring restates the same run/job/commit citation as the PR body."},
+      {"kind": "commit_sha", "value": "16384843995929c0c7a68342e372cb2917e67bc4", "note": "fix commit message restates the same root cause in the same terms."}
+    ]
+  },
+  "affected_files": [
+    "content/candidate_explorer.py",
+    "content/candidate_gate.py",
+    "quality/budget_guard.py"
+  ],
+  "fix": {
+    "commits": [
+      "16384843995929c0c7a68342e372cb2917e67bc4",
+      "4f0cb949432016e2e4bb1cc5341c08161030906f",
+      "da650d06920bf173bb22688250cfe1b0acb2e8be",
+      "1d913e8c08fcb842359f51ad00284b6cbe56bd30"
+    ],
+    "files": [
+      "content/candidate_explorer.py",
+      "content/candidate_gate.py",
+      "quality/budget_guard.py"
+    ],
+    "summary": "Added a semantic 4-element generation contract (concrete subject / observable phenomenon / specific question / specific reveal) with few-shot examples to the Explorer's prompt; strengthened both rewrite prompts to require narrowing along one named concrete axis (part/location/condition/number/exception/before-after/shape) and to instruct against stopping at a bare generic-purpose word; added has_budget_for_rewrite() as a small safety-reserve check so a rewrite cycle is skipped (discarding the candidate, same as hitting the existing 2-rewrite cap) once the API budget reserve is low, instead of risking mid-call exhaustion; added a conservative deterministic pre-check that skips the LLM Narrowness self-critique call only for a bare 'why is X efficient/safe/optimized' pattern. No gate threshold changed, no recovery-call bound increased, V3_MAX_API_CALLS/V3_MAX_COST_USD unchanged."
+  },
+  "regressions": {
+    "test_files": ["quality/run_621_generation_quality_regression_test.py"],
+    "counterexample": "test_no_forced_pass_after_rewrites_exhausted",
+    "result": "PASS"
+  },
+  "pull_requests": [
+    {"number": 426, "status": "OPEN", "merge_commit": null}
+  ],
+  "verification": {
+    "workflow_runs": [
+      {"run_id": 35414363774, "job_id": 105819949461, "conclusion": "success"}
+    ],
+    "result": "PARTIAL",
+    "verified_sha": "1d913e8c08fcb842359f51ad00284b6cbe56bd30"
+  },
+  "relationships": [
+    {"type": "SAME_SIGNATURE_AS", "target_incident_id": "INC-2026-003-MAX-TOPIC-REGEN-DRIFT", "note": "This PR's own diff also independently fixed overlapping stale MAX_TOPIC_REGENERATIONS assertions in CI workflow files, unrelated to its main budget/prompt fix."}
+  ],
+  "status": "MONITORING",
+  "confidence": "PARTIAL"
+}

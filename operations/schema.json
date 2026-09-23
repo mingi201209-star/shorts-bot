@@ -1,0 +1,270 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/mingi201209-star/shorts-bot/operations/schema.json",
+  "title": "Shorts Bot Operations Graph V1 - Incident Record",
+  "description": "One structured, evidence-backed record of a real production/CI incident: failure -> root cause -> fix -> regression -> PR -> verification. A summary field is never authority by itself -- every VERIFIED claim must carry GitHub-native evidence (run/job IDs, commit SHAs, PR numbers, test files). See operations/README.md for the full policy.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "incident_id",
+    "timestamp",
+    "repository",
+    "authority_main_sha",
+    "failure_stage",
+    "failure_signature",
+    "symptoms",
+    "root_cause",
+    "affected_files",
+    "fix",
+    "regressions",
+    "pull_requests",
+    "verification",
+    "relationships",
+    "status",
+    "confidence"
+  ],
+  "properties": {
+    "incident_id": {
+      "type": "string",
+      "description": "Stable unique identifier. Convention: INC-<YYYY>-<3-digit-seq>-<short-slug>.",
+      "pattern": "^INC-[0-9]{4}-[0-9]{3}-[A-Z0-9-]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "description": "ISO 8601 date (or date-time) of the failure itself, not the date the record was written. Use the earliest real evidence timestamp (e.g. the first failing run's created_at date).",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)?$"
+    },
+    "repository": {
+      "type": "string",
+      "description": "owner/repo, GitHub-native.",
+      "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+    },
+    "authority_main_sha": {
+      "description": "The `main` HEAD SHA that was authoritative when this incident was investigated/fixed. null only if genuinely never established (confidence must then be UNVERIFIED or PARTIAL, never VERIFIED).",
+      "oneOf": [
+        {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+        {"type": "null"}
+      ]
+    },
+    "workflow": {
+      "description": "GitHub Actions workflow file name (e.g. hook_experiment_e2e.yml), or null if not workflow-specific.",
+      "oneOf": [{"type": "string"}, {"type": "null"}]
+    },
+    "run_id": {
+      "description": "GitHub Actions run ID of the failing (or representative) run. null if not captured -- then confidence MUST NOT be VERIFIED.",
+      "oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]
+    },
+    "job_id": {
+      "description": "GitHub Actions job ID within run_id. null if not captured at job granularity.",
+      "oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]
+    },
+    "failure_stage": {
+      "type": "string",
+      "description": "Controlled vocabulary for where in the pipeline the failure surfaced.",
+      "enum": [
+        "CANDIDATE",
+        "SCRIPT",
+        "VISUAL",
+        "RENDER",
+        "PROVIDER",
+        "CI_INFRASTRUCTURE",
+        "HOTFIX_COMPOSITION",
+        "TEST_FIXTURE",
+        "OTHER"
+      ]
+    },
+    "failure_signature": {
+      "type": "string",
+      "description": "Short, deterministic fingerprint of the failure -- an exact exception type+message pattern, assertion text, or check name. Used for exact/substring query matching. Must be specific enough to distinguish this incident from an unrelated one with a similar symptom.",
+      "minLength": 3
+    },
+    "symptoms": {
+      "type": "array",
+      "description": "Human-readable observed symptoms (log lines, check names, behavior). Not authority by itself -- root_cause.evidence carries the proof.",
+      "items": {"type": "string"},
+      "minItems": 1
+    },
+    "root_cause": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["category", "summary", "evidence"],
+      "properties": {
+        "category": {
+          "type": "string",
+          "enum": [
+            "STALE_ASSERTION",
+            "MISSING_HOTFIX_STEP",
+            "TYPE_MISMATCH",
+            "SILENT_EXCEPTION_SWALLOW",
+            "PROVIDER_AVAILABILITY",
+            "SEMANTIC_QUALITY",
+            "THRESHOLD_MISCALIBRATION",
+            "BUDGET_EXHAUSTION",
+            "GROUNDING_DRIFT",
+            "IDEMPOTENCY_BUG",
+            "OTHER"
+          ]
+        },
+        "summary": {
+          "type": "string",
+          "description": "One or two sentences: what was actually wrong, in evidence-backed terms, not speculation.",
+          "minLength": 3
+        },
+        "evidence": {
+          "type": "array",
+          "description": "GitHub-native evidence supporting the summary. Empty only when confidence is UNVERIFIED.",
+          "items": {"$ref": "#/$defs/evidence"}
+        }
+      }
+    },
+    "affected_files": {
+      "type": "array",
+      "description": "Repo-relative paths touched by the root cause and/or the fix.",
+      "items": {"type": "string"}
+    },
+    "fix": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commits", "files", "summary"],
+      "properties": {
+        "commits": {
+          "type": "array",
+          "description": "Commit SHAs that make up the fix. Empty only when status is OPEN/MONITORING or confidence is not VERIFIED.",
+          "items": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"}
+        },
+        "files": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "summary": {
+          "type": "string",
+          "description": "What the fix actually does, in concrete terms (not 'fixed the bug')."
+        }
+      }
+    },
+    "regressions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["test_files", "counterexample", "result"],
+      "properties": {
+        "test_files": {
+          "type": "array",
+          "description": "Repo-relative test file paths that cover this incident.",
+          "items": {"type": "string"}
+        },
+        "counterexample": {
+          "description": "Name/id of the specific test case reproducing the original failure, or null if none was added (must be explained in fix.summary why).",
+          "oneOf": [{"type": "string"}, {"type": "null"}]
+        },
+        "result": {
+          "description": "Outcome of running the regression at verification time.",
+          "oneOf": [
+            {"type": "string", "enum": ["PASS", "FAIL", "NOT_RUN"]},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "pull_requests": {
+      "type": "array",
+      "description": "PRs that landed (or attempted to land) this fix.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["number", "status"],
+        "properties": {
+          "number": {"type": "integer", "minimum": 1},
+          "status": {"type": "string", "enum": ["OPEN", "MERGED", "CLOSED"]},
+          "merge_commit": {
+            "oneOf": [
+              {"type": "string", "pattern": "^[0-9a-f]{7,40}$"},
+              {"type": "null"}
+            ]
+          }
+        }
+      }
+    },
+    "verification": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["workflow_runs", "result", "verified_sha"],
+      "properties": {
+        "workflow_runs": {
+          "type": "array",
+          "description": "GitHub Actions runs that verified the fix (post-fix green run for the originally-failing check).",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["run_id", "conclusion"],
+            "properties": {
+              "run_id": {"type": "integer", "minimum": 1},
+              "job_id": {"oneOf": [{"type": "integer", "minimum": 1}, {"type": "null"}]},
+              "conclusion": {"type": "string", "enum": ["success", "failure", "cancelled", "skipped"]}
+            }
+          }
+        },
+        "result": {
+          "type": "string",
+          "enum": ["PASS", "FAIL", "PARTIAL", "NOT_VERIFIED"]
+        },
+        "verified_sha": {
+          "description": "The exact commit SHA verification ran against.",
+          "oneOf": [
+            {"type": "string", "pattern": "^[0-9a-f]{7,40}$"},
+            {"type": "null"}
+          ]
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "description": "Edges to other incidents. Controlled vocabulary only.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "target_incident_id"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["RELATED_TO", "SAME_SIGNATURE_AS", "REGRESSION_OF", "SUPERSEDES"]
+          },
+          "target_incident_id": {"type": "string", "pattern": "^INC-[0-9]{4}-[0-9]{3}-[A-Z0-9-]+$"},
+          "note": {"type": "string"}
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["OPEN", "RESOLVED", "MONITORING", "WONT_FIX"]
+    },
+    "confidence": {
+      "type": "string",
+      "description": "Evidence completeness, not an agent's subjective certainty. See operations/README.md for the exact VERIFIED/PARTIAL/UNVERIFIED gate rules enforced by operations/validate.py.",
+      "enum": ["VERIFIED", "PARTIAL", "UNVERIFIED"]
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "run_id",
+            "job_id",
+            "commit_sha",
+            "pr_number",
+            "file",
+            "test_file",
+            "log_excerpt",
+            "url"
+          ]
+        },
+        "value": {"type": "string"},
+        "note": {"type": "string"}
+      }
+    }
+  }
+}

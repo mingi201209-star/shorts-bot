@@ -1,0 +1,39 @@
+name: Operations Graph Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  operations-graph-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate operations/incidents/*.json
+        run: |
+          python operations/validate.py
+
+      - name: Run Operations Graph regression tests
+        run: |
+          PYTHONPATH=. python quality/operations_graph_regression_test.py
+
+      - name: Compile
+        run: |
+          python -m py_compile \
+            operations/validate.py \
+            operations/query.py \
+            quality/operations_graph_regression_test.py
+
+      - name: Smoke-test query CLI
+        run: |
+          python operations/query.py --list

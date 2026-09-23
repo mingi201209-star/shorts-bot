@@ -1,0 +1,71 @@
+{
+  "incident_id": "INC-2026-003-MAX-TOPIC-REGEN-DRIFT",
+  "timestamp": "2026-09-19",
+  "repository": "mingi201209-star/shorts-bot",
+  "authority_main_sha": "11c151fa80d4fc5ad7e0525cb4c458dafeadfe34",
+  "workflow": "candidate_pool_handoff_regression.yml",
+  "run_id": 35580671177,
+  "job_id": 106272556899,
+  "failure_stage": "CI_INFRASTRUCTURE",
+  "failure_signature": "AssertionError: \"MAX_TOPIC_REGENERATIONS = 6\" in production_hotfix",
+  "symptoms": [
+    "quality/aviation_candidate_context_regression_test.py, quality/candidate_pool_handoff_regression_test.py, and candidate_pool_handoff_regression.yml's own inline 'safety-contract' heredoc check independently asserted the literal 'MAX_TOPIC_REGENERATIONS = 6' -- three separate locations, not one",
+    "ci_hotfix.py (first entry in the production hotfix chain) unconditionally rewrites this constant in main.py to 19 at CI runtime, so all three assertions fail on real, correct production content",
+    "the same stale-value class recurred independently in PR #426's own diff (grounding_aware_candidate_supply_regression.yml and a fourth occurrence in that workflow), confirming this was not a one-off typo but a systemic drift pattern across several independently-maintained CI assertions of the same hotfix-mutated constant"
+  ],
+  "root_cause": {
+    "category": "STALE_ASSERTION",
+    "summary": "MAX_TOPIC_REGENERATIONS is not statically defined in checked-in source; ci_hotfix.py rewrites it from an earlier value to 19 at CI runtime. Multiple independent CI assertions across different files hard-coded the pre-rewrite literal '= 6' and were never updated when the production value changed, so they failed against genuinely correct production code -- exactly the drift pattern AGENTS.md's Quality section now warns against.",
+    "evidence": [
+      {"kind": "commit_sha", "value": "d8f4ee5cb9e51775ff5961ae340d1c2ee513662b", "note": "commit message documents re-deriving the correct value by running ci_hotfix.py in a clean worktree and re-reading main.py, rather than trusting a remembered number."},
+      {"kind": "job_id", "value": "106272556899", "note": "hook-experiment-e2e-contract on PR #430 head 724e7d2, conclusion=success, confirms the fix location for one of the three assertions."},
+      {"kind": "file", "value": "quality/production_hotfix_chain.py", "note": "the single-source-of-truth ordered hotfix list; ci_hotfix.py is its first entry."}
+    ]
+  },
+  "affected_files": [
+    "quality/aviation_candidate_context_regression_test.py",
+    "quality/candidate_pool_handoff_regression_test.py",
+    ".github/workflows/candidate_pool_handoff_regression.yml",
+    ".github/workflows/grounding_aware_candidate_supply_regression.yml"
+  ],
+  "fix": {
+    "commits": [
+      "d8f4ee5cb9e51775ff5961ae340d1c2ee513662b",
+      "724e7d28fc1336ccc568ad0361fed0e7987f3fc8",
+      "52bb426cf9f4745829cbf60869a1d931551a27ad",
+      "f9809ecf9b72a71d2dc2e3509b0e9f9fcfc14145"
+    ],
+    "files": [
+      "quality/aviation_candidate_context_regression_test.py",
+      "quality/candidate_pool_handoff_regression_test.py",
+      ".github/workflows/candidate_pool_handoff_regression.yml"
+    ],
+    "summary": "Updated all three stale 'MAX_TOPIC_REGENERATIONS = 6' assertions to the current production value 19, sourced by actually running ci_hotfix.py in an isolated worktree and re-reading the composed main.py rather than trusting any remembered number. Fixed once in PR #430 (d8f4ee5, 724e7d2), then ported verbatim into the unrelated PR #436 (52bb426, f9809ec) when the same three stale checks surfaced there too."
+  },
+  "regressions": {
+    "test_files": [
+      "quality/aviation_candidate_context_regression_test.py",
+      "quality/candidate_pool_handoff_regression_test.py"
+    ],
+    "counterexample": null,
+    "result": "PASS"
+  },
+  "pull_requests": [
+    {"number": 430, "status": "OPEN", "merge_commit": null},
+    {"number": 436, "status": "OPEN", "merge_commit": null}
+  ],
+  "verification": {
+    "workflow_runs": [
+      {"run_id": 35580671177, "job_id": 106272556899, "conclusion": "success"},
+      {"run_id": 35580671177, "job_id": 106272557326, "conclusion": "success"},
+      {"run_id": 35580671177, "job_id": 106272557237, "conclusion": "success"}
+    ],
+    "result": "PASS",
+    "verified_sha": "724e7d28fc1336ccc568ad0361fed0e7987f3fc8"
+  },
+  "relationships": [
+    {"type": "SAME_SIGNATURE_AS", "target_incident_id": "INC-2026-004-CANDIDATE-BUDGET-EXHAUSTION", "note": "PR #426 independently fixed the same stale-MAX_TOPIC_REGENERATIONS pattern in overlapping but not identical CI files, discovered separately from PR #430."}
+  ],
+  "status": "MONITORING",
+  "confidence": "VERIFIED"
+}
