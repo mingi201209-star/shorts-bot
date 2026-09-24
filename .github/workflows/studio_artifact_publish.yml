@@ -97,7 +97,7 @@ jobs:
           SOURCE_SHA: ${{ steps.source.outputs.source_sha }}
         run: |
           set -euo pipefail
-          python studio_artifact_contract.py studio-artifact --manifest upload-package.json
+          python quality/studio_artifact_contract.py studio-artifact --manifest upload-package.json
           actual_sha="$(jq -r .sha256 upload-package.json)"
           if [ "$CONFIRM_UPLOAD" = "true" ]; then
             test "${#EXPECTED_SHA256}" -eq 64 || { echo "Reviewed SHA-256 is required before upload"; exit 1; }
