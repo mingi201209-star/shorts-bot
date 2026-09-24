@@ -16,6 +16,7 @@ from quality.budget_guard import (
     authorize_call,
     record_usage,
     print_budget_status,
+    has_budget_for_rewrite,
 )
 
 
@@ -300,6 +301,88 @@ fact_check_focus
 이 세션에서 "적합한 후보를 찾지 못했다"는
 REGENERATE보다, 다소 약하더라도 구체적인
 Winner를 제출하는 쪽을 우선하라.
+
+
+============================================================
+3C. WINNER의 4가지 필수 요소 (의미 기준, 키워드 매칭 아님)
+============================================================
+
+네가 최종 선택하는 Winner는 아래 4가지를
+모두 실제로 만족해야 한다.
+이것은 단어를 넣으라는 뜻이 아니라
+그 단어가 가리키는 실질을 갖추라는 뜻이다.
+
+1) CONCRETE SUBJECT (구체적 대상)
+카메라로 실제로 찍어서 보여줄 수 있는
+구체적인 사물/부위/장소여야 한다.
+"항공기", "다리", "사막 마을"처럼 카테고리 수준에서
+멈추면 안 되고, 그 안의 특정 부품/특정 지점까지
+좁혀야 한다.
+
+2) OBSERVABLE PHENOMENON (관찰 가능한 현상)
+눈으로 확인 가능한 구체적 모양/움직임/조건의
+차이여야 한다. "효율적이다", "안전하다" 같은
+평가어가 아니라 "이 부분만 이렇게 휘어 있다",
+"이 조건에서만 이렇게 움직인다"처럼
+직접 보이는 사실이어야 한다.
+
+3) SPECIFIC QUESTION (구체적 질문)
+"왜 A는 효율적/안전/최적화되어 있는가?" 형태의
+목적어 없는 추상 질문은 금지에 가깝다.
+"이 특정 부분이, 이 특정 조건에서,
+왜 이런 모양/동작을 하는가?"처럼
+질문 안에 대상의 특정 부분과 특정 조건이
+명시되어야 한다.
+
+4) SPECIFIC REVEAL (구체적 답)
+질문에 답할 때, 실제 물리적/구조적/인과적
+메커니즘까지 내려가야 한다.
+"효율성을 높이기 위해서다", "안전성을 위해서다",
+"최적화를 위해서다" 같은 일반적 목적어로
+답이 끝나면 그것은 답이 아니라 질문을 반복한 것이다.
+그 목적을 달성하기 위해 실제로 무엇이 어떻게
+작동/구성되는지 한 단계 더 내려가서 답하라.
+
+
+예시 (질문의 구체성 차이 -- 문장 자체를 베끼지 말고
+이 격차의 성격만 참고하라):
+
+나쁨: "비행기 날개는 왜 공기 흐름을 최적화할까?"
+좋음: "비행기 날개 끝은 왜 위로 꺾여 있을까?"
+
+나쁨: "하수도는 왜 효율적으로 설계될까?"
+좋음: "맨홀 뚜껑은 왜 대부분 원형일까?"
+
+나쁨: "다리는 왜 안전하게 만들어질까?"
+좋음: "다리 상판 사이의 틈은 왜 일부러 비워둘까?"
+
+나쁨: "사막 마을은 물을 어떻게 확보할까?"
+좋음: "사막의 카나트는 왜 지하에 완만한 경사를 만들었을까?"
+
+
+예시 (Reveal의 구체성 차이 -- 이 격차의 성격만 참고하라):
+
+나쁨 (일반적 목적어로 끝남):
+"공기 흐름을 최적화하기 위해서다."
+좋음 (실제 메커니즘까지 내려감):
+"날개 끝 소용돌이가 만드는 유도 항력을 줄이려고
+날개 끝을 위로 꺾어 소용돌이의 크기 자체를
+줄이기 때문이다."
+
+나쁨: "안전성을 높이기 위해서다."
+좋음: "온도 변화로 상판이 늘어나고 줄어드는 만큼의
+틈을 미리 비워 두지 않으면 상판끼리 맞부딪혀
+갈라지기 때문이다."
+
+나쁨: "효율을 높이기 위해서다."
+좋음: "뚜껑이 원형이 아니면 대각선 방향으로
+기울여 맨홀 구멍 아래로 빠뜨릴 수 있지만,
+원형은 어느 방향으로 기울여도 지름보다 커서
+구멍에 빠지지 않기 때문이다."
+
+위 예시들은 스타일 참고용이다.
+같은 대상/같은 문장을 그대로 재사용하지 말고,
+매번 새로운 대상에서 같은 수준의 구체성을 찾아라.
 
 
 ============================================================
@@ -1848,22 +1931,39 @@ _NARROWNESS_REWRITE_PROMPT = """
 더 좁고 구체적인 버전으로 다시 쓰는 역할이다.
 
 새로운 대상이나 다른 방향으로 바꾸지 마라.
-같은 대상(subject)을 유지한 채,
-아래 [REJECTION REASON]에서 지적된
-일반적인/예상 가능한 설명 대신
+반드시 같은 대상(subject)을 그대로 유지하라 --
+subject 필드(topic/angle에 들어간 핵심 대상)를
+다른 사물/장소/현상으로 바꾸면 안 된다.
 
-- 수치
-- 임계값
-- 예외
-- 조건
-- 순서
+같은 대상 안에서, 아래 [REJECTION REASON]에서
+지적된 일반적인/예상 가능한 설명 대신
+다음 중 하나의 축을 명확히 좁혀라
+("더 구체적으로 써라" 같은 막연한 지시가 아니라
+반드시 아래 중 하나를 실제로 선택해서 좁혀야 한다):
 
-중 하나 이상이 들어간
-더 좁은 Core Question과 Reveal로 다시 써라.
+- 특정 부품/부위 (전체가 아닌 그 안의 한 부분)
+- 특정 위치 (전체가 아닌 특정 지점)
+- 특정 조건 (특정 상황/환경에서만)
+- 특정 수치/임계값
+- 특정 예외 (일반 규칙이 깨지는 경우)
+- 특정 전후 차이 (달라지기 전/후의 비교)
+- 특정 관찰 가능한 모양 (눈에 보이는 구체적 형태)
+
+Reveal을 다시 쓸 때 특히 주의하라:
+"효율성", "안전성", "최적화", "성능 향상",
+"압력 감소", "안정성 향상" 같은 일반적 목적어
+하나로 문장이 끝나면 그것은 답이 아니라
+질문을 반복한 것으로 간주된다.
+그 목적을 실제로 달성하는 물리적/구조적/인과적
+메커니즘이나 조건/수치를 한 단계 더 추가해서
+Reveal을 완성하라 (이런 단어 자체를 쓰지 말라는
+뜻이 아니라, 그 단어에서 답을 멈추지 말라는 뜻이다).
 
 예:
 넓음: "비행기 날개는 왜 공기 흐름을 최적화할까?"
 좁음: "비행기 날개 끝은 왜 위로 꺾여 있을까?"
+(위 예시는 축의 성격 참고용 -- 실제 대상은
+반드시 원래 Winner의 subject를 그대로 유지하라)
 
 OUTPUT CONTRACT의 winner 객체와
 동일한 형식의 JSON 객체 하나만 반환하라
@@ -1951,6 +2051,45 @@ def _rewrite_narrower_candidate(winner, reason, *, model=MODEL):
         return None
 
 
+# Conservative, deterministic pre-check run BEFORE the expensive LLM
+# narrowness self-critique call. It only exists to catch the cheapest,
+# most obviously-generic shape of question -- "why is X efficient/safe/
+# optimized" with literally nothing else concrete in the sentence -- so
+# that shape never burns an LLM call on the full critique. It is
+# intentionally narrow: it must NEVER flag a question that names any
+# concrete part/location/condition/number, even if it also contains one
+# of the generic adjectives below. This is a supplement to, never a
+# replacement for, the real (LLM) Narrowness self-critique and Candidate
+# Gate, which remain unmodified and are still the actual gates.
+_GENERIC_BARE_QUESTION_RE = re.compile(
+    r"^[가-힣A-Za-z0-9 ]{1,12}(은|는|이|가)\s*"
+    r"왜\s*"
+    r"(효율적(?:이|인가|일까)?|"
+    r"안전(?:한가|할까|하다)?|"
+    r"최적화(?:되어|된|되는가|될까)?|"
+    r"성능이?\s*(?:좋|향상)(?:는가|되는가|될까|한가)?|"
+    r"안정적(?:인가|일까)?)\??$"
+)
+
+
+def _is_trivially_generic_question(core_question):
+    """True only for a bare "왜 효율적인가/안전한가/최적화되는가" style
+    question with no other concrete content -- see module note above the
+    regex for why this must stay conservative. Anything with extra words
+    describing a part, location, condition or number falls outside the
+    fixed-width pattern and is correctly left to the real LLM gates.
+    """
+
+    if not isinstance(core_question, str):
+        return False
+
+    text = core_question.strip()
+    if not text:
+        return False
+
+    return bool(_GENERIC_BARE_QUESTION_RE.match(text))
+
+
 def _self_critique_narrowness(winner, *, model=MODEL):
     """Cheap pre-filter before the independent, more expensive Winner Gate.
 
@@ -1970,6 +2109,19 @@ def _self_critique_narrowness(winner, *, model=MODEL):
     micro = winner.get("micro_narrative")
     if not isinstance(micro, dict):
         micro = {}
+
+    if _is_trivially_generic_question(winner.get("core_question", "")):
+        print(
+            "🪫 Narrowness pre-check: bare generic question pattern "
+            "detected -- skipping LLM self-critique call"
+        )
+        return {
+            "verdict": "TOO_BROAD",
+            "reason": (
+                "결정론적 사전 검사: Core Question이 다른 구체적 내용 "
+                "없이 '왜 효율적/안전/최적화되는가' 형태로만 되어 있습니다."
+            ),
+        }
 
     summary = (
         f"Topic: {winner.get('topic', '')}\n"
@@ -2192,6 +2344,19 @@ def explore_candidates(
             ],
         )
 
+        # Observability: the first-generation Reveal is the element run 621's
+        # rejections overwhelmingly named ("Reveal이 일반 상식 수준의 설명으로
+        # 끝나고 있어"), but it was never printed, so first-generation reveal
+        # quality could not be measured from the log at all.
+        _selected_micro = winner.get("micro_narrative")
+        if not isinstance(_selected_micro, dict):
+            _selected_micro = {}
+
+        print(
+            "Reveal:",
+            _selected_micro.get("reveal", ""),
+        )
+
         if runner_up:
 
             print(
@@ -2217,6 +2382,16 @@ def explore_candidates(
             critique.get("verdict") == "TOO_BROAD"
             and rewrite_attempts < MAX_NARROWNESS_REWRITES
         ):
+
+            if not has_budget_for_rewrite():
+                print("")
+                print("=" * 64)
+                print(
+                    "⚠️  NARROWNESS BOUNDED RECOVERY: skipped "
+                    "(API budget reserve too low) -- discarding candidate"
+                )
+                print("=" * 64)
+                break
 
             print("")
             print("=" * 64)
@@ -2245,6 +2420,18 @@ def explore_candidates(
                 continue
 
             winner = rewritten
+
+            # Observability: run 621's log printed only the ORIGINAL Winner,
+            # so a rewrite that stayed generic was indistinguishable from one
+            # that narrowed correctly and was rejected for another reason.
+            # Printing the rewritten subject/question/reveal makes the
+            # generation-quality effect of this fix measurable from the log.
+            _rewritten_micro = winner.get("micro_narrative")
+            if not isinstance(_rewritten_micro, dict):
+                _rewritten_micro = {}
+            print("🔁 Rewritten Winner:", winner.get("topic", ""))
+            print("🔁 Rewritten Question:", winner.get("core_question", ""))
+            print("🔁 Rewritten Reveal:", _rewritten_micro.get("reveal", ""))
 
             critique = _self_critique_narrowness(winner, model=model)
 

@@ -11,6 +11,7 @@ from quality.budget_guard import (
     authorize_call,
     record_usage,
     print_budget_status,
+    has_budget_for_rewrite,
 )
 
 
@@ -677,21 +678,35 @@ Candidate 하나를 같은 소재, 같은 대상 안에서
 Gate가 지적한 문제를 해결한 버전으로 다시 쓰는 역할이다.
 
 새로운 대상이나 다른 방향으로 바꾸지 마라.
-같은 대상(subject)을 유지한 채,
-아래 [GATE REJECTION REASON]에서 지적된
-너무 넓거나 일반적인 질문, 또는
+반드시 같은 대상(subject)을 그대로 유지하라 --
+subject 필드(topic/angle에 들어간 핵심 대상)를
+다른 사물/장소/현상으로 바꾸면 안 된다.
+
+같은 대상 안에서, 아래 [GATE REJECTION REASON]에서
+지적된 너무 넓거나 일반적인 질문, 또는
 구체적인 메커니즘/예상 밖 연결이 없는 Reveal 대신
+다음 중 하나의 축을 명확히 좁혀라
+("더 구체적으로 써라" 같은 막연한 지시가 아니라
+반드시 아래 중 하나를 실제로 선택해서 좁혀야 한다):
 
-- 수치
-- 임계값
-- 예외
-- 조건
-- 순서
-- 구체적인 메커니즘
-- 예상 밖의 연결
+- 특정 부품/부위 (전체가 아닌 그 안의 한 부분)
+- 특정 위치 (전체가 아닌 특정 지점)
+- 특정 조건 (특정 상황/환경에서만)
+- 특정 수치/임계값
+- 특정 예외 (일반 규칙이 깨지는 경우)
+- 특정 전후 차이 (달라지기 전/후의 비교)
+- 특정 관찰 가능한 모양 (눈에 보이는 구체적 형태)
+- 예상 밖의 인과적 연결
 
-중 하나 이상이 들어간
-더 좁고 구체적인 Core Question과 Reveal로 다시 써라.
+Reveal을 다시 쓸 때 특히 주의하라:
+"효율성", "안전성", "최적화", "성능 향상",
+"압력 감소", "안정성 향상" 같은 일반적 목적어
+하나로 문장이 끝나면 그것은 답이 아니라
+질문을 반복한 것으로 간주된다.
+그 목적을 실제로 달성하는 물리적/구조적/인과적
+메커니즘이나 조건/수치를 한 단계 더 추가해서
+Reveal을 완성하라 (이런 단어 자체를 쓰지 말라는
+뜻이 아니라, 그 단어에서 답을 멈추지 말라는 뜻이다).
 
 OUTPUT CONTRACT의 winner 객체와
 동일한 형식의 JSON 객체 하나만 반환하라
@@ -861,6 +876,16 @@ def evaluate_candidate(
         and rewrite_attempts < MAX_CANDIDATE_GATE_REWRITES
     ):
 
+        if not has_budget_for_rewrite():
+            print("")
+            print("=" * 64)
+            print(
+                "⚠️  CANDIDATE GATE BOUNDED RECOVERY: skipped "
+                "(API budget reserve too low) -- discarding candidate"
+            )
+            print("=" * 64)
+            break
+
         print("")
         print("=" * 64)
         print(
@@ -884,6 +909,16 @@ def evaluate_candidate(
             # spent. Keep the original (still REGENERATE) result so the
             # loop condition above can still try again if attempts remain.
             continue
+
+        # Observability: same reason as the Explorer-side rewrite print --
+        # run 621's log never showed what a rewrite actually produced, so a
+        # rewrite that stayed generic looked identical to one that narrowed.
+        _rewritten_micro = rewritten.get("micro_narrative")
+        if not isinstance(_rewritten_micro, dict):
+            _rewritten_micro = {}
+        print("🔁 Rewritten 소재:", rewritten.get("topic", ""))
+        print("🔁 Rewritten Question:", rewritten.get("core_question", ""))
+        print("🔁 Rewritten Reveal:", _rewritten_micro.get("reveal", ""))
 
         narrowness_ok, narrowness_reason = _narrowness_recheck_ok(
             rewritten,
