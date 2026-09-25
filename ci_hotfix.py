@@ -284,16 +284,28 @@ review_pattern = re.compile(
     r'"status":\s*)"HOLD"(,.*?"reason":\s*"Review 최대 횟수 초과",\s*\})',
     flags=re.DOTALL,
 )
+review_already_applied_pattern = re.compile(
+    r'if\s*\(\s*review_count\s*>=\s*MAX_REVIEW_ROUNDS\s*\):.*?'
+    r'"status":\s*"REGENERATE_TOPIC",.*?"reason":\s*"Review 최대 횟수 초과",\s*\}',
+    flags=re.DOTALL,
+)
 main_source, count = review_pattern.subn(
     r'\1"REGENERATE_TOPIC"\2',
     main_source,
     count=1,
 )
 if count != 1:
-    raise RuntimeError(
-        "main.py Review limit fallback 패치 대상이 정확히 1개가 아닙니다. "
-        f"(count={count})"
-    )
+    # IDEMPOTENCY_V1: a prior run of this same hotfix already flipped "HOLD"
+    # to "REGENERATE_TOPIC", so the "before" pattern no longer matches
+    # (count=0). That is success, not failure -- re-running the chain
+    # against an already-patched main.py must not raise. Only raise when
+    # the "after" shape isn't there either, which means the target block
+    # itself is genuinely missing.
+    if not (count == 0 and review_already_applied_pattern.search(main_source)):
+        raise RuntimeError(
+            "main.py Review limit fallback 패치 대상이 정확히 1개가 아닙니다. "
+            f"(count={count})"
+        )
 
 script_call_marker = """            script_data = (
                 generate_script(
@@ -339,16 +351,25 @@ script_call_replacement = """            try:
                     f"마지막 이유: {message}"
                 )
 """
-if main_source.count(script_call_marker) != 1:
-    raise RuntimeError(
-        "main.py Script Generator fallback 패치 대상이 정확히 1개가 아닙니다. "
-        f"(count={main_source.count(script_call_marker)})"
+# IDEMPOTENCY_V1: unlike this file's other patches, this one had no
+# "already applied" guard at all -- a second run always re-asserted
+# count == 1 against the pre-patch marker, which a prior run had already
+# replaced (count=0), and raised. Match the guard style used by this same
+# file's other insert-once patches: skip when the target text unique to
+# script_call_replacement is already present, and only require the
+# original marker when it is not.
+script_call_already_applied_marker = "Script 생성 가능한 Winner를 확보하지 못했습니다."
+if script_call_already_applied_marker not in main_source:
+    if main_source.count(script_call_marker) != 1:
+        raise RuntimeError(
+            "main.py Script Generator fallback 패치 대상이 정확히 1개가 아닙니다. "
+            f"(count={main_source.count(script_call_marker)})"
+        )
+    main_source = main_source.replace(
+        script_call_marker,
+        script_call_replacement,
+        1,
     )
-main_source = main_source.replace(
-    script_call_marker,
-    script_call_replacement,
-    1,
-)
 
 main_path.write_text(main_source, encoding="utf-8")
 

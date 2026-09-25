@@ -9,6 +9,9 @@ on:
       - "quality/production_hotfix_chain.py"
       - "quality/apply_production_hotfix_chain.py"
       - "quality/production_hotfix_chain_structure_regression_test.py"
+      - "quality/production_hotfix_execution_order.py"
+      - "quality/production_hotfix_execution_order_regression_test.py"
+      - "quality/ci_hotfix_idempotency_regression_test.py"
       - "quality/run_33759359725_wrapper_composition_regression_test.py"
       - "quality/final_visual_semantic_qa_regression_test.py"
       - "quality/run_33977099845_verified_still_rescue_regression_test.py"
@@ -30,6 +33,9 @@ on:
       - "quality/production_hotfix_chain.py"
       - "quality/apply_production_hotfix_chain.py"
       - "quality/production_hotfix_chain_structure_regression_test.py"
+      - "quality/production_hotfix_execution_order.py"
+      - "quality/production_hotfix_execution_order_regression_test.py"
+      - "quality/ci_hotfix_idempotency_regression_test.py"
       - "quality/run_33759359725_wrapper_composition_regression_test.py"
       - "quality/final_visual_semantic_qa_regression_test.py"
       - "quality/run_33977099845_verified_still_rescue_regression_test.py"
@@ -65,6 +71,10 @@ jobs:
           pip install -r requirements.txt
       - name: Verify production hotfix chain structure
         run: python -m quality.production_hotfix_chain_structure_regression_test
+      - name: Verify production hotfix execution order (including hidden chaining)
+        run: python -m quality.production_hotfix_execution_order_regression_test
+      - name: Verify ci_hotfix.py survives a second application (idempotency)
+        run: python -m quality.ci_hotfix_idempotency_regression_test
       - name: Apply exact production hotfix composition
         run: |
           set -euo pipefail
@@ -79,6 +89,9 @@ jobs:
           python -m py_compile \
             quality/production_hotfix_chain.py quality/apply_production_hotfix_chain.py \
             quality/production_hotfix_chain_structure_regression_test.py \
+            quality/production_hotfix_execution_order.py \
+            quality/production_hotfix_execution_order_regression_test.py \
+            quality/ci_hotfix_idempotency_regression_test.py \
             ci_run_33691170895_term_visual_subject_hotfix.py \
             ci_aviation_context_signature_compat_hotfix.py \
             ci_final_visual_semantic_qa_hotfix.py \
