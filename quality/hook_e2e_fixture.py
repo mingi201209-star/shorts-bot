@@ -169,8 +169,8 @@ BASE_SCRIPT = {
 }
 
 
-def _fixture_search_pexels_candidates(query, per_page):
-    del query, per_page
+def _fixture_search_pexels_candidates(query, per_page, provider_state=None):
+    del query, per_page, provider_state
     print("🧪 HOOK VISUAL CONTROLLED SOURCE: Pexels 7592608")
     return [copy.deepcopy(CONTROLLED_HOOK_VIDEO)]
 
@@ -245,9 +245,9 @@ def _render(script, mode):
     _LAST_HOOK_VISUAL_AUDIT = None
 
     if mode == "on":
-        original_search = hook_visual.search_pexels_candidates
+        original_search = hook_visual.search_video_candidates
         original_print = hook_visual.print_hook_visual_audit
-        hook_visual.search_pexels_candidates = _fixture_search_pexels_candidates
+        hook_visual.search_video_candidates = _fixture_search_pexels_candidates
         hook_visual._FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT = original_print
         hook_visual.print_hook_visual_audit = _capture_hook_visual_audit
 
@@ -268,7 +268,7 @@ def _render(script, mode):
         return output
     finally:
         if mode == "on":
-            hook_visual.search_pexels_candidates = original_search
+            hook_visual.search_video_candidates = original_search
             hook_visual.print_hook_visual_audit = original_print
             if hasattr(hook_visual, "_FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT"):
                 delattr(hook_visual, "_FIXTURE_ORIGINAL_PRINT_HOOK_VISUAL_AUDIT")
