@@ -653,14 +653,26 @@ def create_subtitle_clips(
     duration,
     video_clip=None,
     hook_mode=False,
+    audio_path=None,
 ):
 
-    chunks = split_subtitle_text(
-        text
+    # Prefer speech-timestamp alignment so captions follow the TTS rather
+    # than guessed scene percentages. Keep the old splitter as fail-safe.
+    aligned_chunks = []
+    if audio_path:
+        try:
+            from video.subtitle_timing import align_subtitle_chunks_to_audio
+            aligned_chunks = align_subtitle_chunks_to_audio(text, audio_path)
+        except Exception as e:
+            print(f"⚠️ TTS 자막 정렬 fallback: {e}")
+
+    chunks = (
+        [item[0] for item in aligned_chunks]
+        if aligned_chunks
+        else split_subtitle_text(text)
     )
 
     if not chunks:
-
         return []
 
     duration = float(
@@ -698,7 +710,12 @@ def create_subtitle_clips(
         zip(chunks, weights)
     ):
 
-        if idx == len(chunks) - 1:
+        if aligned_chunks:
+            aligned_start = max(0.0, min(duration, aligned_chunks[idx][1]))
+            aligned_end = max(aligned_start + 0.01, min(duration, aligned_chunks[idx][2]))
+            start = aligned_start
+            chunk_duration = aligned_end - aligned_start
+        elif idx == len(chunks) - 1:
             chunk_duration = max(
                 0.01,
                 duration - start,
@@ -736,6 +753,7 @@ def create_subtitle_clips(
             clip
         )
 
-        start += chunk_duration
+        if not aligned_chunks:
+            start += chunk_duration
 
     return clips

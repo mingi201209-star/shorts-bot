@@ -609,6 +609,7 @@ def create_scene(
                 duration,
                 video_clip=video_clip,
                 hook_mode=hook_scene_enabled,
+                audio_path=audio_path,
             )
         )
 
