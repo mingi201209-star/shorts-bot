@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import os
 from pathlib import Path
 
 from quality.canonical_subject_grounding_supply import (
@@ -101,6 +102,13 @@ def main() -> int:
     observed_topics = []
     observed_canonicals = []
 
+    # This regression primarily verifies the generic repo-owned seed identity
+    # route. Production may concurrently pin SHORTS_TOPIC, in which case the
+    # handoff correctly gives the stronger exact-fixed-topic bridge first
+    # authority. Isolate the generic walk from that ambient host input, then
+    # exercise the exact route explicitly below.
+    ambient_fixed_topic = os.environ.pop("SHORTS_TOPIC", None)
+
     # Walk the seed registry one at a time so every repo-owned deterministic seed
     # must survive the unchanged canonical gate, not merely one candidate in a pool.
     for _ in range(len(expected_topics)):
@@ -161,6 +169,48 @@ def main() -> int:
     assert spoof_diag.get("status") == "REJECT", spoof_diag
     assert not spoof_diag.get("trusted_seed_scope"), spoof_diag
     print("CASE B copied/model-authored private seed metadata cannot gain trust: PASS")
+
+    # Restore the real production fixed-topic input and prove that a repo-owned
+    # seed matching that exact topic survives through the exact-topic authority
+    # path. That path intentionally reports grounding_supply instead of
+    # trusted_seed_scope and does not depend on the generic private-ref bridge.
+    if ambient_fixed_topic is not None:
+        os.environ["SHORTS_TOPIC"] = ambient_fixed_topic
+        exact_records = [
+            record
+            for record in seed_records
+            if str((record.get("seed_candidate") or {}).get("topic") or "").strip()
+            == ambient_fixed_topic
+        ]
+        if exact_records:
+            blocked_topics = sorted(expected_topics - {ambient_fixed_topic})
+            exact_pool = grounded_seed_candidate_pool(
+                recent_topics=blocked_topics,
+                rejected_topics=[],
+                max_candidates=1,
+            )
+            assert exact_pool["status"] == "CANDIDATE_POOL", exact_pool
+            exact_candidate = exact_pool["candidates"][0]
+            assert str(exact_candidate.get("topic") or "").strip() == ambient_fixed_topic
+            exact_result = _handoff(exact_candidate)
+            assert exact_result["status"] == "SELECTED", exact_result
+            exact_trace = exact_result.get("_candidate_pool_handoff") or {}
+            exact_diag = (exact_trace.get("diagnostics") or [{}])[0]
+            exact_supply = exact_diag.get("grounding_supply") or {}
+            expected_exact_canonical = str(
+                exact_records[0].get("canonical_subject") or ""
+            ).strip()
+            assert exact_supply.get("status") == "EXACT_FIXED_TOPIC_SEED", exact_diag
+            assert exact_supply.get("canonical_subject") == expected_exact_canonical, exact_diag
+            exact_winner = exact_result.get("winner") or {}
+            assert exact_winner.get("canonical_subject") == expected_exact_canonical
+            assert exact_winner.get("_trusted_grounding_evidence")
+            print(
+                "CASE B2 ambient fixed topic uses exact repo-owned seed authority: "
+                f"PASS canonical={expected_exact_canonical}"
+            )
+    else:
+        os.environ.pop("SHORTS_TOPIC", None)
 
     # Run 34710062143 exposed an integration-only failure: production imports the
     # installer rather than executing it as a script. Lock that composition path so

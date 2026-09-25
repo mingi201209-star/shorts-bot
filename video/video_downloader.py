@@ -10,6 +10,10 @@ from config import (
     PEXELS_RELEVANT_TOP_N,
     PEXELS_MIN_DURATION,
 )
+from quality.visual_semantic_contract import (
+    contract_requires_visual_evidence,
+    evaluate_visual_semantic_contract,
+)
 
 
 PEXELS_VIDEO_API = "https://api.pexels.com/v1/videos/search"
@@ -94,6 +98,18 @@ HUMAN_CENTRIC_SLUG_TERMS = {
 # 일반 인프라 검색에서 핵심 피사체가 fallback/후보 선택 중 사라지는 것을 막는다.
 # canonical 단어는 fallback 검색어에 남기고, aliases는 Pexels page slug 매칭에 쓴다.
 SUBJECT_ANCHOR_GROUPS = {
+    "aircraft": {
+        "aircraft", "airplane", "airplanes", "plane", "planes", "aviation", "jet",
+    },
+    "wing": {
+        "wing", "wings", "winglet", "winglets", "wingtip", "wingtips",
+    },
+    "bridge": {
+        "bridge", "bridges",
+    },
+    "damper": {
+        "damper", "dampers", "pendulum",
+    },
     "road": {
         "road", "roads", "street", "streets", "highway", "highways",
         "motorway", "motorways", "asphalt",
@@ -320,6 +336,26 @@ def _candidate_matches_subject_anchor(candidate, query):
     return False
 
 
+def _candidate_satisfies_visual_semantic_contract(candidate, query):
+    scene = {
+        "text": query,
+        "visual_goal": query,
+        "keyword": query,
+    }
+    metadata = " ".join(
+        str(candidate.get(key) or "")
+        for key in (
+            "query", "page_url", "thumbnail", "title", "tags", "source_id", "id"
+        )
+    )
+    selection = {
+        "metadata": metadata,
+        "source_id": candidate.get("source_id", candidate.get("id")),
+        "provider": candidate.get("provider", "pexels"),
+    }
+    return evaluate_visual_semantic_contract(scene, selection)
+
+
 def _is_nature_object_query(query):
     return contains_any_term(
         query,
@@ -524,6 +560,36 @@ def choose_best_candidate(
                     f"{','.join(subject_anchors)} metadata match 없음 -> "
                     "원래 관련도 후보를 사용합니다."
                 )
+
+    if (
+        not historical
+        and subject_filter_query
+        and contract_requires_visual_evidence(subject_filter_query)
+    ):
+        before_count = len(ordered)
+        semantic_safe = []
+        for item in ordered:
+            result = _candidate_satisfies_visual_semantic_contract(
+                item,
+                subject_filter_query,
+            )
+            if result.get("pass"):
+                semantic_safe.append(item)
+
+        if semantic_safe:
+            removed_count = before_count - len(semantic_safe)
+            if removed_count > 0:
+                print(
+                    "🧭 Phenomenon visual filter: "
+                    f"generic/wrong-action clips excluded ({removed_count}/{before_count})"
+                )
+            ordered = semantic_safe
+        else:
+            print(
+                "🛑 Phenomenon visual filter: "
+                f"no candidate shows required action/evidence for {subject_filter_query}"
+            )
+            return None
 
     relevant_pool = ordered[:max(1, int(relevant_top_n))]
     if not relevant_pool:

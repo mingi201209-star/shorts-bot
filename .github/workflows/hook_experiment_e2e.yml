@@ -40,6 +40,7 @@ jobs:
           python ci_hook_pool_guard_hotfix.py
           python ci_retention_hotfix.py
           python ci_hook_e2e_contract_hotfix.py
+          python ci_video_provider_hotfix.py
           grep -n '"+13%"' config.py
           grep -n "HOOK_GENERATION_COUNT\|speech_style_failure\|cumulative_scoring_pool_count" content/hook_experiment.py
           grep -n "SCRIPT GENERATION FAILED" main.py
@@ -71,6 +72,7 @@ jobs:
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           ENABLE_HOOK_EXPERIMENT: "0"
           V3_MAX_API_CALLS: "30"
           V3_MAX_COST_USD: "0.03"
@@ -165,6 +167,7 @@ jobs:
           python ci_hook_pool_guard_hotfix.py
           python ci_retention_hotfix.py
           python ci_hook_e2e_contract_hotfix.py
+          python ci_video_provider_hotfix.py
           grep -n '"+13%"' config.py
           grep -n "HOOK_GENERATION_COUNT\|speech_style_failure\|cumulative_scoring_pool_count" content/hook_experiment.py
           grep -n "SCRIPT GENERATION FAILED" main.py
@@ -196,6 +199,7 @@ jobs:
         env:
           OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           ENABLE_HOOK_EXPERIMENT: "1"
           V3_MAX_API_CALLS: "35"
           V3_MAX_COST_USD: "0.04"

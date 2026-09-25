@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
 REPORT_PATH = Path("visual_diversity_preflight.json")
 HARD_REPEAT_COUNT = 3
+MAX_CONTINUOUS_SOURCE_SECONDS = 6.0
+MAX_STATIC_LIKE_SECONDS = 4.0
+MEANINGFUL_BEAT_SECONDS = 4.0
+FIRST5_MIN_MEANINGFUL_BEATS = 2
 NON_INFORMATION_ROLES = {"transition", "atmosphere"}
 SUPPORTED_TRANSFORMS = {"WINGLET_FLOW", "WINGLET_VORTEX", "WINGLET_RESULT"}
+NON_MEANINGFUL_MOTION = {"zoom", "crop", "small_pan", "slow_zoom", "slow_pan"}
 
 
 def _norm(value):
@@ -65,6 +71,86 @@ def _member(idx, scene, item, asset_id):
         "variant": _variant(scene, item),
         "asset_id": asset_id,
     }
+
+
+def _duration(item):
+    try:
+        return max(0.0, float((item or {}).get("duration", 0) or 0))
+    except Exception:
+        return 0.0
+
+
+def _motion_profile(item):
+    return _norm((item or {}).get("motion_profile")).replace("-", "_")
+
+
+def _meaningful_visual_signature(scene, item):
+    asset = physical_asset_identity(item)
+    template = _template(item)
+    presentation = _norm((item or {}).get("presentation_variant"))
+    mode = _norm((item or {}).get("mode") or (item or {}).get("provider"))
+    motion = _motion_profile(item)
+    if motion in NON_MEANINGFUL_MOTION:
+        motion = ""
+    return "|".join(part for part in (asset, template, presentation, mode, motion) if part)
+
+
+def _timeline_entries(scenes, lineage):
+    by_index = {int(x.get("scene_index", -1)): dict(x or {}) for x in list(lineage or [])}
+    entries = []
+    cursor = 0.0
+    for idx, scene in enumerate(scenes):
+        item = by_index.get(idx, {})
+        duration = _duration(item)
+        end = cursor + duration
+        entries.append({
+            "scene_index": idx,
+            "human_scene_number": idx + 1,
+            "role": _role(scene),
+            "duration": duration,
+            "start_sec": cursor,
+            "end_sec": end,
+            "asset_id": physical_asset_identity(item),
+            "signature": _meaningful_visual_signature(scene, item),
+            "motion_profile": _motion_profile(item),
+        })
+        cursor = end
+    return entries
+
+
+def _same_continuous_source_groups(entries):
+    groups = []
+    current = []
+    for entry in entries:
+        if entry["role"] in NON_INFORMATION_ROLES or not entry["asset_id"]:
+            if current:
+                groups.append(current)
+                current = []
+            continue
+        if current and entry["asset_id"] != current[-1]["asset_id"]:
+            groups.append(current)
+            current = []
+        current.append(entry)
+    if current:
+        groups.append(current)
+    return groups
+
+
+def _meaningful_beat_count(entries, *, until_sec=None):
+    previous = None
+    count = 0
+    for entry in entries:
+        if entry["role"] in NON_INFORMATION_ROLES:
+            continue
+        if until_sec is not None and entry["start_sec"] >= until_sec:
+            break
+        signature = entry["signature"]
+        if not signature:
+            continue
+        if signature != previous:
+            count += 1
+            previous = signature
+    return count
 
 
 def _append_group(groups, group_id, members, *, group_type):
@@ -139,10 +225,74 @@ def evaluate_visual_diversity(scenes, lineage):
         "count": len(indexes),
         "severity": "warning",
     } for text, indexes in information_groups.items() if len(indexes) >= 2]
+    timeline = _timeline_entries(scenes, lineage)
+    total_duration = sum(entry["duration"] for entry in timeline)
+    meaningful_beats = _meaningful_beat_count(timeline)
+    required_beats = (
+        int(math.ceil(total_duration / MEANINGFUL_BEAT_SECONDS))
+        if total_duration > 0
+        else 0
+    )
+    first5_beats = _meaningful_beat_count(timeline, until_sec=5.0)
+
+    for continuous in _same_continuous_source_groups(timeline):
+        duration = sum(entry["duration"] for entry in continuous)
+        if duration > MAX_CONTINUOUS_SOURCE_SECONDS:
+            hard_failure = True
+            groups.append({
+                "asset_id": continuous[0]["asset_id"],
+                "group_type": "continuous_source_duration",
+                "scene_indices": [entry["scene_index"] for entry in continuous],
+                "human_scene_numbers": [entry["human_scene_number"] for entry in continuous],
+                "duration": duration,
+                "max_duration": MAX_CONTINUOUS_SOURCE_SECONDS,
+                "severity": "high",
+                "members": continuous,
+            })
+        if len(continuous) == 1 and duration > MAX_STATIC_LIKE_SECONDS:
+            motion = continuous[0].get("motion_profile")
+            if not motion or motion in NON_MEANINGFUL_MOTION:
+                hard_failure = True
+                groups.append({
+                    "asset_id": continuous[0]["asset_id"],
+                    "group_type": "static_like_duration",
+                    "scene_indices": [continuous[0]["scene_index"]],
+                    "human_scene_numbers": [continuous[0]["human_scene_number"]],
+                    "duration": duration,
+                    "max_duration": MAX_STATIC_LIKE_SECONDS,
+                    "severity": "high",
+                    "members": continuous,
+                })
+
+    beat_failures = []
+    if total_duration > 0 and meaningful_beats < required_beats:
+        hard_failure = True
+        beat_failures.append({
+            "type": "insufficient_meaningful_visual_beats",
+            "count": meaningful_beats,
+            "required": required_beats,
+            "severity": "high",
+        })
+    if total_duration >= 5.0 and first5_beats < FIRST5_MIN_MEANINGFUL_BEATS:
+        hard_failure = True
+        beat_failures.append({
+            "type": "insufficient_first5_visual_change",
+            "count": first5_beats,
+            "required": FIRST5_MIN_MEANINGFUL_BEATS,
+            "severity": "high",
+        })
     return {
         "pass": not hard_failure,
         "hard_repeat_count": HARD_REPEAT_COUNT,
+        "max_continuous_source_seconds": MAX_CONTINUOUS_SOURCE_SECONDS,
+        "max_static_like_seconds": MAX_STATIC_LIKE_SECONDS,
+        "total_duration": total_duration,
+        "meaningful_visual_beats": meaningful_beats,
+        "required_meaningful_visual_beats": required_beats,
+        "first5_meaningful_visual_beats": first5_beats,
+        "first5_required_meaningful_visual_beats": FIRST5_MIN_MEANINGFUL_BEATS,
         "repetition_groups": groups,
+        "beat_failures": beat_failures,
         "information_beat_repetition": information,
         "capability_exhausted": False,
     }

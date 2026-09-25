@@ -101,6 +101,25 @@ def run():
         trusted_records=records,
     ) is None
 
+    # Run 35413574652 counterexample now has an explicit repo-owned wing-flex
+    # seed. Exact fixed-topic binding must resolve that one record and must not
+    # generically rebound the Candidate to another aircraft component.
+    wing_flex_topic = "비행기 날개는 하중을 받으면 왜 휘고 비틀릴까?"
+    wing_flex = deepcopy(candidate)
+    wing_flex["topic"] = wing_flex_topic
+    wing_flex["core_question"] = "비행기 날개가 하중을 받을 때 왜 휘고 비틀리는가?"
+    wing_flex["micro_narrative"]["core_question"] = wing_flex["core_question"]
+    wing_flex_supply = supply_exact_fixed_topic_seed_grounding(
+        wing_flex,
+        wing_flex_topic,
+        trusted_records=records,
+    )
+    assert wing_flex_supply is not None
+    supplied_wing_flex, wing_flex_record = wing_flex_supply
+    assert wing_flex_record["canonical_subject"] == "aircraft wing structure under aerodynamic load"
+    assert supplied_wing_flex["canonical_subject"] == "aircraft wing structure under aerodynamic load"
+    assert supplied_wing_flex.get("_trusted_grounding_evidence")
+
     duplicate_records = tuple(records) + (deepcopy(resolved),)
     assert exact_fixed_topic_seed_record(
         candidate,
@@ -117,6 +136,10 @@ def run():
     assert "supply_exact_fixed_topic_seed_grounding(" in main_source
     assert '_prewriter_os.environ.get("SHORTS_TOPIC", "")' in main_source
     assert "source=exact_fixed_topic_seed" in main_source
+    assert "RUN_35413574652_FIXED_TOPIC_FALSE_GROUNDING_GUARD" in main_source
+    assert "source=fixed_topic_existing_grounding_only" in main_source
+    assert "elif fixed_topic_candidate and repo_seed_record is None:" in main_source
+    assert "supplied = dict(candidate)" in main_source
     assert "candidate.clear()" in main_source
     assert "candidate.update(supplied)" in main_source
     assert main_source.index("# CANONICAL_SUBJECT_GROUNDING_GATE_V1") < main_source.index(

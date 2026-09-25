@@ -159,7 +159,10 @@ jobs:
             quality/cross_process_video_dedupe_regression_test.py \
             quality/script_v2_gunggeum_formal_ending_regression_test.py \
             quality/visual_diversity_preflight.py quality/visual_diversity_context.py \
-            quality/visual_diversity_preflight_regression_test.py quality/qa_render_artifact_regression_test.py \
+            quality/visual_semantic_contract.py quality/visual_diversity_preflight_regression_test.py \
+            quality/visual_quality_production_gate_regression_test.py quality/qa_render_artifact_regression_test.py \
+            quality/production_execution_trace.py quality/production_execution_trace_compare.py \
+            quality/production_execution_trace_regression_test.py \
             main.py config.py content/candidate_explorer.py content/candidate_recovery.py content/script_generator.py content/hook_experiment.py \
             integrations/tts.py quality/consensus.py quality/rewrite_engine.py quality/explanation_judge.py quality/korean_speech_style.py \
             quality/first5_visual_contract.py quality/final_render_integrity.py \
@@ -172,6 +175,8 @@ jobs:
 
           python quality/final_render_integrity_regression_test.py
           python quality/final_visual_semantic_qa_regression_test.py
+          python quality/visual_quality_production_gate_regression_test.py
+          python quality/production_execution_trace_regression_test.py
           python quality/fixed_topic_gate_feedback_regression_test.py
           python quality/candidate_grounded_recovery_regression_test.py
           python quality/cross_process_video_dedupe_regression_test.py
@@ -235,6 +240,8 @@ jobs:
             artifacts/diagnostics/traceback.txt
             artifacts/diagnostics/progress.json
             artifacts/diagnostics/scene_trace.jsonl
+            artifacts/diagnostics/production_execution_trace.jsonl
+            artifacts/diagnostics/production_execution_trace_summary.json
             visual_diversity_preflight.json
             final_director_qa.json
           if-no-files-found: warn
@@ -267,6 +274,8 @@ jobs:
             artifacts/diagnostics/traceback.txt
             artifacts/diagnostics/progress.json
             artifacts/diagnostics/scene_trace.jsonl
+            artifacts/diagnostics/production_execution_trace.jsonl
+            artifacts/diagnostics/production_execution_trace_summary.json
           if-no-files-found: warn
           retention-days: 30
 
@@ -279,6 +288,8 @@ jobs:
             final_visual_semantic_qa.json
             final_director_qa.json
             visual_diversity_preflight.json
+            artifacts/diagnostics/production_execution_trace.jsonl
+            artifacts/diagnostics/production_execution_trace_summary.json
           if-no-files-found: error
           retention-days: 30
 

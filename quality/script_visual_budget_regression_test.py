@@ -76,9 +76,9 @@ def run():
     production = {
         "scenes": [
             scene(vortex_text, "압력 차와 소용돌이의 관계", "aircraft wing vortex stage 9", "consequence"),
-            scene(result_text, "비행기의 연비 개선", "aircraft wing fuel efficiency stage 10", "consequence"),
+            scene(result_text, "비행기 윙렛과 연비 개선의 관계", "aircraft winglet fuel efficiency stage 10", "consequence"),
             scene(vortex_text, "비행기 날개 끝의 꺾인 형태", "aircraft wing wingtip design stage 11", "reveal"),
-            scene(result_text, "비행기 날개 끝의 꺾인 형태", "aircraft wing wingtip question stage 12", "payoff"),
+            scene(result_text, "보호된 원래 결과 화면", "aircraft result question stage 12", "payoff"),
         ]
     }
     production_result = compact_duplicate_visual_demand(production)
@@ -88,7 +88,7 @@ def run():
     assert production_result["scenes"][1]["text"] == result_text
     # CASE 2/3/11/12/13: protected payoff survives, narration is unchanged, and
     # the existing WINGLET_RESULT-compatible visual contract is inherited.
-    assert production_result["scenes"][1]["visual_goal"] == "비행기의 연비 개선"
+    assert production_result["scenes"][1]["visual_goal"] == "비행기 윙렛과 연비 개선의 관계"
     assert "fuel efficiency" in production_result["scenes"][1]["keyword"]
     assert production_result["script_visual_budget"]["removed_duplicate_count"] == 2
     assert production_result["script_visual_budget"]["visual_contract_inheritance_count"] == 1
@@ -112,8 +112,8 @@ def run():
         "scenes": [
             scene(
                 result_text,
-                "비행기의 연비 개선",
-                "aircraft wing fuel efficiency",
+                "비행기 윙렛과 연비 개선의 관계",
+                "aircraft winglet fuel efficiency",
                 "consequence",
                 fact_id="fact-a",
             ),
