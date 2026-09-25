@@ -19,7 +19,7 @@ accidental copy of some hotfix later -- and separately confirms both
 workflow files actually invoke the shared runner rather than a
 re-hard-coded list.
 
-IMPORTANT: the "exactly 48 entries, exactly one intentional duplicate"
+IMPORTANT: the "exactly 49 entries, exactly one intentional duplicate"
 shape asserted here is a PRE-CONSOLIDATION invariant, not a permanent
 production requirement. Publish Engine Stabilization V1's Phase 3 absorbs
 these hotfixes into checked-in source, which shrinks this list by design.
@@ -33,7 +33,7 @@ from quality.production_hotfix_chain import PRODUCTION_HOTFIX_CHAIN
 
 ROOT = Path(__file__).resolve().parents[1]
 
-_EXPECTED_LENGTH = 48
+_EXPECTED_LENGTH = 49
 _EXPECTED_DUPLICATE = "ci_aviation_context_signature_compat_hotfix.py"
 _EXPECTED_DUPLICATE_FIRST_INDEX = 13
 

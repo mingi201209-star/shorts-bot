@@ -11,6 +11,11 @@ on:
       - "quality/production_hotfix_chain_structure_regression_test.py"
       - "quality/run_33759359725_wrapper_composition_regression_test.py"
       - "quality/final_visual_semantic_qa_regression_test.py"
+      - "quality/visual_quality_production_gate_regression_test.py"
+      - "quality/visual_semantic_contract.py"
+      - "quality/production_execution_trace.py"
+      - "quality/production_execution_trace_compare.py"
+      - "quality/production_execution_trace_regression_test.py"
       - "quality/run_33977099845_verified_still_rescue_regression_test.py"
       - "quality/production_model_routing_composition_regression_test.py"
       - "quality/run_34672661458_hook_floor_feedback_regression_test.py"
@@ -19,6 +24,7 @@ on:
       - "video/video_engine.py"
       - "video/still_image_fallback.py"
       - "quality/visual_diversity_preflight.py"
+      - "quality/final_render_integrity.py"
       - "content/**"
       - "main.py"
       - "config.py"
@@ -32,6 +38,11 @@ on:
       - "quality/production_hotfix_chain_structure_regression_test.py"
       - "quality/run_33759359725_wrapper_composition_regression_test.py"
       - "quality/final_visual_semantic_qa_regression_test.py"
+      - "quality/visual_quality_production_gate_regression_test.py"
+      - "quality/visual_semantic_contract.py"
+      - "quality/production_execution_trace.py"
+      - "quality/production_execution_trace_compare.py"
+      - "quality/production_execution_trace_regression_test.py"
       - "quality/run_33977099845_verified_still_rescue_regression_test.py"
       - "quality/production_model_routing_composition_regression_test.py"
       - "quality/run_34672661458_hook_floor_feedback_regression_test.py"
@@ -40,6 +51,7 @@ on:
       - "video/video_engine.py"
       - "video/still_image_fallback.py"
       - "quality/visual_diversity_preflight.py"
+      - "quality/final_render_integrity.py"
       - "content/**"
       - "main.py"
       - "config.py"
@@ -90,10 +102,16 @@ jobs:
             ci_run_34672661458_hook_floor_feedback_hotfix.py \
             quality/run_33759359725_wrapper_composition_regression_test.py \
             quality/final_visual_semantic_qa_regression_test.py \
+            quality/visual_quality_production_gate_regression_test.py \
+            quality/production_execution_trace.py \
+            quality/production_execution_trace_compare.py \
+            quality/production_execution_trace_regression_test.py \
             quality/run_33977099845_verified_still_rescue_regression_test.py \
             quality/production_model_routing_composition_regression_test.py \
             quality/run_34672661458_hook_floor_feedback_regression_test.py \
+            quality/visual_semantic_contract.py \
             quality/visual_diversity_preflight.py \
+            quality/final_render_integrity.py \
             video/still_image_fallback.py \
             video/video_downloader.py \
             video/video_engine.py \
@@ -105,7 +123,10 @@ jobs:
         env:
           AI_VISUAL_FALLBACK_ENABLED: "false"
           AI_MAX_GENERATIONS_PER_VIDEO: "1"
-        run: python quality/final_visual_semantic_qa_regression_test.py
+        run: |
+          python quality/final_visual_semantic_qa_regression_test.py
+          python quality/visual_quality_production_gate_regression_test.py
+          python quality/production_execution_trace_regression_test.py
       - name: Run 33977099845 verified still rescue regression
         env:
           AI_VISUAL_FALLBACK_ENABLED: "false"

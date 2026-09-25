@@ -33,7 +33,7 @@ required behavior, not a bug; see the ordering comment inline below and
 `quality/production_hotfix_chain_structure_regression_test.py`, which
 asserts this exact shape.
 
-IMPORTANT -- this "exactly 48 entries, exactly one intentional duplicate"
+IMPORTANT -- this "exactly 49 entries, exactly one intentional duplicate"
 shape is a PRE-CONSOLIDATION invariant, not a permanent production
 requirement. Publish Engine Stabilization V1's Phase 3 absorbs these
 hotfixes into checked-in source, which shrinks this list by design. When
@@ -91,6 +91,7 @@ PRODUCTION_HOTFIX_CHAIN = [
     "ci_run_34847558126_fixed_topic_novelty_weak_domain_hotfix.py",
     "ci_script_v2_gunggeum_formal_ending_hotfix.py",
     "ci_final_visual_semantic_qa_hotfix.py",
+    "ci_visual_diversity_preflight_hotfix.py",
     "ci_cross_process_video_dedupe_hotfix.py",
     # Must run after ci_cross_process_video_dedupe_hotfix.py: it chains in
     # ci_grounded_keyword_contract_hotfix.py, and this hotfix wraps that
@@ -103,5 +104,5 @@ PRODUCTION_HOTFIX_CHAIN = [
     "ci_grounded_deterministic_explanation_hotfix.py",
     # Some later production hotfixes rewrite candidate_explorer wrappers.
     # Re-apply the compatibility patch against the FINAL production state.
-    "ci_aviation_context_signature_compat_hotfix.py",  # index 47 (last): second, intentional application
+    "ci_aviation_context_signature_compat_hotfix.py",  # index 48 (last): second, intentional application
 ]

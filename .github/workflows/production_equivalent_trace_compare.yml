@@ -1,0 +1,142 @@
+name: Production Equivalent Trace Compare
+
+on:
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: "Fixed production topic used for both executions"
+        required: true
+        type: string
+      candidate_scope:
+        description: "Optional candidate scope used for both executions"
+        required: false
+        default: ""
+        type: string
+      expected_sha:
+        description: "Optional exact SHA to verify before running"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  trace-compare:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Verify expected SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          DISPATCH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$EXPECTED_SHA" ]; then
+            echo "No expected_sha supplied; using dispatch SHA $DISPATCH_SHA"
+            exit 0
+          fi
+          test "${#EXPECTED_SHA}" -eq 40
+          case "$EXPECTED_SHA" in *[!0-9a-fA-F]*) exit 1;; esac
+          if [ "$DISPATCH_SHA" != "$EXPECTED_SHA" ]; then
+            echo "Dispatch SHA mismatch: github.sha=$DISPATCH_SHA expected=$EXPECTED_SHA"
+            exit 1
+          fi
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_sha || github.sha }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-noto-cjk rsync
+          ffmpeg -version
+          fc-cache -f -v
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run production-equivalent execution twice
+        env:
+          OPENAI_KEY: ${{ secrets.OPENAI_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          V3_JUDGE_MODEL: gpt-4o-mini
+          V3_MAX_API_CALLS: "60"
+          V3_MAX_COST_USD: "0.05"
+          ENABLE_HOOK_EXPERIMENT: "1"
+          AI_VISUAL_FALLBACK_ENABLED: "false"
+          AI_MAX_GENERATIONS_PER_VIDEO: "1"
+          AI_VISUAL_MODEL: sora-2
+          AI_VISUAL_SECONDS: "4"
+          AI_VISUAL_SIZE: "720x1280"
+          SHORTS_TOPIC: ${{ inputs.topic }}
+          SHORTS_CANDIDATE_SCOPE: ${{ inputs.candidate_scope }}
+          ENABLE_YOUTUBE_UPLOAD: "0"
+        run: |
+          set -euo pipefail
+          python -m quality.production_hotfix_chain_structure_regression_test
+
+          run_once() {
+            local label="$1"
+            local work="production-equivalent-${label}"
+            local diag="../production-trace-${label}"
+            mkdir -p "$work"
+            rsync -a \
+              --exclude ".git" \
+              --exclude "production-equivalent-run1" \
+              --exclude "production-equivalent-run2" \
+              --exclude "production-trace-run1" \
+              --exclude "production-trace-run2" \
+              ./ "$work"/
+            pushd "$work"
+            export SHORTS_DIAGNOSTICS_DIR="$diag"
+            export SHORTS_TRACE_RUN_LABEL="$label"
+            export GITHUB_SHA="${GITHUB_SHA}"
+            python quality/apply_production_hotfix_chain.py
+            python -m diagnostics.runner
+            popd
+          }
+
+          run_once run1
+          run_once run2
+
+      - name: Compare production-equivalent traces
+        run: |
+          python -m quality.production_execution_trace_compare \
+            production-trace-run1/production_execution_trace_summary.json \
+            production-trace-run2/production_execution_trace_summary.json \
+            production-equivalent-trace-compare.json
+
+      - name: Preserve production-equivalent trace artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-equivalent-trace-compare-${{ github.run_id }}-${{ github.sha }}
+          path: |
+            production-equivalent-trace-compare.json
+            production-trace-run1/**
+            production-trace-run2/**
+            production-equivalent-run1/final_shorts_*.mp4
+            production-equivalent-run1/final_visual_semantic_qa.json
+            production-equivalent-run1/visual_diversity_preflight.json
+            production-equivalent-run1/final_director_qa.json
+            production-equivalent-run2/final_shorts_*.mp4
+            production-equivalent-run2/final_visual_semantic_qa.json
+            production-equivalent-run2/visual_diversity_preflight.json
+            production-equivalent-run2/final_director_qa.json
+          if-no-files-found: warn
+          retention-days: 30
